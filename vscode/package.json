@@ -1,0 +1,73 @@
+{
+  "name": "codecast",
+  "displayName": "Codecast",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.76.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codecast-view-container",
+          "title": "Codecast",
+          "icon": "resources/dep.svg"
+        }
+      ]
+    },
+    "views": {
+      "codecast-view-container": [
+        {
+          "type": "webview",
+          "id": "codecast-view",
+          "name": "Codecast"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "codecast.record",
+        "title": "Codecast: start recording"
+      },
+      {
+        "command": "codecast.stop_recording",
+        "title": "Codecast: stop recording"
+      },
+      {
+        "command": "codecast.save_recording",
+        "title": "Codecast: save recording"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.0.1",
+    "@types/lodash": "^4.14.191",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.76.0",
+    "@typescript-eslint/eslint-plugin": "^5.49.0",
+    "@typescript-eslint/parser": "^5.49.0",
+    "@vscode/test-electron": "^2.2.2",
+    "eslint": "^8.33.0",
+    "glob": "^8.1.0",
+    "mocha": "^10.1.0",
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "lodash": "^4.17.21",
+    "moment": "^2.29.4"
+  }
+}
