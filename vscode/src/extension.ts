@@ -2,7 +2,7 @@ import Codecast from './codecast';
 import _ from 'lodash';
 import * as vscode from 'vscode';
 
-let codecast: Codecast | undefined;
+let codecast: Codecast;
 
 export function activate(context: vscode.ExtensionContext) {
   codecast = new Codecast(context);

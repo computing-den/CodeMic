@@ -1,8 +1,7 @@
 import * as misc from './misc';
-import * as T from './types';
+import * as ir from './internal_representation';
 import * as vscode from 'vscode';
 import _ from 'lodash';
-import * as fs from 'fs';
 import path from 'path';
 import moment from 'moment';
 
@@ -15,10 +14,10 @@ export default class Recorder {
   // git: GitAPI;
   // repo?: Repository;
   scrolling: boolean = false;
-  scrollStartRange: vscode.Range | undefined;
+  scrollStartRange?: vscode.Range;
   // workdir: string = '';
-  events: T.Event[] = [];
   isRecording: boolean = false;
+  session: ir.Session = new ir.Session();
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
@@ -26,32 +25,29 @@ export default class Recorder {
 
     // listen for open document events
     {
-      const disposable = vscode.workspace.onDidOpenTextDocument(document => {
-        if (this.shouldRecordDocument(document)) {
-          this.pushEvent(this.makeOpenDocumentEvent(document));
+      const disposable = vscode.workspace.onDidOpenTextDocument(vscTextDocument => {
+        if (this.shouldRecordDocument(vscTextDocument)) {
+          this.openDocument(vscTextDocument);
         }
       });
-
       this.disposables.push(disposable);
     }
 
     // listen for show document events
     {
-      const disposable = vscode.window.onDidChangeActiveTextEditor(textEditor => {
-        if (textEditor && this.shouldRecordDocument(textEditor.document)) {
-          this.pushEvent(this.makeShowDocumentEvent(textEditor));
+      const disposable = vscode.window.onDidChangeActiveTextEditor(vscTextEditor => {
+        if (vscTextEditor && this.shouldRecordDocument(vscTextEditor.document)) {
+          this.showTextEditor(vscTextEditor);
         }
       });
-
       this.disposables.push(disposable);
     }
 
     // listen for text change events
     {
       const disposable = vscode.workspace.onDidChangeTextDocument(e => {
-        if (!this.shouldRecordDocument(e.document)) return;
-        for (const change of e.contentChanges) {
-          this.pushEvent(this.makeTextChangeEvent(e.document, change));
+        if (this.shouldRecordDocument(e.document)) {
+          this.textChange(e.document, e.contentChanges);
         }
       });
       this.disposables.push(disposable);
@@ -60,21 +56,21 @@ export default class Recorder {
     // listen for selection change events
     {
       const disposable = vscode.window.onDidChangeTextEditorSelection(e => {
-        // console.log('XXX', e.selections);
-        if (!this.shouldRecordDocument(e.textEditor.document)) return;
-
-        // checking for e.kind !== TextEditorSelectionChangeKind.Keyboard isn't helpful
-        // because shift+arrow keys would trigger this event kind
-        this.pushEvent(this.makeSelectionEvent(e.textEditor, e.selections));
+        if (this.shouldRecordDocument(e.textEditor.document)) {
+          // checking for e.kind !== TextEditorSelectionChangeKind.Keyboard isn'ir helpful
+          // because shift+arrow keys would trigger this event kind
+          this.select(e.textEditor, e.selections);
+        }
       });
       this.disposables.push(disposable);
     }
 
     // listen for save events
     {
-      const disposable = vscode.workspace.onDidSaveTextDocument(document => {
-        if (!this.shouldRecordDocument(document)) return;
-        this.pushEvent(this.makeSaveEvent(document));
+      const disposable = vscode.workspace.onDidSaveTextDocument(vscTextDocument => {
+        if (this.shouldRecordDocument(vscTextDocument)) {
+          this.saveTextDocument(vscTextDocument);
+        }
       });
       this.disposables.push(disposable);
     }
@@ -82,162 +78,190 @@ export default class Recorder {
     // listen for scroll events
     {
       const disposable = vscode.window.onDidChangeTextEditorVisibleRanges(e => {
-        if (!this.shouldRecordDocument(e.textEditor.document)) return;
+        if (this.shouldRecordDocument(e.textEditor.document)) {
+          const vr = e.visibleRanges[0];
 
-        const vr = e.visibleRanges[0];
-
-        if (!this.scrolling) {
-          this.scrollStartRange ??= vr;
-          const delta = Math.abs(vr.start.line - this.scrollStartRange.start.line);
-          if (delta > SCROLL_LINES_TRIGGER) {
-            this.scrolling = true;
+          if (!this.scrolling) {
+            this.scrollStartRange ??= vr;
+            const delta = Math.abs(vr.start.line - this.scrollStartRange.start.line);
+            if (delta > SCROLL_LINES_TRIGGER) {
+              this.scrolling = true;
+            }
           }
-        }
 
-        if (this.scrolling) {
-          this.pushEvent(this.makeScrollEvent(e.textEditor, vr));
+          if (this.scrolling) {
+            this.scroll(e.textEditor, vr);
+          }
         }
       });
       this.disposables.push(disposable);
     }
 
-    // register disposables and start recording
+    // register disposables
     this.context.subscriptions.push(...this.disposables);
 
-    // insert events to open all the documents currently open in the workspace
+    // open all the documents currently open in the workspace
     {
-      for (const document of vscode.workspace.textDocuments) {
-        if (this.shouldRecordDocument(document)) {
-          this.pushEvent(this.makeOpenDocumentEvent(document));
+      for (const vscTextDocument of vscode.workspace.textDocuments) {
+        if (this.shouldRecordDocument(vscTextDocument)) {
+          this.openDocument(vscTextDocument);
         }
       }
     }
 
-    // insert event to show the currectly active document
+    // show the currectly active text editor
     {
-      const textEditor = vscode.window.activeTextEditor;
-      if (textEditor && this.shouldRecordDocument(textEditor.document)) {
-        this.pushEvent(this.makeShowDocumentEvent(textEditor));
+      const vscTextEditor = vscode.window.activeTextEditor;
+      if (vscTextEditor && this.shouldRecordDocument(vscTextEditor.document)) {
+        this.showTextEditor(vscTextEditor);
       }
     }
   }
 
   stop() {
-    console.log('events: ', this.events);
+    console.log('events: ', this.session.events);
     this.isRecording = false;
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
   }
 
   save() {
-    if (this.events.length === 0) {
+    if (this.session.events.length === 0) {
       vscode.window.showInformationMessage('Nothing to save.');
       return;
     }
 
-    const p = path.join(misc.getRecordingsPath(), moment().format('YYYY-MM-DD-HH:mm:ss'));
-    fs.writeFileSync(p, JSON.stringify(this.events), 'utf8');
+    // const p = path.join(misc.getRecordingsPath(), moment().format('YYYY-MM-DD-HH:mm:ss'));
+    const p = misc.getDefaultRecordingPath();
+    this.session.writeToFile(p);
     vscode.window.showInformationMessage(`Saved to ${p}`);
   }
 
-  shouldRecordDocument(document: vscode.TextDocument): boolean {
-    // TODO
-    return true;
-    // return misc.isUriPartOfRecording(document.uri, this.workdir);
+  shouldRecordDocument(vscTextDocument: vscode.TextDocument): boolean {
+    // TODO check working directory as well
+    return misc.SUPPORTED_URI_SCHEMES.some(x => x === vscTextDocument.uri.scheme);
+    // return misc.isUriPartOfRecording(vscTextDocument.uri, this.workdir);
   }
 
-  makeTextChangeEvent(
-    document: vscode.TextDocument,
-    contentChange: vscode.TextDocumentContentChangeEvent,
-  ): T.TextChangeEvent {
-    // assert(this.repo);
-    console.log(`adding textChange for ${document.uri}: ${contentChange.text}`);
-    return {
+  textChange(
+    vscTextDocument: vscode.TextDocument,
+    vscContentChanges: readonly vscode.TextDocumentContentChangeEvent[],
+  ) {
+    console.log(`adding textChange for ${vscTextDocument.uri}`);
+
+    const [irTextDocument, irTextEditor] = this.session.getTextDocumentAndEditor(
+      vscTextDocument,
+      vscode.window.activeTextEditor,
+    );
+    const revSelections =
+      irTextEditor?.selections || _.map(vscContentChanges, x => new vscode.Selection(x.range.start, x.range.end));
+    const irContentChanges = irTextDocument.applyVscContentChanges(vscContentChanges);
+    irTextDocument.isDirty = true;
+
+    this.pushEvent({
       type: 'textChange',
       clock: Date.now(),
-      uri: document.uri,
-      text: contentChange.text,
-      range: contentChange.range,
-      selections: [], // TODO
-      revRange: contentChange.range, // TODO
-      revText: '', // TODO
-      revSelections: [], // TODO
-    };
+      uri: irTextDocument.uri,
+      contentChanges: irContentChanges,
+      revSelections,
+    });
   }
 
-  makeOpenDocumentEvent(document: vscode.TextDocument): T.OpenDocumentEvent {
-    console.log(`adding openDocument for ${document.uri}`);
+  openDocument(vscTextDocument: vscode.TextDocument) {
+    console.log(`adding openDocument for ${vscTextDocument.uri}`);
 
-    return {
+    const irTextDocument = this.session.openTextDocument(vscTextDocument);
+
+    this.pushEvent({
       type: 'openDocument',
       clock: Date.now(),
-      uri: document.uri,
-      text: document.getText(),
-      eol: document.eol,
-    };
+      uri: irTextDocument.uri,
+      text: irTextDocument.getText(),
+      eol: irTextDocument.eol,
+    });
   }
 
-  makeShowDocumentEvent(textEditor: vscode.TextEditor): T.ShowDocumentEvent {
-    console.log(`adding showDocument for ${textEditor.document.uri}`);
+  showTextEditor(vscTextEditor: vscode.TextEditor) {
+    console.log(`adding showTextEditor for ${vscTextEditor.document.uri}`);
 
-    return {
-      type: 'showDocument',
+    const revUri = this.session.activeTextEditor?.document.uri;
+    const irTextDocument = this.session.openTextDocument(vscTextEditor.document);
+    const irTextEditor = this.session.showTextEditor(vscTextEditor, irTextDocument);
+
+    this.pushEvent({
+      type: 'showTextEditor',
       clock: Date.now(),
-      uri: textEditor.document.uri,
-      selections: misc.duplicateSelections(textEditor.selections),
-      revUri: textEditor.document.uri, // TODO
-      revSelections: misc.duplicateSelections(textEditor.selections), // TODO
-    };
+      uri: irTextDocument.uri,
+      selections: irTextEditor.selections,
+      revUri,
+    });
   }
 
-  makeSelectionEvent(
-    textEditor: vscode.TextEditor,
-    selections: readonly vscode.Selection[],
-  ): T.SelectEvent {
-    const { document, visibleRanges } = textEditor;
-    console.log(`adding select for ${document.uri}`);
+  select(vscTextEditor: vscode.TextEditor, selections: readonly vscode.Selection[]) {
+    console.log(`adding select for ${vscTextEditor.document.uri}`);
 
-    return {
+    const irTextEditor = this.session.findTextEditor(vscTextEditor);
+    if (!irTextEditor) {
+      throw new Error(`select(): did not find the text editor for ${vscTextEditor.document.fileName}`);
+    }
+
+    const revSelections = irTextEditor.selections;
+    const revVisibleRanges = irTextEditor.visibleRange;
+    irTextEditor.select(selections, vscTextEditor.visibleRanges[0]);
+
+    this.pushEvent({
       type: 'select',
       clock: Date.now(),
-      uri: document.uri,
-      selections: misc.duplicateSelections(selections),
-      visibleRange: visibleRanges[0],
-      revSelections: misc.duplicateSelections(selections), // TODO
-      revVisibleRange: visibleRanges[0], // TODO
-    };
+      uri: irTextEditor.document.uri,
+      selections: irTextEditor.selections,
+      visibleRange: irTextEditor.visibleRange,
+      revSelections,
+      revVisibleRange: revVisibleRanges,
+    });
   }
 
-  makeSaveEvent(document: vscode.TextDocument): T.SaveEvent {
-    console.log(`adding save for ${document.uri}`);
+  saveTextDocument(vscTextDocument: vscode.TextDocument) {
+    console.log(`adding save for ${vscTextDocument.uri}`);
 
-    return {
+    const irTextDocument = this.session.findTextDocument(vscTextDocument);
+    if (!irTextDocument) {
+      throw new Error(`saveTextDocument(): did not find the text document for ${vscTextDocument.fileName}`);
+    }
+
+    irTextDocument.isDirty = false;
+
+    this.pushEvent({
       type: 'save',
       clock: Date.now(),
-      uri: document.uri,
-    };
+      uri: irTextDocument.uri,
+    });
   }
 
-  makeScrollEvent(
-    textEditor: vscode.TextEditor,
-    visibleRange: vscode.Range,
-  ): T.ScrollEvent {
-    console.log(`adding scroll for ${textEditor.document.uri}`);
+  scroll(vscTextEditor: vscode.TextEditor, visibleRange: vscode.Range) {
+    console.log(`adding scroll for ${vscTextEditor.document.uri}`);
 
-    return {
+    const irTextEditor = this.session.findTextEditor(vscTextEditor);
+    if (!irTextEditor) {
+      throw new Error(`scroll(): did not find the text editor for ${vscTextEditor.document.fileName}`);
+    }
+
+    const revVisibleRange = irTextEditor.visibleRange;
+    irTextEditor.scroll(visibleRange);
+
+    this.pushEvent({
       type: 'scroll',
       clock: Date.now(),
-      uri: textEditor.document.uri,
+      uri: irTextEditor.document.uri,
       visibleRange,
-      revVisibleRange: visibleRange, // TODO
-    };
+      revVisibleRange,
+    });
   }
 
-  pushEvent(e: T.Event) {
+  pushEvent(e: ir.PlaybackEvent) {
     if (e.type !== 'scroll') {
       this.scrolling = false;
       this.scrollStartRange = undefined;
     }
-    this.events.push(e);
+    this.session.events.push(e);
   }
 }

@@ -8,20 +8,32 @@ export function getRecordingsPath(): string {
   return path.join(os.homedir(), 'codecast', 'recordings');
 }
 
+export function getDefaultRecordingPath(): string {
+  return path.join(getRecordingsPath(), 'session.codecast');
+}
+
 export async function getGitAPI(): Promise<git.API> {
-  const extension = vscode.extensions.getExtension(
-    'vscode.git',
-  ) as vscode.Extension<git.GitExtension>;
+  const extension = vscode.extensions.getExtension('vscode.git') as vscode.Extension<git.GitExtension>;
 
   if (!extension) throw new Error('Git extension not found');
   const git = extension.isActive ? extension.exports : await extension.activate();
   return git.getAPI(1);
 }
 
-export function duplicateSelections(
-  selections: readonly vscode.Selection[],
-): vscode.Selection[] {
-  return selections.map(s => new vscode.Selection(s.anchor, s.active));
+export function duplicateSelections(selections: readonly vscode.Selection[]): vscode.Selection[] {
+  return selections.map(duplicateSelection);
+}
+
+export function duplicateSelection(selection: vscode.Selection): vscode.Selection {
+  return new vscode.Selection(selection.anchor, selection.active);
+}
+
+export function duplicateRanges(ranges: readonly vscode.Range[]): vscode.Range[] {
+  return ranges.map(duplicateRange);
+}
+
+export function duplicateRange(range: vscode.Range): vscode.Range {
+  return new vscode.Range(range.start, range.end);
 }
 
 // // If root is given and uri is a file with absolute path, it'll make the uri relative to root
@@ -42,14 +54,18 @@ export function duplicateSelections(
 //   return Uri.from({ scheme: uri.scheme, path: p });
 // }
 
-export function isUriPartOfRecording(uri: vscode.Uri, workdir: string) {
-  if (uri.scheme === 'untitled') {
-    return true;
-  } else if (uri.scheme === 'file') {
-    const rel = path.relative(workdir, uri.path);
-    return !rel.startsWith('..');
-  }
-  return false;
+export const SUPPORTED_URI_SCHEMES = ['untitled', 'file'] as const;
+
+export function isUriPartOfRecording(uri: vscode.Uri) {
+  // TODO
+  return true;
+  // if (uri.scheme === 'untitled') {
+  //   return true;
+  // } else if (uri.scheme === 'file') {
+  //   const rel = path.relative(workdir, uri.path);
+  //   return !rel.startsWith('..');
+  // }
+  // return false;
 }
 
 // export function makeCcPos(p: Position): CcPos {

@@ -2,3 +2,4 @@ node_modules
 .emacs.desktop.lock
 .emacs.desktop
 vscode/out
+vscode/webview/out

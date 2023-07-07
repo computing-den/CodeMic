@@ -3,6 +3,15 @@
   "displayName": "Codecast",
   "description": "",
   "version": "0.0.1",
+  "scripts": {
+    "postinstall": "cd webview && npm install",
+    "vscode:prepublish": "npm run build",
+    "build": "npm run build:extension && npm run build:webview",
+    "build:extension": "tsc -p ./",
+    "watch:extension": "tsc -watch -p ./",
+    "build:webview": "cd webview && node esbuild.mjs",
+    "watch:webview": "cd webview && node esbuild.mjs --watch"
+  },
   "engines": {
     "vscode": "^1.76.0"
   },
@@ -16,7 +25,7 @@
         {
           "id": "codecast-view-container",
           "title": "Codecast",
-          "icon": "resources/dep.svg"
+          "icon": "resources/icon.svg"
         }
       ]
     },
@@ -44,14 +53,6 @@
       }
     ]
   },
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
-  },
   "devDependencies": {
     "@types/glob": "^8.0.1",
     "@types/lodash": "^4.14.191",
@@ -67,7 +68,9 @@
     "typescript": "^4.9.4"
   },
   "dependencies": {
+    "@types/uuid": "^9.0.2",
     "lodash": "^4.17.21",
-    "moment": "^2.29.4"
+    "moment": "^2.29.4",
+    "uuid": "^9.0.0"
   }
 }
