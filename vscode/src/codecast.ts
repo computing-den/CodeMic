@@ -26,11 +26,17 @@ class Codecast {
   }
 
   receivedMessage = (e: ui.Event) => {
-    console.log('extension received: ', e);
+    // console.log('extension received: ', e);
 
     switch (e.type) {
       case 'play': {
         this.player ??= Player.fromFile(this.context, misc.getDefaultRecordingPath());
+        break;
+      }
+      case 'seek': {
+        break;
+      }
+      case 'stop': {
         break;
       }
       case 'playbackUpdate': {
@@ -40,6 +46,9 @@ class Codecast {
         }
         this.player.update(e.time);
         break;
+      }
+      default: {
+        const unreachable: never = e;
       }
     }
   };

@@ -24,7 +24,7 @@ export type TextChangeEvent = {
   clock: number;
   uri: vscode.Uri;
   contentChanges: ContentChange[];
-  revSelections: vscode.Selection[];
+  // revSelections: vscode.Selection[];
 };
 
 export type OpenDocumentEvent = {
@@ -40,7 +40,10 @@ export type ShowTextEditor = {
   clock: number;
   uri: vscode.Uri;
   selections: vscode.Selection[];
+  visibleRange: vscode.Range;
   revUri?: vscode.Uri;
+  revSelections?: vscode.Selection[];
+  revVisibleRange?: vscode.Range;
   // revSelections: vscode.Selection[];
 };
 
@@ -82,14 +85,19 @@ export class Session {
   activeTextEditor?: TextEditor;
   textEditors: TextEditor[] = [];
   textDocuments: TextDocument[] = [];
+  debug: Map<vscode.TextEditor, number> = new Map();
 
   static fromFile(filename: string): Session {
     const plain = JSON.parse(fs.readFileSync(filename, 'utf8')) as PlainSession;
     return sessionFromPlain(plain);
   }
 
-  constructor(events: PlaybackEvent[] = []) {
+  constructor(events: PlaybackEvent[]) {
     this.events = events;
+  }
+
+  toPlain() {
+    return sessionToPlain(this);
   }
 
   writeToFile(filename: string) {
@@ -98,7 +106,7 @@ export class Session {
   }
 
   openTextDocument(vscTextDocument: vscode.TextDocument): TextDocument {
-    let textDocument = this.findTextDocument(vscTextDocument);
+    let textDocument = this.findTextDocumentByUri(vscTextDocument.uri);
     if (!textDocument) {
       textDocument = new TextDocument(vscTextDocument);
       this.textDocuments.push(textDocument);
@@ -106,69 +114,130 @@ export class Session {
     return textDocument;
   }
 
-  showTextEditor(vscTextEditor: vscode.TextEditor, textDocument: TextDocument): TextEditor {
-    let textEditor = this.findTextEditor(vscTextEditor);
+  openTextEditor(
+    vscTextDocument: vscode.TextDocument,
+    selections: vscode.Selection[],
+    visibleRange: vscode.Range,
+  ): TextEditor {
+    const textDocument = this.openTextDocument(vscTextDocument);
+    let textEditor = this.findTextEditorByUri(textDocument.uri);
     if (!textEditor) {
-      textEditor = new TextEditor(vscTextEditor, textDocument);
+      textEditor = new TextEditor(textDocument, selections, visibleRange);
       this.textEditors.push(textEditor);
-      this.activeTextEditor = textEditor;
+    } else {
+      textEditor.select(selections, visibleRange);
     }
     return textEditor;
   }
 
-  findTextEditor(vscTextEditor: vscode.TextEditor): TextEditor | undefined {
-    return this.textEditors.find(x => x.vscTextEditor === vscTextEditor);
+  findTextDocumentByUri(uri: vscode.Uri): TextDocument | undefined {
+    return this.textDocuments.find(x => misc.isEqualUri(x.uri, uri));
   }
 
-  findTextDocument(vscTextDocument: vscode.TextDocument): TextDocument | undefined {
-    return this.textDocuments.find(x => x.vscTextDocument === vscTextDocument);
+  findTextEditorByUri(uri: vscode.Uri): TextEditor | undefined {
+    return this.textEditors.find(x => misc.isEqualUri(x.document.uri, uri));
   }
 
-  // A text editor is returned only if there's only 1 text editor for the given document,
-  // or the text editor matches the given vscTextEditor.
-  // vscTextEditor is a suggestion, usually the current active text editor is passed.
-  // But it's possible that we're trying to get the TextDocument related to a vscTextDocument
-  // that was modified in the background and therefore does not have a text editor, or
-  // it is not the active text editor.
-  getTextDocumentAndEditor(
-    vscTextDocument: vscode.TextDocument,
-    vscTextEditor?: vscode.TextEditor,
-  ): [TextDocument, TextEditor?] {
-    const document = this.findTextDocument(vscTextDocument);
-    if (!document) {
-      throw new Error(`getIRTextDocumentAndEditor: document "${vscTextDocument.fileName}" was not found`);
-    }
-
-    const textEditors = this.textEditors.filter(x => x.document === document);
-    let textEditor: TextEditor | undefined;
-    if (textEditors.length === 1) {
-      textEditor = textEditors[0];
-    } else if (textEditors.length > 1 && vscTextEditor) {
-      textEditor = textEditors.find(x => x.vscTextEditor === vscTextEditor);
-    }
-
-    return [document, textEditor];
+  getTextDocumentByUri(uri: vscode.Uri): TextDocument {
+    const textDocument = this.findTextDocumentByUri(uri);
+    assert(textDocument);
+    return textDocument;
   }
+
+  getTextEditorByUri(uri: vscode.Uri): TextEditor {
+    const textEditor = this.findTextEditorByUri(uri);
+    assert(textEditor);
+    return textEditor;
+  }
+
+  // openTextEditorByUri(vscTextEditor: vscode.TextEditor): TextEditor {
+  //   const textDocument = this.openTextDocumentByVsc(vscTextEditor.document);
+  //   let textEditor = this.findTextEditorByVsc(vscTextEditor);
+  //   if (!textEditor) {
+  //     textEditor = new TextEditor(vscTextEditor, textDocument);
+  //     this.textEditors.push(textEditor);
+  //   }
+  //   return textEditor;
+  // }
+
+  // openTextEditorByVsc(vscTextEditor: vscode.TextEditor, textEditorId?: number): TextEditor {
+  //   textEditorId ??= ++this.textEditorIdCounter;
+  //   const textDocument = this.openTextDocumentByVsc(vscTextEditor.document);
+  //   let textEditor = this.findTextEditorByVsc(vscTextEditor);
+  //   if (!textEditor) {
+  //     if (this.debug.get(vscTextEditor)) {
+  //       throw new Error(
+  //         `session.openTextEditorByVsc vscTextEditor is already associated with an id ${this.debug.get(vscTextEditor)}`,
+  //       );
+  //     }
+  //     this.debug.set(vscTextEditor, textEditorId);
+  //     textEditor = new TextEditor(vscTextEditor, textDocument, textEditorId);
+  //     this.textEditors.push(textEditor);
+  //   }
+  //   return textEditor;
+  // }
+
+  // setActiveTextEditor(textEditor: TextEditor) {
+  //   this.activeTextEditor = textEditor;
+  // }
+
+  // openTextEditorById(id: number): TextEditor {
+  // }
+
+  // private findTextEditorByVsc(vscTextEditor: vscode.TextEditor): TextEditor | undefined {
+  //   return this.textEditors.find(x => x.vscTextEditor === vscTextEditor);
+  // }
+
+  // private findTextDocumentByVsc(vscTextDocument: vscode.TextDocument): TextDocument | undefined {
+  //   return this.textDocuments.find(x => x.vscTextDocument === vscTextDocument);
+  // }
+
+  // // A text editor is returned only if there's only 1 text editor for the given document,
+  // // or the text editor matches the given vscTextEditor.
+  // // vscTextEditor is a suggestion, usually the current active text editor is passed.
+  // // But it's possible that we're trying to get the TextDocument related to a vscTextDocument
+  // // that was modified in the background and therefore does not have a text editor, or
+  // // it is not the active text editor.
+  // getTextDocumentAndEditorByVsc(
+  //   vscTextDocument: vscode.TextDocument,
+  //   vscTextEditor?: vscode.TextEditor,
+  // ): [TextDocument, TextEditor?] {
+  //   const document = this.findTextDocumentByVsc(vscTextDocument);
+  //   if (!document) {
+  //     throw new Error(`getTextDocumentAndEditor: document "${vscTextDocument.fileName}" was not found`);
+  //   }
+
+  //   const textEditors = this.textEditors.filter(x => x.document === document);
+  //   let textEditor: TextEditor | undefined;
+  //   if (textEditors.length === 1) {
+  //     textEditor = textEditors[0];
+  //   } else if (textEditors.length > 1 && vscTextEditor) {
+  //     textEditor = textEditors.find(x => x.vscTextEditor === vscTextEditor);
+  //   }
+
+  //   return [document, textEditor];
+  // }
 }
 
+// We cannot hold a reference to vscode.TextEditor because its identity is not stable.
+// Vscode may give us two different instances of vscode.TextEditor for the what appears
+// to be the same editor for the same document in the same tab.
 export class TextEditor {
-  vscTextEditor: vscode.TextEditor;
   // The document associated with this text editor.
   // The document will be the same for the entire lifetime of this text editor.
   document: TextDocument;
   selections: vscode.Selection[];
   visibleRange: vscode.Range;
 
-  constructor(vscTextEditor: vscode.TextEditor, textDocument: TextDocument) {
-    this.vscTextEditor = vscTextEditor;
+  constructor(textDocument: TextDocument, selections: vscode.Selection[], visibleRange: vscode.Range) {
     this.document = textDocument;
-    this.selections = misc.duplicateSelections(vscTextEditor.selections);
-    this.visibleRange = misc.duplicateRange(vscTextEditor.visibleRanges[0]);
+    this.selections = selections;
+    this.visibleRange = visibleRange;
   }
 
-  select(selections: readonly vscode.Selection[], visibleRange: vscode.Range) {
-    this.selections = misc.duplicateSelections(selections);
-    this.visibleRange = misc.duplicateRange(visibleRange);
+  select(selections: vscode.Selection[], visibleRange: vscode.Range) {
+    this.selections = selections;
+    this.visibleRange = visibleRange;
   }
 
   scroll(visibleRange: vscode.Range) {
@@ -218,22 +287,28 @@ export class TextDocument {
     );
   }
 
-  applyVscContentChanges(vscContentChanges: readonly vscode.TextDocumentContentChangeEvent[]): ContentChange[] {
-    if (vscContentChanges.length > 1) {
-      // can the content changes be applied one at a time? or do we need to
-      // update the range of the second content change after applying the first?
-      throw new Error('TODO textChange: vscContentChanges > 1');
-    }
+  // applyVscContentChanges(vscContentChanges: readonly vscode.TextDocumentContentChangeEvent[]): ContentChange[] {
+  //   if (vscContentChanges.length > 1) {
+  //     // can the content changes be applied one at a time? or do we need to
+  //     // update the range of the second content change after applying the first?
+  //     throw new Error('TODO textChange: vscContentChanges > 1');
+  //   }
 
-    return vscContentChanges.map(x => this.applyVscContentChange(x));
-  }
+  //   return vscContentChanges.map(x => this.applyContentChange(x));
+  // }
 
-  applyVscContentChange(vscContentChange: vscode.TextDocumentContentChangeEvent): ContentChange {
-    const { range, text } = vscContentChange;
-    assert(this.isRangeValid(range), 'applyVscContentChange: invalid range');
+  applyContentChange(
+    range: vscode.Range,
+    text: string,
+    calcReverse: boolean,
+  ): [range: vscode.Range, text: string] | undefined {
+    assert(this.isRangeValid(range), 'applyContentChange: invalid range');
     const { lines } = this;
-    const revText = this.getText(range);
     const newLines = text.split(/\r?\n/);
+
+    // calculate revText
+    let revText: string | undefined;
+    if (calcReverse) revText = this.getText(range);
 
     // Prepend [0, range.start.character] of the first old line to the first new line.
     const firstLinePrefix = lines[range.start.line].text.slice(0, range.start.character);
@@ -260,18 +335,16 @@ export class TextDocument {
     }
 
     // Calculate revRange.
-    const endPosition = new vscode.Position(
-      range.end.line + extraLineCount,
-      newLines[newLines.length - 1].length - lastLineSuffix.length,
-    );
-    const revRange = new vscode.Range(range.start, endPosition);
+    let revRange: vscode.Range | undefined;
+    if (calcReverse) {
+      const endPosition = new vscode.Position(
+        range.end.line + extraLineCount,
+        newLines[newLines.length - 1].length - lastLineSuffix.length,
+      );
+      revRange = new vscode.Range(range.start, endPosition);
+    }
 
-    return {
-      range,
-      text,
-      revRange,
-      revText,
-    };
+    if (calcReverse) return [revRange!, revText!];
   }
 }
 
@@ -312,7 +385,7 @@ type PlainTextChangeEvent = {
   clock: number;
   uri: PlainUri;
   contentChanges: PlainContentChange[];
-  revSelections: PlainSelection[];
+  // revSelections: PlainSelection[];
 };
 
 type PlainOpenDocumentEvent = {
@@ -328,7 +401,10 @@ type PlainShowTextEditor = {
   clock: number;
   uri: PlainUri;
   selections: PlainSelection[];
+  visibleRange: PlainRange;
   revUri?: PlainUri;
+  revSelections?: PlainSelection[];
+  revVisibleRange?: PlainRange;
 };
 
 type PlainSelectEvent = {
@@ -388,15 +464,17 @@ type PlainEndOfLine = 'LF' | 'CRLF';
 // Conversion from normal structures to plain json
 //=========================================================
 
-function sessionToPlain(session: Session): PlainSession {
-  return { events: playbackEventsToPlain(session.events) };
+export function sessionToPlain(session: Session): PlainSession {
+  return {
+    events: playbackEventsToPlain(session.events),
+  };
 }
 
-function playbackEventsToPlain(es: PlaybackEvent[]): PlainPlaybackEvent[] {
+export function playbackEventsToPlain(es: PlaybackEvent[]): PlainPlaybackEvent[] {
   return es.map(playbackEventToPlain);
 }
 
-function playbackEventToPlain(e: PlaybackEvent): PlainPlaybackEvent {
+export function playbackEventToPlain(e: PlaybackEvent): PlainPlaybackEvent {
   switch (e.type) {
     case 'stop': {
       return {
@@ -410,7 +488,7 @@ function playbackEventToPlain(e: PlaybackEvent): PlainPlaybackEvent {
         clock: e.clock,
         uri: uriToPlain(e.uri),
         contentChanges: contentChangesToPlain(e.contentChanges),
-        revSelections: selectionsToPlain(e.revSelections),
+        // revSelections: selectionsToPlain(e.revSelections),
       };
     }
     case 'openDocument': {
@@ -428,7 +506,10 @@ function playbackEventToPlain(e: PlaybackEvent): PlainPlaybackEvent {
         clock: e.clock,
         uri: uriToPlain(e.uri),
         selections: selectionsToPlain(e.selections),
+        visibleRange: rangeToPlain(e.visibleRange),
         revUri: e.revUri && uriToPlain(e.revUri),
+        revSelections: e.revSelections && selectionsToPlain(e.revSelections),
+        revVisibleRange: e.revVisibleRange && rangeToPlain(e.revVisibleRange),
       };
     }
     case 'select': {
@@ -459,7 +540,7 @@ function playbackEventToPlain(e: PlaybackEvent): PlainPlaybackEvent {
       };
     }
     default:
-      throw new Error(`playbackEventToJson: unknown type ${(e as any).type || ''}`);
+      misc.unreachable(e, `playbackEventToJson: unknown type ${(e as any).type || ''}`);
   }
 }
 
@@ -535,7 +616,7 @@ function playbackEventFromPlain(e: PlainPlaybackEvent): PlaybackEvent {
         clock: e.clock,
         uri: uriFromPlain(e.uri),
         contentChanges: contentChangesFromPlain(e.contentChanges),
-        revSelections: selectionsFromPlain(e.revSelections),
+        // revSelections: selectionsFromPlain(e.revSelections),
       };
     }
     case 'openDocument': {
@@ -553,7 +634,10 @@ function playbackEventFromPlain(e: PlainPlaybackEvent): PlaybackEvent {
         clock: e.clock,
         uri: uriFromPlain(e.uri),
         selections: selectionsFromPlain(e.selections),
+        visibleRange: rangeFromPlain(e.visibleRange),
         revUri: e.revUri && uriFromPlain(e.revUri),
+        revSelections: e.revSelections && selectionsFromPlain(e.revSelections),
+        revVisibleRange: e.revVisibleRange && rangeFromPlain(e.revVisibleRange),
       };
     }
     case 'select': {
@@ -584,7 +668,7 @@ function playbackEventFromPlain(e: PlainPlaybackEvent): PlaybackEvent {
       };
     }
     default:
-      throw new Error(`playbackEventToJson: unknown type ${(e as any).type || ''}`);
+      misc.unreachable(e, `playbackEventToJson: unknown type ${(e as any).type || ''}`);
   }
 }
 
