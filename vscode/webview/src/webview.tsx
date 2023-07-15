@@ -1,61 +1,26 @@
-import { h, render, Component } from 'preact';
+import { h, render } from 'preact';
 import * as ui from './lib/ui';
+import { provideVSCodeDesignSystem, allComponents } from '@vscode/webview-ui-toolkit';
+import App from './app';
 
-export class App extends Component {
-  interval: any;
+provideVSCodeDesignSystem().register(allComponents);
 
-  state = {
-    time: 0,
-    duration: 60,
-    isPlaying: false,
-  };
+render(
+  <App onRecordSession={recordSession} onBrowseSession={browseSession} onOpenSession={openSession} />,
+  document.getElementById('app')!,
+);
 
-  sliderChanged = (e: Event) => {
-    const time = Number((e.target as HTMLInputElement).value);
-    this.setState({ time });
-    postMessage({ type: 'seek', time });
-  };
-
-  play = () => {
-    this.setState({ isPlaying: true });
-    postMessage({ type: 'play' });
-
-    // Fake playback events
-    const TS = 0.2;
-    this.interval = setInterval(() => {
-      const time = Math.min(this.state.duration, this.state.time + TS);
-      this.setState({ time });
-      postMessage({ type: 'playbackUpdate', time });
-      if (time >= this.state.duration) {
-        this.stop();
-      }
-    }, TS * 1000);
-  };
-
-  stop = () => {
-    this.setState({ isPlaying: false });
-    postMessage({ type: 'stop' });
-    clearInterval(this.interval);
-    this.interval = undefined;
-  };
-
-  render = () => {
-    const { time, duration, isPlaying } = this.state;
-    return (
-      <div>
-        <input type="range" min={0} max={duration} step="any" onChange={this.sliderChanged} value={time} />
-        <button className="button" onClick={this.play} disabled={isPlaying}>
-          play
-        </button>
-        <button className="button" onClick={this.stop} disabled={!isPlaying}>
-          stop
-        </button>
-      </div>
-    );
-  };
+function recordSession() {
+  postMessage({ type: 'record' });
 }
 
-render(<App />, document.getElementById('app')!);
+function browseSession() {
+  postMessage({ type: 'play' });
+}
+
+function openSession() {
+  postMessage({ type: 'play' });
+}
 
 const vscode = acquireVsCodeApi();
 // const oldState = vscode.getState() || { colors: [] };

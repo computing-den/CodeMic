@@ -1,3 +1,37 @@
+:root {
+  --spacing-medium: 8px;
+  --spacing-large: 16px;
+}
+
 body {
   background-color: transparent;
+}
+
+ul.unstyled {
+  list-style: none;
+  padding: 0;
+
+  & li {
+    /* margin: 0; */
+  }
+}
+
+.codicon.m-right {
+  margin-right: var(--spacing-medium);
+}
+
+.codicon.va-top {
+  vertical-align: top;
+}
+
+.welcome {
+  .section + .section {
+    margin-top: var(--spacing-large);
+  }
+
+  .section.recent {
+    & li vscode-link {
+      margin-right: var(--spacing-large);
+    }
+  }
 }

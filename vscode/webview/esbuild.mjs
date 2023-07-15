@@ -4,28 +4,25 @@ import { execSync } from 'child_process';
 
 const mustWatch = process.argv[2] === '--watch';
 
-const target = ['chrome114', 'firefox113', 'safari16.5', 'edge114'];
+const base = {
+  target: ['chrome114', 'firefox113', 'safari16.5', 'edge114'],
+  sourcemap: 'inline',
+  minify: false,
+  bundle: true,
+  preserveSymlinks: true,
+};
 
 const jsConfig = {
+  ...base,
   entryPoints: ['src/webview.tsx'],
-  bundle: true,
-  minify: false,
-  sourcemap: true,
-  target,
   outfile: 'out/webview.js',
-  preserveSymlinks: true,
-  sourcemap: 'inline',
   // define: { DEBUG: JSON.stringify(config.debug) },
 };
 
 const cssConfig = {
+  ...base,
   entryPoints: ['src/webview.css'],
-  bundle: true,
-  target,
   outfile: 'out/webview.css',
-  preserveSymlinks: true,
-  sourcemap: true,
-  sourcemap: 'inline',
 };
 
 if (mustWatch) {
@@ -41,6 +38,7 @@ if (mustWatch) {
 
 const RED = '\x1b[31m';
 const GREEN = '\x1b[32m';
+const YELLOW = '\x1b[33m';
 const RESET = '\x1b[0m';
 
 function messagePlugin(name) {
@@ -48,25 +46,37 @@ function messagePlugin(name) {
     name: 'Message',
     setup(build) {
       build.onEnd(result => {
-        if (result.errors.length === 0) {
+        if (result.errors.length > 0) {
+          notify(result.errors[0]);
+        }
+        if (result.warnings.length > 0) {
+          notify(result.warnings[0]);
+        }
+
+        if (result.errors.length === 0 && result.warnings.length === 0) {
           console.log(`${GREEN}${name} built successfully.${RESET}`);
-        } else {
-          try {
-            const e = result.errors[0];
-            // console.error(e);
-            let msg;
-            if (e.location) {
-              msg = `${e.location.file}:${e.location.line}: ${e.text}`;
-            } else {
-              msg = `Unknown location: ${e.text}`;
-            }
-            msg = msg.replaceAll('"', '\\"');
-            execSync(`notify-send --urgency=critical --expire-time=2000 "esbuild" "${msg}"`);
-          } catch (error) {
-            console.error(error);
-          }
         }
       });
     },
   };
+}
+
+function notify(item) {
+  try {
+    const msg = itemToStr(item);
+    execSync(`notify-send --urgency=critical --expire-time=2000 "esbuild" "${msg}"`);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function itemToStr(item) {
+  let msg;
+  if (item.location) {
+    msg = `${item.location.file}:${item.location.line}: ${item.text}`;
+  } else {
+    msg = `Unknown location: ${item.text}`;
+  }
+  msg = msg.replaceAll('"', '\\"');
+  return msg;
 }

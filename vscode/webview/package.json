@@ -10,6 +10,7 @@
     "@types/uuid": "^9.0.2",
     "@types/vscode": "^1.79.1",
     "@types/vscode-webview": "^1.57.1",
+    "@vscode/codicons": "^0.0.33",
     "@vscode/webview-ui-toolkit": "^1.2.2",
     "esbuild": "^0.18.10",
     "lodash": "^4.17.21",

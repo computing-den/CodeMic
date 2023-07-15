@@ -29,6 +29,10 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(this.onDidReceiveMessage);
   }
 
+  public show() {
+    this.view?.show();
+  }
+
   // public addColor() {
   //   if (this.view) {
   //     this.view.show?.(true); // `show` is not implemented in 1.49 but is for 1.50 insiders
@@ -48,29 +52,25 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     const scripts = [getPath('webview', 'out', 'webview.js')];
 
     const styles = [
-      getPath('resources', 'normalize-8.0.1.css'),
-      getPath('resources', 'vscode.css'),
+      getPath('webview', 'resources', 'normalize-8.0.1.css'),
+      getPath('webview', 'resources', 'vscode.css'),
       getPath('webview', 'out', 'webview.css'),
+      getPath('webview', 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css'),
     ];
 
-    // Using a content security policy to only allow loading styles from our extension directory,
-    // and only allow scripts that have a specific nonce.
-    // (See the 'webview-sample' extension sample for img-src content security policy examples)
-    const nonce = uuid();
+    // const font = getPath('webview', 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.ttf');
+
     return `<!DOCTYPE html>
 			<html lang="en">
 			<head>
 				<meta charset="UTF-8">
-				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${
-          webview.cspSource
-        }; script-src 'nonce-${nonce}';">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
         ${styles.map(uri => `<link href="${uri}" rel="stylesheet">`).join('\n')}
 				<title>Codecast</title>
 			</head>
 			<body>
         <div id="app"></div>
-        ${scripts.map(uri => `<script nonce="${nonce}" src="${uri}" type="module"></script>`)}
+        ${scripts.map(uri => `<script src="${uri}" type="module"></script>`)}
 			</body>
 			</html>`;
   }
