@@ -126,7 +126,9 @@ class Record extends Component<ScreenProps> {
     if (this.props.store.recorder.isRecording) {
       return (
         <div className="record">
-          <h1>Recording</h1>
+          <h1>
+            Recording <span className="rec-icon codicon codicon-circle-large-filled" />
+          </h1>
           <vscode-text-field autofocus>Session Name</vscode-text-field>
           <vscode-button onClick={this.stopRecording}>Stop recording</vscode-button>
         </div>

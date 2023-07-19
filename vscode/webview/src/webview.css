@@ -42,6 +42,14 @@ ul.unstyled {
     font-style: italic;
   }
 
+  & h1 {
+    white-space: nowrap;
+    .rec-icon {
+      color: #ee0000;
+      vertical-align: middle;
+    }
+  }
+
   & vscode-text-field {
     margin-bottom: var(--spacing-medium);
   }
