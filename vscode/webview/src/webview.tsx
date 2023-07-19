@@ -1,39 +1,27 @@
 import { h, render } from 'preact';
 import * as ui from './lib/ui';
+import Bus from './lib/bus';
+import type { Message, MessageHandler, Parcel } from './lib/bus';
 import { provideVSCodeDesignSystem, allComponents } from '@vscode/webview-ui-toolkit';
 import App from './app';
 
 provideVSCodeDesignSystem().register(allComponents);
-
-render(
-  <App onRecordSession={recordSession} onBrowseSession={browseSession} onOpenSession={openSession} />,
-  document.getElementById('app')!,
-);
-
-function recordSession() {
-  postMessage({ type: 'record' });
-}
-
-function browseSession() {
-  postMessage({ type: 'play' });
-}
-
-function openSession() {
-  postMessage({ type: 'play' });
-}
-
 const vscode = acquireVsCodeApi();
-// const oldState = vscode.getState() || { colors: [] };
-// vscode.setState({ colors: colors });
+const bus = new Bus(postParcel, messageHandler);
+window.addEventListener('message', event => bus.handleParcel(event.data));
+render(<App postMessage={postMessage} />, document.getElementById('app')!);
 
-window.addEventListener('message', event => {
-  receivedMessage(event.data as ui.Event);
-});
-
-function postMessage(e: ui.Event) {
-  vscode.postMessage(e);
+function postMessage(e: ui.FrontendEvent): Promise<ui.BackendResponse> {
+  return bus.post(e) as Promise<ui.BackendResponse>;
 }
 
-function receivedMessage(e: ui.Event) {
+function postParcel(parcel: Parcel): Promise<boolean> {
+  vscode.postMessage(parcel);
+  return Promise.resolve(true);
+}
+
+async function messageHandler(msg: Message): Promise<ui.FrontendResponse | undefined> {
+  const e = msg as ui.BackendEvent;
   console.log('webview received: ', e);
+  return;
 }

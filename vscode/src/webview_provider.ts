@@ -1,20 +1,25 @@
 import * as vscode from 'vscode';
+import assert from 'assert';
 import _ from 'lodash';
 import { v4 as uuid } from 'uuid';
 import * as ui from './lib/ui';
+import Bus from './lib/bus';
+import type { MessageHandler, PostParcel, Parcel, ParcelMsg } from './lib/bus';
 
 class WebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'codecast-view';
 
   view?: vscode.WebviewView;
+  bus?: Bus;
 
-  constructor(public readonly extensionUri: vscode.Uri, public onDidReceiveMessage: (e: ui.Event) => void) {}
+  constructor(public readonly extensionUri: vscode.Uri, public messageHandler: MessageHandler) {}
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken,
   ) {
+    this.bus = new Bus(this.postParcel.bind(this), this.messageHandler);
     this.view = webviewView;
 
     webviewView.webview.options = {
@@ -25,26 +30,22 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     };
 
     webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
-
-    webviewView.webview.onDidReceiveMessage(this.onDidReceiveMessage);
+    webviewView.webview.onDidReceiveMessage(this.bus.handleParcel.bind(this.bus));
   }
 
   public show() {
     this.view?.show();
   }
 
-  // public addColor() {
-  //   if (this.view) {
-  //     this.view.show?.(true); // `show` is not implemented in 1.49 but is for 1.50 insiders
-  //     this.view.webview.postMessage({ type: 'addColor' });
-  //   }
-  // }
+  public async postMessage(e: ui.BackendEvent): Promise<ui.FrontendResponse> {
+    assert(this.bus);
+    return this.bus.post(e) as Promise<ui.FrontendResponse>;
+  }
 
-  // public clearColors() {
-  //   if (this.view) {
-  //     this.view.webview.postMessage({ type: 'clearColors' });
-  //   }
-  // }
+  private postParcel(parcel: Parcel): Promise<boolean> {
+    assert(this.view);
+    return this.view.webview.postMessage(parcel) as Promise<boolean>;
+  }
 
   private getHtmlForWebview(webview: vscode.Webview) {
     const getPath = (...args: string[]) => webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, ...args));

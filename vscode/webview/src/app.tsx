@@ -1,4 +1,5 @@
 import { h, Component } from 'preact';
+import * as ui from './lib/ui';
 
 type AppProps = WelcomeProps;
 
@@ -9,12 +10,25 @@ export default class App extends Component<AppProps> {
 }
 
 type WelcomeProps = {
-  onRecordSession(): void;
-  onBrowseSession(): void;
-  onOpenSession(): void;
+  postMessage(e: ui.FrontendEvent): Promise<ui.BackendResponse>;
 };
 
 class Welcome extends Component<WelcomeProps> {
+  record = async () => {
+    const res = await this.props.postMessage({ type: 'record' });
+    console.log('record: got response from backend: ', res);
+  };
+
+  open = async (name: string) => {
+    const res = await this.props.postMessage({ type: 'play' });
+    console.log('open: got response from backend: ', res);
+  };
+
+  browse = async () => {
+    const res = await this.props.postMessage({ type: 'play' });
+    console.log('browse: got response from backend: ', res);
+  };
+
   render() {
     const recentFiles = [
       { name: 'session1', dir: '~' },
@@ -29,13 +43,13 @@ class Welcome extends Component<WelcomeProps> {
           <h2>Start</h2>
           <ul className="unstyled">
             <li>
-              <vscode-link href="#" onClick={this.props.onRecordSession}>
+              <vscode-link href="#" onClick={this.record}>
                 <span className="codicon codicon-device-camera-video va-top m-right" />
                 Record new session
               </vscode-link>
             </li>
             <li>
-              <vscode-link href="#" onClick={this.props.onBrowseSession}>
+              <vscode-link href="#" onClick={() => this.browse()}>
                 <span className="codicon codicon-folder-opened va-top m-right" />
                 Open session
               </vscode-link>
@@ -47,7 +61,7 @@ class Welcome extends Component<WelcomeProps> {
           <ul className="unstyled">
             {recentFiles.map(({ name, dir }) => (
               <li>
-                <vscode-link href="#" onClick={this.props.onOpenSession}>
+                <vscode-link href="#" onClick={() => this.open(name)}>
                   {name}
                 </vscode-link>
                 {dir}
