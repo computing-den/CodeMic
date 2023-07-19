@@ -6,21 +6,21 @@ declare module 'preact' {
     interface IntrinsicElements {
       'vscode-button': any;
       'vscode-link': any;
-      badge: any;
-      button: any;
-      checkbox: any;
-      'data-grid': any;
-      divider: any;
-      dropdown: any;
-      link: any;
-      option: any;
-      panels: any;
-      'progress-ring': any;
-      radio: any;
-      'radio-group': any;
-      tag: any;
-      'text-area': any;
-      'text-field': any;
+      'vscode-badge': any;
+      'vscode-button': any;
+      'vscode-checkbox': any;
+      'vscode-data-grid': any;
+      'vscode-divider': any;
+      'vscode-dropdown': any;
+      'vscode-link': any;
+      'vscode-option': any;
+      'vscode-panels': any;
+      'vscode-progress-ring': any;
+      'vscode-radio': any;
+      'vscode-radio-group': any;
+      'vscode-tag': any;
+      'vscode-text-area': any;
+      'vscode-text-field': any;
     }
   }
 }

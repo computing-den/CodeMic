@@ -1,24 +1,30 @@
 import { h, Component } from 'preact';
 import * as ui from './lib/ui';
+import { Store, updateStore } from './store';
+// import type { WebviewApi } from 'vscode-webview';
 
-type AppProps = WelcomeProps;
-
-export default class App extends Component<AppProps> {
-  render() {
-    return <Welcome {...this.props}></Welcome>;
-  }
-}
-
-type WelcomeProps = {
+type AppProps = {
+  store: Store;
   postMessage(e: ui.FrontendEvent): Promise<ui.BackendResponse>;
 };
 
-class Welcome extends Component<WelcomeProps> {
-  record = async () => {
-    const res = await this.props.postMessage({ type: 'record' });
-    console.log('record: got response from backend: ', res);
+type ScreenProps = AppProps & {
+  openScreen(screen: any): void;
+};
+
+export default class App extends Component<AppProps> {
+  state = {
+    screen: Welcome,
   };
 
+  openScreen = (screen: any) => this.setState({ screen });
+
+  render() {
+    return <this.state.screen {...this.props} openScreen={this.openScreen} />;
+  }
+}
+
+class Welcome extends Component<ScreenProps> {
   open = async (name: string) => {
     const res = await this.props.postMessage({ type: 'play' });
     console.log('open: got response from backend: ', res);
@@ -38,12 +44,16 @@ class Welcome extends Component<WelcomeProps> {
 
     return (
       <div className="welcome">
-        <h1>CodeCast</h1>
         <div className="section">
           <h2>Start</h2>
           <ul className="unstyled">
             <li>
-              <vscode-link href="#" onClick={this.record}>
+              <vscode-link
+                href="#"
+                onClick={() => {
+                  this.props.openScreen(Record);
+                }}
+              >
                 <span className="codicon codicon-device-camera-video va-top m-right" />
                 Record new session
               </vscode-link>
@@ -69,6 +79,65 @@ class Welcome extends Component<WelcomeProps> {
             ))}
           </ul>
         </div>
+      </div>
+    );
+  }
+}
+
+class Record extends Component<ScreenProps> {
+  state = {
+    path: '',
+  };
+
+  startRecording = async () => {
+    const { type } = await this.props.postMessage({ type: 'record' });
+    if (type === 'yes') {
+      updateStore(store => {
+        store.recorder.isRecording = true;
+      });
+    }
+  };
+
+  stopRecording = async () => {
+    const { type } = await this.props.postMessage({ type: 'stop' });
+    if (type === 'yes') {
+      updateStore(store => {
+        store.recorder.isRecording = false;
+      });
+    }
+  };
+  async componentDidMount() {
+    const res = await this.props.postMessage({ type: 'getWorkspaceFolder' });
+    if (res.type !== 'getWorkspaceFolder') throw new Error(`Unknown response type ${res.type}`);
+
+    this.setState({ path: res.path || '' });
+  }
+
+  render() {
+    if (!this.state.path) {
+      return (
+        <div className="record">
+          <h1>Record</h1>
+          <div className="add-folder-msg">Add a folder to your workspace.</div>
+        </div>
+      );
+    }
+
+    if (this.props.store.recorder.isRecording) {
+      return (
+        <div className="record">
+          <h1>Recording</h1>
+          <vscode-text-field autofocus>Session Name</vscode-text-field>
+          <vscode-button onClick={this.stopRecording}>Stop recording</vscode-button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="record">
+        <h1>Record</h1>
+        <vscode-text-field autofocus>Session Name</vscode-text-field>
+        <vscode-button onClick={this.startRecording}>Start recording</vscode-button>
       </div>
     );
   }

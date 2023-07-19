@@ -35,3 +35,14 @@ ul.unstyled {
     }
   }
 }
+
+.record {
+  .add-folder-msg {
+    margin-bottom: var(--spacing-large);
+    font-style: italic;
+  }
+
+  & vscode-text-field {
+    margin-bottom: var(--spacing-medium);
+  }
+}

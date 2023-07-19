@@ -13,6 +13,7 @@
     "@vscode/codicons": "^0.0.33",
     "@vscode/webview-ui-toolkit": "^1.2.2",
     "esbuild": "^0.18.10",
+    "immer": "^10.0.2",
     "lodash": "^4.17.21",
     "moment": "^2.29.4",
     "preact": "^10.15.1",

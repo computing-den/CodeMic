@@ -1,6 +1,4 @@
-export type Message = {
-  type: string;
-};
+export type Message = unknown;
 
 export type ParcelMsg = { id: number; msg: Message };
 export type ParcelError = { id: number; error: string };

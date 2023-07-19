@@ -75,6 +75,9 @@ class Codecast {
         this.player.update(e.time);
         return { type: 'yes' };
       }
+      case 'getWorkspaceFolder': {
+        return { type: 'getWorkspaceFolder', path: vscode.workspace.workspaceFolders?.[0]?.uri.path };
+      }
       default: {
         misc.unreachable(e);
       }

@@ -4,12 +4,19 @@ import Bus from './lib/bus';
 import type { Message, MessageHandler, Parcel } from './lib/bus';
 import { provideVSCodeDesignSystem, allComponents } from '@vscode/webview-ui-toolkit';
 import App from './app';
+import { getStore, listenToStore } from './store';
 
 provideVSCodeDesignSystem().register(allComponents);
 const vscode = acquireVsCodeApi();
 const bus = new Bus(postParcel, messageHandler);
+
 window.addEventListener('message', event => bus.handleParcel(event.data));
-render(<App postMessage={postMessage} />, document.getElementById('app')!);
+listenToStore(renderApp);
+renderApp();
+
+function renderApp() {
+  render(<App store={getStore()} postMessage={postMessage} />, document.getElementById('app')!);
+}
 
 function postMessage(e: ui.FrontendEvent): Promise<ui.BackendResponse> {
   return bus.post(e) as Promise<ui.BackendResponse>;
