@@ -5,7 +5,7 @@ import { Store, updateStore } from './store';
 
 type AppProps = {
   store: Store;
-  postMessage(e: ui.FrontendEvent): Promise<ui.BackendResponse>;
+  postMessage(req: ui.FrontendRequest): Promise<ui.BackendResponse>;
 };
 
 type ScreenProps = AppProps & {

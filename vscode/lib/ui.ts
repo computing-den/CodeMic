@@ -1,4 +1,4 @@
-export type FrontendEvent =
+export type FrontendRequest =
   | { type: 'seek'; time: number }
   | { type: 'play' }
   | { type: 'record' }
@@ -11,5 +11,5 @@ export type BackendResponse =
   | { type: 'ack' }
   | { type: 'getWorkspaceFolder'; path?: string };
 
-export type BackendEvent = { type: 'error' };
+export type BackendRequest = { type: 'error' };
 export type FrontendResponse = { type: 'yes' } | { type: 'no' } | { type: 'ack' };

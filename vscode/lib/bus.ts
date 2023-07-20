@@ -1,18 +1,16 @@
-export type Message = unknown;
-
-export type ParcelMsg = { id: number; msg: Message };
+export type ParcelMsg = { id: number; msg: any };
 export type ParcelError = { id: number; error: string };
 export type Parcel = ParcelMsg | ParcelError;
 
 export type PendingParcel = {
   parcel: ParcelMsg;
-  resolve: Function;
-  reject: Function;
+  resolve: (response: any) => void;
+  reject: (error: Error) => void;
 };
 
 // PostParcel never throws
 export type PostParcel = (parcel: Parcel) => Promise<boolean>;
-export type MessageHandler = (msg: Message) => Promise<Message | undefined>;
+export type MessageHandler = (msg: any) => Promise<any>;
 
 export default class Bus {
   private pendingParcels: Map<number, PendingParcel> = new Map();
@@ -36,7 +34,7 @@ export default class Bus {
       // parcel is new, call its handler and send back the response
       try {
         if (!('msg' in parcel)) throw new Error('parcel is missing msg');
-        const msg = (await this.onMessage(parcel.msg)) || { type: 'ack' };
+        const msg = await this.onMessage(parcel.msg);
         await this.postParcel({ id: parcel.id, msg });
       } catch (error: any) {
         await this.postParcel({ id: parcel.id, error: error.message });
@@ -44,7 +42,7 @@ export default class Bus {
     }
   }
 
-  post(msg: Message): Promise<Message> {
+  post(msg: any): Promise<any> {
     return new Promise(async (resolve, reject) => {
       const parcel = { id: this.idCounter++, msg };
       if (await this.postParcel(parcel)) {

@@ -5,8 +5,6 @@ import WebviewProvider from './webview_provider';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import * as ui from './lib/ui';
-import Bus from './lib/bus';
-import type { Message } from './lib/bus';
 
 class Codecast {
   context: vscode.ExtensionContext;
@@ -32,11 +30,10 @@ class Codecast {
     );
   }
 
-  messageHandler = async (msg: Message): Promise<ui.BackendResponse | undefined> => {
-    const e = msg as ui.FrontendEvent;
-    console.log('extension received: ', e);
+  messageHandler = async (req: ui.FrontendRequest): Promise<ui.BackendResponse> => {
+    console.log('extension received: ', req);
 
-    switch (e.type) {
+    switch (req.type) {
       case 'play': {
         if (this.player) {
           vscode.window.showInformationMessage('Codecast is already playing.');
@@ -72,14 +69,14 @@ class Codecast {
           console.error('got playbackUpdate but player is not playing');
           return { type: 'no' };
         }
-        this.player.update(e.time);
+        this.player.update(req.time);
         return { type: 'yes' };
       }
       case 'getWorkspaceFolder': {
         return { type: 'getWorkspaceFolder', path: vscode.workspace.workspaceFolders?.[0]?.uri.path };
       }
       default: {
-        misc.unreachable(e);
+        misc.unreachable(req);
       }
     }
   };

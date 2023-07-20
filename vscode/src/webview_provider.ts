@@ -4,7 +4,7 @@ import _ from 'lodash';
 import { v4 as uuid } from 'uuid';
 import * as ui from './lib/ui';
 import Bus from './lib/bus';
-import type { MessageHandler, PostParcel, Parcel, ParcelMsg } from './lib/bus';
+import type { MessageHandler, Parcel } from './lib/bus';
 
 class WebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'codecast-view';
@@ -37,10 +37,10 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     this.view?.show();
   }
 
-  public async postMessage(e: ui.BackendEvent): Promise<ui.FrontendResponse> {
-    assert(this.bus);
-    return this.bus.post(e) as Promise<ui.FrontendResponse>;
-  }
+  // public async postMessage(e: ui.BackendEvent): Promise<ui.FrontendResponse> {
+  //   assert(this.bus);
+  //   return this.bus.post(e) as Promise<ui.FrontendResponse>;
+  // }
 
   private postParcel(parcel: Parcel): Promise<boolean> {
     assert(this.view);

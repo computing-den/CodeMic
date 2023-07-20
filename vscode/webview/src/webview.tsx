@@ -1,7 +1,7 @@
 import { h, render } from 'preact';
 import * as ui from './lib/ui';
 import Bus from './lib/bus';
-import type { Message, MessageHandler, Parcel } from './lib/bus';
+import type { MessageHandler, Parcel } from './lib/bus';
 import { provideVSCodeDesignSystem, allComponents } from '@vscode/webview-ui-toolkit';
 import App from './app';
 import { getStore, listenToStore } from './store';
@@ -18,8 +18,8 @@ function renderApp() {
   render(<App store={getStore()} postMessage={postMessage} />, document.getElementById('app')!);
 }
 
-function postMessage(e: ui.FrontendEvent): Promise<ui.BackendResponse> {
-  return bus.post(e) as Promise<ui.BackendResponse>;
+function postMessage(req: ui.FrontendRequest): Promise<ui.BackendResponse> {
+  return bus.post(req) as Promise<ui.BackendResponse>;
 }
 
 function postParcel(parcel: Parcel): Promise<boolean> {
@@ -27,8 +27,7 @@ function postParcel(parcel: Parcel): Promise<boolean> {
   return Promise.resolve(true);
 }
 
-async function messageHandler(msg: Message): Promise<ui.FrontendResponse | undefined> {
-  const e = msg as ui.BackendEvent;
-  console.log('webview received: ', e);
-  return;
+async function messageHandler(req: ui.BackendRequest): Promise<ui.FrontendResponse> {
+  console.log('webview received: ', req);
+  return { type: 'ack' };
 }
