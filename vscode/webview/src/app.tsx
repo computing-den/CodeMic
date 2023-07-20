@@ -1,45 +1,75 @@
-import { h, Component } from 'preact';
+import { h, Fragment, Component } from 'preact';
 import * as ui from './lib/ui';
-import { Store, updateStore } from './store';
+import * as actions from './actions';
+import { updateStore } from './store';
 // import type { WebviewApi } from 'vscode-webview';
 
 type AppProps = {
-  store: Store;
-  postMessage(req: ui.FrontendRequest): Promise<ui.BackendResponse>;
+  store: ui.Store;
+  // postMessage(req: ui.FrontendRequest): Promise<ui.BackendResponse>;
 };
 
 type ScreenProps = AppProps & {
-  openScreen(screen: any): void;
+  breadcrumbs: BreadcrumbType[];
+  openWelcome(): void;
+  openRecorder(): void;
+  openPlayer(path: string): void;
 };
+
+type BreadcrumbsProps = {
+  breadcrumbs: BreadcrumbType[];
+};
+
+type BreadcrumbType = { title: string; onClick?: () => void };
 
 export default class App extends Component<AppProps> {
   state = {
     screen: Welcome,
   };
 
-  openScreen = (screen: any) => this.setState({ screen });
+  openWelcome = () => this.setState({ screen: Welcome });
+
+  openRecorder = async () => {
+    await actions.getStore();
+    this.setState({ screen: Recorder });
+  };
+
+  openPlayer = async (path: string) => {
+    await actions.startPlaying();
+    this.setState({ screen: Player });
+  };
+
+  breadcrumbs = [
+    {
+      title: 'Start',
+      onClick: this.openWelcome,
+    },
+  ];
 
   render() {
-    return <this.state.screen {...this.props} openScreen={this.openScreen} />;
+    return (
+      <this.state.screen
+        {...this.props}
+        openWelcome={this.openWelcome}
+        openRecorder={this.openRecorder}
+        openPlayer={this.openPlayer}
+        breadcrumbs={this.breadcrumbs}
+      />
+    );
   }
 }
 
 class Welcome extends Component<ScreenProps> {
-  open = async (name: string) => {
-    const res = await this.props.postMessage({ type: 'play' });
-    console.log('open: got response from backend: ', res);
-  };
-
-  browse = async () => {
-    const res = await this.props.postMessage({ type: 'play' });
-    console.log('browse: got response from backend: ', res);
+  openBrowser = async () => {
+    // TODO show file dialog
+    this.props.openPlayer('~/session1');
   };
 
   render() {
     const recentFiles = [
-      { name: 'session1', dir: '~' },
-      { name: 'session2', dir: '~/workspaces' },
-      { name: 'session3', dir: '~/some-other' },
+      { name: 'session1', dir: '~', path: '~/session1' },
+      { name: 'session2', dir: '~/workspaces', path: '~/workspaces/session2' },
+      { name: 'session3', dir: '~/some-other', path: '~/some-other/session3' },
     ];
 
     return (
@@ -48,18 +78,13 @@ class Welcome extends Component<ScreenProps> {
           <h2>Start</h2>
           <ul className="unstyled">
             <li>
-              <vscode-link
-                href="#"
-                onClick={() => {
-                  this.props.openScreen(Record);
-                }}
-              >
+              <vscode-link href="#" onClick={this.props.openRecorder}>
                 <span className="codicon codicon-device-camera-video va-top m-right" />
                 Record new session
               </vscode-link>
             </li>
             <li>
-              <vscode-link href="#" onClick={() => this.browse()}>
+              <vscode-link href="#" onClick={this.openBrowser}>
                 <span className="codicon codicon-folder-opened va-top m-right" />
                 Open session
               </vscode-link>
@@ -69,9 +94,9 @@ class Welcome extends Component<ScreenProps> {
         <div className="section recent">
           <h2>Recent</h2>
           <ul className="unstyled">
-            {recentFiles.map(({ name, dir }) => (
+            {recentFiles.map(({ name, dir, path }) => (
               <li>
-                <vscode-link href="#" onClick={() => this.open(name)}>
+                <vscode-link href="#" onClick={() => this.props.openPlayer(path)}>
                   {name}
                 </vscode-link>
                 {dir}
@@ -84,64 +109,122 @@ class Welcome extends Component<ScreenProps> {
   }
 }
 
-class Record extends Component<ScreenProps> {
-  state = {
-    path: '',
-  };
-
+class Recorder extends Component<ScreenProps> {
   startRecording = async () => {
-    const { type } = await this.props.postMessage({ type: 'record' });
-    if (type === 'yes') {
-      updateStore(store => {
-        store.recorder.isRecording = true;
-      });
-    }
+    await actions.startRecording();
   };
 
   stopRecording = async () => {
-    const { type } = await this.props.postMessage({ type: 'stop' });
-    if (type === 'yes') {
-      updateStore(store => {
-        store.recorder.isRecording = false;
-      });
-    }
+    await actions.stopRecording();
   };
-  async componentDidMount() {
-    const res = await this.props.postMessage({ type: 'getWorkspaceFolder' });
-    if (res.type !== 'getWorkspaceFolder') throw new Error(`Unknown response type ${res.type}`);
 
-    this.setState({ path: res.path || '' });
-  }
+  saveRecording = async () => {
+    await actions.saveRecording();
+  };
+
+  discardRecording = async () => {
+    await actions.discardRecording();
+  };
 
   render() {
-    if (!this.state.path) {
-      return (
-        <div className="record">
-          <h1>Record</h1>
-          <div className="add-folder-msg">Add a folder to your workspace.</div>
-        </div>
-      );
-    }
+    const recorder = this.props.store.recorder!;
 
-    if (this.props.store.recorder.isRecording) {
-      return (
-        <div className="record">
-          <h1>
-            Recording <span className="rec-icon codicon codicon-circle-large-filled" />
-          </h1>
-          <vscode-text-field autofocus>Session Name</vscode-text-field>
-          <vscode-button onClick={this.stopRecording}>Stop recording</vscode-button>
-        </div>
-      );
-    }
+    const breadcrumbs = [...this.props.breadcrumbs, { title: 'Record' }];
 
-    return (
-      <div className="record">
-        <h1>Record</h1>
-        <vscode-text-field autofocus>Session Name</vscode-text-field>
-        <vscode-button onClick={this.startRecording}>Start recording</vscode-button>
+    const wrap = (body: any) => (
+      <div className="recorder screen">
+        <Breadcrumbs breadcrumbs={breadcrumbs} />
+        {body}
       </div>
     );
+
+    if (recorder.session) {
+      if (recorder.session.isRecording) {
+        return wrap(
+          <>
+            <vscode-text-field autofocus>Session Name</vscode-text-field>
+            <div className="buttons">
+              <vscode-button onClick={this.stopRecording}>Stop recording</vscode-button>
+            </div>
+          </>,
+        );
+      } else {
+        return wrap(
+          <>
+            <div>{recorder.session.name}</div>
+            <div>{recorder.session.path}</div>
+            <div>Duration: {recorder.session.duration}s</div>
+            <div className="buttons">
+              <vscode-button onClick={this.discardRecording} className="discard" appearance="secondary">
+                Discard
+              </vscode-button>
+              <vscode-button autofocus onClick={this.saveRecording} className="save">
+                Save
+              </vscode-button>
+            </div>
+          </>,
+        );
+      }
+    } else if (recorder.workspaceFolders.length === 0) {
+      return wrap(
+        <>
+          <div className="add-folder-msg">Add a folder to your workspace.</div>
+        </>,
+      );
+    } else {
+      return wrap(
+        <>
+          <vscode-text-field autofocus>Session Name</vscode-text-field>
+          <div className="buttons">
+            <vscode-button onClick={this.startRecording}>Start recording</vscode-button>
+          </div>
+        </>,
+      );
+    }
+  }
+}
+
+class Player extends Component<ScreenProps> {
+  stopPlaying = async () => {
+    await actions.stopPlaying();
+  };
+
+  render() {
+    const player = this.props.store.player!;
+
+    const breadcrumbs = [...this.props.breadcrumbs, { title: 'Play' }];
+
+    const wrap = (body: any) => (
+      <div className="player screen">
+        <Breadcrumbs breadcrumbs={breadcrumbs} />
+        {body}
+      </div>
+    );
+
+    return wrap(
+      <>
+        <p>isPlaying: {player.isPlaying ? 'yes' : 'no'}</p>
+        <p>Name: {player.name}</p>
+        <p>Duration: {player.duration}</p>
+        <p>Path: {player.path}</p>
+      </>,
+    );
+  }
+}
+
+class Breadcrumbs extends Component<BreadcrumbsProps> {
+  render() {
+    let elems = this.props.breadcrumbs.map(b =>
+      b.onClick ? (
+        <vscode-link href="#" onClick={b.onClick}>
+          <h2>{b.title}</h2>
+        </vscode-link>
+      ) : (
+        <h2>{b.title}</h2>
+      ),
+    );
+    elems = elems.flatMap((x, i) => (i ? [<span className="separator codicon codicon-chevron-right" />, x] : [x]));
+    return <div className="breadcrumbs">{elems}</div>;
   }
 }
 

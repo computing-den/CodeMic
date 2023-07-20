@@ -1,32 +1,17 @@
 import { produce } from 'immer';
+import * as ui from './lib/ui';
 
-export type Store = {
-  recorder: {
-    isRecording: boolean;
-  };
-  player: {
-    isPlaying: boolean;
-  };
-};
+let store: ui.Store = {};
 
-let store: Store = {
-  recorder: {
-    isRecording: false,
-  },
-  player: {
-    isPlaying: false,
-  },
-};
-
-export type Listener = (old: Store, cur: Store) => void;
+export type Listener = (old: ui.Store, cur: ui.Store) => void;
 
 let listener: Listener | undefined;
 
-export function getStore(): Store {
+export function getStore(): ui.Store {
   return store;
 }
 
-export function updateStore(recipe: (draft: Store) => void): Store {
+export function updateStore(recipe: (draft: ui.Store) => void): ui.Store {
   const old = store;
   store = produce(old, recipe);
   listener?.(old, store);

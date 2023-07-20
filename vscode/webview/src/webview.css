@@ -1,10 +1,15 @@
 :root {
+  --spacing-small: 4px;
   --spacing-medium: 8px;
   --spacing-large: 16px;
 }
 
 body {
   background-color: transparent;
+}
+
+#app {
+  margin: 0;
 }
 
 ul.unstyled {
@@ -36,21 +41,50 @@ ul.unstyled {
   }
 }
 
-.record {
+.recorder {
   .add-folder-msg {
     margin-bottom: var(--spacing-large);
     font-style: italic;
   }
 
-  & h1 {
-    white-space: nowrap;
-    .rec-icon {
-      color: #ee0000;
-      vertical-align: middle;
-    }
+  .rec-icon {
+    color: #ee0000;
+    vertical-align: middle;
   }
 
   & vscode-text-field {
     margin-bottom: var(--spacing-medium);
+  }
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  /* margin-bottom: var(--spacing-large); */
+
+  .separator {
+    margin: 0 var(--spacing-medium);
+    color: #a9a9a9;
+    font-weight: bold;
+  }
+  & h2 {
+    white-space: nowrap;
+    /* margin: 0; */
+  }
+}
+
+.screen {
+  .buttons {
+    margin-top: var(--spacing-large);
+    display: flex;
+    justify-content: flex-start;
+
+    & vscode-button {
+      flex: 1;
+      max-width: 200px;
+    }
+    & vscode-button + vscode-button {
+      margin-left: var(--spacing-small);
+    }
   }
 }

@@ -306,4 +306,8 @@ export default class Player {
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
   }
+
+  getDuration(): number {
+    return _.last(this.session.events)?.clock ?? 0;
+  }
 }

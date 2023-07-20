@@ -264,7 +264,11 @@ export default class Recorder {
   }
 
   getClock(): number {
-    return (Date.now() - this.startTimeMs) / 1000;
+    if (this.isRecording) {
+      return (Date.now() - this.startTimeMs) / 1000;
+    } else {
+      return _.last(this.session.events)?.clock ?? 0;
+    }
   }
 
   pushEvent(e: ir.PlaybackEvent) {

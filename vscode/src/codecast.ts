@@ -15,11 +15,7 @@ class Codecast {
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
 
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codecast.openView', this.openView.bind(this)),
-      // vscode.commands.registerCommand('codecast.stop_recording', this.stopRecording.bind(this)),
-      // vscode.commands.registerCommand('codecast.save_recording', this.saveRecording.bind(this)),
-    );
+    context.subscriptions.push(vscode.commands.registerCommand('codecast.openView', this.openView.bind(this)));
 
     this.webview = new WebviewProvider(context.extensionUri, this.messageHandler);
 
@@ -37,43 +33,62 @@ class Codecast {
       case 'play': {
         if (this.player) {
           vscode.window.showInformationMessage('Codecast is already playing.');
-          return { type: 'no' };
+          return { type: 'error' };
         } else {
           this.player = Player.fromFile(this.context, misc.getDefaultRecordingPath());
-          return { type: 'yes' };
+          return this.respondWithStore();
         }
       }
       case 'record': {
         if (this.recorder?.isRecording) {
           vscode.window.showInformationMessage('Codecast is already recording.');
-          return { type: 'no' };
+          return { type: 'error' };
         } else {
           this.recorder = new Recorder(this.context);
-          return { type: 'yes' };
+          return this.respondWithStore();
         }
       }
       case 'seek': {
-        return { type: 'no' };
+        return { type: 'error' };
       }
       case 'stop': {
         if (this.recorder) {
           this.recorder.stop();
-          return { type: 'yes' };
+          return this.respondWithStore();
         } else {
           vscode.window.showInformationMessage('Codecast is not playing or recording.');
-          return { type: 'no' };
+          return { type: 'error' };
+        }
+      }
+      case 'save': {
+        if (this.recorder) {
+          this.recorder.save();
+          return this.respondWithStore();
+        } else {
+          vscode.window.showInformationMessage('Codecast is not recording.');
+          return { type: 'error' };
+        }
+      }
+      case 'discard': {
+        if (this.recorder) {
+          this.recorder.stop();
+          this.recorder = undefined;
+          return this.respondWithStore();
+        } else {
+          vscode.window.showInformationMessage('Codecast is not recording.');
+          return { type: 'error' };
         }
       }
       case 'playbackUpdate': {
         if (!this.player?.isPlaying) {
           console.error('got playbackUpdate but player is not playing');
-          return { type: 'no' };
+          return { type: 'error' };
         }
         this.player.update(req.time);
-        return { type: 'yes' };
+        return this.respondWithStore();
       }
-      case 'getWorkspaceFolder': {
-        return { type: 'getWorkspaceFolder', path: vscode.workspace.workspaceFolders?.[0]?.uri.path };
+      case 'getStore': {
+        return this.respondWithStore();
       }
       default: {
         misc.unreachable(req);
@@ -91,6 +106,30 @@ class Codecast {
 
   deactivate = () => {
     // TODO
+  };
+
+  respondWithStore = (): ui.BackendResponse => {
+    return { type: 'getStore', store: this.getStore() };
+  };
+
+  getStore = (): ui.Store => {
+    return {
+      recorder: {
+        workspaceFolders: vscode.workspace.workspaceFolders?.map(x => x.uri.path) || [],
+        session: this.recorder && {
+          isRecording: this.recorder.isRecording,
+          duration: this.recorder.getClock(),
+          name: 'Name (TODO)',
+          path: 'Path/TODO',
+        },
+      },
+      player: this.player && {
+        isPlaying: this.player.isPlaying,
+        duration: this.player.getDuration(),
+        name: 'Name (TODO)',
+        path: 'Path/TODO',
+      },
+    };
   };
 }
 
