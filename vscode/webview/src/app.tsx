@@ -2,7 +2,10 @@ import { h, Fragment, Component } from 'preact';
 import * as ui from './lib/ui';
 import * as actions from './actions';
 import { updateStore } from './store';
+import { JsxElement } from 'typescript';
+import { EventEmitter } from 'vscode';
 // import type { WebviewApi } from 'vscode-webview';
+import _ from 'lodash';
 
 type AppProps = {
   store: ui.Store;
@@ -73,7 +76,7 @@ class Welcome extends Component<ScreenProps> {
     ];
 
     return (
-      <div className="welcome">
+      <div className="screen welcome">
         <div className="section">
           <h2>Start</h2>
           <ul className="unstyled">
@@ -185,9 +188,71 @@ class Recorder extends Component<ScreenProps> {
 }
 
 class Player extends Component<ScreenProps> {
+  progressBar?: Element;
+  fakeProgressInterval: any;
+  lastFakeProgressTime?: DOMHighResTimeStamp;
+  media: FakeMedia = new FakeMedia(this.handleMediaProgress.bind(this));
+
+  state = {
+    localClock: 0,
+  };
+
   stopPlaying = async () => {
     await actions.stopPlaying();
+    this.media.pause();
   };
+
+  handleProgressBarRef = (elem: Element | null) => {
+    this.progressBar = elem || undefined;
+  };
+
+  mouseMoved = (e: MouseEvent) => {
+    if (!this.isMouseOnProgressBar(e)) return;
+    const p = this.getPosNormOfMouse(e);
+    const shadow = this.progressBar!.querySelector('.shadow') as HTMLElement;
+    shadow.style.height = `${p * 100}%`;
+  };
+
+  clicked = async (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const clock = this.getClockOfMouse(e);
+    await this.seekBackendThrottled(clock);
+    this.media.time = clock * 1000;
+    this.setState({ localClock: clock });
+  };
+
+  getClockOfMouse = (e: MouseEvent): number => {
+    const p = this.getPosNormOfMouse(e);
+    return this.props.store.player!.duration * p;
+  };
+
+  getPosNormOfMouse = (e: MouseEvent): number => {
+    const rect = this.progressBar!.getBoundingClientRect();
+    return (e.clientY - rect.y) / rect.height;
+  };
+
+  isMouseOnProgressBar = (e: MouseEvent): boolean => {
+    const rect = this.progressBar!.getBoundingClientRect();
+    const p = [e.clientX - rect.x, e.clientY - rect.y];
+    return p[0] >= 0 && p[0] <= rect.width && p[1] >= 0 && p[1] <= rect.height;
+  };
+
+  seekBackendThrottled = _.throttle(actions.seek, 200);
+
+  handleMediaProgress(ms: number) {
+    const localClock = Math.max(0, Math.min(ms / 1000, this.props.store.player!.duration));
+    this.setState({ localClock });
+  }
+
+  componentDidMount() {
+    document.addEventListener('mousemove', this.mouseMoved);
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.fakeProgressInterval);
+    document.removeEventListener('mousemove', this.mouseMoved);
+  }
 
   render() {
     const player = this.props.store.player!;
@@ -201,13 +266,21 @@ class Player extends Component<ScreenProps> {
       </div>
     );
 
+    const filledStyle = { height: `${(this.state.localClock / player.duration) * 100}%` };
+
     return wrap(
-      <>
+      <div className="content">
+        <div className="progress-bar" ref={this.handleProgressBarRef} onClick={this.clicked}>
+          <div className="bar">
+            <div className="shadow" />
+            <div className="filled" style={filledStyle} />
+          </div>
+        </div>
         <p>isPlaying: {player.isPlaying ? 'yes' : 'no'}</p>
         <p>Name: {player.name}</p>
         <p>Duration: {player.duration}</p>
         <p>Path: {player.path}</p>
-      </>,
+      </div>,
     );
   }
 }
@@ -226,6 +299,35 @@ class Breadcrumbs extends Component<BreadcrumbsProps> {
     elems = elems.flatMap((x, i) => (i ? [<span className="separator codicon codicon-chevron-right" />, x] : [x]));
     return <div className="breadcrumbs">{elems}</div>;
   }
+}
+
+class FakeMedia {
+  private request: any;
+  private lastTime: DOMHighResTimeStamp = 0;
+
+  constructor(private listener: (time: number) => void, public time: number = 0) {
+    this.play();
+  }
+
+  // set(time: number) {
+  //   this.time += (performance.now() - )
+  // }
+
+  play() {
+    this.lastTime = performance.now();
+    this.request = requestAnimationFrame(this.handle);
+  }
+
+  pause() {
+    cancelAnimationFrame(this.request);
+  }
+
+  private handle = (time: DOMHighResTimeStamp) => {
+    this.time += time - this.lastTime;
+    this.lastTime = time;
+    this.listener(this.time);
+    requestAnimationFrame(this.handle);
+  };
 }
 
 // export class App extends Component {

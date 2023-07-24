@@ -21,7 +21,9 @@ export default class Player {
   // workdir: string = '';
   isPlaying: boolean = false;
   session: ir.Session;
-  eventIndex: number = -1;
+
+  private eventIndex: number = -1;
+  private clock: number = 0;
 
   static fromFile(context: vscode.ExtensionContext, filename: string): Player {
     return new Player(context, ir.Session.fromFile(filename));
@@ -150,6 +152,8 @@ export default class Player {
         this.eventIndex = i - 1;
       }
     }
+
+    this.clock = Math.max(0, Math.min(this.getDuration(), clock));
 
     if (this.eventIndex === n - 1) {
       this.pause();
@@ -309,5 +313,9 @@ export default class Player {
 
   getDuration(): number {
     return _.last(this.session.events)?.clock ?? 0;
+  }
+
+  getClock(): number {
+    return this.clock;
   }
 }

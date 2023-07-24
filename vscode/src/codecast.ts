@@ -49,7 +49,13 @@ class Codecast {
         }
       }
       case 'seek': {
-        return { type: 'error' };
+        if (this.player) {
+          await this.player.update(req.clock);
+          return this.respondWithStore();
+        } else {
+          vscode.window.showInformationMessage('Codecast is not playing.');
+          return { type: 'error' };
+        }
       }
       case 'stop': {
         if (this.recorder) {
@@ -84,7 +90,7 @@ class Codecast {
           console.error('got playbackUpdate but player is not playing');
           return { type: 'error' };
         }
-        this.player.update(req.time);
+        this.player.update(req.clock);
         return this.respondWithStore();
       }
       case 'getStore': {
@@ -126,6 +132,7 @@ class Codecast {
       player: this.player && {
         isPlaying: this.player.isPlaying,
         duration: this.player.getDuration(),
+        clock: this.player.getClock(),
         name: 'Name (TODO)',
         path: 'Path/TODO',
       },

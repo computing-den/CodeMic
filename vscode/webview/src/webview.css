@@ -4,12 +4,157 @@
   --spacing-large: 16px;
 }
 
+html,
+body {
+  min-height: 100vh;
+}
+
 body {
   background-color: transparent;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 #app {
+  flex: 1;
+  width: 100%;
+  padding: 0;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen {
+  flex: 1;
+
+  .section + .section {
+    margin-top: var(--spacing-large);
+  }
+
+  .buttons {
+    margin-top: var(--spacing-large);
+    display: flex;
+    justify-content: flex-start;
+
+    & vscode-button {
+      flex: 1;
+      max-width: 200px;
+    }
+    & vscode-button + vscode-button {
+      margin-left: var(--spacing-small);
+    }
+  }
+}
+
+.welcome {
+  padding: 0 var(--container-padding);
+  .section.recent {
+    & li vscode-link {
+      margin-right: var(--spacing-large);
+    }
+  }
+}
+
+.recorder {
+  padding: 0 var(--container-padding);
+  .add-folder-msg {
+    margin-bottom: var(--spacing-large);
+    font-style: italic;
+  }
+
+  .rec-icon {
+    color: #ee0000;
+    vertical-align: middle;
+  }
+
+  & vscode-text-field {
+    margin-bottom: var(--spacing-medium);
+  }
+}
+
+.player {
+  --progress-bar-full-width: var(--container-padding);
+  --progress-bar-small-width: 2px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .breadcrumbs {
+    padding: 0 var(--container-padding);
+  }
+
+  .content {
+    flex: 1;
+    padding: 0 var(--container-padding);
+    /* padding-left: var(--spacing-medium); */
+    position: relative;
+
+    .progress-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: var(--container-padding);
+      width: var(--progress-bar-full-width);
+
+      &:hover .bar {
+        width: calc(var(--progress-bar-full-width) - 4px);
+
+        .shadow {
+          opacity: 1;
+        }
+      }
+
+      .bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: var(--progress-bar-small-width);
+        background: #ccc;
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
+
+        .shadow {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          /* height: 200px; */
+          background: #cc000030;
+          opacity: 0;
+          transition: opacity 0.2s ease-in-out;
+        }
+        .filled {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          min-height: 2px;
+          /* height: 100px; */
+          background: #cc0000;
+          /* transition: all 0.1s ease-in-out; */
+        }
+      }
+    }
+  }
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  /* margin-bottom: var(--spacing-large); */
+
+  .separator {
+    margin: 0 var(--spacing-medium);
+    color: #a9a9a9;
+    font-weight: bold;
+  }
+
+  & h2 {
+    white-space: nowrap;
+    /* margin: 0; */
+  }
 }
 
 ul.unstyled {
@@ -27,64 +172,4 @@ ul.unstyled {
 
 .codicon.va-top {
   vertical-align: top;
-}
-
-.welcome {
-  .section + .section {
-    margin-top: var(--spacing-large);
-  }
-
-  .section.recent {
-    & li vscode-link {
-      margin-right: var(--spacing-large);
-    }
-  }
-}
-
-.recorder {
-  .add-folder-msg {
-    margin-bottom: var(--spacing-large);
-    font-style: italic;
-  }
-
-  .rec-icon {
-    color: #ee0000;
-    vertical-align: middle;
-  }
-
-  & vscode-text-field {
-    margin-bottom: var(--spacing-medium);
-  }
-}
-
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  /* margin-bottom: var(--spacing-large); */
-
-  .separator {
-    margin: 0 var(--spacing-medium);
-    color: #a9a9a9;
-    font-weight: bold;
-  }
-  & h2 {
-    white-space: nowrap;
-    /* margin: 0; */
-  }
-}
-
-.screen {
-  .buttons {
-    margin-top: var(--spacing-large);
-    display: flex;
-    justify-content: flex-start;
-
-    & vscode-button {
-      flex: 1;
-      max-width: 200px;
-    }
-    & vscode-button + vscode-button {
-      margin-left: var(--spacing-small);
-    }
-  }
 }

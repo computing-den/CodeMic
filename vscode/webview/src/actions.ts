@@ -31,6 +31,10 @@ export async function stopPlaying() {
   await postMessageAndUpdateStore({ type: 'stop' });
 }
 
+export async function seek(clock: number) {
+  await postMessageAndUpdateStore({ type: 'seek', clock });
+}
+
 export async function getStore() {
   await postMessageAndUpdateStore({ type: 'getStore' });
 }
