@@ -1,4 +1,5 @@
 import * as misc from './misc';
+import * as libMisc from './lib/misc';
 import * as ir from './internal_representation';
 import * as vscode from 'vscode';
 import _ from 'lodash';
@@ -24,15 +25,20 @@ export default class Player {
 
   private eventIndex: number = -1;
   private clock: number = 0;
+  private enqueueUpdate = libMisc.taskQueue(this.updateImmediately.bind(this), 1);
 
   static fromFile(context: vscode.ExtensionContext, filename: string): Player {
     return new Player(context, ir.Session.fromFile(filename));
   }
 
   constructor(context: vscode.ExtensionContext, session: ir.Session) {
-    console.log('Player: start');
     this.context = context;
     this.session = session;
+  }
+
+  start() {
+    if (this.isPlaying) throw new Error('play(): is already playing');
+
     this.isPlaying = true;
 
     // ignore user input
@@ -51,6 +57,13 @@ export default class Player {
     this.context.subscriptions.push(...this.disposables);
   }
 
+  stop() {
+    this.enqueueUpdate.clear();
+    this.isPlaying = false;
+    for (const d of this.disposables) d.dispose();
+    this.disposables = [];
+  }
+
   async update(clock: number) {
     try {
       await this.enqueueUpdate(clock);
@@ -59,8 +72,6 @@ export default class Player {
       this.stop();
     }
   }
-
-  private enqueueUpdate = misc.taskQueue(this.updateImmediately.bind(this), 1);
 
   private async updateImmediately(clock: number) {
     // FORWARD
@@ -156,7 +167,7 @@ export default class Player {
     this.clock = Math.max(0, Math.min(this.getDuration(), clock));
 
     if (this.eventIndex === n - 1) {
-      this.pause();
+      this.stop();
     }
   }
 
@@ -164,7 +175,7 @@ export default class Player {
     console.log(`Applying ${Dir[dir]}: `, ir.playbackEventToPlain(e));
     switch (e.type) {
       case 'stop': {
-        this.pause();
+        this.stop();
         break;
       }
       case 'textChange': {
@@ -298,17 +309,6 @@ export default class Player {
 
   findVscVisibleTextEditorByUri(uri: vscode.Uri) {
     return vscode.window.visibleTextEditors.find(x => misc.isEqualUri(x.document.uri, uri));
-  }
-
-  pause() {
-    throw new Error('TODO');
-  }
-
-  stop() {
-    this.enqueueUpdate.clear();
-    this.isPlaying = false;
-    for (const d of this.disposables) d.dispose();
-    this.disposables = [];
   }
 
   getDuration(): number {

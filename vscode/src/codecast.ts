@@ -30,13 +30,22 @@ class Codecast {
     console.log('extension received: ', req);
 
     switch (req.type) {
-      case 'play': {
+      case 'openPlayer': {
         if (this.player) {
           vscode.window.showInformationMessage('Codecast is already playing.');
           return { type: 'error' };
         } else {
           this.player = Player.fromFile(this.context, misc.getDefaultRecordingPath());
           return this.respondWithStore();
+        }
+      }
+      case 'play': {
+        if (this.player) {
+          this.player.start();
+          return this.respondWithStore();
+        } else {
+          vscode.window.showInformationMessage('Codecast player is not open.');
+          return { type: 'error' };
         }
       }
       case 'record': {
@@ -60,6 +69,9 @@ class Codecast {
       case 'stop': {
         if (this.recorder) {
           this.recorder.stop();
+          return this.respondWithStore();
+        } else if (this.player) {
+          this.player.stop();
           return this.respondWithStore();
         } else {
           vscode.window.showInformationMessage('Codecast is not playing or recording.');

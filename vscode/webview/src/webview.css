@@ -137,6 +137,15 @@ body {
         }
       }
     }
+
+    .control-toolbar {
+      display: flex;
+      align-items: center;
+
+      .time {
+        margin-left: var(--spacing-medium);
+      }
+    }
   }
 }
 

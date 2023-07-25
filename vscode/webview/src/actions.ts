@@ -23,6 +23,10 @@ export async function discardRecording() {
   await postMessageAndUpdateStore({ type: 'discard' });
 }
 
+export async function openPlayer() {
+  await postMessageAndUpdateStore({ type: 'openPlayer' });
+}
+
 export async function startPlaying() {
   await postMessageAndUpdateStore({ type: 'play' });
 }

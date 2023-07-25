@@ -1,5 +1,6 @@
 export type FrontendRequest =
   | { type: 'seek'; clock: number }
+  | { type: 'openPlayer' }
   | { type: 'play' }
   | { type: 'record' }
   | { type: 'stop' }

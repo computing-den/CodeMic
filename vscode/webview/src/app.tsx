@@ -1,5 +1,6 @@
 import { h, Fragment, Component } from 'preact';
 import * as ui from './lib/ui';
+import * as libMisc from './lib/misc';
 import * as actions from './actions';
 import { updateStore } from './store';
 import { JsxElement } from 'typescript';
@@ -38,7 +39,7 @@ export default class App extends Component<AppProps> {
   };
 
   openPlayer = async (path: string) => {
-    await actions.startPlaying();
+    await actions.openPlayer();
     this.setState({ screen: Player });
   };
 
@@ -197,9 +198,12 @@ class Player extends Component<ScreenProps> {
     localClock: 0,
   };
 
+  startPlaying = async () => {
+    await actions.startPlaying();
+  };
+
   stopPlaying = async () => {
     await actions.stopPlaying();
-    this.media.pause();
   };
 
   handleProgressBarRef = (elem: Element | null) => {
@@ -240,13 +244,28 @@ class Player extends Component<ScreenProps> {
 
   seekBackendThrottled = _.throttle(actions.seek, 200);
 
+  enableOrDisableMedia() {
+    const { isPlaying } = this.props.store.player!;
+    if (isPlaying !== this.media.isPlaying()) {
+      if (isPlaying) this.media.play();
+      else this.media.stop();
+    }
+  }
+
   handleMediaProgress(ms: number) {
-    const localClock = Math.max(0, Math.min(ms / 1000, this.props.store.player!.duration));
-    this.setState({ localClock });
+    if (this.props.store.player!.isPlaying) {
+      const localClock = Math.max(0, Math.min(ms / 1000, this.props.store.player!.duration));
+      this.setState({ localClock });
+    }
+  }
+
+  componentDidUpdate() {
+    this.enableOrDisableMedia();
   }
 
   componentDidMount() {
     document.addEventListener('mousemove', this.mouseMoved);
+    this.enableOrDisableMedia();
   }
 
   componentWillUnmount() {
@@ -276,6 +295,20 @@ class Player extends Component<ScreenProps> {
             <div className="filled" style={filledStyle} />
           </div>
         </div>
+        <div className="control-toolbar">
+          {player.isPlaying ? (
+            <vscode-button onClick={this.stopPlaying} appearance="secondary">
+              <div class="codicon codicon-debug-pause" />
+            </vscode-button>
+          ) : (
+            <vscode-button onClick={this.startPlaying}>
+              <div class="codicon codicon-play" />
+            </vscode-button>
+          )}
+          <div className="time">
+            {libMisc.formatTimeSeconds(this.state.localClock)} / {libMisc.formatTimeSeconds(player.duration)}
+          </div>
+        </div>
         <p>isPlaying: {player.isPlaying ? 'yes' : 'no'}</p>
         <p>Name: {player.name}</p>
         <p>Duration: {player.duration}</p>
@@ -302,7 +335,7 @@ class Breadcrumbs extends Component<BreadcrumbsProps> {
 }
 
 class FakeMedia {
-  private request: any;
+  private request: number = 0;
   private lastTime: DOMHighResTimeStamp = 0;
 
   constructor(private listener: (time: number) => void, public time: number = 0) {
@@ -318,8 +351,13 @@ class FakeMedia {
     this.request = requestAnimationFrame(this.handle);
   }
 
-  pause() {
+  stop() {
     cancelAnimationFrame(this.request);
+    this.request = 0;
+  }
+
+  isPlaying(): boolean {
+    return Boolean(this.request);
   }
 
   private handle = (time: DOMHighResTimeStamp) => {
