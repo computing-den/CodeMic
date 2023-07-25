@@ -12,12 +12,12 @@ export async function startRecording() {
 }
 
 export async function stopRecording() {
-  await postMessageAndUpdateStore({ type: 'stop' });
+  await postMessageAndUpdateStore({ type: 'stopRecording' });
 }
 
-export async function saveRecording() {
-  await postMessageAndUpdateStore({ type: 'save' });
-}
+// export async function saveRecording() {
+//   await postMessageAndUpdateStore({ type: 'save' });
+// }
 
 export async function discardRecording() {
   await postMessageAndUpdateStore({ type: 'discard' });
@@ -27,12 +27,16 @@ export async function openPlayer() {
   await postMessageAndUpdateStore({ type: 'openPlayer' });
 }
 
+export async function openRecorder() {
+  await postMessageAndUpdateStore({ type: 'openRecorder' });
+}
+
 export async function startPlaying() {
   await postMessageAndUpdateStore({ type: 'play' });
 }
 
 export async function stopPlaying() {
-  await postMessageAndUpdateStore({ type: 'stop' });
+  await postMessageAndUpdateStore({ type: 'stopPlaying' });
 }
 
 export async function seek(clock: number) {

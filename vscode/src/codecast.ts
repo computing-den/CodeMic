@@ -31,13 +31,12 @@ class Codecast {
 
     switch (req.type) {
       case 'openPlayer': {
-        if (this.player) {
-          vscode.window.showInformationMessage('Codecast is already playing.');
-          return { type: 'error' };
-        } else {
-          this.player = Player.fromFile(this.context, misc.getDefaultRecordingPath());
-          return this.respondWithStore();
-        }
+        this.player ??= Player.fromFile(this.context, misc.getDefaultRecordingPath());
+        return this.respondWithStore();
+      }
+      case 'openRecorder': {
+        this.recorder ??= new Recorder(this.context);
+        return this.respondWithStore();
       }
       case 'play': {
         if (this.player) {
@@ -49,12 +48,12 @@ class Codecast {
         }
       }
       case 'record': {
-        if (this.recorder?.isRecording) {
-          vscode.window.showInformationMessage('Codecast is already recording.');
-          return { type: 'error' };
-        } else {
-          this.recorder = new Recorder(this.context);
+        if (this.recorder) {
+          this.recorder.start();
           return this.respondWithStore();
+        } else {
+          vscode.window.showInformationMessage('Codecast recorder is not open.');
+          return { type: 'error' };
         }
       }
       case 'seek': {
@@ -66,27 +65,23 @@ class Codecast {
           return { type: 'error' };
         }
       }
-      case 'stop': {
-        if (this.recorder) {
-          this.recorder.stop();
-          return this.respondWithStore();
-        } else if (this.player) {
-          this.player.stop();
-          return this.respondWithStore();
-        } else {
-          vscode.window.showInformationMessage('Codecast is not playing or recording.');
-          return { type: 'error' };
-        }
+      case 'stopPlaying': {
+        this.player?.stop();
+        return this.respondWithStore();
       }
-      case 'save': {
-        if (this.recorder) {
-          this.recorder.save();
-          return this.respondWithStore();
-        } else {
-          vscode.window.showInformationMessage('Codecast is not recording.');
-          return { type: 'error' };
-        }
+      case 'stopRecording': {
+        this.recorder?.stop();
+        return this.respondWithStore();
       }
+      // case 'save': {
+      //   if (this.recorder) {
+      //     this.recorder.save();
+      //     return this.respondWithStore();
+      //   } else {
+      //     vscode.window.showInformationMessage('Codecast is not recording.');
+      //     return { type: 'error' };
+      //   }
+      // }
       case 'discard': {
         if (this.recorder) {
           this.recorder.stop();

@@ -38,6 +38,7 @@ export default class Player {
 
   start() {
     if (this.isPlaying) throw new Error('play(): is already playing');
+    console.log('Player: start()');
 
     this.isPlaying = true;
 
@@ -58,6 +59,7 @@ export default class Player {
   }
 
   stop() {
+    console.log('Player: stop()');
     this.enqueueUpdate.clear();
     this.isPlaying = false;
     for (const d of this.disposables) d.dispose();

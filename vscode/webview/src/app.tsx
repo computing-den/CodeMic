@@ -34,7 +34,7 @@ export default class App extends Component<AppProps> {
   openWelcome = () => this.setState({ screen: Welcome });
 
   openRecorder = async () => {
-    await actions.getStore();
+    await actions.openRecorder();
     this.setState({ screen: Recorder });
   };
 
@@ -114,6 +114,12 @@ class Welcome extends Component<ScreenProps> {
 }
 
 class Recorder extends Component<ScreenProps> {
+  media: FakeMedia = new FakeMedia(this.handleMediaProgress.bind(this));
+
+  state = {
+    localClock: 0,
+  };
+
   startRecording = async () => {
     await actions.startRecording();
   };
@@ -130,8 +136,31 @@ class Recorder extends Component<ScreenProps> {
     await actions.discardRecording();
   };
 
+  enableOrDisableMedia() {
+    const isRecording = Boolean(this.props.store.recorder!.session?.isRecording);
+    if (isRecording !== this.media.isPlaying()) {
+      if (isRecording) this.media.play();
+      else this.media.stop();
+    }
+  }
+
+  handleMediaProgress(ms: number) {
+    if (this.props.store.recorder!.session?.isRecording) {
+      this.setState({ localClock: ms / 1000 });
+    }
+  }
+
+  componentDidUpdate() {
+    this.enableOrDisableMedia();
+  }
+
+  componentDidMount() {
+    this.enableOrDisableMedia();
+  }
+
   render() {
     const recorder = this.props.store.recorder!;
+    const { session, workspaceFolders } = recorder;
 
     const breadcrumbs = [...this.props.breadcrumbs, { title: 'Record' }];
 
@@ -142,57 +171,38 @@ class Recorder extends Component<ScreenProps> {
       </div>
     );
 
-    if (recorder.session) {
-      if (recorder.session.isRecording) {
-        return wrap(
-          <>
-            <vscode-text-field autofocus>Session Name</vscode-text-field>
-            <div className="buttons">
-              <vscode-button onClick={this.stopRecording}>Stop recording</vscode-button>
-            </div>
-          </>,
-        );
-      } else {
-        return wrap(
-          <>
-            <div>{recorder.session.name}</div>
-            <div>{recorder.session.path}</div>
-            <div>Duration: {recorder.session.duration}s</div>
-            <div className="buttons">
-              <vscode-button onClick={this.discardRecording} className="discard" appearance="secondary">
-                Discard
-              </vscode-button>
-              <vscode-button autofocus onClick={this.saveRecording} className="save">
-                Save
-              </vscode-button>
-            </div>
-          </>,
-        );
-      }
-    } else if (recorder.workspaceFolders.length === 0) {
-      return wrap(
-        <>
-          <div className="add-folder-msg">Add a folder to your workspace.</div>
-        </>,
-      );
-    } else {
-      return wrap(
-        <>
-          <vscode-text-field autofocus>Session Name</vscode-text-field>
-          <div className="buttons">
-            <vscode-button onClick={this.startRecording}>Start recording</vscode-button>
-          </div>
-        </>,
-      );
+    if (!session) {
+      return wrap(<div className="background-msg">ERROR: empty session.</div>);
     }
+
+    const toggleButton = session.isRecording ? (
+      <vscode-button onClick={this.stopRecording} appearance="secondary">
+        <div class="codicon codicon-debug-stop" />
+      </vscode-button>
+    ) : (
+      <vscode-button onClick={this.startRecording}>
+        <div class="codicon codicon-device-camera-video" />
+      </vscode-button>
+    );
+
+    const timeStr = session.isRecording ? libMisc.formatTimeSeconds(this.state.localClock) : '00:00';
+
+    return wrap(
+      <>
+        <vscode-text-field autofocus>Session Name</vscode-text-field>
+        <div className="control-toolbar">
+          {toggleButton}
+          <div className="time">{timeStr}</div>
+        </div>
+      </>,
+    );
   }
 }
 
 class Player extends Component<ScreenProps> {
   progressBar?: Element;
-  fakeProgressInterval: any;
-  lastFakeProgressTime?: DOMHighResTimeStamp;
   media: FakeMedia = new FakeMedia(this.handleMediaProgress.bind(this));
+  isSeeking: boolean = false;
 
   state = {
     localClock: 0,
@@ -221,9 +231,18 @@ class Player extends Component<ScreenProps> {
     e.preventDefault();
     e.stopPropagation();
     const clock = this.getClockOfMouse(e);
-    await this.seekBackendThrottled(clock);
+    await this.seek(clock);
     this.media.time = clock * 1000;
     this.setState({ localClock: clock });
+  };
+
+  seek = async (clock: number) => {
+    try {
+      this.isSeeking = true;
+      await actions.seek(clock);
+    } finally {
+      this.isSeeking = false;
+    }
   };
 
   getClockOfMouse = (e: MouseEvent): number => {
@@ -242,7 +261,9 @@ class Player extends Component<ScreenProps> {
     return p[0] >= 0 && p[0] <= rect.width && p[1] >= 0 && p[1] <= rect.height;
   };
 
-  seekBackendThrottled = _.throttle(actions.seek, 200);
+  // seekBackend = async (clock: number) => {
+  //   (actions.seek, 200);
+  // }
 
   enableOrDisableMedia() {
     const { isPlaying } = this.props.store.player!;
@@ -252,9 +273,10 @@ class Player extends Component<ScreenProps> {
     }
   }
 
-  handleMediaProgress(ms: number) {
-    if (this.props.store.player!.isPlaying) {
+  async handleMediaProgress(ms: number) {
+    if (this.props.store.player!.isPlaying && !this.isSeeking) {
       const localClock = Math.max(0, Math.min(ms / 1000, this.props.store.player!.duration));
+      await this.seek(localClock);
       this.setState({ localClock });
     }
   }
@@ -269,7 +291,6 @@ class Player extends Component<ScreenProps> {
   }
 
   componentWillUnmount() {
-    clearInterval(this.fakeProgressInterval);
     document.removeEventListener('mousemove', this.mouseMoved);
   }
 
@@ -338,7 +359,7 @@ class FakeMedia {
   private request: any;
   private lastTime: DOMHighResTimeStamp = 0;
 
-  static intervalMs: number = 1000;
+  static intervalMs: number = 200;
 
   constructor(private listener: (time: number) => void, public time: number = 0) {
     this.play();
@@ -349,11 +370,13 @@ class FakeMedia {
   // }
 
   play() {
+    console.log('fakemedia: play()');
     this.lastTime = performance.now();
     this.request = setTimeout(this.handle, FakeMedia.intervalMs);
   }
 
   stop() {
+    console.log('fakemedia: stop()');
     clearTimeout(this.request);
     this.request = undefined;
   }
@@ -366,6 +389,7 @@ class FakeMedia {
     const time = performance.now();
     this.time += time - this.lastTime;
     this.lastTime = time;
+    console.log('fakemedia: event: ', this.time);
     this.listener(this.time);
     this.request = setTimeout(this.handle, FakeMedia.intervalMs);
   };

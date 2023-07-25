@@ -58,7 +58,8 @@ body {
 
 .recorder {
   padding: 0 var(--container-padding);
-  .add-folder-msg {
+
+  .background-msg {
     margin-bottom: var(--spacing-large);
     font-style: italic;
   }
@@ -68,6 +69,17 @@ body {
     vertical-align: middle;
   }
 
+  .control-toolbar {
+    display: flex;
+    align-items: center;
+
+    .time {
+      margin-left: var(--spacing-medium);
+      font-size: 1.5em;
+      font-weight: bold;
+    }
+  }
+
   & vscode-text-field {
     margin-bottom: var(--spacing-medium);
   }
@@ -75,7 +87,7 @@ body {
 
 .player {
   --progress-bar-full-width: var(--container-padding);
-  --progress-bar-small-width: 2px;
+  --progress-bar-small-width: 3px;
   min-height: 100%;
   display: flex;
   flex-direction: column;
@@ -93,7 +105,7 @@ body {
     .progress-bar {
       position: absolute;
       top: 0;
-      left: 0;
+      right: 0;
       bottom: var(--container-padding);
       width: var(--progress-bar-full-width);
 
@@ -108,7 +120,7 @@ body {
       .bar {
         position: absolute;
         top: 0;
-        left: 0;
+        right: 0;
         bottom: 0;
         width: var(--progress-bar-small-width);
         background: #ccc;

@@ -23,6 +23,11 @@ export default class Recorder {
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
+
+    // TODO store workspace folders, check git repository etc.
+  }
+
+  start() {
     this.isRecording = true;
 
     // listen for open document events
@@ -129,6 +134,7 @@ export default class Recorder {
 
     console.log('session: ', this.session.toPlain());
     this.isRecording = false;
+    this.save();
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
   }

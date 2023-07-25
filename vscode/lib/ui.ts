@@ -1,10 +1,12 @@
 export type FrontendRequest =
   | { type: 'seek'; clock: number }
   | { type: 'openPlayer' }
+  | { type: 'openRecorder' }
   | { type: 'play' }
   | { type: 'record' }
-  | { type: 'stop' }
-  | { type: 'save' }
+  | { type: 'stopPlaying' }
+  | { type: 'stopRecording' }
+  // | { type: 'save' }
   | { type: 'discard' }
   | { type: 'playbackUpdate'; clock: number }
   | { type: 'getStore' };
