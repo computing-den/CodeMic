@@ -335,8 +335,10 @@ class Breadcrumbs extends Component<BreadcrumbsProps> {
 }
 
 class FakeMedia {
-  private request: number = 0;
+  private request: any;
   private lastTime: DOMHighResTimeStamp = 0;
+
+  static intervalMs: number = 1000;
 
   constructor(private listener: (time: number) => void, public time: number = 0) {
     this.play();
@@ -348,23 +350,24 @@ class FakeMedia {
 
   play() {
     this.lastTime = performance.now();
-    this.request = requestAnimationFrame(this.handle);
+    this.request = setTimeout(this.handle, FakeMedia.intervalMs);
   }
 
   stop() {
-    cancelAnimationFrame(this.request);
-    this.request = 0;
+    clearTimeout(this.request);
+    this.request = undefined;
   }
 
   isPlaying(): boolean {
     return Boolean(this.request);
   }
 
-  private handle = (time: DOMHighResTimeStamp) => {
+  private handle = () => {
+    const time = performance.now();
     this.time += time - this.lastTime;
     this.lastTime = time;
     this.listener(this.time);
-    requestAnimationFrame(this.handle);
+    this.request = setTimeout(this.handle, FakeMedia.intervalMs);
   };
 }
 
