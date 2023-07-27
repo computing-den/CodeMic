@@ -8,6 +8,7 @@ import * as ui from './lib/ui';
 
 class Codecast {
   context: vscode.ExtensionContext;
+  screen: ui.Screen = ui.Screen.Welcome;
   recorder?: Recorder;
   player?: Player;
   webview: WebviewProvider;
@@ -17,7 +18,7 @@ class Codecast {
 
     context.subscriptions.push(vscode.commands.registerCommand('codecast.openView', this.openView.bind(this)));
 
-    this.webview = new WebviewProvider(context.extensionUri, this.messageHandler);
+    this.webview = new WebviewProvider(context.extensionUri, this.messageHandler.bind(this));
 
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(WebviewProvider.viewType, this.webview, {
@@ -26,18 +27,34 @@ class Codecast {
     );
   }
 
-  messageHandler = async (req: ui.FrontendRequest): Promise<ui.BackendResponse> => {
+  async messageHandler(req: ui.FrontendRequest): Promise<ui.BackendResponse> {
     console.log('extension received: ', req);
 
     switch (req.type) {
+      case 'openWelcome': {
+        await this.closeCurrentScreen();
+        return this.respondWithStore();
+      }
       case 'openPlayer': {
-        this.player ??= Player.fromFile(this.context, misc.getDefaultRecordingPath());
+        if (await this.closeCurrentScreen()) {
+          this.screen = ui.Screen.Player;
+          this.player ??= Player.fromFile(this.context, misc.getDefaultRecordingPath());
+        }
         return this.respondWithStore();
       }
       case 'openRecorder': {
-        this.recorder ??= new Recorder(this.context);
+        if (await this.closeCurrentScreen()) {
+          this.screen = ui.Screen.Recorder;
+          this.recorder ??= new Recorder(this.context);
+        }
         return this.respondWithStore();
       }
+      // case 'closePlayer': {
+      //   if (this.player) {
+      //     // nothing to do
+      //   }
+      //   return this.respondWithStore();
+      // }
       case 'play': {
         if (this.player) {
           this.player.start();
@@ -65,12 +82,12 @@ class Codecast {
           return { type: 'error' };
         }
       }
-      case 'stopPlaying': {
-        this.player?.stop();
+      case 'pausePlayer': {
+        this.player?.pause();
         return this.respondWithStore();
       }
-      case 'stopRecording': {
-        this.recorder?.stop();
+      case 'pauseRecorder': {
+        this.recorder?.pause();
         return this.respondWithStore();
       }
       // case 'save': {
@@ -82,16 +99,16 @@ class Codecast {
       //     return { type: 'error' };
       //   }
       // }
-      case 'discard': {
-        if (this.recorder) {
-          this.recorder.stop();
-          this.recorder = undefined;
-          return this.respondWithStore();
-        } else {
-          vscode.window.showInformationMessage('Codecast is not recording.');
-          return { type: 'error' };
-        }
-      }
+      // case 'discard': {
+      //   if (this.recorder) {
+      //     this.recorder.stop();
+      //     this.recorder = undefined;
+      //     return this.respondWithStore();
+      //   } else {
+      //     vscode.window.showInformationMessage('Codecast is not recording.');
+      //     return { type: 'error' };
+      //   }
+      // }
       case 'playbackUpdate': {
         if (!this.player?.isPlaying) {
           console.error('got playbackUpdate but player is not playing');
@@ -107,26 +124,56 @@ class Codecast {
         misc.unreachable(req);
       }
     }
-  };
+  }
 
-  openView = () => {
+  async closeCurrentScreen(): Promise<boolean> {
+    if (this.screen === ui.Screen.Recorder) {
+      return await this.closeRecorder();
+    } else if (this.screen === ui.Screen.Player) {
+      return await this.closePlayer();
+    }
+    return true;
+  }
+
+  async closeRecorder(): Promise<boolean> {
+    if (this.recorder!.isRecording) {
+      const saveTitle = 'Save and exit';
+      const answer = await vscode.window.showWarningMessage(
+        'Recording is in progress. Do you wish to stop the session?',
+        { modal: true, detail: 'The session will be saved if you stop recording.' },
+        { title: saveTitle },
+        { title: 'Cancel', isCloseAffordance: true },
+      );
+      if (answer?.title !== saveTitle) return false;
+    }
+    this.recorder!.stop();
+    this.recorder = undefined;
+    this.screen = ui.Screen.Welcome;
+    return true;
+  }
+
+  async closePlayer(): Promise<boolean> {
+    this.player!.stop();
+    this.player = undefined;
+    this.screen = ui.Screen.Welcome;
+    return true;
+  }
+
+  openView() {
     this.webview.show();
-  };
+  }
 
-  saveRecording = () => {
-    this.recorder?.save();
-  };
-
-  deactivate = () => {
+  deactivate() {
     // TODO
-  };
+  }
 
-  respondWithStore = (): ui.BackendResponse => {
+  respondWithStore(): ui.BackendResponse {
     return { type: 'getStore', store: this.getStore() };
-  };
+  }
 
-  getStore = (): ui.Store => {
+  getStore(): ui.Store {
     return {
+      screen: this.screen,
       recorder: {
         workspaceFolders: vscode.workspace.workspaceFolders?.map(x => x.uri.path) || [],
         session: this.recorder && {
@@ -144,7 +191,7 @@ class Codecast {
         path: 'Path/TODO',
       },
     };
-  };
+  }
 }
 
 export default Codecast;

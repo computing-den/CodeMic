@@ -18,6 +18,7 @@ type ScreenProps = AppProps & {
   openWelcome(): void;
   openRecorder(): void;
   openPlayer(path: string): void;
+  // setOnExit(onExit: () => Promise<boolean>): void;
 };
 
 type BreadcrumbsProps = {
@@ -27,21 +28,42 @@ type BreadcrumbsProps = {
 type BreadcrumbType = { title: string; onClick?: () => void };
 
 export default class App extends Component<AppProps> {
-  state = {
-    screen: Welcome,
-  };
+  onExit?: () => Promise<boolean>;
 
-  openWelcome = () => this.setState({ screen: Welcome });
+  openWelcome = async () => {
+    await actions.openWelcome();
+    // if (await this.exitScreen()) {
+    //   this.setState({ screen: Welcome });
+    // }
+  };
 
   openRecorder = async () => {
     await actions.openRecorder();
-    this.setState({ screen: Recorder });
+    // if (await this.exitScreen()) {
+    //   await actions.openRecorder();
+    //   this.setState({ screen: Recorder });
+    // }
   };
 
   openPlayer = async (path: string) => {
     await actions.openPlayer();
-    this.setState({ screen: Player });
+    // if (await this.exitScreen()) {
+    //   await actions.openPlayer();
+    //   this.setState({ screen: Player });
+    // }
   };
+
+  // exitScreen = async () => {
+  //   if (!this.onExit || (await this.onExit())) {
+  //     this.onExit = undefined;
+  //     return true;
+  //   }
+  //   return false;
+  // };
+
+  // setOnExit = (onExit: () => Promise<boolean>) => {
+  //   this.onExit = onExit;
+  // };
 
   breadcrumbs = [
     {
@@ -50,14 +72,22 @@ export default class App extends Component<AppProps> {
     },
   ];
 
+  screens = {
+    [ui.Screen.Welcome]: Welcome,
+    [ui.Screen.Recorder]: Recorder,
+    [ui.Screen.Player]: Player,
+  };
+
   render() {
+    const Screen = this.screens[this.props.store.screen];
     return (
-      <this.state.screen
+      <Screen
         {...this.props}
         openWelcome={this.openWelcome}
         openRecorder={this.openRecorder}
         openPlayer={this.openPlayer}
         breadcrumbs={this.breadcrumbs}
+        // setOnExit={this.setOnExit}
       />
     );
   }
@@ -120,27 +150,33 @@ class Recorder extends Component<ScreenProps> {
     localClock: 0,
   };
 
-  startRecording = async () => {
-    await actions.startRecording();
+  startRecorder = async () => {
+    await actions.startRecorder();
   };
 
-  stopRecording = async () => {
-    await actions.stopRecording();
+  pauseRecorder = async () => {
+    await actions.pauseRecorder();
   };
 
-  saveRecording = async () => {
-    await actions.saveRecording();
+  // saveRecording = async () => {
+  //   await actions.saveRecording();
+  // };
+
+  discardRecorder = async () => {
+    await actions.discardRecorder();
   };
 
-  discardRecording = async () => {
-    await actions.discardRecording();
-  };
+  // onExit = async () => {
+  //   const canExit = await actions.askToCloseRecorder();
+  //   if (canExit) await actions.closeRecorder();
+  //   return canExit;
+  // };
 
   enableOrDisableMedia() {
     const isRecording = Boolean(this.props.store.recorder!.session?.isRecording);
-    if (isRecording !== this.media.isPlaying()) {
-      if (isRecording) this.media.play();
-      else this.media.stop();
+    if (isRecording !== this.media.isActive()) {
+      if (isRecording) this.media.start();
+      else this.media.pause();
     }
   }
 
@@ -156,6 +192,7 @@ class Recorder extends Component<ScreenProps> {
 
   componentDidMount() {
     this.enableOrDisableMedia();
+    // this.props.setOnExit(this.onExit);
   }
 
   render() {
@@ -172,20 +209,20 @@ class Recorder extends Component<ScreenProps> {
     );
 
     if (!session) {
-      return wrap(<div className="background-msg">ERROR: empty session.</div>);
+      throw new Error('Recorder:render(): no session');
     }
 
     const toggleButton = session.isRecording ? (
-      <vscode-button onClick={this.stopRecording} appearance="secondary">
-        <div class="codicon codicon-debug-stop" />
+      <vscode-button onClick={this.pauseRecorder} appearance="secondary">
+        <div class="codicon codicon-debug-pause" />
       </vscode-button>
     ) : (
-      <vscode-button onClick={this.startRecording}>
+      <vscode-button onClick={this.startRecorder}>
         <div class="codicon codicon-device-camera-video" />
       </vscode-button>
     );
 
-    const timeStr = session.isRecording ? libMisc.formatTimeSeconds(this.state.localClock) : '00:00';
+    const timeStr = libMisc.formatTimeSeconds(this.state.localClock);
 
     return wrap(
       <>
@@ -208,12 +245,12 @@ class Player extends Component<ScreenProps> {
     localClock: 0,
   };
 
-  startPlaying = async () => {
-    await actions.startPlaying();
+  startPlayer = async () => {
+    await actions.startPlayer();
   };
 
-  stopPlaying = async () => {
-    await actions.stopPlaying();
+  pausePlayer = async () => {
+    await actions.pausePlayer();
   };
 
   handleProgressBarRef = (elem: Element | null) => {
@@ -267,9 +304,9 @@ class Player extends Component<ScreenProps> {
 
   enableOrDisableMedia() {
     const { isPlaying } = this.props.store.player!;
-    if (isPlaying !== this.media.isPlaying()) {
-      if (isPlaying) this.media.play();
-      else this.media.stop();
+    if (isPlaying !== this.media.isActive()) {
+      if (isPlaying) this.media.start();
+      else this.media.pause();
     }
   }
 
@@ -318,11 +355,11 @@ class Player extends Component<ScreenProps> {
         </div>
         <div className="control-toolbar">
           {player.isPlaying ? (
-            <vscode-button onClick={this.stopPlaying} appearance="secondary">
+            <vscode-button onClick={this.pausePlayer} appearance="secondary">
               <div class="codicon codicon-debug-pause" />
             </vscode-button>
           ) : (
-            <vscode-button onClick={this.startPlaying}>
+            <vscode-button onClick={this.startPlayer}>
               <div class="codicon codicon-play" />
             </vscode-button>
           )}
@@ -362,26 +399,24 @@ class FakeMedia {
   static intervalMs: number = 200;
 
   constructor(private listener: (time: number) => void, public time: number = 0) {
-    this.play();
+    this.start();
   }
 
   // set(time: number) {
   //   this.time += (performance.now() - )
   // }
 
-  play() {
-    console.log('fakemedia: play()');
+  start() {
     this.lastTime = performance.now();
     this.request = setTimeout(this.handle, FakeMedia.intervalMs);
   }
 
-  stop() {
-    console.log('fakemedia: stop()');
+  pause() {
     clearTimeout(this.request);
     this.request = undefined;
   }
 
-  isPlaying(): boolean {
+  isActive(): boolean {
     return Boolean(this.request);
   }
 
@@ -389,7 +424,6 @@ class FakeMedia {
     const time = performance.now();
     this.time += time - this.lastTime;
     this.lastTime = time;
-    console.log('fakemedia: event: ', this.time);
     this.listener(this.time);
     this.request = setTimeout(this.handle, FakeMedia.intervalMs);
   };

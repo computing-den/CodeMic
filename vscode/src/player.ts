@@ -37,8 +37,7 @@ export default class Player {
   }
 
   start() {
-    if (this.isPlaying) throw new Error('play(): is already playing');
-    console.log('Player: start()');
+    assert(!this.isPlaying);
 
     this.isPlaying = true;
 
@@ -58,12 +57,15 @@ export default class Player {
     this.context.subscriptions.push(...this.disposables);
   }
 
-  stop() {
-    console.log('Player: stop()');
+  pause() {
     this.enqueueUpdate.clear();
     this.isPlaying = false;
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
+  }
+
+  stop() {
+    this.pause();
   }
 
   async update(clock: number) {

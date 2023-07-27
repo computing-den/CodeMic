@@ -1,7 +1,7 @@
 import { produce } from 'immer';
 import * as ui from './lib/ui';
 
-let store: ui.Store = {};
+let store: ui.Store;
 
 export type Listener = (old: ui.Store, cur: ui.Store) => void;
 

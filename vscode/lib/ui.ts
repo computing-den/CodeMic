@@ -1,22 +1,37 @@
 export type FrontendRequest =
   | { type: 'seek'; clock: number }
+  | { type: 'openWelcome' }
   | { type: 'openPlayer' }
   | { type: 'openRecorder' }
+  // | { type: 'askToCloseRecorder' }
   | { type: 'play' }
   | { type: 'record' }
-  | { type: 'stopPlaying' }
-  | { type: 'stopRecording' }
+  // | { type: 'closePlayer' }
+  // | { type: 'closeRecorder' }
+  | { type: 'pausePlayer' }
+  | { type: 'pauseRecorder' }
   // | { type: 'save' }
-  | { type: 'discard' }
+  // | { type: 'discard' }
   | { type: 'playbackUpdate'; clock: number }
   | { type: 'getStore' };
-export type BackendResponse = { type: 'getStore'; store: Store } | { type: 'error' } | { type: 'ok' };
+export type BackendResponse =
+  | { type: 'getStore'; store: Store }
+  | { type: 'error' }
+  | { type: 'ok' }
+  | { type: 'boolean'; value: boolean };
 
 export type BackendRequest = { type: 'error' };
 export type FrontendResponse = { type: 'error' } | { type: 'ok' };
 
+export enum Screen {
+  Welcome,
+  Recorder,
+  Player,
+}
+
 // A separate field for each page
 export type Store = {
+  screen: Screen;
   recorder?: Recorder;
   player?: Player;
   // welcome?: Welcome;

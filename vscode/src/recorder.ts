@@ -20,6 +20,7 @@ export default class Recorder {
   isRecording: boolean = false;
   session: ir.Session = new ir.Session([]);
   startTimeMs: number = Date.now();
+  isStopped: boolean = false;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
@@ -28,6 +29,8 @@ export default class Recorder {
   }
 
   start() {
+    assert(!this.isStopped && !this.isRecording);
+
     this.isRecording = true;
 
     // listen for open document events
@@ -126,17 +129,20 @@ export default class Recorder {
     }
   }
 
+  pause() {
+    this.isRecording = false;
+    for (const d of this.disposables) d.dispose();
+    this.disposables = [];
+  }
+
   stop() {
+    this.isStopped = true;
     this.pushEvent({
       type: 'stop',
       clock: this.getClock(),
     });
-
-    console.log('session: ', this.session.toPlain());
-    this.isRecording = false;
+    this.pause();
     this.save();
-    for (const d of this.disposables) d.dispose();
-    this.disposables = [];
   }
 
   save() {
@@ -148,7 +154,7 @@ export default class Recorder {
     // const p = path.join(misc.getRecordingsPath(), moment().format('YYYY-MM-DD-HH:mm:ss'));
     const p = misc.getDefaultRecordingPath();
     this.session.writeToFile(p);
-    vscode.window.showInformationMessage(`Saved to ${p}`);
+    // vscode.window.showInformationMessage(`Saved to ${p}`);
   }
 
   shouldRecordDocument(vscTextDocument: vscode.TextDocument): boolean {

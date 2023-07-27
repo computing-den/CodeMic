@@ -14,7 +14,7 @@ const bus = new Bus(postParcel, messageHandler);
 actions.init(postMessage);
 window.addEventListener('message', event => bus.handleParcel(event.data));
 listenToStore(renderApp);
-renderApp();
+actions.getStore().then(renderApp).catch(console.error);
 
 function renderApp() {
   render(<App store={getStore()} />, document.getElementById('app')!);
@@ -31,5 +31,8 @@ function postParcel(parcel: Parcel): Promise<boolean> {
 
 async function messageHandler(req: ui.BackendRequest): Promise<ui.FrontendResponse> {
   console.log('webview received: ', req);
-  return { type: 'ack' };
+
+  // no backend requests to handle yet
+
+  return { type: 'ok' };
 }
