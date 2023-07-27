@@ -32,25 +32,14 @@ export default class App extends Component<AppProps> {
 
   openWelcome = async () => {
     await actions.openWelcome();
-    // if (await this.exitScreen()) {
-    //   this.setState({ screen: Welcome });
-    // }
   };
 
   openRecorder = async () => {
     await actions.openRecorder();
-    // if (await this.exitScreen()) {
-    //   await actions.openRecorder();
-    //   this.setState({ screen: Recorder });
-    // }
   };
 
   openPlayer = async (path: string) => {
     await actions.openPlayer();
-    // if (await this.exitScreen()) {
-    //   await actions.openPlayer();
-    //   this.setState({ screen: Player });
-    // }
   };
 
   // exitScreen = async () => {
@@ -239,7 +228,6 @@ class Recorder extends Component<ScreenProps> {
 class Player extends Component<ScreenProps> {
   progressBar?: Element;
   media: FakeMedia = new FakeMedia(this.handleMediaProgress.bind(this));
-  isSeeking: boolean = false;
 
   state = {
     localClock: 0,
@@ -268,19 +256,29 @@ class Player extends Component<ScreenProps> {
     e.preventDefault();
     e.stopPropagation();
     const clock = this.getClockOfMouse(e);
-    await this.seek(clock);
     this.media.time = clock * 1000;
-    this.setState({ localClock: clock });
+
+    await this.seek(clock, true);
+    // this.media.time = clock * 1000;
+    // this.setState({ localClock: clock });
   };
 
-  seek = async (clock: number) => {
-    try {
-      this.isSeeking = true;
-      await actions.seek(clock);
-    } finally {
-      this.isSeeking = false;
-    }
+  // force will delete any seek before or after this one.
+  // Consider that we are currently at t=10, and we seek to t=20,
+  // but before the seek is complete, media sends a progress update
+  // to seek to t=10.1. If the seek t=20 is forced, the t=10.1 will be
+  // removed from the queue
+  seek = async (clock: number, force: boolean) => {
+    if (force) this.seekTaskQueueDontUseDirectly.clear();
+    await this.seekTaskQueueDontUseDirectly(clock);
+    if (force) this.seekTaskQueueDontUseDirectly.clear();
   };
+
+  seekTaskQueueDontUseDirectly = libMisc.taskQueue(async (clock: number) => {
+    const localClock = Math.max(0, Math.min(clock, this.props.store.player!.duration));
+    await actions.seek(clock);
+    this.setState({ localClock });
+  }, 1);
 
   getClockOfMouse = (e: MouseEvent): number => {
     const p = this.getPosNormOfMouse(e);
@@ -311,10 +309,8 @@ class Player extends Component<ScreenProps> {
   }
 
   async handleMediaProgress(ms: number) {
-    if (this.props.store.player!.isPlaying && !this.isSeeking) {
-      const localClock = Math.max(0, Math.min(ms / 1000, this.props.store.player!.duration));
-      await this.seek(localClock);
-      this.setState({ localClock });
+    if (this.props.store.player!.isPlaying) {
+      await this.seek(ms / 1000, false);
     }
   }
 
@@ -428,70 +424,3 @@ class FakeMedia {
     this.request = setTimeout(this.handle, FakeMedia.intervalMs);
   };
 }
-
-// export class App extends Component {
-//   interval: any;
-
-//   state = {
-//     time: 0,
-//     duration: 60,
-//     isPlaying: false,
-//   };
-
-//   sliderChanged = (e: Event) => {
-//     const time = Number((e.target as HTMLInputElement).value);
-//     console.log(`sliderChanged: ${time}`);
-//     this.setState({ time });
-//     postMessage({ type: 'seek', time });
-//   };
-
-//   play = () => {
-//     this.setState({ isPlaying: true });
-//     postMessage({ type: 'play' });
-
-//     // Fake playback events
-//     const TS = 0.2;
-//     this.interval = setInterval(() => {
-//       const time = Math.min(this.state.duration, this.state.time + TS);
-//       this.setState({ time });
-//       postMessage({ type: 'playbackUpdate', time });
-//       if (time >= this.state.duration) {
-//         this.stop();
-//       }
-//     }, TS * 1000);
-//   };
-
-//   stop = () => {
-//     this.setState({ isPlaying: false });
-//     postMessage({ type: 'stop' });
-//     clearInterval(this.interval);
-//     this.interval = undefined;
-//   };
-
-//   clicked = (e: Event) => {
-//     console.log('clicked', e);
-//   };
-
-//   render = () => {
-//     const { time, duration, isPlaying } = this.state;
-//     return (
-//       <div>
-//         <input type="range" min={0} max={duration} step="any" onChange={this.sliderChanged} value={time} />
-//         <vscode-button onClick={this.clicked}>
-//           <div class="codicon codicon-add" />
-//           Hello!
-//         </vscode-button>
-//       </div>
-//     );
-//     // return (
-//     //   <div>
-//     //     <button className="button" onClick={this.play} disabled={isPlaying}>
-//     //       play
-//     //     </button>
-//     //     <button className="button" onClick={this.stop} disabled={!isPlaying}>
-//     //       stop
-//     //     </button>
-//     //   </div>
-//     // );
-//   };
-// }
