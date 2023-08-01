@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "out",
+    "lib": ["dom", "dom.iterable"],
+    // "esModuleInterop": false,
+    "isolatedModules": true,
+    "noEmit": true, // because esbuild will emit the output (in bundle form)
+    "jsx": "preserve",
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "Fragment"
+    // "jsx": "react-jsx"
+  },
+  "references": [{ "path": "../lib" }]
+}

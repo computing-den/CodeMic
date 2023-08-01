@@ -1,0 +1,14 @@
+{
+  "name": "@codecast/lib",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {},
+  "devDependencies": {},
+  "main": "./out/index.js",
+  "types": "./out/index.d.ts",
+  "dependencies": {
+    "@types/uuid": "^9.0.2",
+    "lodash": "^4.17.21",
+    "uuid": "^9.0.0"
+  }
+}

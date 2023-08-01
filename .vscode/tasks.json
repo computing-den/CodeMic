@@ -1,0 +1,48 @@
+// See https://go.microsoft.com/fwlink/?LinkId=733558
+// for the documentation about the tasks.json format
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "tsc",
+      "type": "typescript",
+      "tsconfig": "tsconfig.json",
+      "problemMatcher": "$tsc",
+      "isBackground": false,
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "options": {
+        "cwd": "${workspaceRoot}"
+      }
+    },
+    {
+      "label": "webview",
+      "type": "npm",
+      "script": "build:webview",
+      "problemMatcher": "$ts-esbuild",
+      "isBackground": false,
+      "dependsOn": ["tsc"],
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "build-all",
+      "isBackground": false,
+      "dependsOn": ["webview"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}

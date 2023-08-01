@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/vscode-extension" },
+    { "path": "packages/vscode-webview" },
+    { "path": "packages/lib" }
+  ]
+}

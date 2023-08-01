@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es2020",
+    "lib": ["es2020"],
+    "declaration": true,
+    "sourceMap": true,
+    "strict": true /* enable all strict type-checking options */,
+    "moduleResolution": "node",
+    "noFallthroughCasesInSwitch": true /* Report errors for fallthrough cases in switch statement. */,
+    "esModuleInterop": true,
+    "incremental": true, // default is true when composite: true
+    "composite": true,
+    "useDefineForClassFields": true,
+    "allowJs": false,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true
+  }
+  // "exclude": ["node_modules", ".vscode-test", "webview", "lib"]
+}

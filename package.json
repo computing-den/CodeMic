@@ -1,0 +1,19 @@
+{
+  "name": "CodeCast",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "build": "npm run build:tsc && npm run build:webview",
+    "build:tsc": "tsc --build",
+    "build:webview": "cd packages/vscode-webview && node esbuild.mjs",
+    "clean": "rm -rf packages/*/out && rm -rf packages/*/tsconfig.tsbuildinfo"
+  },
+  "workspaces": [
+    "packages/vscode-extension",
+    "packages/vscode-webview",
+    "packages/lib"
+  ],
+  "devDependencies": {
+    "typescript": "^4.9.4"
+  }
+}

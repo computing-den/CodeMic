@@ -1,0 +1,53 @@
+{
+  "name": "@codecast/vscode-extension",
+  "displayName": "CodeCast",
+  "description": "",
+  "version": "0.0.1",
+  "scripts": {},
+  "engines": {
+    "vscode": "^1.76.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codecast-view-container",
+          "title": "Codecast",
+          "icon": "../vscode-webview/resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codecast-view-container": [
+        {
+          "type": "webview",
+          "id": "codecast-view",
+          "name": "Codecast"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "codecast.openView",
+        "title": "Codecast"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.14.191",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.76.0",
+    "@vscode/test-electron": "^2.2.2"
+  },
+  "dependencies": {
+    "@codecast/lib": "^1.0.0",
+    "@types/uuid": "^9.0.2",
+    "lodash": "^4.17.21",
+    "moment": "^2.29.4",
+    "uuid": "^9.0.0"
+  }
+}
