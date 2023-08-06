@@ -1,4 +1,5 @@
 :root {
+  --spacing-x-small: 2px;
   --spacing-small: 4px;
   --spacing-medium: 8px;
   --spacing-large: 16px;
@@ -27,31 +28,98 @@ body {
 
 .screen {
   flex: 1;
+}
 
-  .section + .section {
+.section {
+  & + .section {
     margin-top: var(--spacing-large);
   }
 
-  .buttons {
-    margin-top: var(--spacing-large);
-    display: flex;
-    justify-content: flex-start;
+  &.bordered {
+    border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
+  }
 
-    & vscode-button {
-      flex: 1;
-      max-width: 200px;
+  .header {
+    display: flex;
+    align-items: center;
+
+    &.collapsible {
+      cursor: pointer;
     }
-    & vscode-button + vscode-button {
-      margin-left: var(--spacing-small);
+
+    & h3 {
+      margin: 0;
+      padding: var(--spacing-small) 0;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      font-size: 11px;
+      min-width: 3ch;
     }
   }
 }
 
+/* .buttons { */
+/*   margin-top: var(--spacing-large); */
+/*   display: flex; */
+/*   justify-content: flex-start; */
+
+/*   & vscode-button { */
+/*     flex: 1; */
+/*     max-width: 200px; */
+/*   } */
+/*   & vscode-button + vscode-button { */
+/*     margin-left: var(--spacing-small); */
+/*   } */
+/* } */
+
 .welcome {
-  padding: 0 var(--container-padding);
-  .section.recent {
-    & li vscode-link {
-      margin-right: var(--spacing-large);
+  .search-section {
+    padding: 0 var(--container-padding);
+    display: flex;
+    align-items: center;
+
+    & vscode-text-field {
+      flex: 1;
+    }
+
+    & vscode-button {
+      margin-left: var(--spacing-medium);
+    }
+  }
+}
+
+.sessions-section {
+  .item {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-small) var(--container-padding);
+    cursor: pointer;
+    position: relative;
+
+    &:hover {
+      background: var(--vscode-list-hoverBackground);
+      .actions {
+        visibility: visible;
+      }
+    }
+    &.selected {
+      background: var(--vscode-list-activeSelectionBackground);
+    }
+
+    .title {
+    }
+    .actions {
+      background: var(--vscode-list-hoverBackground);
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      border-left: 1px solid var(--vscode-sideBarSectionHeader-border);
+      padding-left: 4px;
+      visibility: hidden;
     }
   }
 }
@@ -161,22 +229,22 @@ body {
   }
 }
 
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  /* margin-bottom: var(--spacing-large); */
+/* .breadcrumbs { */
+/*   display: flex; */
+/*   align-items: center; */
+/*   /\* margin-bottom: var(--spacing-large); *\/ */
 
-  .separator {
-    margin: 0 var(--spacing-medium);
-    color: #a9a9a9;
-    font-weight: bold;
-  }
+/*   .separator { */
+/*     margin: 0 var(--spacing-medium); */
+/*     color: #a9a9a9; */
+/*     font-weight: bold; */
+/*   } */
 
-  & h2 {
-    white-space: nowrap;
-    /* margin: 0; */
-  }
-}
+/*   & h2 { */
+/*     white-space: nowrap; */
+/*     /\* margin: 0; *\/ */
+/*   } */
+/* } */
 
 ul.unstyled {
   list-style: none;
@@ -189,6 +257,14 @@ ul.unstyled {
 
 .codicon.m-right {
   margin-right: var(--spacing-medium);
+}
+
+.codicon.m-right_x-small {
+  margin-right: var(--spacing-small);
+}
+
+.codicon.m-right_small {
+  margin-right: var(--spacing-small);
 }
 
 .codicon.va-top {

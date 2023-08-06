@@ -84,43 +84,103 @@ class Welcome extends Component<ScreenProps> {
   };
 
   render() {
-    const recentFiles = [
-      { name: 'session1', dir: '~', uri: { scheme: 'file', path: '~/session1' } as t.Uri },
-      { name: 'session2', dir: '~/workspaces', uri: { scheme: 'file', path: '~/workspaces/session2' } as t.Uri },
-      { name: 'session3', dir: '~/some-other', uri: { scheme: 'file', path: '~/some-other/session3' } as t.Uri },
-    ];
-
+    const { sessions } = this.props.store.welcome;
     return (
       <div className="screen welcome">
-        <div className="section">
-          <h2>Start</h2>
-          <ul className="unstyled">
-            <li>
-              <vscode-link href="#" onClick={this.openRecorder}>
-                <span className="codicon codicon-device-camera-video va-top m-right" />
-                Record new session
-              </vscode-link>
-            </li>
-            <li>
-              <vscode-link href="#" onClick={() => this.openPlayer()}>
-                <span className="codicon codicon-folder-opened va-top m-right" />
-                Open session
-              </vscode-link>
-            </li>
-          </ul>
+        <div className="section search-section">
+          <vscode-text-field placeholder="Search" autofocus></vscode-text-field>
+          <vscode-button onClick={this.openRecorder}>
+            <span className="codicon codicon-device-camera-video" />
+          </vscode-button>
         </div>
-        <div className="section recent">
-          <h2>Recent</h2>
-          <ul className="unstyled">
-            {recentFiles.map(({ name, dir, uri }) => (
-              <li>
-                <vscode-link href="#" onClick={() => this.openPlayer(uri)}>
-                  {name}
-                </vscode-link>
-                {dir}
-              </li>
-            ))}
-          </ul>
+        <SessionsSection title="RECENTLY WATCHED" sessions={sessions.recent} />
+        <SessionsSection title="WORKSPACE" sessions={sessions.workspace} bordered />
+        <SessionsSection title="RECOMMENDED" sessions={sessions.recommended} bordered />
+      </div>
+    );
+
+    // return (
+    //   <div className="screen welcome">
+    //     <div className="section">
+    //       <h2>Start</h2>
+    //       <ul className="unstyled">
+    //         <li>
+    //           <vscode-link href="#" onClick={this.openRecorder}>
+    //             <span className="codicon codicon-device-camera-video va-top m-right" />
+    //             Record new session
+    //           </vscode-link>
+    //         </li>
+    //         <li>
+    //           <vscode-link href="#" onClick={() => this.openPlayer()}>
+    //             <span className="codicon codicon-folder-opened va-top m-right" />
+    //             Open session
+    //           </vscode-link>
+    //         </li>
+    //       </ul>
+    //     </div>
+    //     <div className="section recent">
+    //       <h2>Recent</h2>
+    //       <ul className="unstyled">
+    //         {recentFiles.map(({ name, dir, uri }) => (
+    //           <li>
+    //             <vscode-link href="#" onClick={() => this.openPlayer(uri)}>
+    //               {name}
+    //             </vscode-link>
+    //             {dir}
+    //           </li>
+    //         ))}
+    //       </ul>
+    //     </div>
+    //   </div>
+    // );
+  }
+}
+
+type SessionsSectionProps = {
+  title: string;
+  sessions: t.SessionSummary[];
+  bordered?: boolean;
+};
+
+class SessionsSection extends Component<SessionsSectionProps> {
+  render() {
+    return (
+      <div className={`section sessions-section ${this.props.bordered ? 'bordered' : ''}`}>
+        <div className="header collapsible">
+          <span className="codicon codicon-chevron-down m-right_x-small va-top" />
+          <h3>{this.props.title}</h3>
+        </div>
+        {this.props.sessions.map(session => (
+          <SessionItem session={session} />
+        ))}
+      </div>
+    );
+  }
+}
+
+type SessionItemProps = {
+  session: t.SessionSummary;
+};
+
+class SessionItem extends Component<SessionItemProps> {
+  render() {
+    const { session } = this.props;
+    return (
+      <div className="item">
+        <div className="title">{session.title}</div>
+        <div className="actions">
+          <vscode-button appearance="icon" title="Play">
+            <span className="codicon codicon-play" />
+          </vscode-button>
+          <vscode-button appearance="icon" title="Continue recording this session">
+            <span className="codicon codicon-device-camera-video" />
+          </vscode-button>
+          <vscode-button appearance="icon" title="Fork: create a new session at the end of this one">
+            <span className="codicon codicon-repo-forked" />
+          </vscode-button>
+          <vscode-button appearance="icon" title="Delete: delete this session">
+            <span className="codicon codicon-close" />
+          </vscode-button>
         </div>
       </div>
     );
@@ -198,11 +258,11 @@ class Recorder extends Component<ScreenProps> {
 
     const toggleButton = session.isRecording ? (
       <vscode-button onClick={this.pauseRecorder} appearance="secondary">
-        <div class="codicon codicon-debug-pause" />
+        <div className="codicon codicon-debug-pause" />
       </vscode-button>
     ) : (
       <vscode-button onClick={this.startRecorder}>
-        <div class="codicon codicon-device-camera-video" />
+        <div className="codicon codicon-device-camera-video" />
       </vscode-button>
     );
 
@@ -347,11 +407,11 @@ class Player extends Component<ScreenProps> {
         <div className="control-toolbar">
           {player.isPlaying ? (
             <vscode-button onClick={this.pausePlayer} appearance="secondary">
-              <div class="codicon codicon-debug-pause" />
+              <div className="codicon codicon-debug-pause" />
             </vscode-button>
           ) : (
             <vscode-button onClick={this.startPlayer}>
-              <div class="codicon codicon-play" />
+              <div className="codicon codicon-play" />
             </vscode-button>
           )}
           <div className="time">

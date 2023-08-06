@@ -6,6 +6,59 @@ import * as vscode from 'vscode';
 import _ from 'lodash';
 import { types as t } from '@codecast/lib';
 
+const SESSIONS: t.SessionSummary[] = [
+  {
+    id: 'fd4659dd-150a-408b-aac3-1bc815a83be9',
+    title: 'DumDB part 2',
+    summary: 'A small DB easy to use',
+    author: 'sean_shir',
+    published: false,
+    localPath: '~/codecast/recordings/fd4659dd-150a-408b-aac3-1bc815a83be9.codecast',
+    workspace: '~/workspace/dumdb',
+    duration: 78,
+    views: 0,
+    likes: 0,
+    timestamp: '2023-07-08T14:22:35.344Z',
+  },
+  {
+    id: '8cd503ae-108a-49e0-b33f-af1320f66a68',
+    title: 'cThruLisp',
+    summary: 'An interesting take on lisp',
+    author: 'sean_shir',
+    published: false,
+    localPath: '~/codecast/recordings/8cd503ae-108a-49e0-b33f-af1320f66a68.codecast',
+    workspace: '~/workspace/dumdb',
+    duration: 4023,
+    views: 0,
+    likes: 0,
+    timestamp: '2023-08-08T14:22:35.344Z',
+  },
+  {
+    id: '4167cb21-e47d-478c-a741-0e3f6c69079e',
+    title: 'DumDB part 1',
+    summary: 'A small DB easy to use',
+    author: 'sean_shir',
+    published: true,
+    workspace: '~/workspace/dumdb',
+    duration: 62,
+    views: 123,
+    likes: 11,
+    timestamp: '2023-06-06T14:22:35.344Z',
+  },
+  {
+    id: 'fa97abc4-d71d-4ff3-aebf-e5aadf77b3f7',
+    title: 'Some other project',
+    summary:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+    author: 'jane',
+    published: true,
+    duration: 662,
+    views: 100,
+    likes: 45,
+    timestamp: '2023-08-06T10:22:35.344Z',
+  },
+];
+
 class Codecast {
   context: vscode.ExtensionContext;
   screen: t.Screen = t.Screen.Welcome;
@@ -190,6 +243,13 @@ class Codecast {
   getStore(): t.Store {
     return {
       screen: this.screen,
+      welcome: {
+        sessions: {
+          recent: [SESSIONS[0], SESSIONS[1], SESSIONS[2]],
+          workspace: [SESSIONS[0], SESSIONS[1]],
+          recommended: [SESSIONS[2], SESSIONS[3]],
+        },
+      },
       recorder: {
         workspaceFolders: vscode.workspace.workspaceFolders?.map(x => x.uri.path) || [],
         session: this.recorder && {

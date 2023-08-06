@@ -32,10 +32,19 @@ export enum Screen {
 // A separate field for each page
 export type Store = {
   screen: Screen;
+  welcome: Welcome;
   recorder?: Recorder;
   player?: Player;
   // welcome?: Welcome;
   // login?: Login;
+};
+
+export type Welcome = {
+  sessions: {
+    recent: SessionSummary[];
+    workspace: SessionSummary[];
+    recommended: SessionSummary[];
+  };
 };
 
 export type Recorder = {
@@ -59,4 +68,18 @@ export type Player = {
 export type Uri = {
   scheme: 'file' | 'untitled';
   path: string;
+};
+
+export type SessionSummary = {
+  id: string;
+  title: string;
+  summary: string;
+  author: string;
+  published: boolean;
+  localPath?: string;
+  workspace?: string;
+  duration: number;
+  views: number;
+  likes: number;
+  timestamp: string;
 };
