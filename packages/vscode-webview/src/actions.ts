@@ -1,5 +1,5 @@
 import { types as t } from '@codecast/lib';
-import { updateStore } from './store';
+import { updateStore } from './store.js';
 
 let postMessage: (req: t.FrontendRequest) => Promise<t.BackendResponse>;
 
@@ -31,8 +31,8 @@ export async function openWelcome() {
   await postMessageAndUpdateStore({ type: 'openWelcome' });
 }
 
-export async function openPlayer(uri?: t.Uri) {
-  await postMessageAndUpdateStore({ type: 'openPlayer', uri });
+export async function openPlayer(sessionId: string) {
+  await postMessageAndUpdateStore({ type: 'openPlayer', sessionId });
 }
 
 export async function openRecorder() {
@@ -44,8 +44,8 @@ export async function openRecorder() {
 //   return res.value;
 // }
 
-export async function startPlayer() {
-  await postMessageAndUpdateStore({ type: 'play' });
+export async function startPlayer(workspacePath?: t.Uri) {
+  await postMessageAndUpdateStore({ type: 'play', workspacePath });
 }
 
 export async function pausePlayer() {

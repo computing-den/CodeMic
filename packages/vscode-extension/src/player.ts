@@ -1,6 +1,6 @@
-import * as misc from './misc';
-import { lib } from '@codecast/lib';
-import * as ir from './internal_representation';
+import * as misc from './misc.js';
+import { types as t, lib } from '@codecast/lib';
+import * as ir from './internal_representation.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import * as fs from 'fs';
@@ -14,32 +14,27 @@ enum Dir {
 }
 
 export default class Player {
-  context: vscode.ExtensionContext;
-  disposables: vscode.Disposable[] = [];
-  // hash: string = '';
-  // git: GitAPI;
-  // repo?: Repository;
-  // workdir: string = '';
-  isPlaying: boolean = false;
-  session: ir.Session;
+  status: t.PlayerStatus = t.PlayerStatus.Init;
 
+  private disposables: vscode.Disposable[] = [];
   private eventIndex: number = -1;
   private clock: number = 0;
   private enqueueUpdate = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
-  static fromFile(context: vscode.ExtensionContext, filename: string): Player {
-    return new Player(context, ir.Session.fromFile(filename));
+  static open(context: vscode.ExtensionContext, sessionSummary: t.SessionSummary): Player {
+    assert(sessionSummary.uri.scheme === 'file', 'TODO only local files are currently supported.');
+    return new Player(context, sessionSummary, ir.Session.fromFile(sessionSummary.uri.path));
   }
 
-  constructor(context: vscode.ExtensionContext, session: ir.Session) {
-    this.context = context;
-    this.session = session;
-  }
+  constructor(
+    public context: vscode.ExtensionContext,
+    public sessionSummary: t.SessionSummary,
+    public session: ir.Session,
+  ) {}
 
   start() {
-    assert(!this.isPlaying);
-
-    this.isPlaying = true;
+    assert(this.status === t.PlayerStatus.Init || this.status === t.PlayerStatus.Paused);
+    this.status = t.PlayerStatus.Playing;
 
     // ignore user input
     {
@@ -57,15 +52,20 @@ export default class Player {
     this.context.subscriptions.push(...this.disposables);
   }
 
-  pause() {
+  dispose() {
     this.enqueueUpdate.clear();
-    this.isPlaying = false;
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
   }
 
+  pause() {
+    this.status = t.PlayerStatus.Paused;
+    this.dispose();
+  }
+
   stop() {
-    this.pause();
+    this.status = t.PlayerStatus.Stopped;
+    this.dispose();
   }
 
   async update(clock: number) {
@@ -168,7 +168,7 @@ export default class Player {
       }
     }
 
-    this.clock = Math.max(0, Math.min(this.getDuration(), clock));
+    this.clock = Math.max(0, Math.min(this.sessionSummary.duration, clock));
 
     if (this.eventIndex === n - 1) {
       this.stop();
@@ -313,10 +313,6 @@ export default class Player {
 
   findVscVisibleTextEditorByUri(uri: vscode.Uri) {
     return vscode.window.visibleTextEditors.find(x => misc.isEqualUri(x.document.uri, uri));
-  }
-
-  getDuration(): number {
-    return _.last(this.session.events)?.clock ?? 0;
   }
 
   getClock(): number {

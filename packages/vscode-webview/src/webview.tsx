@@ -1,9 +1,9 @@
 import { h, render } from 'preact';
 import { types as t, bus as b } from '@codecast/lib';
 import { provideVSCodeDesignSystem, allComponents } from '@vscode/webview-ui-toolkit';
-import App from './app';
-import { getStore, listenToStore } from './store';
-import * as actions from './actions';
+import App from './app.js';
+import { getStore, listenToStore } from './store.js';
+import * as actions from './actions.js';
 
 provideVSCodeDesignSystem().register(allComponents);
 const vscode = acquireVsCodeApi();

@@ -7,7 +7,10 @@
       "label": "tsc",
       "type": "typescript",
       "tsconfig": "tsconfig.json",
-      "problemMatcher": "$tsc",
+      "problemMatcher": {
+        "base": "$tsc-watch",
+        "fileLocation": ["relative", "${workspaceFolder}/packages"],
+      },
       "isBackground": false,
       "presentation": {
         "reveal": "never"

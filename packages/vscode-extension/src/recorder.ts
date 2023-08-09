@@ -1,5 +1,6 @@
-import * as misc from './misc';
-import * as ir from './internal_representation';
+import * as misc from './misc.js';
+import { types as t } from '@codecast/lib';
+import * as ir from './internal_representation.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import path from 'path';
@@ -9,29 +10,21 @@ import assert from 'assert';
 const SCROLL_LINES_TRIGGER = 2;
 
 export default class Recorder {
-  context: vscode.ExtensionContext;
-  disposables: vscode.Disposable[] = [];
-  // hash: string = '';
-  // git: GitAPI;
-  // repo?: Repository;
-  scrolling: boolean = false;
-  scrollStartRange?: vscode.Range;
-  // workdir: string = '';
-  isRecording: boolean = false;
+  status: t.RecorderStatus = t.RecorderStatus.Init;
   session: ir.Session = new ir.Session([]);
-  startTimeMs: number = Date.now();
-  isStopped: boolean = false;
+  workspaceFolders = vscode.workspace.workspaceFolders?.map(x => x.uri.path) || [];
 
-  constructor(context: vscode.ExtensionContext) {
-    this.context = context;
+  private disposables: vscode.Disposable[] = [];
+  private scrolling: boolean = false;
+  private scrollStartRange?: vscode.Range;
+  private startTimeMs: number = Date.now();
 
-    // TODO store workspace folders, check git repository etc.
-  }
+  constructor(public context: vscode.ExtensionContext) {}
 
   start() {
-    assert(!this.isStopped && !this.isRecording);
+    assert(this.status === t.RecorderStatus.Init || this.status === t.RecorderStatus.Paused);
 
-    this.isRecording = true;
+    this.status = t.RecorderStatus.Recording;
 
     // listen for open document events
     {
@@ -130,18 +123,22 @@ export default class Recorder {
   }
 
   pause() {
-    this.isRecording = false;
+    this.status = t.RecorderStatus.Paused;
+    this.dispose();
+  }
+
+  dispose() {
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
   }
 
   stop() {
-    this.isStopped = true;
     this.pushEvent({
       type: 'stop',
       clock: this.getClock(),
     });
-    this.pause();
+    this.status = t.RecorderStatus.Stopped;
+    this.dispose();
     this.save();
   }
 
@@ -276,7 +273,7 @@ export default class Recorder {
   }
 
   getClock(): number {
-    if (this.isRecording) {
+    if (this.status === t.RecorderStatus.Recording) {
       return (Date.now() - this.startTimeMs) / 1000;
     } else {
       return _.last(this.session.events)?.clock ?? 0;

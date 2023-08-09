@@ -1,10 +1,10 @@
 export type FrontendRequest =
   | { type: 'seek'; clock: number }
   | { type: 'openWelcome' }
-  | { type: 'openPlayer'; uri?: Uri }
+  | { type: 'openPlayer'; sessionId: string }
   | { type: 'openRecorder' }
   // | { type: 'askToCloseRecorder' }
-  | { type: 'play' }
+  | { type: 'play'; workspacePath?: Uri }
   | { type: 'record' }
   // | { type: 'closePlayer' }
   // | { type: 'closeRecorder' }
@@ -40,44 +40,53 @@ export type Store = {
 };
 
 export type Welcome = {
-  sessions: {
-    recent: SessionSummary[];
-    workspace: SessionSummary[];
-    recommended: SessionSummary[];
-  };
+  recent: SessionSummary[];
+  workspace: SessionSummary[];
+  featured: SessionSummary[];
 };
+
+export enum RecorderStatus {
+  Init,
+  Recording,
+  Paused,
+  Stopped,
+}
 
 export type Recorder = {
   workspaceFolders: string[];
-  session?: {
-    isRecording: boolean;
-    duration: number;
-    name: string;
-    uri?: Uri;
-  };
-};
-
-export type Player = {
-  isPlaying: boolean;
+  status: RecorderStatus;
   duration: number;
-  clock: number;
   name: string;
   uri?: Uri;
 };
 
-export type Uri = {
-  scheme: 'file' | 'untitled';
-  path: string;
+export enum PlayerStatus {
+  Init,
+  WorkspacePopulated,
+  Buffering,
+  Playing,
+  Paused,
+  Stopped,
+}
+
+export type Player = {
+  sessionSummary: SessionSummary;
+  status: PlayerStatus;
+  clock: number;
 };
+
+export type Uri =
+  | { scheme: 'file' | 'untitled'; path: string }
+  | { scheme: 'http' | 'https'; authority: string; path: string; query?: string; fragment?: string };
 
 export type SessionSummary = {
   id: string;
   title: string;
-  summary: string;
+  description: string;
   author: string;
   published: boolean;
-  localPath?: string;
-  workspace?: string;
+  uri: Uri;
+  defaultWorkspacePath?: string;
   duration: number;
   views: number;
   likes: number;

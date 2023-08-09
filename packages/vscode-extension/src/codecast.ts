@@ -1,20 +1,21 @@
-import * as misc from './misc';
-import Recorder from './recorder';
-import Player from './player';
-import WebviewProvider from './webview_provider';
+import * as misc from './misc.js';
+import Recorder from './recorder.js';
+import Player from './player.js';
+import WebviewProvider from './webview_provider.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
+import assert from 'assert';
 import { types as t } from '@codecast/lib';
 
 const SESSIONS: t.SessionSummary[] = [
   {
     id: 'fd4659dd-150a-408b-aac3-1bc815a83be9',
     title: 'DumDB part 2',
-    summary: 'A small DB easy to use',
+    description: 'A small DB easy to use',
     author: 'sean_shir',
     published: false,
-    localPath: '~/codecast/recordings/fd4659dd-150a-408b-aac3-1bc815a83be9.codecast',
-    workspace: '~/workspace/dumdb',
+    uri: { scheme: 'file', path: '/home/sean/codecast/recordings/session.codecast' },
+    defaultWorkspacePath: '/home/sean/workspace/dumdb',
     duration: 78,
     views: 0,
     likes: 0,
@@ -23,11 +24,11 @@ const SESSIONS: t.SessionSummary[] = [
   {
     id: '8cd503ae-108a-49e0-b33f-af1320f66a68',
     title: 'cThruLisp',
-    summary: 'An interesting take on lisp',
+    description: 'An interesting take on lisp',
     author: 'sean_shir',
     published: false,
-    localPath: '~/codecast/recordings/8cd503ae-108a-49e0-b33f-af1320f66a68.codecast',
-    workspace: '~/workspace/dumdb',
+    uri: { scheme: 'file', path: '/home/sean/codecast/recordings/session.codecast' },
+    defaultWorkspacePath: '/home/sean/workspace/dumdb',
     duration: 4023,
     views: 0,
     likes: 0,
@@ -36,10 +37,11 @@ const SESSIONS: t.SessionSummary[] = [
   {
     id: '4167cb21-e47d-478c-a741-0e3f6c69079e',
     title: 'DumDB part 1',
-    summary: 'A small DB easy to use',
+    description: 'A small DB easy to use',
     author: 'sean_shir',
     published: true,
-    workspace: '~/workspace/dumdb',
+    uri: { scheme: 'https', path: 'codecasts/8cd503ae-108a-49e0-b33f-af1320f66a68', authority: 'codecast.io' },
+    defaultWorkspacePath: '/home/sean/workspace/dumdb',
     duration: 62,
     views: 123,
     likes: 11,
@@ -48,10 +50,11 @@ const SESSIONS: t.SessionSummary[] = [
   {
     id: 'fa97abc4-d71d-4ff3-aebf-e5aadf77b3f7',
     title: 'Some other project',
-    summary:
+    description:
       'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
     author: 'jane',
     published: true,
+    uri: { scheme: 'https', path: 'codecasts/8cd503ae-108a-49e0-b33f-af1320f66a68', authority: 'codecast.io' },
     duration: 662,
     views: 100,
     likes: 45,
@@ -65,6 +68,11 @@ class Codecast {
   recorder?: Recorder;
   player?: Player;
   webview: WebviewProvider;
+  sessionSummaries = {
+    recent: [SESSIONS[0], SESSIONS[1], SESSIONS[2]],
+    workspace: [SESSIONS[0], SESSIONS[1]],
+    featured: [SESSIONS[2], SESSIONS[3]],
+  };
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
@@ -90,15 +98,14 @@ class Codecast {
       }
       case 'openPlayer': {
         if (await this.closeCurrentScreen()) {
-          const uri = req.uri || (await this.showOpenSessionDialog());
-          if (uri) {
-            if (uri.scheme !== 'file') {
-              vscode.window.showErrorMessage('Can only open local files.');
-              throw new Error('unsupported scheme');
-            }
-            this.player ??= Player.fromFile(this.context, uri.path);
-            this.screen = t.Screen.Player;
-          }
+          const sessionSummary =
+            _.find(this.sessionSummaries.recent, ['id', req.sessionId]) ||
+            _.find(this.sessionSummaries.workspace, ['id', req.sessionId]) ||
+            _.find(this.sessionSummaries.featured, ['id', req.sessionId]);
+          assert(sessionSummary);
+
+          this.player ??= Player.open(this.context, sessionSummary);
+          this.screen = t.Screen.Player;
         }
         return this.respondWithStore();
       }
@@ -170,7 +177,7 @@ class Codecast {
       //   }
       // }
       case 'playbackUpdate': {
-        if (!this.player?.isPlaying) {
+        if (this.player?.status !== t.PlayerStatus.Playing) {
           console.error('got playbackUpdate but player is not playing');
           return { type: 'error' };
         }
@@ -196,7 +203,7 @@ class Codecast {
   }
 
   async closeRecorder(): Promise<boolean> {
-    if (this.recorder!.isRecording) {
+    if (this.recorder!.status === t.RecorderStatus.Recording) {
       const saveTitle = 'Save and exit';
       const answer = await vscode.window.showWarningMessage(
         'Recording is in progress. Do you wish to stop the session?',
@@ -219,14 +226,14 @@ class Codecast {
     return true;
   }
 
-  async showOpenSessionDialog(): Promise<t.Uri | undefined> {
-    const uris = await vscode.window.showOpenDialog({
-      canSelectFiles: true,
-      canSelectMany: false,
-      filters: { CodeCast: ['codecast'] },
-    });
-    return uris?.[0] && misc.uriFromVsc(uris?.[0]);
-  }
+  // async showOpenSessionDialog(): Promise<t.Uri | undefined> {
+  //   const uris = await vscode.window.showOpenDialog({
+  //     canSelectFiles: true,
+  //     canSelectMany: false,
+  //     filters: { CodeCast: ['codecast'] },
+  //   });
+  //   return uris?.[0] && misc.uriFromVsc(uris?.[0]);
+  // }
 
   openView() {
     this.webview.show();
@@ -244,27 +251,19 @@ class Codecast {
     return {
       screen: this.screen,
       welcome: {
-        sessions: {
-          recent: [SESSIONS[0], SESSIONS[1], SESSIONS[2]],
-          workspace: [SESSIONS[0], SESSIONS[1]],
-          recommended: [SESSIONS[2], SESSIONS[3]],
-        },
+        ...this.sessionSummaries,
       },
-      recorder: {
-        workspaceFolders: vscode.workspace.workspaceFolders?.map(x => x.uri.path) || [],
-        session: this.recorder && {
-          isRecording: this.recorder.isRecording,
-          duration: this.recorder.getClock(),
-          name: 'Name (TODO)',
-          uri: { scheme: 'file', path: 'Path/TODO' },
-        },
-      },
-      player: this.player && {
-        isPlaying: this.player.isPlaying,
-        duration: this.player.getDuration(),
-        clock: this.player.getClock(),
+      recorder: this.recorder && {
+        workspaceFolders: this.recorder.workspaceFolders,
+        status: this.recorder.status,
+        duration: this.recorder.getClock(),
         name: 'Name (TODO)',
         uri: { scheme: 'file', path: 'Path/TODO' },
+      },
+      player: this.player && {
+        sessionSummary: this.player.sessionSummary,
+        status: this.player.status,
+        clock: this.player.getClock(),
       },
     };
   }

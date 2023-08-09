@@ -1,4 +1,4 @@
-import * as misc from './misc';
+import * as misc from './misc.js';
 import * as vscode from 'vscode';
 import assert from 'assert';
 import _ from 'lodash';

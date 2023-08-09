@@ -1,4 +1,4 @@
-import Codecast from './codecast';
+import Codecast from './codecast.js';
 import _ from 'lodash';
 import * as vscode from 'vscode';
 
