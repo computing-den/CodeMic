@@ -133,20 +133,20 @@ export default class Recorder {
   }
 
   stop() {
-    this.pushEvent({
-      type: 'stop',
-      clock: this.getClock(),
-    });
-    this.status = t.RecorderStatus.Stopped;
+    if (this.session.events.length > 0) {
+      this.pushEvent({
+        type: 'stop',
+        clock: this.getClock(),
+      });
+      this.status = t.RecorderStatus.Stopped;
+      this.save();
+    }
     this.dispose();
-    this.save();
   }
 
   save() {
-    if (this.session.events.length === 0) {
-      vscode.window.showInformationMessage('Nothing to save.');
-      return;
-    }
+    // there must be more than a stop event
+    assert(this.session.events.length > 1);
 
     // const p = path.join(misc.getRecordingsPath(), moment().format('YYYY-MM-DD-HH:mm:ss'));
     const p = misc.getDefaultRecordingPath();

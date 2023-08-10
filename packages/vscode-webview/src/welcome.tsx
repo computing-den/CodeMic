@@ -8,6 +8,7 @@ import { JsxElement } from 'typescript';
 import { EventEmitter } from 'vscode';
 // import type { WebviewApi } from 'vscode-webview';
 import _ from 'lodash';
+import moment from 'moment';
 
 type Props = { store: t.Store; onExit: () => void };
 export default class Welcome extends Component<Props> {
@@ -28,8 +29,8 @@ export default class Welcome extends Component<Props> {
           </Section.Body>
         </Section>
         <SessionsSection title="RECENTLY WATCHED" sessions={recent} />
-        <SessionsSection title="WORKSPACE" sessions={workspace} bordered />
-        <SessionsSection title="FEATURED" sessions={featured} bordered />
+        <SessionsSection title="WORKSPACE" sessions={workspace} />
+        <SessionsSection title="FEATURED" sessions={featured} />
       </Screen>
     );
 
@@ -103,9 +104,22 @@ class SessionItem extends Component<SessionItemProps> {
   render() {
     const { session } = this.props;
     return (
-      <div className="item" onClick={this.openPlayer}>
+      <div className="card join-cards has-hover-actions session-item" onClick={this.openPlayer}>
         <div className="title">{session.title}</div>
-        <div className="actions">
+        <div className="description">{session.description}</div>
+        <div className="footer">
+          <span className="footer-item author">{session.author}</span>
+          <span className="footer-item timestamp">{moment(session.timestamp).fromNow()}</span>
+          <div className="footer-item badge">
+            <span className="codicon codicon-eye va-top m-right_small" />
+            <span className="count">{session.views}</span>
+          </div>
+          <div className="footer-item badge">
+            <span className="codicon codicon-heart va-top m-right_small" />
+            <span className="count">{session.likes}</span>
+          </div>
+        </div>
+        <div className="hover-actions">
           <vscode-button appearance="icon" title="Play" onClick={this.openPlayer}>
             <span className="codicon codicon-play" />
           </vscode-button>

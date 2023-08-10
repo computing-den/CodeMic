@@ -5,6 +5,7 @@
   --spacing-large: 16px;
   --spacing-x-large: 24px;
   --spacing-xx-large: 32px;
+  --card-border-radius: 5px;
 }
 
 body.vscode-light {
@@ -147,37 +148,8 @@ body {
 }
 
 .sessions-section {
-  .item {
-    display: flex;
-    align-items: center;
-    padding: var(--spacing-small) var(--container-padding);
-    cursor: pointer;
-    position: relative;
-
-    &:hover {
-      background: var(--vscode-list-hoverBackground);
-      .actions {
-        visibility: visible;
-      }
-    }
-    &.selected {
-      background: var(--vscode-list-activeSelectionBackground);
-    }
-
-    .title {
-    }
-    .actions {
-      background: var(--vscode-list-hoverBackground);
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      right: 0;
-      display: flex;
-      align-items: center;
-      border-left: 1px solid var(--vscode-sideBarSectionHeader-border);
-      padding: 0 var(--spacing-small);
-      visibility: hidden;
-    }
+  > .body {
+    padding: 0 var(--container-padding);
   }
 }
 
@@ -260,6 +232,7 @@ body {
         right: 0;
         bottom: var(--container-padding);
         width: var(--progress-bar-full-width);
+        z-index: 1;
 
         &:hover .bar {
           width: calc(var(--progress-bar-full-width) - 4px);
@@ -320,50 +293,7 @@ body {
         }
       }
 
-      .subsection.details {
-        border: 1px solid var(--vscode-sideBarSectionHeader-border);
-        padding: var(--spacing-small) var(--spacing-medium);
-        margin: calc(var(--spacing-small) * -1) calc(var(--spacing-medium) * -1);
-        margin-top: calc(var(--spacing-medium) + var(--spacing-small));
-        border-radius: 5px;
-        background: var(--input-background);
-
-        > .header {
-          display: flex;
-          align-items: flex-start;
-
-          .heading {
-            .author {
-              font-weight: bold;
-            }
-            .timestamp {
-              font-weight: bold;
-              opacity: 0.6;
-              font-size: 0.9em;
-              margin-left: var(--spacing-medium);
-            }
-          }
-
-          .stats-and-actions {
-            margin-left: auto;
-            display: flex;
-            font-weight: bold;
-
-            .item {
-              background: var(--player-badge-background);
-              padding: 2px 8px;
-              border-radius: 10px;
-              white-space: nowrap;
-            }
-
-            .item + .item {
-              margin-left: var(--spacing-large);
-            }
-          }
-        }
-        > .body {
-          margin-top: var(--spacing-medium);
-        }
+      .card.subsection.details {
       }
     }
   }
@@ -409,4 +339,103 @@ ul.unstyled {
 
 .codicon.va-top {
   vertical-align: top;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+
+  border: 1px solid var(--vscode-sideBarSectionHeader-border);
+  padding: var(--spacing-medium);
+  margin: 0 calc(var(--spacing-medium) * -1);
+  background: var(--input-background);
+  overflow: hidden;
+  border-radius: var(--card-border-radius);
+
+  &.join-cards {
+    border-radius: 0;
+
+    &:first-child {
+      border-top-left-radius: var(--card-border-radius);
+      border-top-right-radius: var(--card-border-radius);
+    }
+    &:last-child {
+      border-bottom-left-radius: var(--card-border-radius);
+      border-bottom-right-radius: var(--card-border-radius);
+    }
+    & + .card {
+      border-top: 0;
+    }
+  }
+
+  &.has-hover-actions {
+    cursor: pointer;
+
+    &:hover {
+      background: var(--vscode-list-hoverBackground);
+      .hover-actions {
+        visibility: visible;
+      }
+    }
+  }
+
+  .title {
+    font-weight: bold;
+  }
+
+  .description {
+    opacity: 0.8;
+    margin-top: var(--spacing-small);
+  }
+
+  .footer {
+    margin-top: var(--spacing-small);
+    display: flex;
+    align-items: center;
+    font-weight: bold;
+    opacity: 0.6;
+
+    .footer-item {
+      font-size: 0.9em;
+      white-space: nowrap;
+
+      &.footer-item-title {
+        font-size: unset;
+      }
+
+      &.badge {
+        display: flex;
+        align-items: center;
+        font-size: 0.9em;
+
+        .codicon {
+          font-size: 0.9rem;
+        }
+        .codicon-eye {
+          margin-bottom: -2px;
+        }
+        .codicon-heart {
+          margin-bottom: -2px;
+          font-size: 0.8rem;
+        }
+      }
+    }
+    .footer-item + .footer-item {
+      margin-left: var(--spacing-medium);
+    }
+  }
+
+  .hover-actions {
+    background: var(--vscode-list-hoverBackground);
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--vscode-sideBarSectionHeader-border);
+    padding: 0 var(--spacing-small);
+    visibility: hidden;
+  }
 }

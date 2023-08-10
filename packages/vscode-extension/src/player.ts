@@ -33,7 +33,11 @@ export default class Player {
   ) {}
 
   start() {
-    assert(this.status === t.PlayerStatus.Init || this.status === t.PlayerStatus.Paused);
+    assert(
+      this.status === t.PlayerStatus.Init ||
+        this.status === t.PlayerStatus.Paused ||
+        this.status === t.PlayerStatus.Stopped,
+    );
     this.status = t.PlayerStatus.Playing;
 
     // ignore user input
@@ -72,8 +76,9 @@ export default class Player {
     try {
       await this.enqueueUpdate(clock);
     } catch (error) {
+      vscode.window.showErrorMessage('Sorry, something went wrong.', { detail: (error as Error).message });
       console.error(error);
-      this.stop();
+      this.pause();
     }
   }
 

@@ -13,13 +13,17 @@ import moment from 'moment';
 type Props = { store: t.Store; onExit: () => void };
 export default class Player extends Component<Props> {
   progressBar?: Element;
-  media: FakeMedia = new FakeMedia(this.handleMediaProgress.bind(this));
+  media = new FakeMedia(this.handleMediaProgress.bind(this));
+  seeking = false;
 
   state = {
     localClock: 0,
   };
 
   startPlayer = async () => {
+    if (this.isStoppedAlmostAtTheEnd()) {
+      await this.seek(0);
+    }
     await actions.startPlayer();
   };
 
@@ -42,28 +46,27 @@ export default class Player extends Component<Props> {
     e.preventDefault();
     e.stopPropagation();
     const clock = this.getClockOfMouse(e);
-    this.media.time = clock * 1000;
 
-    await this.seek(clock, true);
+    await this.seek(clock);
     // this.media.time = clock * 1000;
     // this.setState({ localClock: clock });
   };
 
-  // force will delete any seek before or after this one.
-  // Consider that we are currently at t=10, and we seek to t=20,
-  // but before the seek is complete, media sends a progress update
-  // to seek to t=10.1. If the seek t=20 is forced, the t=10.1 will be
-  // removed from the queue
-  seek = async (clock: number, force: boolean) => {
-    if (force) this.seekTaskQueueDontUseDirectly.clear();
+  seek = async (clock: number) => {
+    this.seekTaskQueueDontUseDirectly.clear();
     await this.seekTaskQueueDontUseDirectly(clock);
-    if (force) this.seekTaskQueueDontUseDirectly.clear();
   };
 
   seekTaskQueueDontUseDirectly = lib.taskQueue(async (clock: number) => {
-    const localClock = Math.max(0, Math.min(clock, this.props.store.player!.sessionSummary.duration));
-    await actions.seek(clock);
-    this.setState({ localClock });
+    try {
+      this.seeking = true;
+      const localClock = Math.max(0, Math.min(clock, this.props.store.player!.sessionSummary.duration));
+      await actions.seek(localClock);
+      this.media.time = localClock * 1000;
+      this.setState({ localClock });
+    } finally {
+      this.seeking = false;
+    }
   }, 1);
 
   getClockOfMouse = (e: MouseEvent): number => {
@@ -86,6 +89,13 @@ export default class Player extends Component<Props> {
   //   (actions.seek, 200);
   // }
 
+  isStoppedAlmostAtTheEnd(): boolean {
+    return (
+      this.props.store.player!.status === t.PlayerStatus.Stopped &&
+      this.props.store.player!.clock >= this.props.store.player!.sessionSummary.duration - 0.5
+    );
+  }
+
   enableOrDisableMedia() {
     const { status } = this.props.store.player!;
     if (status === t.PlayerStatus.Playing && !this.media.isActive()) {
@@ -96,8 +106,8 @@ export default class Player extends Component<Props> {
   }
 
   async handleMediaProgress(ms: number) {
-    if (this.props.store.player!.status === t.PlayerStatus.Playing) {
-      await this.seek(ms / 1000, false);
+    if (!this.seeking && this.props.store.player!.status === t.PlayerStatus.Playing) {
+      await this.seek(ms / 1000);
     }
   }
 
@@ -117,6 +127,7 @@ export default class Player extends Component<Props> {
   render() {
     const player = this.props.store.player!;
     const filledStyle = { height: `${(this.state.localClock / player.sessionSummary.duration) * 100}%` };
+    const ss = player.sessionSummary;
 
     let toggleFn: () => void, toggleIcon: string;
     if (player.status === t.PlayerStatus.Playing) {
@@ -129,7 +140,7 @@ export default class Player extends Component<Props> {
       <Screen className="player">
         <Section className="main-section">
           <Section.Header
-            title={player.sessionSummary.title}
+            title="Player"
             buttons={[<Section.Header.ExitButton onClick={this.props.onExit} />]}
             collapsible
           />
@@ -145,7 +156,7 @@ export default class Player extends Component<Props> {
                 <div className={`codicon ${toggleIcon}`} />
               </vscode-button>
               <div className="time">
-                {lib.formatTimeSeconds(this.state.localClock)} / {lib.formatTimeSeconds(player.sessionSummary.duration)}
+                {lib.formatTimeSeconds(this.state.localClock)} / {lib.formatTimeSeconds(ss.duration)}
               </div>
               <div className="actions">
                 <vscode-button appearance="icon" title="Fork: record a new session at this point">
@@ -154,26 +165,26 @@ export default class Player extends Component<Props> {
                 <vscode-button appearance="icon" title="Bookmark">
                   <span className="codicon codicon-bookmark" />
                 </vscode-button>
+                <vscode-button appearance="icon" title="Like">
+                  <span className="codicon codicon-heart" />
+                </vscode-button>
               </div>
             </div>
-            <div className="subsection details">
-              <div className="header">
-                <div className="heading">
-                  <span className="author">{player.sessionSummary.author}</span>
-                  <span className="timestamp">{moment(player.sessionSummary.timestamp).fromNow()}</span>
+            <div className="card subsection details">
+              <div className="title">{ss.title}</div>
+              <div className="description">{ss.description}</div>
+              <div className="footer">
+                <span className="footer-item author">{ss.author}</span>
+                <span className="footer-item timestamp">{moment(ss.timestamp).fromNow()}</span>
+                <div className="footer-item badge">
+                  <span className="codicon codicon-eye va-top m-right_small" />
+                  <span className="count">{ss.views}</span>
                 </div>
-                <div className="stats-and-actions">
-                  <div className="item">
-                    <span className="codicon codicon-eye va-top m-right_small" />
-                    {player.sessionSummary.views}
-                  </div>
-                  <div className="item">
-                    <span className="codicon codicon-thumbsup va-top m-right_small" />
-                    {player.sessionSummary.likes}
-                  </div>
+                <div className="footer-item badge">
+                  <span className="codicon codicon-heart va-top m-right_small" />
+                  <span className="count">{ss.likes}</span>
                 </div>
               </div>
-              {player.sessionSummary.description && <div className="body">{player.sessionSummary.description}</div>}
             </div>
           </Section.Body>
         </Section>
