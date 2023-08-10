@@ -5,7 +5,7 @@ export default class FakeMedia {
   static intervalMs: number = 200;
 
   constructor(private listener: (time: number) => void, public time: number = 0) {
-    this.start();
+    // this.start();
   }
 
   // set(time: number) {

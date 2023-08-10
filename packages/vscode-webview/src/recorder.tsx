@@ -100,7 +100,7 @@ export default class Recorder extends Component<Props> {
               Summary
             </vscode-text-area>
             <vscode-text-field className="item" placeholder={workspaceFolders[0] || ''}>
-              Workspace folder
+              Workspace
               <vscode-button slot="end" appearance="icon" title="Pick">
                 <span className="codicon codicon-search" />
               </vscode-button>

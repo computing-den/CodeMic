@@ -8,6 +8,10 @@
   --card-border-radius: 5px;
 }
 
+button {
+  min-width: 0;
+}
+
 body.vscode-light {
   --player-badge-background: #f1f1f1;
 }
@@ -112,6 +116,8 @@ body {
 
   > .body {
     flex: 1;
+    display: flex;
+    flex-direction: column;
   }
 }
 
@@ -135,6 +141,7 @@ body {
       padding: 0 var(--container-padding);
       display: flex;
       align-items: center;
+      flex-direction: row;
 
       & vscode-text-field {
         flex: 1;
@@ -165,7 +172,7 @@ body {
       }
 
       .item {
-        width: 100%;
+        /* width: 100%; */
         &.help {
           margin-top: var(--spacing-x-small);
           font-size: 0.9em;
@@ -275,10 +282,90 @@ body {
         }
       }
 
+      .subsection {
+      }
+
+      /*
       .subsection + .subsection {
         margin-top: var(--spacing-medium);
       }
+      */
 
+      /*
+      .subsection.control-and-details {
+        display: flex;
+        align-items: stretch;
+
+        > vscode-button {
+          min-width: 45px;
+          min-height: 40px;
+
+          .codicon {
+            font-size: 1.2rem;
+          }
+        }
+
+        .details {
+          flex: 1;
+          margin-left: var(--spacing-medium);
+
+          .title {
+            font-weight: bold;
+            margin-bottom: var(--spacing-x-small);
+          }
+          .time {
+            margin-top: var(--spacing-x-small);
+            font-weight: bold;
+            opacity: 0.7;
+            font-size: 0.9em;
+          }
+        }
+      }
+      */
+
+      .subsection.control-toolbar {
+        display: flex;
+        align-items: center;
+
+        .toggle-button {
+          width: 35px;
+          height: 35px;
+          border-radius: 50%;
+          border: 1px solid var(--button-primary-background);
+          background: var(--button-primary-background);
+          color: var(--button-primary-foreground);
+
+          &:hover {
+            background: var(--button-primary-hover-background);
+            color: var(--button-primary-foreground);
+          }
+          /* &:active, */
+          /* &:focus { */
+          /*   background: var(--button-primary-active-background); */
+          /* } */
+
+          .codicon {
+            margin-left: 3px;
+          }
+        }
+
+        .actions {
+          margin-left: var(--spacing-medium);
+          display: flex;
+        }
+
+        .time {
+          font-weight: bold;
+          opacity: 0.7;
+          margin-left: auto;
+        }
+      }
+
+      .subsection.details {
+        margin: var(--spacing-x-large) 0;
+      }
+
+      /*
       .subsection.control-toolbar {
         display: flex;
         align-items: center;
@@ -295,6 +382,7 @@ body {
 
       .card.subsection.details {
       }
+      */
     }
   }
 }
@@ -348,10 +436,16 @@ ul.unstyled {
 
   border: 1px solid var(--vscode-sideBarSectionHeader-border);
   padding: var(--spacing-medium);
-  margin: 0 calc(var(--spacing-medium) * -1);
+  /* margin: 0 calc(var(--spacing-medium) * -1); */
   background: var(--input-background);
   overflow: hidden;
   border-radius: var(--card-border-radius);
+
+  &.card-bare {
+    background: unset;
+    padding: unset;
+    border: unset;
+  }
 
   &.join-cards {
     border-radius: 0;

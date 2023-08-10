@@ -97,11 +97,10 @@ export default class Player extends Component<Props> {
   }
 
   enableOrDisableMedia() {
-    const { status } = this.props.store.player!;
-    if (status === t.PlayerStatus.Playing && !this.media.isActive()) {
-      this.media.start();
-    } else if (status === t.PlayerStatus.Playing && !this.media.isActive()) {
-      this.media.pause();
+    const isPlaying = Boolean(this.props.store.player!.status === t.PlayerStatus.Playing);
+    if (isPlaying !== this.media.isActive()) {
+      if (isPlaying) this.media.start();
+      else this.media.pause();
     }
   }
 
@@ -152,6 +151,57 @@ export default class Player extends Component<Props> {
               </div>
             </div>
             <div className="subsection control-toolbar">
+              <vscode-button className="toggle-button" onClick={toggleFn} appearance="icon">
+                <div className={`codicon ${toggleIcon}`} />
+              </vscode-button>
+              <div className="actions">
+                <vscode-button appearance="icon" title="Fork: record a new session at this point">
+                  <span className="codicon codicon-repo-forked" />
+                </vscode-button>
+                <vscode-button appearance="icon" title="Bookmark">
+                  <span className="codicon codicon-bookmark" />
+                </vscode-button>
+                <vscode-button appearance="icon" title="Like">
+                  <span className="codicon codicon-heart" />
+                </vscode-button>
+              </div>
+              <div className="time">
+                {lib.formatTimeSeconds(this.state.localClock)} / {lib.formatTimeSeconds(ss.duration)}
+              </div>
+            </div>
+            <div className="card card-bare subsection details">
+              <div className="title">{ss.title}</div>
+              <div className="description">{ss.description}</div>
+              <div className="footer">
+                <span className="footer-item author">{ss.author}</span>
+                <span className="footer-item timestamp">{moment(ss.timestamp).fromNow()}</span>
+                <div className="footer-item badge">
+                  <span className="codicon codicon-eye va-top m-right_small" />
+                  <span className="count">{ss.views}</span>
+                </div>
+                <div className="footer-item badge">
+                  <span className="codicon codicon-heart va-top m-right_small" />
+                  <span className="count">{ss.likes}</span>
+                </div>
+              </div>
+            </div>
+
+            {/*
+            <div className="subsection control-and-details">
+              <vscode-button onClick={toggleFn}>
+                <div className={`codicon ${toggleIcon}`} />
+              </vscode-button>
+              <div className="details">
+                <div className="title">{ss.title}</div>
+                <div className="time">
+                  {lib.formatTimeSeconds(this.state.localClock)} / {lib.formatTimeSeconds(ss.duration)}
+                </div>
+              </div>
+            </div>
+            <div className="subsection description">{ss.description}</div>
+              */}
+            {/*
+            <div className="subsection control-toolbar">
               <vscode-button onClick={toggleFn}>
                 <div className={`codicon ${toggleIcon}`} />
               </vscode-button>
@@ -169,7 +219,9 @@ export default class Player extends Component<Props> {
                   <span className="codicon codicon-heart" />
                 </vscode-button>
               </div>
-            </div>
+              </div>
+              */}
+            {/*
             <div className="card subsection details">
               <div className="title">{ss.title}</div>
               <div className="description">{ss.description}</div>
@@ -186,6 +238,15 @@ export default class Player extends Component<Props> {
                 </div>
               </div>
             </div>
+              */}
+            {player.status === t.PlayerStatus.Init && (
+              <vscode-text-field className="subsection" placeholder={ss.defaultWorkspacePath || '~/codecast'} autofocus>
+                Workspace
+                <vscode-button slot="end" appearance="icon" title="Pick">
+                  <span className="codicon codicon-search" />
+                </vscode-button>
+              </vscode-text-field>
+            )}
           </Section.Body>
         </Section>
       </Screen>
