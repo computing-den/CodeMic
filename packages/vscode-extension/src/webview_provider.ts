@@ -48,15 +48,10 @@ class WebviewProvider implements vscode.WebviewViewProvider {
   private getHtmlForWebview(webview: vscode.Webview) {
     const getPath = (...args: string[]) => webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, ...args));
 
-    const scripts = [getPath('..', 'vscode-webview', 'out', 'webview.js')];
-
-    const styles = [
-      getPath('..', 'vscode-webview', 'resources', 'normalize-8.0.1.css'),
-      getPath('..', 'vscode-webview', 'resources', 'vscode.css'),
-      getPath('..', 'vscode-webview', 'out', 'webview.css'),
-      getPath('..', '..', 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css'),
-    ];
-
+    const resourcesUri = getPath('..', 'vscode-webview', 'resources');
+    const webviewJs = getPath('..', 'vscode-webview', 'out', 'webview.js');
+    const webviewCss = getPath('..', 'vscode-webview', 'out', 'webview.css');
+    const codiconCss = getPath('..', '..', 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css');
     // const font = getPath('webview', 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.ttf');
 
     return `<!DOCTYPE html>
@@ -64,12 +59,17 @@ class WebviewProvider implements vscode.WebviewViewProvider {
 			<head>
 				<meta charset="UTF-8">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
-        ${styles.map(uri => `<link href="${uri}" rel="stylesheet">`).join('\n')}
+        <base href="${resourcesUri}/">
+        <link href="normalize-8.0.1.css" rel="stylesheet">
+        <link href="vscode.css" rel="stylesheet">
+        <link href="${webviewCss}" rel="stylesheet">
+        <link href="${webviewCss}" rel="stylesheet">
+        <link href="${codiconCss}" rel="stylesheet">
 				<title>Codecast</title>
 			</head>
 			<body>
         <div id="app"></div>
-        ${scripts.map(uri => `<script src="${uri}" type="module"></script>`)}
+        <script src="${webviewJs}" type="module"></script>
 			</body>
 			</html>`;
   }

@@ -12,7 +12,10 @@ const SESSIONS: t.SessionSummary[] = [
     id: 'fd4659dd-150a-408b-aac3-1bc815a83be9',
     title: 'DumDB part 2',
     description: 'A small DB easy to use',
-    author: 'sean_shir',
+    author: {
+      name: 'sean_shir',
+      avatar: 'avatar1.png',
+    },
     published: false,
     uri: { scheme: 'file', path: '/home/sean/codecast/recordings/session.codecast' },
     defaultWorkspacePath: '/home/sean/workspace/dumdb',
@@ -25,7 +28,10 @@ const SESSIONS: t.SessionSummary[] = [
     id: '8cd503ae-108a-49e0-b33f-af1320f66a68',
     title: 'cThruLisp',
     description: 'An interesting take on lisp',
-    author: 'sean_shir',
+    author: {
+      name: 'sean_shir',
+      avatar: 'avatar2.png',
+    },
     published: false,
     uri: { scheme: 'file', path: '/home/sean/codecast/recordings/session.codecast' },
     defaultWorkspacePath: '/home/sean/workspace/dumdb',
@@ -38,7 +44,10 @@ const SESSIONS: t.SessionSummary[] = [
     id: '4167cb21-e47d-478c-a741-0e3f6c69079e',
     title: 'DumDB part 1',
     description: 'A small DB easy to use',
-    author: 'sean_shir',
+    author: {
+      name: 'sean_shir',
+      avatar: 'https://cdn-icons-png.flaticon.com/512/924/924915.png',
+    },
     published: true,
     uri: { scheme: 'https', path: 'codecasts/8cd503ae-108a-49e0-b33f-af1320f66a68', authority: 'codecast.io' },
     defaultWorkspacePath: '/home/sean/workspace/dumdb',
@@ -52,7 +61,10 @@ const SESSIONS: t.SessionSummary[] = [
     title: 'Some other project',
     description:
       'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
-    author: 'jane',
+    author: {
+      name: 'jane',
+      avatar: 'avatar2.png',
+    },
     published: true,
     uri: { scheme: 'https', path: 'codecasts/8cd503ae-108a-49e0-b33f-af1320f66a68', authority: 'codecast.io' },
     duration: 662,

@@ -104,34 +104,41 @@ class SessionItem extends Component<SessionItemProps> {
   render() {
     const { session } = this.props;
     return (
-      <div className="card join-cards has-hover-actions session-item" onClick={this.openPlayer}>
-        <div className="title">{session.title}</div>
-        <div className="description">{session.description}</div>
-        <div className="footer">
-          <span className="footer-item author">{session.author}</span>
-          <span className="footer-item timestamp">{moment(session.timestamp).fromNow()}</span>
-          <div className="footer-item badge">
-            <span className="codicon codicon-eye va-top m-right_small" />
-            <span className="count">{session.views}</span>
-          </div>
-          <div className="footer-item badge">
-            <span className="codicon codicon-heart va-top m-right_small" />
-            <span className="count">{session.likes}</span>
-          </div>
+      <div className="card card-bare card-with-media has-hover-actions session-item" onClick={this.openPlayer}>
+        <div className="media">
+          <img src={session.author.avatar} />
         </div>
-        <div className="hover-actions">
-          <vscode-button appearance="icon" title="Play" onClick={this.openPlayer}>
-            <span className="codicon codicon-play" />
-          </vscode-button>
-          <vscode-button appearance="icon" title="Continue recording this session">
-            <span className="codicon codicon-device-camera-video" />
-          </vscode-button>
-          <vscode-button appearance="icon" title="Fork: record a new session at the end of this one">
-            <span className="codicon codicon-repo-forked" />
-          </vscode-button>
-          <vscode-button appearance="icon" title="Delete this session">
-            <span className="codicon codicon-close" />
-          </vscode-button>
+        <div className="card-content">
+          <div className="title">{session.title}</div>
+          <div className="description">{session.description}</div>
+          <div className="footer">
+            <span className="footer-item author">{session.author.name}</span>
+          </div>
+          <div className="footer">
+            <span className="footer-item timestamp">{moment(session.timestamp).fromNow()}</span>
+            <div className="footer-item badge">
+              <span className="codicon codicon-eye va-top m-right_small" />
+              <span className="count">{session.views}</span>
+            </div>
+            <div className="footer-item badge">
+              <span className="codicon codicon-heart va-top m-right_small" />
+              <span className="count">{session.likes}</span>
+            </div>
+          </div>
+          <div className="hover-actions">
+            <vscode-button appearance="icon" title="Play" onClick={this.openPlayer}>
+              <span className="codicon codicon-play" />
+            </vscode-button>
+            <vscode-button appearance="icon" title="Continue recording this session">
+              <span className="codicon codicon-device-camera-video" />
+            </vscode-button>
+            <vscode-button appearance="icon" title="Fork: record a new session at the end of this one">
+              <span className="codicon codicon-repo-forked" />
+            </vscode-button>
+            <vscode-button appearance="icon" title="Delete this session">
+              <span className="codicon codicon-close" />
+            </vscode-button>
+          </div>
         </div>
       </div>
     );

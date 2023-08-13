@@ -137,17 +137,38 @@ export default class Player extends Component<Props> {
 
     return (
       <Screen className="player">
+        <div className="progress-bar" ref={this.handleProgressBarRef} onClick={this.clicked}>
+          <div className="bar">
+            <div className="shadow" />
+            <div className="filled" style={filledStyle} />
+          </div>
+        </div>
         <Section className="main-section">
           <Section.Header
-            title="Player"
+            title="PLAYER"
             buttons={[<Section.Header.ExitButton onClick={this.props.onExit} />]}
             collapsible
           />
           <Section.Body>
-            <div className="progress-bar" ref={this.handleProgressBarRef} onClick={this.clicked}>
-              <div className="bar">
-                <div className="shadow" />
-                <div className="filled" style={filledStyle} />
+            <div className="details card card-bare card-no-padding card-with-media">
+              <div className="media">
+                <img src={ss.author.avatar} />
+              </div>
+              <div className="card-content">
+                <div className="title">{ss.title}</div>
+                <div className="description">{ss.description}</div>
+                <div className="footer">
+                  <span className="footer-item author">{ss.author.name}</span>
+                  <span className="footer-item timestamp">{moment(ss.timestamp).fromNow()}</span>
+                  <div className="footer-item badge">
+                    <span className="codicon codicon-eye va-top m-right_small" />
+                    <span className="count">{ss.views}</span>
+                  </div>
+                  <div className="footer-item badge">
+                    <span className="codicon codicon-heart va-top m-right_small" />
+                    <span className="count">{ss.likes}</span>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="control-toolbar">
@@ -171,23 +192,6 @@ export default class Player extends Component<Props> {
                 </span>
               </div>
             </div>
-            <div className="card card-bare subsection details">
-              <div className="title">{ss.title}</div>
-              <div className="description">{ss.description}</div>
-              <div className="footer">
-                <span className="footer-item author">{ss.author}</span>
-                <span className="footer-item timestamp">{moment(ss.timestamp).fromNow()}</span>
-                <div className="footer-item badge">
-                  <span className="codicon codicon-eye va-top m-right_small" />
-                  <span className="count">{ss.views}</span>
-                </div>
-                <div className="footer-item badge">
-                  <span className="codicon codicon-heart va-top m-right_small" />
-                  <span className="count">{ss.likes}</span>
-                </div>
-              </div>
-            </div>
-
             {player.status === t.PlayerStatus.Init && (
               <vscode-text-field className="subsection" placeholder={ss.defaultWorkspacePath || '~/codecast'} autofocus>
                 Workspace
@@ -196,6 +200,17 @@ export default class Player extends Component<Props> {
                 </vscode-button>
               </vscode-text-field>
             )}
+          </Section.Body>
+        </Section>
+        <Section className="contents-section">
+          <Section.Header title="CONTENTS" collapsible />
+          <Section.Body>
+            <vscode-text-field className="subsection" placeholder="Search"></vscode-text-field>
+            <vscode-dropdown>
+              <vscode-option>Table of contents</vscode-option>
+              <vscode-option>Files</vscode-option>
+              <vscode-option>Entities</vscode-option>
+            </vscode-dropdown>
           </Section.Body>
         </Section>
       </Screen>

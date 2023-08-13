@@ -83,7 +83,10 @@ export type SessionSummary = {
   id: string;
   title: string;
   description: string;
-  author: string;
+  author: {
+    avatar: string;
+    name: string;
+  };
   published: boolean;
   uri: Uri;
   defaultWorkspacePath?: string;

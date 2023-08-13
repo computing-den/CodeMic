@@ -93,9 +93,11 @@ export default class Recorder extends Component<Props> {
                 <div className={`codicon ${toggleIcon}`} />
               </vscode-button>
               <div className="actions">
-                <vscode-button appearance="icon" title="Discard">
-                  <span className="codicon codicon-trash" />
-                </vscode-button>
+                {status !== t.RecorderStatus.Init && (
+                  <vscode-button appearance="icon" title="Discard">
+                    <span className="codicon codicon-debug-restart" />
+                  </vscode-button>
+                )}
               </div>
               <div className="time">
                 <span

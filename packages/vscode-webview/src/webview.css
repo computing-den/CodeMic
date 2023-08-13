@@ -7,7 +7,8 @@
   --spacing-xx-large: 32px;
   --card-border-radius: 5px;
   --toggle-button-size: 35px;
-  --progress-bar-full-width: var(--container-padding);
+  --progress-bar-full-width: 16px;
+  --progress-bar-hover-width: 30px;
   --progress-bar-small-width: 3px;
   --button-danger-color: #f85149;
   --button-danger-hover-color: #f85149e6;
@@ -50,6 +51,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .section {
@@ -102,15 +104,19 @@ body {
   }
 
   > .body {
-    flex: 1;
     display: flex;
     flex-direction: column;
+    /* padding: var(--spacing-large) var(--container-padding); */
+
+    .subsection + .subsection {
+      margin-top: var(--spacing-medium);
+    }
   }
 }
 
 .welcome {
   .search-section {
-    .body {
+    > .body {
       padding: 0 var(--container-padding);
       display: flex;
       align-items: center;
@@ -125,21 +131,29 @@ body {
       }
     }
   }
-}
 
-.sessions-section {
-  > .body {
-    padding: 0 var(--container-padding);
+  .sessions-section {
+    > .body {
+      padding: 0 var(--spacing-medium);
+
+      /* .session-item { */
+      /*   flex-direction: row; */
+      /*   .card-content { */
+      /*     display: flex; */
+      /*     flex-direction: column; */
+      /*   } */
+      /* } */
+    }
   }
 }
 
 .recorder {
   .main-section {
     > .body {
-      padding: var(--container-padding);
+      padding: var(--spacing-large) var(--container-padding);
 
       .control-toolbar {
-        margin-bottom: var(--spacing-x-large);
+        margin-bottom: var(--spacing-large);
       }
 
       .subsection.help {
@@ -150,33 +164,31 @@ body {
           color: inherit;
         }
       }
-
-      .subsection + .subsection {
-        margin-top: var(--spacing-medium);
-      }
     }
   }
 }
 
 .player {
-  min-height: 100%;
-
+  .progress-bar {
+  }
   .main-section {
-    flex: 1;
     > .body {
-      padding: var(--container-padding);
-      position: relative;
-
-      .progress-bar {
-      }
+      padding: var(--spacing-large) var(--container-padding);
 
       .control-toolbar {
-        margin-bottom: var(--spacing-x-large);
+        margin-bottom: var(--spacing-xx-large);
       }
 
-      .subsection.details {
-        margin-bottom: var(--spacing-x-large);
+      .details {
+        /* margin: var(--spacing-xx-large) 0; */
+        margin-bottom: var(--spacing-medium);
       }
+    }
+  }
+
+  .contents-section {
+    > .body {
+      padding: var(--spacing-large) var(--container-padding);
     }
   }
 }
@@ -210,16 +222,44 @@ ul.unstyled {
   flex-direction: column;
   position: relative;
 
-  border: 1px solid var(--vscode-sideBarSectionHeader-border);
+  border: 1px solid var(--vscode-input-border);
   padding: var(--spacing-medium);
   background: var(--input-background);
   overflow: hidden;
   border-radius: var(--card-border-radius);
 
+  &.card-with-media {
+    flex-direction: row;
+
+    .media {
+      display: flex;
+      align-items: flex-start;
+
+      & img {
+        width: 42px;
+        height: 42px;
+        flex-shrink: 0;
+        object-fit: contain;
+        margin-right: var(--spacing-large);
+        border-radius: 50%;
+        border: 1px solid var(--vscode-input-border);
+      }
+    }
+
+    .card-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+  }
+
   &.card-bare {
     background: unset;
-    padding: unset;
     border: unset;
+  }
+
+  &.card-no-padding {
+    padding: 0;
   }
 
   &.join-cards {
@@ -254,7 +294,10 @@ ul.unstyled {
   }
 
   .description {
-    opacity: 0.8;
+    opacity: 1;
+  }
+
+  .title + .description {
     margin-top: var(--spacing-small);
   }
 
@@ -317,7 +360,7 @@ ul.unstyled {
   border: 1px solid var(--vscode-input-border);
   padding: 6px 11px 6px 7px;
   border-radius: 30px;
-  margin: 0 -7px 0 -7px;
+  margin: 0 -3px 0 -3px;
 
   .toggle-button {
     min-width: var(--toggle-button-size);
@@ -405,11 +448,11 @@ ul.unstyled {
 }
 
 .progress-bar {
-  position: absolute;
-  top: var(--container-padding);
+  position: fixed;
+  top: calc(22px + var(--container-padding));
   right: 0;
   bottom: var(--container-padding);
-  width: var(--progress-bar-full-width);
+  width: var(--progress-bar-hover-width);
   z-index: 1;
 
   &:hover .bar {
