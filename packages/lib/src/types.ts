@@ -79,6 +79,8 @@ export type Uri =
   | { scheme: 'file' | 'untitled'; path: string }
   | { scheme: 'http' | 'https'; authority: string; path: string; query?: string; fragment?: string };
 
+export type TocItem = { title: string; clock: number };
+
 export type SessionSummary = {
   id: string;
   title: string;
@@ -94,4 +96,5 @@ export type SessionSummary = {
   views: number;
   likes: number;
   timestamp: string;
+  toc?: TocItem[];
 };

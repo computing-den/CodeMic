@@ -23,6 +23,17 @@ const SESSIONS: t.SessionSummary[] = [
     views: 0,
     likes: 0,
     timestamp: '2023-07-08T14:22:35.344Z',
+    toc: [
+      { title: 'Intro', clock: 0 },
+      { title: 'Setting things up', clock: 3 },
+      { title: 'First function', clock: 8 },
+      { title: 'Second function', clock: 16 },
+      { title: 'Another thing here', clock: 100 },
+      { title: 'More stuff', clock: 200 },
+      { title: "Here's another topic", clock: 300 },
+      { title: 'And here is a very long topic that might not fit into a single line', clock: 4000 },
+      { title: 'Conclusion', clock: 8000 },
+    ],
   },
   {
     id: '8cd503ae-108a-49e0-b33f-af1320f66a68',

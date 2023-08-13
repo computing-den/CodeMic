@@ -208,6 +208,35 @@ body {
       padding-top: var(--spacing-large);
       padding-left: var(--container-padding);
       padding-right: var(--container-padding);
+
+      .toc {
+        > .item {
+          display: flex;
+          align-items: center;
+
+          margin-left: calc(var(--spacing-small) * -1);
+          margin-right: calc(var(--spacing-small) * -1);
+          padding: var(--spacing-small);
+          cursor: pointer;
+
+          &:hover {
+            background: var(--vscode-list-hoverBackground);
+          }
+
+          & + .item {
+            /* margin-top: var(--spacing-small); */
+          }
+
+          > .title {
+            flex: 1;
+            padding-right: var(--spacing-medium);
+          }
+          > .clock {
+            font-weight: bold;
+            opacity: 0.7;
+          }
+        }
+      }
     }
   }
 }

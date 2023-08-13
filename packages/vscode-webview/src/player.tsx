@@ -53,6 +53,11 @@ export default class Player extends Component<Props> {
   };
 
   seek = async (clock: number) => {
+    if (this.props.store.player!.status === t.PlayerStatus.Init) {
+      // TODO populate the workspace automatically or prompt the user
+      console.error('Workspace not populated yet');
+      return;
+    }
     this.seekTaskQueueDontUseDirectly.clear();
     await this.seekTaskQueueDontUseDirectly(clock);
   };
@@ -83,6 +88,11 @@ export default class Player extends Component<Props> {
     const rect = this.progressBar!.getBoundingClientRect();
     const p = [e.clientX - rect.x, e.clientY - rect.y];
     return p[0] >= 0 && p[0] <= rect.width && p[1] >= 0 && p[1] <= rect.height;
+  };
+
+  tocItemClicked = async (e: Event, item: t.TocItem) => {
+    e.preventDefault();
+    await this.seek(item.clock);
   };
 
   // seekBackend = async (clock: number) => {
@@ -216,11 +226,21 @@ export default class Player extends Component<Props> {
           <Section.Header title="CONTENTS" collapsible />
           <Section.Body>
             <vscode-text-field className="subsection" placeholder="Search"></vscode-text-field>
-            <vscode-dropdown>
+            <vscode-dropdown className="subsection">
               <vscode-option>Table of contents</vscode-option>
               <vscode-option>Files</vscode-option>
               <vscode-option>Entities</vscode-option>
             </vscode-dropdown>
+            {ss.toc && (
+              <div className="subsection toc">
+                {ss.toc.map(item => (
+                  <div tabIndex={0} className="item" onClick={e => this.tocItemClicked(e, item)}>
+                    <div className="title">{item.title}</div>
+                    <div className="clock">{lib.formatTimeSeconds(item.clock)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Section.Body>
         </Section>
       </Screen>
