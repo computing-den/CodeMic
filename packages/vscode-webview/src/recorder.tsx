@@ -88,7 +88,7 @@ export default class Recorder extends Component<Props> {
             collapsible
           />
           <Section.Body>
-            <div className="subsection control-toolbar">
+            <div className="control-toolbar">
               <vscode-button className="toggle-button for-recorder" onClick={toggleFn} appearance="icon">
                 <div className={`codicon ${toggleIcon}`} />
               </vscode-button>
@@ -98,9 +98,11 @@ export default class Recorder extends Component<Props> {
                 </vscode-button>
               </div>
               <div className="time">
-                {status === t.RecorderStatus.Recording && (
-                  <span className="recording-indicator codicon codicon-circle-filled m-right_small" />
-                )}
+                <span
+                  className={`recording-indicator codicon codicon-circle-filled m-right_small ${
+                    status === t.RecorderStatus.Recording ? 'active' : ''
+                  }`}
+                />
                 <span className="text large">{lib.formatTimeSeconds(this.state.localClock, true)}</span>
               </div>
             </div>

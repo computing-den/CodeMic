@@ -150,7 +150,7 @@ export default class Player extends Component<Props> {
                 <div className="filled" style={filledStyle} />
               </div>
             </div>
-            <div className="subsection control-toolbar">
+            <div className="control-toolbar">
               <vscode-button className="toggle-button for-player" onClick={toggleFn} appearance="icon">
                 <div className={`codicon ${toggleIcon}`} />
               </vscode-button>

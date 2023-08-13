@@ -138,7 +138,7 @@ body {
     > .body {
       padding: var(--container-padding);
 
-      .subsection.control-toolbar {
+      .control-toolbar {
         margin-bottom: var(--spacing-x-large);
       }
 
@@ -170,7 +170,7 @@ body {
       .progress-bar {
       }
 
-      .subsection.control-toolbar {
+      .control-toolbar {
         margin-bottom: var(--spacing-x-large);
       }
 
@@ -313,6 +313,12 @@ ul.unstyled {
   display: flex;
   align-items: center;
 
+  background: var(--input-background);
+  border: 1px solid var(--vscode-input-border);
+  padding: 6px 11px 6px 7px;
+  border-radius: 30px;
+  margin: 0 -7px 0 -7px;
+
   .toggle-button {
     min-width: var(--toggle-button-size);
     min-height: var(--toggle-button-size);
@@ -383,9 +389,13 @@ ul.unstyled {
     }
 
     .recording-indicator {
-      color: var(--button-danger-color);
-      vertical-align: middle;
-      margin-top: -4px;
+      vertical-align: text-top;
+      opacity: 0.5;
+
+      &.active {
+        opacity: 1;
+        color: var(--button-danger-color);
+      }
     }
     .text {
       font-weight: bold;
