@@ -150,56 +150,66 @@ export default class Player extends Component<Props> {
             collapsible
           />
           <Section.Body>
-            <div className="details card card-bare card-no-padding card-with-media">
-              <div className="media">
-                <img src={ss.author.avatar} />
-              </div>
-              <div className="card-content">
-                <div className="title">{ss.title}</div>
-                <div className="description">{ss.description}</div>
-                <div className="footer">
-                  <span className="footer-item author">{ss.author.name}</span>
-                  <span className="footer-item timestamp">{moment(ss.timestamp).fromNow()}</span>
-                  <div className="footer-item badge">
-                    <span className="codicon codicon-eye va-top m-right_small" />
-                    <span className="count">{ss.views}</span>
-                  </div>
-                  <div className="footer-item badge">
-                    <span className="codicon codicon-heart va-top m-right_small" />
-                    <span className="count">{ss.likes}</span>
+            <div className="controls-and-details">
+              <div className="details card card-bare card-no-padding card-with-media">
+                <div className="media">
+                  <img src={ss.author.avatar} />
+                </div>
+                <div className="card-content">
+                  <div className="title">{ss.title}</div>
+                  <div className="description">{ss.description}</div>
+                  <div className="footer">
+                    <span className="footer-item author">{ss.author.name}</span>
+                    <span className="footer-item timestamp">{moment(ss.timestamp).fromNow()}</span>
+                    <div className="footer-item badge">
+                      <span className="codicon codicon-eye va-top m-right_small" />
+                      <span className="count">{ss.views}</span>
+                    </div>
+                    <div className="footer-item badge">
+                      <span className="codicon codicon-heart va-top m-right_small" />
+                      <span className="count">{ss.likes}</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <div className="control-toolbar">
-              <vscode-button className="toggle-button for-player" onClick={toggleFn} appearance="icon">
-                <div className={`codicon ${toggleIcon}`} />
-              </vscode-button>
-              <div className="actions">
-                <vscode-button appearance="icon" title="Fork: record a new session starting at this point">
-                  <span className="codicon codicon-repo-forked" />
-                </vscode-button>
-                <vscode-button appearance="icon" title="Bookmark">
-                  <span className="codicon codicon-bookmark" />
-                </vscode-button>
-                <vscode-button appearance="icon" title="Like">
-                  <span className="codicon codicon-heart" />
-                </vscode-button>
+              <div className="control-toolbar">
+                <div className="toggle-button-container">
+                  <vscode-button className="toggle-button for-player" onClick={toggleFn} appearance="icon">
+                    <div className={`codicon ${toggleIcon}`} />
+                  </vscode-button>
+                </div>
+                <div className="actions">
+                  <vscode-button appearance="icon" title="Fork: record a new session starting at this point">
+                    <span className="codicon codicon-repo-forked" />
+                  </vscode-button>
+                  <vscode-button appearance="icon" title="Bookmark">
+                    <span className="codicon codicon-bookmark" />
+                  </vscode-button>
+                  <vscode-button appearance="icon" title="Like">
+                    <span className="codicon codicon-heart" />
+                  </vscode-button>
+                </div>
+                <div className="time">
+                  <span className="text">
+                    {lib.formatTimeSeconds(this.state.localClock)} / {lib.formatTimeSeconds(ss.duration)}
+                  </span>
+                </div>
               </div>
-              <div className="time">
-                <span className="text">
-                  {lib.formatTimeSeconds(this.state.localClock)} / {lib.formatTimeSeconds(ss.duration)}
-                </span>
-              </div>
             </div>
-            {player.status === t.PlayerStatus.Init && (
-              <vscode-text-field className="subsection" placeholder={ss.defaultWorkspacePath || '~/codecast'} autofocus>
-                Workspace
-                <vscode-button slot="end" appearance="icon" title="Pick">
-                  <span className="codicon codicon-search" />
-                </vscode-button>
-              </vscode-text-field>
-            )}
+            <div className="forms">
+              {player.status === t.PlayerStatus.Init && (
+                <vscode-text-field
+                  className="subsection"
+                  placeholder={ss.defaultWorkspacePath || '~/codecast'}
+                  autofocus
+                >
+                  Workspace
+                  <vscode-button slot="end" appearance="icon" title="Pick">
+                    <span className="codicon codicon-search" />
+                  </vscode-button>
+                </vscode-text-field>
+              )}
+            </div>
           </Section.Body>
         </Section>
         <Section className="contents-section">

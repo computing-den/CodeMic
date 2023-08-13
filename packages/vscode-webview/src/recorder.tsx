@@ -89,15 +89,15 @@ export default class Recorder extends Component<Props> {
           />
           <Section.Body>
             <div className="control-toolbar">
-              <vscode-button className="toggle-button for-recorder" onClick={toggleFn} appearance="icon">
-                <div className={`codicon ${toggleIcon}`} />
-              </vscode-button>
+              <div className="toggle-button-container">
+                <vscode-button className="toggle-button for-recorder" onClick={toggleFn} appearance="icon">
+                  <div className={`codicon ${toggleIcon}`} />
+                </vscode-button>
+              </div>
               <div className="actions">
-                {status !== t.RecorderStatus.Init && (
-                  <vscode-button appearance="icon" title="Discard">
-                    <span className="codicon codicon-debug-restart" />
-                  </vscode-button>
-                )}
+                <vscode-button appearance="icon" title="Discard" disabled={status === t.RecorderStatus.Init}>
+                  <span className="codicon codicon-debug-restart" />
+                </vscode-button>
               </div>
               <div className="time">
                 <span

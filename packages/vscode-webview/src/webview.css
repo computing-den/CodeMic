@@ -6,7 +6,7 @@
   --spacing-x-large: 24px;
   --spacing-xx-large: 32px;
   --card-border-radius: 5px;
-  --toggle-button-size: 35px;
+  --toggle-button-size: 34px;
   --progress-bar-full-width: 16px;
   --progress-bar-hover-width: 30px;
   --progress-bar-small-width: 3px;
@@ -150,10 +150,14 @@ body {
 .recorder {
   .main-section {
     > .body {
-      padding: var(--spacing-large) var(--container-padding);
+      padding-top: var(--spacing-large);
 
       .control-toolbar {
-        margin-bottom: var(--spacing-large);
+        margin: 0 var(--spacing-large) var(--spacing-large) var(--spacing-large);
+      }
+
+      .subsection {
+        padding: 0 var(--container-padding);
       }
 
       .subsection.help {
@@ -173,22 +177,37 @@ body {
   }
   .main-section {
     > .body {
-      padding: var(--spacing-large) var(--container-padding);
+      padding-top: var(--spacing-large);
 
-      .control-toolbar {
-        margin-bottom: var(--spacing-xx-large);
+      .controls-and-details {
+        padding: 0 var(--spacing-large);
+        display: flex;
+        flex-direction: column;
+
+        .details {
+          margin-left: -2px; /* to align it with the control toolbar's toggle button */
+        }
+        .control-toolbar {
+          margin-top: var(--spacing-large);
+        }
       }
 
-      .details {
-        /* margin: var(--spacing-xx-large) 0; */
-        margin-bottom: var(--spacing-medium);
+      .forms {
+        padding: 0 var(--container-padding);
+        display: flex;
+        flex-direction: column;
+        > *:first-child {
+          margin-top: var(--spacing-large);
+        }
       }
     }
   }
 
   .contents-section {
     > .body {
-      padding: var(--spacing-large) var(--container-padding);
+      padding-top: var(--spacing-large);
+      padding-left: var(--container-padding);
+      padding-right: var(--container-padding);
     }
   }
 }
@@ -355,71 +374,84 @@ ul.unstyled {
 .control-toolbar {
   display: flex;
   align-items: center;
-
+  position: relative;
   background: var(--input-background);
   border: 1px solid var(--vscode-input-border);
-  padding: 6px 11px 6px 7px;
+  padding: 2px 11px 2px 7px;
   border-radius: 30px;
-  margin: 0 -3px 0 -3px;
+  border-left: none;
 
-  .toggle-button {
-    min-width: var(--toggle-button-size);
-    min-height: var(--toggle-button-size);
-    max-width: var(--toggle-button-size);
-    max-height: var(--toggle-button-size);
-    border-radius: 50%;
-    color: var(--button-primary-foreground);
+  .toggle-button-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
 
-    &:hover {
+    .toggle-button {
+      min-width: var(--toggle-button-size);
+      min-height: var(--toggle-button-size);
+      max-width: var(--toggle-button-size);
+      max-height: var(--toggle-button-size);
+      border-radius: 50%;
       color: var(--button-primary-foreground);
-    }
-
-    &.for-player {
-      border: 1px solid var(--button-primary-background);
-      background: var(--button-primary-background);
 
       &:hover {
-        background: var(--button-primary-hover-background);
+        color: var(--button-primary-foreground);
       }
-    }
 
-    &.for-recorder {
-      border: 2px solid var(--button-danger-border);
-      color: var(--button-danger-color);
+      &.for-player {
+        border: 1px solid var(--button-primary-background);
+        background: var(--button-primary-background);
 
-      &:hover {
-        color: var(--button-danger-hover-color);
-        background: unset;
+        &:hover {
+          background: var(--button-primary-hover-background);
+        }
       }
-      &::part(control):active {
-        background: unset;
-      }
-    }
 
-    .codicon-play {
-      font-size: 1.2rem;
-      margin-left: 3px;
-    }
-    .codicon-primitive-square {
-      font-size: 1.5rem;
-    }
-    .codicon-circle-large-filled {
-      font-size: 1.8rem;
-      margin-top: 1px;
-    }
-    &.for-player .codicon-debug-pause {
-      font-size: 1.3rem;
-      margin: 2px 0 0 1px;
-    }
-    &.for-recorder .codicon-debug-pause {
-      font-size: 1.5rem;
-      margin: 1px 0 0 -1px;
-      font-weight: bold;
+      &.for-recorder {
+        background: var(--input-background);
+        border: 0;
+        color: var(--button-danger-color);
+        border: 1px solid var(--vscode-input-border);
+
+        &:hover {
+          border: 1px solid var(--button-danger-hover-color);
+          color: var(--button-danger-hover-color);
+          background: var(--input-background);
+        }
+        &::part(control):active,
+        &::part(control):focus {
+          border: 1px solid var(--button-danger-hover-color);
+          background: var(--input-background);
+        }
+      }
+
+      .codicon-play {
+        font-size: 1.2rem;
+        margin-left: 2px;
+      }
+      .codicon-primitive-square {
+        font-size: 1.5rem;
+      }
+      .codicon-circle-large-filled {
+        font-size: 1rem;
+      }
+      &.for-player .codicon-debug-pause {
+        font-size: 1.2rem;
+        margin: 2px 0 0 -1px;
+      }
+      &.for-recorder .codicon-debug-pause {
+        font-size: 1.2rem;
+        margin: 2px 0 0 -1px;
+        font-weight: bold;
+      }
     }
   }
 
   .actions {
-    margin-left: var(--spacing-medium);
+    margin-left: 35px;
     display: flex;
   }
 
