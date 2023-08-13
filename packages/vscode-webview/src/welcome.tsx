@@ -129,7 +129,7 @@ class SessionItem extends Component<SessionItemProps> {
           <vscode-button appearance="icon" title="Fork: record a new session at the end of this one">
             <span className="codicon codicon-repo-forked" />
           </vscode-button>
-          <vscode-button appearance="icon" title="Delete: delete this session">
+          <vscode-button appearance="icon" title="Delete this session">
             <span className="codicon codicon-close" />
           </vscode-button>
         </div>

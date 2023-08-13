@@ -68,18 +68,17 @@ export default class Recorder extends Component<Props> {
     const { status, workspaceFolders } = recorder;
 
     const timeStr = lib.formatTimeSeconds(this.state.localClock);
-    let toggleFn: () => void, label: string;
+    let toggleFn: () => void, toggleIcon: string;
     if (status === t.RecorderStatus.Init) {
-      [toggleFn, label] = [this.startRecorder, 'Start'];
+      [toggleFn, toggleIcon] = [this.startRecorder, 'codicon-circle-large-filled'];
     } else if (status === t.RecorderStatus.Paused) {
-      [toggleFn, label] = [this.startRecorder, 'Resume'];
+      [toggleFn, toggleIcon] = [this.startRecorder, 'codicon-circle-large-filled'];
     } else if (status === t.RecorderStatus.Recording) {
-      [toggleFn, label] = [this.pauseRecorder, 'Stop'];
+      [toggleFn, toggleIcon] = [this.pauseRecorder, 'codicon-debug-pause'];
     } else {
       throw new Error(`Cannot render recorder status: ${status}`);
     }
 
-    // <Screen.Header title="Recorder" onExit={this.props.onExit} />
     return (
       <Screen className="recorder">
         <Section className="main-section">
@@ -89,23 +88,36 @@ export default class Recorder extends Component<Props> {
             collapsible
           />
           <Section.Body>
-            <div className="item time">{timeStr}</div>
-            <vscode-button className="item toggle-recorder" onClick={toggleFn}>
-              {label}
-            </vscode-button>
-            <vscode-text-field className="item" autofocus>
+            <div className="subsection control-toolbar">
+              <vscode-button className="toggle-button for-recorder" onClick={toggleFn} appearance="icon">
+                <div className={`codicon ${toggleIcon}`} />
+              </vscode-button>
+              <div className="actions">
+                <vscode-button appearance="icon" title="Discard">
+                  <span className="codicon codicon-trash" />
+                </vscode-button>
+              </div>
+              <div className="time">
+                {status === t.RecorderStatus.Recording && (
+                  <span className="recording-indicator codicon codicon-circle-filled m-right_small" />
+                )}
+                <span className="text large">{lib.formatTimeSeconds(this.state.localClock, true)}</span>
+              </div>
+            </div>
+
+            <vscode-text-field className="subsection" autofocus>
               Title
             </vscode-text-field>
-            <vscode-text-area className="item" rows={5} resize="vertical">
+            <vscode-text-area className="subsection" rows={5} resize="vertical">
               Summary
             </vscode-text-area>
-            <vscode-text-field className="item" placeholder={workspaceFolders[0] || ''}>
+            <vscode-text-field className="subsection" placeholder={workspaceFolders[0] || ''}>
               Workspace
               <vscode-button slot="end" appearance="icon" title="Pick">
                 <span className="codicon codicon-search" />
               </vscode-button>
             </vscode-text-field>
-            <p className="item help">
+            <p className="subsection help">
               Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
             </p>
           </Section.Body>

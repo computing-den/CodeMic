@@ -54,7 +54,7 @@ export function taskQueue<F extends TaskConsumer>(consumer: F, maxConcurrency: n
   return supply as TaskQueue<F>; // didn't find a better way to type this
 }
 
-export function formatTimeSeconds(time: number): string {
+export function formatTimeSeconds(time: number, full: boolean = false): string {
   // 12345.777
   // 12345.777 / 60 / 60 = 3.4293825 h
   // 3.4293825 % 3 * 60 = 0.4293825 * 60 = 25.76295 m
@@ -77,5 +77,5 @@ export function formatTimeSeconds(time: number): string {
   const mStr = String(m).padStart(2, '0');
   const sStr = String(s).padStart(2, '0');
 
-  return h ? `${hStr}:${mStr}:${sStr}` : `${mStr}:${sStr}`;
+  return h || full ? `${hStr}:${mStr}:${sStr}` : `${mStr}:${sStr}`;
 }
