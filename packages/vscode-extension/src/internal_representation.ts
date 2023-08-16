@@ -31,7 +31,7 @@ export type OpenDocumentEvent = {
   type: 'openDocument';
   clock: number;
   uri: vscode.Uri;
-  text: string;
+  // text: string;
   eol: vscode.EndOfLine;
 };
 
@@ -392,7 +392,7 @@ type PlainOpenDocumentEvent = {
   type: 'openDocument';
   clock: number;
   uri: PlainUri;
-  text: string;
+  // text: string;
   eol: PlainEndOfLine;
 };
 
@@ -496,7 +496,7 @@ export function playbackEventToPlain(e: PlaybackEvent): PlainPlaybackEvent {
         type: e.type,
         clock: e.clock,
         uri: uriToPlain(e.uri),
-        text: e.text,
+        // text: e.text,
         eol: endOfLineToPlain(e.eol),
       };
     }
@@ -624,7 +624,7 @@ function playbackEventFromPlain(e: PlainPlaybackEvent): PlaybackEvent {
         type: e.type,
         clock: e.clock,
         uri: uriFromPlain(e.uri),
-        text: e.text,
+        // text: e.text,
         eol: endOfLineFromPlain(e.eol),
       };
     }

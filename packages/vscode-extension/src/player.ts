@@ -221,10 +221,10 @@ export default class Player {
       case 'openDocument': {
         if (dir === Dir.Forwards) {
           const vscTextDocument = await vscode.workspace.openTextDocument(e.uri);
-          const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument, { preserveFocus: true });
-          await vscTextEditor.edit(editBuilder => {
-            editBuilder.replace(misc.getWholeTextDocumentRange(vscTextDocument), e.text);
-          });
+          // const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument, { preserveFocus: true });
+          // await vscTextEditor.edit(editBuilder => {
+          //   editBuilder.replace(misc.getWholeTextDocumentRange(vscTextDocument), e.text);
+          // });
           this.session.openTextDocument(vscTextDocument);
         } else {
           // nothing

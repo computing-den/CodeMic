@@ -193,7 +193,7 @@ export default class Recorder {
       type: 'openDocument',
       clock: this.getClock(),
       uri: irTextDocument.uri,
-      text: irTextDocument.getText(),
+      // text: irTextDocument.getText(),
       eol: irTextDocument.eol,
     });
   }
