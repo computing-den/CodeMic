@@ -4,8 +4,8 @@ export type FrontendRequest =
   | { type: 'openPlayer'; sessionId: string }
   | { type: 'openRecorder' }
   // | { type: 'askToCloseRecorder' }
-  | { type: 'play'; workspacePath?: Uri }
-  | { type: 'record' }
+  | { type: 'play'; workspacePath?: string }
+  | { type: 'record'; workspacePath?: string }
   // | { type: 'closePlayer' }
   // | { type: 'closeRecorder' }
   | { type: 'pausePlayer' }
@@ -33,8 +33,16 @@ export enum Screen {
 export type Store = {
   screen: Screen;
   welcome: Welcome;
-  recorder?: Recorder;
+
+  // It is possible to have an uninitialized recorder which is still waiting for workspacePath and
+  // possibly other fields to be filled out and workspace being scanned before starting.
+  recorder: Recorder;
+
+  // It is not possible to have even an uninitialized player without picking a session summary first.
+  // After picking a session summary, now we can have an uninitialized player until workspacePath is
+  // selected and workspace is populated.
   player?: Player;
+
   // welcome?: Welcome;
   // login?: Login;
 };
@@ -46,23 +54,24 @@ export type Welcome = {
 };
 
 export enum RecorderStatus {
-  Init,
+  Uninitialized,
+  Ready,
   Recording,
   Paused,
   Stopped,
 }
 
 export type Recorder = {
-  workspaceFolders: string[];
   status: RecorderStatus;
   duration: number;
   name: string;
-  uri?: Uri;
+  workspacePath?: string;
+  defaultWorkspacePath?: string;
 };
 
 export enum PlayerStatus {
-  Init,
-  WorkspacePopulated,
+  Uninitialized,
+  Ready,
   Buffering,
   Playing,
   Paused,
@@ -70,7 +79,7 @@ export enum PlayerStatus {
 }
 
 export type Player = {
-  sessionSummary: SessionSummary;
+  sessionSummary?: SessionSummary;
   status: PlayerStatus;
   clock: number;
 };

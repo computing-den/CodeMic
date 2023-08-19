@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import path from 'path';
 import os from 'os';
+import fs from 'fs';
 import * as git from './git';
 import { types as t } from '@codecast/lib';
 import _ from 'lodash';
@@ -50,39 +51,64 @@ export function duplicateRange(range: vscode.Range): vscode.Range {
   return new vscode.Range(range.start, range.end);
 }
 
-// // If root is given and uri is a file with absolute path, it'll make the uri relative to root
-// export function makeCcUri(uri: Uri, root?: string): CcUri {
-//   let p = uri.path;
-//   if (root && uri.scheme === 'file' && path.isAbsolute(p)) {
-//     p = path.relative(root, p);
-//   }
-//   return { scheme: uri.scheme, path: p };
-// }
+export function getRelUri(workspacePath: string, uri: vscode.Uri): vscode.Uri | undefined {
+  // TODO remember that untitled uri's path may or may not be an actual path, it might just be a name
+  assert(uri.scheme !== 'untitled', 'TODO: untitled uri is not yet supported.');
 
-// // If root is given and uri is a file with relative path, it'll join them
-// export function makeUri(uri: CcUri, root?: string): Uri {
-//   let p = uri.path;
-//   if (root && uri.scheme === 'file' && !path.isAbsolute(p)) {
-//     p = path.join(root, p);
-//   }
-//   return Uri.from({ scheme: uri.scheme, path: p });
-// }
+  if (uri.scheme === 'file') {
+    const p = path.relative(path.resolve(workspacePath), path.resolve(uri.path));
+    if (!p.startsWith('../')) {
+      return vscode.Uri.from({ scheme: 'file', path: p });
+    }
+  }
+  return undefined;
+}
 
-export const SUPPORTED_URI_SCHEMES = ['untitled', 'file'] as const;
+export function getAbsUri(workspacePath: string, uri: vscode.Uri): vscode.Uri | undefined {
+  // TODO remember that untitled uri's path may or may not be an actual path, it might just be a name
+  assert(uri.scheme !== 'untitled', 'TODO: untitled uri is not yet supported.');
 
-export function isUriPartOfRecording(uri: vscode.Uri) {
-  // TODO
-  return true;
-  // if (uri.scheme === 'untitled') {
-  //   return true;
-  // } else if (uri.scheme === 'file') {
-  //   const rel = path.relative(workdir, uri.path);
-  //   return !rel.startsWith('..');
-  // }
-  // return false;
+  if (uri.scheme === 'file') {
+    return vscode.Uri.from({ scheme: 'file', path: path.join(path.resolve(workspacePath), path.resolve(uri.path)) });
+  } else {
+    return undefined;
+  }
 }
 
 export function uriFromVsc(uri: vscode.Uri): t.Uri {
-  assert(uri.scheme === 'untitled' || uri.scheme === 'file');
+  // TODO remember that untitled uri's path may or may not be an actual path, it might just be a name
+  assert(uri.scheme !== 'untitled', 'TODO: untitled uri is not yet supported.');
+  assert(uri.scheme === 'file');
   return { scheme: uri.scheme, path: uri.path };
+}
+
+// Returns a sorted list of all files. It excludes empty directories.
+export async function readDirRecursively(root: string, rel: string = '', res: string[] = []): Promise<string[]> {
+  let filenames: string[] = [];
+  try {
+    filenames = await fs.promises.readdir(path.join(root, rel));
+  } catch (error) {
+    const rootDoesntExist = (error as NodeJS.ErrnoException).code === 'ENOENT' && !rel;
+    if (!rootDoesntExist) throw error;
+  }
+
+  filenames.sort();
+  for (const childname of filenames) {
+    const childRel = path.join(rel, childname);
+    const childFull = path.join(root, childRel);
+    const stat = await fs.promises.stat(childFull);
+
+    if (stat.isDirectory()) {
+      await readDirRecursively(root, childRel, res);
+    } else if (stat.isFile()) {
+      res.push(childRel);
+    }
+  }
+  return res;
+}
+
+// Returns a sorted list of all file URIs. It excludes empty directories.
+export async function readDirRecursivelyUri(root: string, rel: string = '', res: string[] = []): Promise<vscode.Uri[]> {
+  const files = await readDirRecursively(root);
+  return files.map(file => vscode.Uri.from({ scheme: 'file', path: file }));
 }

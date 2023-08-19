@@ -3,9 +3,6 @@ import { types as t, lib } from '@codecast/lib';
 import * as ir from './internal_representation.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
-import * as fs from 'fs';
-import path from 'path';
-import moment from 'moment';
 import assert from 'assert';
 
 enum Dir {
@@ -13,28 +10,57 @@ enum Dir {
   Backwards,
 }
 
-export default class Player {
-  status: t.PlayerStatus = t.PlayerStatus.Init;
+export interface PlayerI {
+  status: t.PlayerStatus;
+  sessionSummary?: t.SessionSummary;
+  start(): void;
+  update(clock: number): Promise<void>;
+  pause(): void;
+  stop(): Promise<void>;
+  getClock(): number;
+}
+
+export class UninitializedPlayer implements PlayerI {
+  status = t.PlayerStatus.Uninitialized;
+  constructor(public sessionSummary?: t.SessionSummary) {}
+  start() {}
+  async update(clock: number) {}
+  pause() {}
+  async stop() {}
+  getClock() {
+    return 0;
+  }
+}
+
+export class Player implements PlayerI {
+  status: t.PlayerStatus = t.PlayerStatus.Ready;
 
   private disposables: vscode.Disposable[] = [];
   private eventIndex: number = -1;
   private clock: number = 0;
   private enqueueUpdate = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
-  static open(context: vscode.ExtensionContext, sessionSummary: t.SessionSummary): Player {
+  static async populateIntoWorkspace(
+    context: vscode.ExtensionContext,
+    sessionSummary: t.SessionSummary,
+    workspacePath: string,
+  ): Promise<Player> {
     assert(sessionSummary.uri.scheme === 'file', 'TODO only local files are currently supported.');
-    return new Player(context, sessionSummary, ir.Session.fromFile(sessionSummary.uri.path));
+
+    const session = await ir.Session.fromFile(sessionSummary.uri.path, workspacePath);
+    await session.syncToVscodeAndDisk();
+    return new Player(context, session, sessionSummary);
   }
 
   constructor(
     public context: vscode.ExtensionContext,
-    public sessionSummary: t.SessionSummary,
     public session: ir.Session,
+    public sessionSummary: t.SessionSummary,
   ) {}
 
   start() {
     assert(
-      this.status === t.PlayerStatus.Init ||
+      this.status === t.PlayerStatus.Ready ||
         this.status === t.PlayerStatus.Paused ||
         this.status === t.PlayerStatus.Stopped,
     );
@@ -44,7 +70,7 @@ export default class Player {
     {
       const disposable = vscode.commands.registerCommand('type', (e: { text: string }) => {
         const uri = vscode.window.activeTextEditor?.document.uri;
-        if (!uri || !misc.isUriPartOfRecording(uri)) {
+        if (!uri || !this.session.getRelUri(uri)) {
           // approve the default type command
           vscode.commands.executeCommand('default:type', e);
         }
@@ -67,7 +93,7 @@ export default class Player {
     this.dispose();
   }
 
-  stop() {
+  async stop() {
     this.status = t.PlayerStatus.Stopped;
     this.dispose();
   }
@@ -176,15 +202,16 @@ export default class Player {
     this.clock = Math.max(0, Math.min(this.sessionSummary.duration, clock));
 
     if (this.eventIndex === n - 1) {
-      this.stop();
+      await this.stop();
     }
   }
 
   private async applyEvent(e: ir.PlaybackEvent, dir: Dir) {
     console.log(`Applying ${Dir[dir]}: `, ir.playbackEventToPlain(e));
+
     switch (e.type) {
       case 'stop': {
-        this.stop();
+        await this.stop();
         break;
       }
       case 'textChange': {
@@ -196,9 +223,10 @@ export default class Player {
         // because vscode's event itself does not provide a text editor.
 
         const irTextDocument = this.session.getTextDocumentByUri(e.uri);
+        const vscTextDocument = await this.getVscTextDocumentByUri(e.uri);
         const vscTextEditor =
           this.findVscVisibleTextEditorByUri(e.uri) ||
-          (await vscode.window.showTextDocument(irTextDocument.vscTextDocument, { preserveFocus: true }));
+          (await vscode.window.showTextDocument(vscTextDocument, { preserveFocus: true }));
 
         if (dir === Dir.Forwards) {
           for (const cc of e.contentChanges) {
@@ -220,7 +248,9 @@ export default class Player {
       }
       case 'openDocument': {
         if (dir === Dir.Forwards) {
-          const vscTextDocument = await vscode.workspace.openTextDocument(e.uri);
+          const absUri = this.session.getAbsUri(e.uri);
+          assert(absUri);
+          const vscTextDocument = await vscode.workspace.openTextDocument(absUri);
           // const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument, { preserveFocus: true });
           // await vscTextEditor.edit(editBuilder => {
           //   editBuilder.replace(misc.getWholeTextDocumentRange(vscTextDocument), e.text);
@@ -233,27 +263,19 @@ export default class Player {
       }
       case 'showTextEditor': {
         if (dir === Dir.Forwards) {
-          const irTextDocument = this.session.getTextDocumentByUri(e.uri);
-          const irTextEditor = this.session.openTextEditor(
-            irTextDocument.vscTextDocument,
-            e.selections,
-            e.visibleRange,
-          );
+          const vscTextDocument = await this.getVscTextDocumentByUri(e.uri);
+          const irTextEditor = this.session.openTextEditor(vscTextDocument, e.selections, e.visibleRange);
           this.session.activeTextEditor = irTextEditor;
 
-          const vscTextEditor = await vscode.window.showTextDocument(irTextDocument.vscTextDocument);
+          const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument);
           vscTextEditor.selections = e.selections;
           await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
         } else if (e.revUri) {
-          const irTextDocument = this.session.getTextDocumentByUri(e.revUri);
-          const irTextEditor = this.session.openTextEditor(
-            irTextDocument.vscTextDocument,
-            e.revSelections!,
-            e.revVisibleRange!,
-          );
+          const vscTextDocument = await this.getVscTextDocumentByUri(e.uri);
+          const irTextEditor = this.session.openTextEditor(vscTextDocument, e.revSelections!, e.revVisibleRange!);
           this.session.activeTextEditor = irTextEditor;
 
-          const vscTextEditor = await vscode.window.showTextDocument(irTextDocument.vscTextDocument);
+          const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument);
           vscTextEditor.selections = e.revSelections!;
           await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange!.start.line, at: 'top' });
         }
@@ -261,8 +283,9 @@ export default class Player {
         break;
       }
       case 'select': {
+        const vscTextDocument = await this.getVscTextDocumentByUri(e.uri);
         const irTextEditor = this.session.getTextEditorByUri(e.uri);
-        const vscTextEditor = await vscode.window.showTextDocument(irTextEditor.document.vscTextDocument);
+        const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument);
 
         if (dir === Dir.Forwards) {
           irTextEditor.selections = e.selections;
@@ -280,8 +303,9 @@ export default class Player {
         break;
       }
       case 'scroll': {
+        const vscTextDocument = await this.getVscTextDocumentByUri(e.uri);
         const irTextEditor = this.session.getTextEditorByUri(e.uri);
-        await vscode.window.showTextDocument(irTextEditor.document.vscTextDocument);
+        await vscode.window.showTextDocument(vscTextDocument);
 
         if (dir === Dir.Forwards) {
           irTextEditor.visibleRange = e.visibleRange;
@@ -293,9 +317,8 @@ export default class Player {
         break;
       }
       case 'save': {
-        const irTextDocument = this.session.getTextDocumentByUri(e.uri);
-        irTextDocument.isDirty = false;
-        if (!(await irTextDocument.vscTextDocument.save())) {
+        const vscTextDocument = await this.getVscTextDocumentByUri(e.uri);
+        if (!(await vscTextDocument.save())) {
           throw new Error(`Could not save ${e.uri}`);
         }
         break;
@@ -306,18 +329,20 @@ export default class Player {
     }
   }
 
-  // findOrOpenTextEditor(uri: vscode.Uri, textEditorId: number) {
-  //   const vscTextDocument = await vscode.workspace.openTextDocument(e.uri);
-  //   const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument, {preserveFocus: true,});
-  //   await vscTextEditor.edit(editBuilder => {
-  //     editBuilder.replace(misc.getWholeTextDocumentRange(vscTextDocument), e.text);
-  //   });
-  //   this.session.openTextDocumentByVsc(vscTextDocument);
-
-  // }
+  // Note that the lifecycle of the returned document from vscode.workspace.openTextDocument() is owned
+  // by the editor and not by the extension. That means an onDidClose event can occur at any time after opening it.
+  // We probably should not cache the vscTextDocument itself.
+  // TODO avoid the path.resolve call inside misc.getAbsUri()
+  async getVscTextDocumentByUri(uri: vscode.Uri): Promise<vscode.TextDocument> {
+    const absUri = this.session.getAbsUri(uri);
+    assert(absUri);
+    return await vscode.workspace.openTextDocument(absUri);
+  }
 
   findVscVisibleTextEditorByUri(uri: vscode.Uri) {
-    return vscode.window.visibleTextEditors.find(x => misc.isEqualUri(x.document.uri, uri));
+    const absUri = this.session.getAbsUri(uri);
+    assert(absUri);
+    return vscode.window.visibleTextEditors.find(x => misc.isEqualUri(x.document.uri, absUri));
   }
 
   getClock(): number {

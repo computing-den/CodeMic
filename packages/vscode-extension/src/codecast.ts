@@ -1,6 +1,6 @@
 import * as misc from './misc.js';
-import Recorder from './recorder.js';
-import Player from './player.js';
+import { UninitializedRecorder, Recorder, RecorderI } from './recorder.js';
+import { UninitializedPlayer, Player, PlayerI } from './player.js';
 import WebviewProvider from './webview_provider.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
@@ -86,10 +86,9 @@ const SESSIONS: t.SessionSummary[] = [
 ];
 
 class Codecast {
-  context: vscode.ExtensionContext;
   screen: t.Screen = t.Screen.Welcome;
-  recorder?: Recorder;
-  player?: Player;
+  recorder: RecorderI = new UninitializedRecorder();
+  player?: PlayerI;
   webview: WebviewProvider;
   sessionSummaries = {
     recent: [SESSIONS[0], SESSIONS[1], SESSIONS[2]],
@@ -97,9 +96,7 @@ class Codecast {
     featured: [SESSIONS[2], SESSIONS[3]],
   };
 
-  constructor(context: vscode.ExtensionContext) {
-    this.context = context;
-
+  constructor(public context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.commands.registerCommand('codecast.openView', this.openView.bind(this)));
 
     this.webview = new WebviewProvider(context.extensionUri, this.messageHandler.bind(this));
@@ -127,7 +124,7 @@ class Codecast {
             _.find(this.sessionSummaries.featured, ['id', req.sessionId]);
           assert(sessionSummary);
 
-          this.player ??= Player.open(this.context, sessionSummary);
+          this.player = new UninitializedPlayer(sessionSummary);
           this.screen = t.Screen.Player;
         }
         return this.respondWithStore();
@@ -135,7 +132,6 @@ class Codecast {
       case 'openRecorder': {
         if (await this.closeCurrentScreen()) {
           this.screen = t.Screen.Recorder;
-          this.recorder ??= new Recorder(this.context);
         }
         return this.respondWithStore();
       }
@@ -146,38 +142,41 @@ class Codecast {
       //   return this.respondWithStore();
       // }
       case 'play': {
-        if (this.player) {
-          this.player.start();
-          return this.respondWithStore();
-        } else {
-          vscode.window.showInformationMessage('Codecast player is not open.');
-          return { type: 'error' };
+        assert(this.player);
+        if (this.player.status === t.PlayerStatus.Uninitialized) {
+          assert(req.workspacePath);
+          assert(this.player.sessionSummary);
+          this.player = await Player.populateIntoWorkspace(this.context, this.player.sessionSummary, req.workspacePath);
         }
+        this.player.start();
+        return this.respondWithStore();
       }
       case 'record': {
-        if (this.recorder) {
-          this.recorder.start();
-          return this.respondWithStore();
-        } else {
-          vscode.window.showInformationMessage('Codecast recorder is not open.');
-          return { type: 'error' };
+        if (this.recorder.status === t.RecorderStatus.Uninitialized) {
+          for (const vscTextDocument of vscode.workspace.textDocuments) {
+            if (vscTextDocument.isDirty) {
+              vscode.window.showInformationMessage(
+                'There are unsaved files in the current workspace. Please save them first and then try again.',
+              );
+              return { type: 'error' };
+            }
+          }
+          assert(req.workspacePath);
+          this.recorder = await Recorder.fromWorkspace(this.context, req.workspacePath);
         }
+        this.recorder.start();
+        return this.respondWithStore();
       }
       case 'seek': {
-        if (this.player) {
-          await this.player.update(req.clock);
-          return this.respondWithStore();
-        } else {
-          vscode.window.showInformationMessage('Codecast is not playing.');
-          return { type: 'error' };
-        }
+        await this.player?.update(req.clock);
+        return this.respondWithStore();
       }
       case 'pausePlayer': {
         this.player?.pause();
         return this.respondWithStore();
       }
       case 'pauseRecorder': {
-        this.recorder?.pause();
+        this.recorder.pause();
         return this.respondWithStore();
       }
       // case 'save': {
@@ -200,11 +199,11 @@ class Codecast {
       //   }
       // }
       case 'playbackUpdate': {
-        if (this.player?.status !== t.PlayerStatus.Playing) {
-          console.error('got playbackUpdate but player is not playing');
-          return { type: 'error' };
-        }
-        this.player.update(req.clock);
+        // if (this.player?.status !== t.PlayerStatus.Playing) {
+        //   console.error('got playbackUpdate but player is not playing');
+        //   return { type: 'error' };
+        // }
+        this.player?.update(req.clock);
         return this.respondWithStore();
       }
       case 'getStore': {
@@ -226,7 +225,7 @@ class Codecast {
   }
 
   async closeRecorder(): Promise<boolean> {
-    if (this.recorder!.status === t.RecorderStatus.Recording) {
+    if (this.recorder.status === t.RecorderStatus.Recording) {
       const saveTitle = 'Save and exit';
       const answer = await vscode.window.showWarningMessage(
         'Recording is in progress. Do you wish to stop the session?',
@@ -236,14 +235,14 @@ class Codecast {
       );
       if (answer?.title !== saveTitle) return false;
     }
-    this.recorder!.stop();
-    this.recorder = undefined;
+    await this.recorder.stop();
+    this.recorder = new UninitializedRecorder();
     this.screen = t.Screen.Welcome;
     return true;
   }
 
   async closePlayer(): Promise<boolean> {
-    this.player!.stop();
+    await this.player?.stop();
     this.player = undefined;
     this.screen = t.Screen.Welcome;
     return true;
@@ -276,12 +275,12 @@ class Codecast {
       welcome: {
         ...this.sessionSummaries,
       },
-      recorder: this.recorder && {
-        workspaceFolders: this.recorder.workspaceFolders,
+      recorder: {
         status: this.recorder.status,
         duration: this.recorder.getClock(),
         name: 'Name (TODO)',
-        uri: { scheme: 'file', path: 'Path/TODO' },
+        workspacePath: this.recorder.getWorkspacePath(),
+        defaultWorkspacePath: this.recorder.getDefaultWorkspacePath(),
       },
       player: this.player && {
         sessionSummary: this.player.sessionSummary,

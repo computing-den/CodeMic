@@ -2,7 +2,9 @@ import * as misc from './misc.js';
 import * as vscode from 'vscode';
 import assert from 'assert';
 import _ from 'lodash';
+import os from 'os';
 import * as fs from 'fs';
+import path from 'path';
 
 export type PlaybackEvent =
   | StopEvent
@@ -81,34 +83,62 @@ export type ContentChange = {
 // Not every TextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
 export class Session {
-  events: PlaybackEvent[];
-  activeTextEditor?: TextEditor;
-  textEditors: TextEditor[] = [];
   textDocuments: TextDocument[] = [];
-  debug: Map<vscode.TextEditor, number> = new Map();
+  textEditors: TextEditor[] = [];
+  activeTextEditor?: TextEditor;
+  // checkpoints: Checkpoint[];
+  // debug: Map<vscode.TextEditor, number> = new Map();
 
-  static fromFile(filename: string): Session {
-    const plain = JSON.parse(fs.readFileSync(filename, 'utf8')) as PlainSession;
-    return sessionFromPlain(plain);
+  constructor(public initCheckpoint: Checkpoint, public events: PlaybackEvent[], public workspacePath: string) {}
+
+  static async fromWorkspace(workspacePath: string): Promise<Session> {
+    const checkpoint = await Checkpoint.fromWorkspace(workspacePath);
+    return new Session(checkpoint, [], workspacePath);
   }
 
-  constructor(events: PlaybackEvent[]) {
-    this.events = events;
+  static fromCheckpoint(checkpoint: Checkpoint, events: PlaybackEvent[], workspacePath: string): Session {
+    const session = new Session(checkpoint, events, workspacePath);
+    session.restoreCheckpoint(checkpoint);
+    return session;
   }
 
-  toPlain() {
-    return sessionToPlain(this);
+  static async fromFile(filename: string, workspacePath: string): Promise<Session> {
+    const plain = JSON.parse(await fs.promises.readFile(filename, 'utf8')) as PlainSession;
+    const events = playbackEventsFromPlain(plain.events);
+    const checkpoint = Checkpoint.fromPlain(plain.initCheckpoint);
+    return Session.fromCheckpoint(checkpoint, events, workspacePath);
   }
 
-  writeToFile(filename: string) {
-    const plainSession = sessionToPlain(this);
-    fs.writeFileSync(filename, JSON.stringify(plainSession, null, 2), 'utf8');
+  // Modify the current session except for the events.
+  restoreCheckpoint(checkpoint: Checkpoint) {
+    const textDocuments = checkpoint.textDocuments.map(d => TextDocument.fromText(d.uri, d.text));
+    const textEditors = checkpoint.textEditors.map(e => {
+      const textDocument = textDocuments.find(d => misc.isEqualUri(d.uri, e.uri));
+      assert(textDocument, `restoreCheckpoint: did not find textDocument for the textEditor with uri ${e.uri}`);
+      return new TextEditor(textDocument, e.selections, e.visibleRange);
+    });
+    let activeTextEditor: TextEditor | undefined;
+    if (checkpoint.activeTextEditorUri) {
+      activeTextEditor = textEditors.find(e => misc.isEqualUri(checkpoint.activeTextEditorUri!, e.document.uri));
+      assert(activeTextEditor, `restoreCheckpoint: did not find textEditor with uri ${checkpoint.activeTextEditorUri}`);
+    }
+
+    this.textDocuments = textDocuments;
+    this.textEditors = textEditors;
+    this.activeTextEditor = activeTextEditor;
+  }
+
+  async syncToVscodeAndDisk() {
+    // TODO
+    vscode.window.showInformationMessage('syncToVscodeAndDisk: TODO');
   }
 
   openTextDocument(vscTextDocument: vscode.TextDocument): TextDocument {
-    let textDocument = this.findTextDocumentByUri(vscTextDocument.uri);
+    const uri = this.getRelUri(vscTextDocument.uri);
+    assert(uri);
+    let textDocument = this.findTextDocumentByUri(uri);
     if (!textDocument) {
-      textDocument = new TextDocument(vscTextDocument);
+      textDocument = TextDocument.fromVscTextDocument(vscTextDocument, uri);
       this.textDocuments.push(textDocument);
     }
     return textDocument;
@@ -150,78 +180,30 @@ export class Session {
     return textEditor;
   }
 
-  // openTextEditorByUri(vscTextEditor: vscode.TextEditor): TextEditor {
-  //   const textDocument = this.openTextDocumentByVsc(vscTextEditor.document);
-  //   let textEditor = this.findTextEditorByVsc(vscTextEditor);
-  //   if (!textEditor) {
-  //     textEditor = new TextEditor(vscTextEditor, textDocument);
-  //     this.textEditors.push(textEditor);
-  //   }
-  //   return textEditor;
-  // }
+  toPlain() {
+    return {
+      events: playbackEventsToPlain(this.events),
+      initCheckpoint: this.initCheckpoint.toPlain(),
+    };
+  }
 
-  // openTextEditorByVsc(vscTextEditor: vscode.TextEditor, textEditorId?: number): TextEditor {
-  //   textEditorId ??= ++this.textEditorIdCounter;
-  //   const textDocument = this.openTextDocumentByVsc(vscTextEditor.document);
-  //   let textEditor = this.findTextEditorByVsc(vscTextEditor);
-  //   if (!textEditor) {
-  //     if (this.debug.get(vscTextEditor)) {
-  //       throw new Error(
-  //         `session.openTextEditorByVsc vscTextEditor is already associated with an id ${this.debug.get(vscTextEditor)}`,
-  //       );
-  //     }
-  //     this.debug.set(vscTextEditor, textEditorId);
-  //     textEditor = new TextEditor(vscTextEditor, textDocument, textEditorId);
-  //     this.textEditors.push(textEditor);
-  //   }
-  //   return textEditor;
-  // }
+  async writeToFile(filename: string) {
+    const plainSession = this.toPlain();
+    await fs.promises.writeFile(filename, JSON.stringify(plainSession, null, 2), 'utf8');
+  }
 
-  // setActiveTextEditor(textEditor: TextEditor) {
-  //   this.activeTextEditor = textEditor;
-  // }
+  getRelUri(uri: vscode.Uri): vscode.Uri | undefined {
+    return misc.getRelUri(this.workspacePath, uri);
+  }
 
-  // openTextEditorById(id: number): TextEditor {
-  // }
-
-  // private findTextEditorByVsc(vscTextEditor: vscode.TextEditor): TextEditor | undefined {
-  //   return this.textEditors.find(x => x.vscTextEditor === vscTextEditor);
-  // }
-
-  // private findTextDocumentByVsc(vscTextDocument: vscode.TextDocument): TextDocument | undefined {
-  //   return this.textDocuments.find(x => x.vscTextDocument === vscTextDocument);
-  // }
-
-  // // A text editor is returned only if there's only 1 text editor for the given document,
-  // // or the text editor matches the given vscTextEditor.
-  // // vscTextEditor is a suggestion, usually the current active text editor is passed.
-  // // But it's possible that we're trying to get the TextDocument related to a vscTextDocument
-  // // that was modified in the background and therefore does not have a text editor, or
-  // // it is not the active text editor.
-  // getTextDocumentAndEditorByVsc(
-  //   vscTextDocument: vscode.TextDocument,
-  //   vscTextEditor?: vscode.TextEditor,
-  // ): [TextDocument, TextEditor?] {
-  //   const document = this.findTextDocumentByVsc(vscTextDocument);
-  //   if (!document) {
-  //     throw new Error(`getTextDocumentAndEditor: document "${vscTextDocument.fileName}" was not found`);
-  //   }
-
-  //   const textEditors = this.textEditors.filter(x => x.document === document);
-  //   let textEditor: TextEditor | undefined;
-  //   if (textEditors.length === 1) {
-  //     textEditor = textEditors[0];
-  //   } else if (textEditors.length > 1 && vscTextEditor) {
-  //     textEditor = textEditors.find(x => x.vscTextEditor === vscTextEditor);
-  //   }
-
-  //   return [document, textEditor];
-  // }
+  getAbsUri(uri: vscode.Uri): vscode.Uri | undefined {
+    return misc.getAbsUri(this.workspacePath, uri);
+  }
 }
 
 // We cannot hold a reference to vscode.TextEditor because its identity is not stable.
-// Vscode may give us two different instances of vscode.TextEditor for the what appears
-// to be the same editor for the same document in the same tab.
+// Vscode may give us two different instances of vscode.TextEditor for what appears to
+// be the same editor for the same document in the same tab.
 export class TextEditor {
   // The document associated with this text editor.
   // The document will be the same for the entire lifetime of this text editor.
@@ -246,35 +228,44 @@ export class TextEditor {
 }
 
 export class TextDocument {
-  vscTextDocument: vscode.TextDocument;
-  uri: vscode.Uri;
-  lines: TextLine[];
-  eol: vscode.EndOfLine;
-  isDirty: boolean;
+  // vscTextDocument: vscode.TextDocument;
+  // isDirty: boolean;
 
-  constructor(vscTextDocument: vscode.TextDocument) {
-    this.vscTextDocument = vscTextDocument;
-    this.uri = vscTextDocument.uri;
-    this.lines = _.times(vscTextDocument.lineCount, i => new TextLine(vscTextDocument.lineAt(i).text));
-    this.eol = vscTextDocument.eol;
-    this.isDirty = vscTextDocument.isDirty;
+  constructor(public uri: vscode.Uri, public lines: string[], public eol: vscode.EndOfLine) {}
+
+  static fromText(uri: vscode.Uri, text: string): TextDocument {
+    const eolStr = text.match(/\r?\n/)?.[0] || os.EOL;
+    const eol = eolStr === '\r\n' ? vscode.EndOfLine.CRLF : vscode.EndOfLine.LF;
+    const lines = text.split(/\r?\n/);
+    return new TextDocument(uri, lines, eol);
+  }
+
+  static fromVscTextDocument(vscTextDocument: vscode.TextDocument, uri: vscode.Uri): TextDocument {
+    const lines = _.times(vscTextDocument.lineCount, i => vscTextDocument.lineAt(i).text);
+    const eol = vscTextDocument.eol;
+    return new TextDocument(uri, lines, eol);
+  }
+
+  getEolString(): string {
+    return this.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
   }
 
   getText(range?: vscode.Range): string {
+    const eolString = this.getEolString();
     if (range) {
       assert(this.isRangeValid(range), 'TextDocument getText: invalid range');
       if (range.isSingleLine) {
-        return this.lines[range.start.line].text.slice(range.start.character, range.end.character);
+        return this.lines[range.start.line].slice(range.start.character, range.end.character);
       } else {
-        let text = this.lines[range.start.line].text.slice(range.start.character);
+        let text = this.lines[range.start.line].slice(range.start.character);
         for (let i = range.start.line + 1; i < range.end.line; i++) {
-          text += '\n' + this.lines[i].text;
+          text += eolString + this.lines[i];
         }
-        text += '\n' + this.lines[range.end.line].text.slice(0, range.end.character);
+        text += eolString + this.lines[range.end.line].slice(0, range.end.character);
         return text;
       }
     } else {
-      return this.lines.map(x => x.text).join('\n');
+      return this.lines.map(x => x).join(eolString);
     }
   }
 
@@ -283,7 +274,7 @@ export class TextDocument {
       range.start.line >= 0 &&
       range.start.character >= 0 &&
       range.end.line < this.lines.length &&
-      range.end.character <= this.lines[this.lines.length - 1].text.length
+      range.end.character <= this.lines[this.lines.length - 1].length
     );
   }
 
@@ -311,11 +302,11 @@ export class TextDocument {
     if (calcReverse) revText = this.getText(range);
 
     // Prepend [0, range.start.character] of the first old line to the first new line.
-    const firstLinePrefix = lines[range.start.line].text.slice(0, range.start.character);
+    const firstLinePrefix = lines[range.start.line].slice(0, range.start.character);
     newLines[0] = firstLinePrefix + newLines[0];
 
     // Append [range.end.character, END] of the last old line to the last new line.
-    const lastLineSuffix = lines[range.end.line].text.slice(range.end.character);
+    const lastLineSuffix = lines[range.end.line].slice(range.end.character);
     newLines[newLines.length - 1] += lastLineSuffix;
 
     const rangeLineCount = range.end.line - range.start.line + 1;
@@ -323,7 +314,7 @@ export class TextDocument {
 
     // Insert or delete extra lines.
     if (extraLineCount > 0) {
-      const extraLines = _.times(extraLineCount, () => new TextLine(''));
+      const extraLines = _.times(extraLineCount, () => '');
       lines.splice(range.start.line, 0, ...extraLines);
     } else if (extraLineCount < 0) {
       lines.splice(range.start.line, -extraLineCount);
@@ -331,7 +322,7 @@ export class TextDocument {
 
     // Replace lines.
     for (let i = 0; i < newLines.length; i++) {
-      lines[i + range.start.line].text = newLines[i];
+      lines[i + range.start.line] = newLines[i];
     }
 
     // Calculate revRange.
@@ -348,13 +339,109 @@ export class TextDocument {
   }
 }
 
-export class TextLine {
-  constructor(public text: string) {}
+class Checkpoint {
+  constructor(
+    public textDocuments: CheckpointTextDocument[],
+    public textEditors: CheckpointTextEditor[],
+    public openDocumentUris: vscode.Uri[],
+    public activeTextEditorUri?: vscode.Uri,
+  ) {}
+
+  static async fromWorkspace(workspacePath: string): Promise<Checkpoint> {
+    for (const vscTextDocument of vscode.workspace.textDocuments) {
+      if (vscTextDocument.isDirty) {
+        throw new Error('Checkpoint.fromWorkspace: there are unsaved files in the current workspace.');
+      }
+    }
+
+    const textDocuments = await CheckpointTextDocument.fromWorkspace(workspacePath);
+    const textEditors = _.compact(
+      vscode.window.visibleTextEditors.map(e => CheckpointTextEditor.fromVsc(workspacePath, e)),
+    );
+    const activeTextEditorUri =
+      vscode.window.activeTextEditor?.document.uri &&
+      misc.getRelUri(workspacePath, vscode.window.activeTextEditor?.document.uri);
+    const openDocumentUris = _.compact(vscode.workspace.textDocuments.map(d => misc.getRelUri(workspacePath, d.uri)));
+
+    return new Checkpoint(textDocuments, textEditors, openDocumentUris, activeTextEditorUri);
+  }
+
+  static fromSession(session: Session): Checkpoint {
+    const textDocuments: CheckpointTextDocument[] = session.textDocuments.map(d => ({
+      uri: d.uri,
+      text: d.getText(),
+    }));
+
+    const textEditors: CheckpointTextEditor[] = session.textEditors.map(e => ({
+      uri: e.document.uri,
+      selections: e.selections,
+      visibleRange: e.visibleRange,
+    }));
+
+    const openDocumentUris = session.textEditors.map(e => e.document.uri);
+
+    const activeTextEditorUri = session.activeTextEditor?.document.uri;
+
+    return new Checkpoint(textDocuments, textEditors, openDocumentUris, activeTextEditorUri);
+  }
+
+  static fromPlain(plain: PlainCheckpoint): Checkpoint {
+    const textDocuments = plain.textDocuments.map(d => ({
+      uri: uriFromPlain(d.uri),
+      text: d.text,
+    }));
+    const textEditors = plain.textEditors.map(e => ({
+      uri: uriFromPlain(e.uri),
+      selections: selectionsFromPlain(e.selections),
+      visibleRange: rangeFromPlain(e.visibleRange),
+    }));
+    const activeTextEditorUri = plain.activeTextEditorUri && uriFromPlain(plain.activeTextEditorUri);
+    const openDocumentUris = plain.openDocumentUris.map(uriFromPlain);
+    return new Checkpoint(textDocuments, textEditors, openDocumentUris, activeTextEditorUri);
+  }
+
+  toPlain(): PlainCheckpoint {
+    return {
+      textDocuments: this.textDocuments.map(d => ({
+        uri: uriToPlain(d.uri),
+        text: d.text,
+      })),
+      textEditors: this.textEditors.map(e => ({
+        uri: uriToPlain(e.uri),
+        selections: selectionsToPlain(e.selections),
+        visibleRange: rangeToPlain(e.visibleRange),
+      })),
+      openDocumentUris: this.openDocumentUris.map(uriToPlain),
+      activeTextEditorUri: this.activeTextEditorUri && uriToPlain(this.activeTextEditorUri),
+    };
+  }
 }
 
-// function playbackEventsToJson(events: PlaybackEvent[]): Object[] {
-//   return events.map(playbackEventToJson);
-// }
+class CheckpointTextDocument {
+  constructor(public uri: vscode.Uri, public text: string) {}
+
+  static async fromWorkspace(root: string): Promise<CheckpointTextDocument[]> {
+    const res: CheckpointTextDocument[] = [];
+    const uris = await misc.readDirRecursivelyUri(root);
+    for (const uri of uris) {
+      const text = await fs.promises.readFile(path.join(root, uri.path), 'utf8');
+      res.push(new CheckpointTextDocument(uri, text));
+    }
+    return res;
+  }
+}
+
+class CheckpointTextEditor {
+  constructor(public uri: vscode.Uri, public selections: vscode.Selection[], public visibleRange: vscode.Range) {}
+
+  static fromVsc(workspacePath: string, vscTextEditor: vscode.TextEditor): CheckpointTextEditor | undefined {
+    const uri = misc.getRelUri(workspacePath, vscTextEditor.document.uri);
+    if (!uri) return undefined;
+    const selections = misc.duplicateSelections(vscTextEditor.selections);
+    const visibleRange = misc.duplicateRange(vscTextEditor.visibleRanges[0]);
+    return new CheckpointTextEditor(uri, selections, visibleRange);
+  }
+}
 
 //======================================================
 // Plain JSON equivalent of the playback event types
@@ -363,6 +450,26 @@ export class TextLine {
 
 type PlainSession = {
   events: PlainPlaybackEvent[];
+  initCheckpoint: PlainCheckpoint;
+};
+
+export type PlainCheckpoint = {
+  // base: CheckpointBaseGit;
+  textDocuments: PlainCheckpointTextDocument[];
+  textEditors: PlainCheckpointTextEditor[];
+  openDocumentUris: PlainUri[];
+  activeTextEditorUri?: PlainUri;
+};
+
+export type PlainCheckpointTextDocument = {
+  uri: PlainUri;
+  text: string;
+};
+
+export type PlainCheckpointTextEditor = {
+  uri: PlainUri;
+  selections: PlainSelection[];
+  visibleRange: PlainRange;
 };
 
 type PlainPlaybackEvent =
@@ -432,7 +539,7 @@ type PlainSaveEvent = {
 };
 
 type PlainUri = {
-  scheme: (typeof misc.SUPPORTED_URI_SCHEMES)[number];
+  scheme: 'file';
   path: string;
 };
 
@@ -463,12 +570,6 @@ type PlainEndOfLine = 'LF' | 'CRLF';
 //=========================================================
 // Conversion from normal structures to plain json
 //=========================================================
-
-export function sessionToPlain(session: Session): PlainSession {
-  return {
-    events: playbackEventsToPlain(session.events),
-  };
-}
 
 export function playbackEventsToPlain(es: PlaybackEvent[]): PlainPlaybackEvent[] {
   return es.map(playbackEventToPlain);
@@ -545,7 +646,7 @@ export function playbackEventToPlain(e: PlaybackEvent): PlainPlaybackEvent {
 }
 
 function uriToPlain(uri: vscode.Uri): PlainUri {
-  assert(uri.scheme === 'untitled' || uri.scheme === 'file');
+  assert(uri.scheme === 'file');
   return { scheme: uri.scheme, path: uri.path };
 }
 
@@ -593,10 +694,6 @@ function rangeToPlain(range: vscode.Range): PlainRange {
 //=========================================================
 // Conversion plain json to normal structures
 //=========================================================
-
-function sessionFromPlain(session: PlainSession): Session {
-  return new Session(playbackEventsFromPlain(session.events));
-}
 
 function playbackEventsFromPlain(es: PlainPlaybackEvent[]): PlaybackEvent[] {
   return es.map(playbackEventFromPlain);
