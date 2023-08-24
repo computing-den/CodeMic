@@ -13,12 +13,14 @@ export type FrontendRequest =
   // | { type: 'save' }
   // | { type: 'discard' }
   | { type: 'playbackUpdate'; clock: number }
-  | { type: 'getStore' };
+  | { type: 'getStore' }
+  | { type: 'showOpenDialog'; options: OpenDialogOptions };
 export type BackendResponse =
   | { type: 'getStore'; store: Store }
   | { type: 'error' }
   | { type: 'ok' }
-  | { type: 'boolean'; value: boolean };
+  | { type: 'boolean'; value: boolean }
+  | { type: 'uris'; uris?: Uri[] };
 
 export type BackendRequest = { type: 'error' };
 export type FrontendResponse = { type: 'error' } | { type: 'ok' };
@@ -79,7 +81,7 @@ export enum PlayerStatus {
 }
 
 export type Player = {
-  sessionSummary?: SessionSummary;
+  sessionSummary: SessionSummary;
   status: PlayerStatus;
   clock: number;
 };
@@ -106,4 +108,13 @@ export type SessionSummary = {
   likes: number;
   timestamp: string;
   toc?: TocItem[];
+};
+
+export type OpenDialogOptions = {
+  canSelectFiles?: boolean;
+  canSelectFolders?: boolean;
+  canSelectMany?: boolean;
+  defaultUri?: Uri;
+  filters?: { [name: string]: string[] };
+  title?: string;
 };

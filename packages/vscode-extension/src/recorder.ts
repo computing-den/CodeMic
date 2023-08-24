@@ -9,7 +9,7 @@ const SCROLL_LINES_TRIGGER = 2;
 
 export interface RecorderI {
   status: t.RecorderStatus;
-  start(): void;
+  start(): Promise<void>;
   pause(): void;
   stop(): Promise<void>;
   getClock(): number;
@@ -19,7 +19,7 @@ export interface RecorderI {
 
 export class UninitializedRecorder implements RecorderI {
   status = t.RecorderStatus.Uninitialized;
-  start() {}
+  async start() {}
   pause() {}
   async stop() {}
   getClock() {
@@ -29,7 +29,7 @@ export class UninitializedRecorder implements RecorderI {
     return undefined;
   }
   getDefaultWorkspacePath() {
-    return undefined;
+    return getDefaultWorkspacePath();
   }
 }
 
@@ -43,12 +43,15 @@ export class Recorder implements RecorderI {
 
   constructor(public context: vscode.ExtensionContext, public session: ir.Session) {}
 
+  /**
+   * workspacePath must be already resolved.
+   */
   static async fromWorkspace(context: vscode.ExtensionContext, workspacePath: string): Promise<Recorder> {
     const session = await ir.Session.fromWorkspace(workspacePath);
     return new Recorder(context, session);
   }
 
-  start() {
+  async start() {
     assert(this.status === t.RecorderStatus.Ready || this.status === t.RecorderStatus.Paused);
 
     this.status = t.RecorderStatus.Recording;
@@ -105,19 +108,6 @@ export class Recorder implements RecorderI {
 
     // register disposables
     this.context.subscriptions.push(...this.disposables);
-
-    // open all the documents currently open in the workspace
-    {
-      for (const vscTextDocument of vscode.workspace.textDocuments) {
-        this.openDocument(vscTextDocument);
-      }
-    }
-
-    // show the currectly active text editor
-    {
-      const vscTextEditor = vscode.window.activeTextEditor;
-      if (vscTextEditor) this.showTextEditor(vscTextEditor);
-    }
   }
 
   pause() {
@@ -153,14 +143,14 @@ export class Recorder implements RecorderI {
   }
 
   // shouldRecordDocument(vscTextDocument: vscode.TextDocument): boolean {
-  //   return Boolean(this.session.getRelUri(vscTextDocument.uri));
+  //   return Boolean(this.session.getPartialUri(vscTextDocument.uri));
   // }
 
   textChange(
     vscTextDocument: vscode.TextDocument,
     vscContentChanges: readonly vscode.TextDocumentContentChangeEvent[],
   ) {
-    const uri = this.session.getRelUri(vscTextDocument.uri);
+    const uri = this.session.getPartialUri(vscTextDocument.uri);
     if (!uri) return;
 
     console.log(`adding textChange for ${uri}`);
@@ -183,7 +173,7 @@ export class Recorder implements RecorderI {
   }
 
   openDocument(vscTextDocument: vscode.TextDocument) {
-    const uri = this.session.getRelUri(vscTextDocument.uri);
+    const uri = this.session.getPartialUri(vscTextDocument.uri);
     if (!uri) return;
 
     console.log(`adding openDocument for ${uri}`);
@@ -198,7 +188,7 @@ export class Recorder implements RecorderI {
   }
 
   showTextEditor(vscTextEditor: vscode.TextEditor) {
-    const uri = this.session.getRelUri(vscTextEditor.document.uri);
+    const uri = this.session.getPartialUri(vscTextEditor.document.uri);
     if (!uri) return;
 
     console.log(`adding showTextEditor for ${uri}`);
@@ -225,7 +215,7 @@ export class Recorder implements RecorderI {
   }
 
   select(vscTextEditor: vscode.TextEditor, selections: readonly vscode.Selection[]) {
-    const uri = this.session.getRelUri(vscTextEditor.document.uri);
+    const uri = this.session.getPartialUri(vscTextEditor.document.uri);
     if (!uri) return;
 
     console.log(`adding select for ${uri}`);
@@ -250,7 +240,7 @@ export class Recorder implements RecorderI {
   }
 
   saveTextDocument(vscTextDocument: vscode.TextDocument) {
-    const uri = this.session.getRelUri(vscTextDocument.uri);
+    const uri = this.session.getPartialUri(vscTextDocument.uri);
     if (!uri) return;
 
     console.log(`adding save for ${uri}`);
@@ -263,7 +253,7 @@ export class Recorder implements RecorderI {
   }
 
   scroll(vscTextEditor: vscode.TextEditor, visibleRanges: readonly vscode.Range[]) {
-    const uri = this.session.getRelUri(vscTextEditor.document.uri);
+    const uri = this.session.getPartialUri(vscTextEditor.document.uri);
     if (!uri) return;
 
     const visibleRange = misc.duplicateRange(visibleRanges[0]);
@@ -299,7 +289,7 @@ export class Recorder implements RecorderI {
   }
 
   getDefaultWorkspacePath() {
-    return vscode.workspace.workspaceFolders?.[0].uri.path;
+    return getDefaultWorkspacePath();
   }
 
   getClock(): number {
@@ -317,4 +307,8 @@ export class Recorder implements RecorderI {
     }
     this.session.events.push(e);
   }
+}
+
+function getDefaultWorkspacePath(): string | undefined {
+  return vscode.workspace.workspaceFolders?.[0].uri.path;
 }

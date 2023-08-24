@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
 import { types as t } from '@codecast/lib';
+import path from 'path';
 
 const SESSIONS: t.SessionSummary[] = [
   {
@@ -146,9 +147,13 @@ class Codecast {
         if (this.player.status === t.PlayerStatus.Uninitialized) {
           assert(req.workspacePath);
           assert(this.player.sessionSummary);
-          this.player = await Player.populateIntoWorkspace(this.context, this.player.sessionSummary, req.workspacePath);
+          this.player = await Player.populate(
+            this.context,
+            this.player.sessionSummary,
+            path.resolve(req.workspacePath),
+          );
         }
-        this.player.start();
+        await this.player.start();
         return this.respondWithStore();
       }
       case 'record': {
@@ -162,9 +167,9 @@ class Codecast {
             }
           }
           assert(req.workspacePath);
-          this.recorder = await Recorder.fromWorkspace(this.context, req.workspacePath);
+          this.recorder = await Recorder.fromWorkspace(this.context, path.resolve(req.workspacePath));
         }
-        this.recorder.start();
+        await this.recorder.start();
         return this.respondWithStore();
       }
       case 'seek': {
@@ -208,6 +213,18 @@ class Codecast {
       }
       case 'getStore': {
         return this.respondWithStore();
+      }
+      case 'showOpenDialog': {
+        const options = {
+          canSelectFiles: req.options.canSelectFiles,
+          canSelectFolders: req.options.canSelectFolders,
+          canSelectMany: req.options.canSelectMany,
+          defaultUri: req.options.defaultUri && vscode.Uri.from(req.options.defaultUri),
+          filters: req.options.filters,
+          title: req.options.title,
+        };
+        const uris = await vscode.window.showOpenDialog(options);
+        return { type: 'uris', uris: uris?.map(misc.uriFromVsc) };
       }
       default: {
         misc.unreachable(req);

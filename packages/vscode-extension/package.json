@@ -46,6 +46,7 @@
   "dependencies": {
     "@codecast/lib": "^1.0.0",
     "@types/uuid": "^9.0.2",
+    "ignore": "^5.2.4",
     "lodash": "^4.17.21",
     "moment": "^2.29.4",
     "uuid": "^9.0.0"

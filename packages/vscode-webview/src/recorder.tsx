@@ -16,14 +16,41 @@ export default class Recorder extends Component<Props> {
 
   state = {
     localClock: 0,
+    workspacePath: this.props.store.recorder!.defaultWorkspacePath,
+    title: '',
+    description: '',
   };
 
   startRecorder = async () => {
-    await actions.startRecorder();
+    if (this.props.store.recorder!.status === t.RecorderStatus.Uninitialized) {
+      await actions.startRecorder(this.state.workspacePath);
+    } else {
+      await actions.startRecorder();
+    }
   };
 
   pauseRecorder = async () => {
     await actions.pauseRecorder();
+  };
+
+  updateField = (e: InputEvent) => {
+    const target = e.target as HTMLInputElement;
+    this.setState({ [target.dataset.field!]: target.value });
+  };
+
+  pickWorkspacePath = async () => {
+    const p = await actions.showOpenDialog({
+      defaultUri: this.state.workspacePath ? { scheme: 'file', path: this.state.workspacePath } : undefined,
+      canSelectFolders: true,
+      canSelectFiles: false,
+      title: 'Select workspace folder',
+    });
+    if (p?.length === 1) {
+      if (p[0].scheme !== 'file') {
+        throw new Error(`pickWorkspacePath: only local paths are supported. Instead received ${p[0].scheme}`);
+      }
+      this.setState({ workspacePath: p[0].path });
+    }
   };
 
   // saveRecording = async () => {
@@ -65,11 +92,13 @@ export default class Recorder extends Component<Props> {
 
   render() {
     const recorder = this.props.store.recorder!;
-    const { status, workspaceFolders } = recorder;
+    const { status } = recorder;
 
     const timeStr = lib.formatTimeSeconds(this.state.localClock);
     let toggleFn: () => void, toggleIcon: string;
-    if (status === t.RecorderStatus.Init) {
+    if (status === t.RecorderStatus.Uninitialized) {
+      [toggleFn, toggleIcon] = [this.startRecorder, 'codicon-circle-large-filled'];
+    } else if (status === t.RecorderStatus.Ready) {
       [toggleFn, toggleIcon] = [this.startRecorder, 'codicon-circle-large-filled'];
     } else if (status === t.RecorderStatus.Paused) {
       [toggleFn, toggleIcon] = [this.startRecorder, 'codicon-circle-large-filled'];
@@ -90,12 +119,21 @@ export default class Recorder extends Component<Props> {
           <Section.Body>
             <div className="control-toolbar">
               <div className="toggle-button-container">
-                <vscode-button className="toggle-button for-recorder" onClick={toggleFn} appearance="icon">
+                <vscode-button
+                  className="toggle-button for-recorder"
+                  onClick={toggleFn}
+                  appearance="icon"
+                  disabled={!this.state.workspacePath}
+                >
                   <div className={`codicon ${toggleIcon}`} />
                 </vscode-button>
               </div>
               <div className="actions">
-                <vscode-button appearance="icon" title="Discard" disabled={status === t.RecorderStatus.Init}>
+                <vscode-button
+                  appearance="icon"
+                  title="Discard"
+                  disabled={status === t.RecorderStatus.Ready || status === t.RecorderStatus.Uninitialized}
+                >
                   <span className="codicon codicon-debug-restart" />
                 </vscode-button>
               </div>
@@ -108,19 +146,37 @@ export default class Recorder extends Component<Props> {
                 <span className="text large">{lib.formatTimeSeconds(this.state.localClock, true)}</span>
               </div>
             </div>
-
-            <vscode-text-field className="subsection" autofocus>
-              Title
-            </vscode-text-field>
-            <vscode-text-area className="subsection" rows={5} resize="vertical">
-              Summary
-            </vscode-text-area>
-            <vscode-text-field className="subsection" placeholder={workspaceFolders[0] || ''}>
+            <vscode-text-field
+              className="subsection"
+              value={this.state.workspacePath}
+              onChange={this.updateField}
+              data-field="workspacePath"
+              disabled={status !== t.RecorderStatus.Uninitialized}
+              autofocus
+            >
               Workspace
-              <vscode-button slot="end" appearance="icon" title="Pick">
+              <vscode-button slot="end" appearance="icon" title="Pick" onClick={this.pickWorkspacePath}>
                 <span className="codicon codicon-search" />
               </vscode-button>
             </vscode-text-field>
+            <vscode-text-field
+              className="subsection"
+              value={this.state.title}
+              onChange={this.updateField}
+              data-field="title"
+            >
+              Title
+            </vscode-text-field>
+            <vscode-text-area
+              className="subsection"
+              rows={5}
+              resize="vertical"
+              value={this.state.description}
+              onChange={this.updateField}
+              data-field="description"
+            >
+              Description
+            </vscode-text-area>
             <p className="subsection help">
               Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
             </p>

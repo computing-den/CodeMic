@@ -18,17 +18,40 @@ export default class Player extends Component<Props> {
 
   state = {
     localClock: 0,
+    workspacePath: this.props.store.player!.sessionSummary.defaultWorkspacePath,
   };
 
   startPlayer = async () => {
-    if (this.isStoppedAlmostAtTheEnd()) {
-      await this.seek(0);
+    if (this.props.store.player!.status === t.PlayerStatus.Uninitialized) {
+      await actions.startPlayer(this.state.workspacePath);
+    } else {
+      if (this.isStoppedAlmostAtTheEnd()) await this.seek(0);
+      await actions.startPlayer();
     }
-    await actions.startPlayer();
   };
 
   pausePlayer = async () => {
     await actions.pausePlayer();
+  };
+
+  updateField = (e: InputEvent) => {
+    const target = e.target as HTMLInputElement;
+    this.setState({ [target.dataset.field!]: target.value });
+  };
+
+  pickWorkspacePath = async () => {
+    const p = await actions.showOpenDialog({
+      defaultUri: this.state.workspacePath ? { scheme: 'file', path: this.state.workspacePath } : undefined,
+      canSelectFolders: true,
+      canSelectFiles: false,
+      title: 'Select workspace folder',
+    });
+    if (p?.length === 1) {
+      if (p[0].scheme !== 'file') {
+        throw new Error(`pickWorkspacePath: only local paths are supported. Instead received ${p[0].scheme}`);
+      }
+      this.setState({ workspacePath: p[0].path });
+    }
   };
 
   handleProgressBarRef = (elem: Element | null) => {
@@ -53,7 +76,7 @@ export default class Player extends Component<Props> {
   };
 
   seek = async (clock: number) => {
-    if (this.props.store.player!.status === t.PlayerStatus.Init) {
+    if (this.props.store.player!.status === t.PlayerStatus.Uninitialized) {
       // TODO populate the workspace automatically or prompt the user
       console.error('Workspace not populated yet');
       return;
@@ -207,14 +230,15 @@ export default class Player extends Component<Props> {
               </div>
             </div>
             <div className="forms">
-              {player.status === t.PlayerStatus.Init && (
+              {player.status === t.PlayerStatus.Uninitialized && (
                 <vscode-text-field
                   className="subsection"
-                  placeholder={ss.defaultWorkspacePath || '~/codecast'}
+                  data-field="workspacePath"
+                  onChange={this.updateField}
                   autofocus
                 >
                   Workspace
-                  <vscode-button slot="end" appearance="icon" title="Pick">
+                  <vscode-button slot="end" appearance="icon" title="Pick" onClick={this.pickWorkspacePath}>
                     <span className="codicon codicon-search" />
                   </vscode-button>
                 </vscode-text-field>

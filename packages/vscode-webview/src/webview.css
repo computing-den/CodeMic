@@ -429,6 +429,9 @@ ul.unstyled {
       &:hover {
         color: var(--button-primary-foreground);
       }
+      &:disabled {
+        opacity: 1;
+      }
 
       &.for-player {
         border: 1px solid var(--button-primary-background);

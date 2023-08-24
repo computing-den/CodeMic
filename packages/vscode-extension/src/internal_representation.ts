@@ -91,17 +91,26 @@ export class Session {
 
   constructor(public initCheckpoint: Checkpoint, public events: PlaybackEvent[], public workspacePath: string) {}
 
+  /**
+   * workspacePath must be already resolved.
+   */
   static async fromWorkspace(workspacePath: string): Promise<Session> {
     const checkpoint = await Checkpoint.fromWorkspace(workspacePath);
-    return new Session(checkpoint, [], workspacePath);
+    return Session.fromCheckpoint(checkpoint, [], workspacePath);
   }
 
+  /**
+   * workspacePath must be already resolved.
+   */
   static fromCheckpoint(checkpoint: Checkpoint, events: PlaybackEvent[], workspacePath: string): Session {
     const session = new Session(checkpoint, events, workspacePath);
     session.restoreCheckpoint(checkpoint);
     return session;
   }
 
+  /**
+   * workspacePath must be already resolved.
+   */
   static async fromFile(filename: string, workspacePath: string): Promise<Session> {
     const plain = JSON.parse(await fs.promises.readFile(filename, 'utf8')) as PlainSession;
     const events = playbackEventsFromPlain(plain.events);
@@ -130,11 +139,33 @@ export class Session {
 
   async syncToVscodeAndDisk() {
     // TODO
-    vscode.window.showInformationMessage('syncToVscodeAndDisk: TODO');
+    // delete documents in workspace
+    // {
+    //   const workspaceFiles = await misc.readDirRecursively(this.workspacePath, {includeDirs: true});
+    //   // TODO currently, all vscode.Uri paths start with / so we have to do the ugly slice trick here
+    //   //      remove this once we stop using vscode.Uri
+    //   const deletedFiles = workspaceFiles.filter(f => !this.textDocuments.some(d => d.uri.path.slice(1) === f));
+    //   for (const file of deletedFiles) {
+    //     // fs.promises.rm()
+    //     // TODO delete empty directories
+    //   }
+    // }
+    // // open all the documents currently open in the checkpoint
+    // {
+    //   for (const uri of this.session.initCheckpoint.openDocumentUris) {
+    //     const textDocument = await vscode.workspace.openTextDocument(this.session.getFullUri(uri));
+    //     this.openDocument(vscTextDocument);
+    //   }
+    // }
+    // // show the currectly active text editor
+    // {
+    //   const vscTextEditor = vscode.window.activeTextEditor;
+    //   if (vscTextEditor) this.showTextEditor(vscTextEditor);
+    // }
   }
 
   openTextDocument(vscTextDocument: vscode.TextDocument): TextDocument {
-    const uri = this.getRelUri(vscTextDocument.uri);
+    const uri = this.getPartialUri(vscTextDocument.uri);
     assert(uri);
     let textDocument = this.findTextDocumentByUri(uri);
     if (!textDocument) {
@@ -192,12 +223,12 @@ export class Session {
     await fs.promises.writeFile(filename, JSON.stringify(plainSession, null, 2), 'utf8');
   }
 
-  getRelUri(uri: vscode.Uri): vscode.Uri | undefined {
-    return misc.getRelUri(this.workspacePath, uri);
+  getPartialUri(uri: vscode.Uri): vscode.Uri | undefined {
+    return misc.getPartialUri(this.workspacePath, uri);
   }
 
-  getAbsUri(uri: vscode.Uri): vscode.Uri | undefined {
-    return misc.getAbsUri(this.workspacePath, uri);
+  getFullUri(uri: vscode.Uri): vscode.Uri {
+    return misc.getFullUri(this.workspacePath, uri);
   }
 }
 
@@ -347,6 +378,9 @@ class Checkpoint {
     public activeTextEditorUri?: vscode.Uri,
   ) {}
 
+  /**
+   * workspacePath must be already resolved.
+   */
   static async fromWorkspace(workspacePath: string): Promise<Checkpoint> {
     for (const vscTextDocument of vscode.workspace.textDocuments) {
       if (vscTextDocument.isDirty) {
@@ -360,8 +394,10 @@ class Checkpoint {
     );
     const activeTextEditorUri =
       vscode.window.activeTextEditor?.document.uri &&
-      misc.getRelUri(workspacePath, vscode.window.activeTextEditor?.document.uri);
-    const openDocumentUris = _.compact(vscode.workspace.textDocuments.map(d => misc.getRelUri(workspacePath, d.uri)));
+      misc.getPartialUri(workspacePath, vscode.window.activeTextEditor?.document.uri);
+    const openDocumentUris = _.compact(
+      vscode.workspace.textDocuments.map(d => misc.getPartialUri(workspacePath, d.uri)),
+    );
 
     return new Checkpoint(textDocuments, textEditors, openDocumentUris, activeTextEditorUri);
   }
@@ -422,7 +458,7 @@ class CheckpointTextDocument {
 
   static async fromWorkspace(root: string): Promise<CheckpointTextDocument[]> {
     const res: CheckpointTextDocument[] = [];
-    const uris = await misc.readDirRecursivelyUri(root);
+    const uris = await misc.readDirRecursivelyUri(root, { includeFiles: true });
     for (const uri of uris) {
       const text = await fs.promises.readFile(path.join(root, uri.path), 'utf8');
       res.push(new CheckpointTextDocument(uri, text));
@@ -434,8 +470,11 @@ class CheckpointTextDocument {
 class CheckpointTextEditor {
   constructor(public uri: vscode.Uri, public selections: vscode.Selection[], public visibleRange: vscode.Range) {}
 
+  /**
+   * workspacePath must be already resolved.
+   */
   static fromVsc(workspacePath: string, vscTextEditor: vscode.TextEditor): CheckpointTextEditor | undefined {
-    const uri = misc.getRelUri(workspacePath, vscTextEditor.document.uri);
+    const uri = misc.getPartialUri(workspacePath, vscTextEditor.document.uri);
     if (!uri) return undefined;
     const selections = misc.duplicateSelections(vscTextEditor.selections);
     const visibleRange = misc.duplicateRange(vscTextEditor.visibleRanges[0]);

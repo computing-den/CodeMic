@@ -12,8 +12,8 @@ enum Dir {
 
 export interface PlayerI {
   status: t.PlayerStatus;
-  sessionSummary?: t.SessionSummary;
-  start(): void;
+  sessionSummary: t.SessionSummary;
+  start(): Promise<void>;
   update(clock: number): Promise<void>;
   pause(): void;
   stop(): Promise<void>;
@@ -22,8 +22,8 @@ export interface PlayerI {
 
 export class UninitializedPlayer implements PlayerI {
   status = t.PlayerStatus.Uninitialized;
-  constructor(public sessionSummary?: t.SessionSummary) {}
-  start() {}
+  constructor(public sessionSummary: t.SessionSummary) {}
+  async start() {}
   async update(clock: number) {}
   pause() {}
   async stop() {}
@@ -40,7 +40,10 @@ export class Player implements PlayerI {
   private clock: number = 0;
   private enqueueUpdate = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
-  static async populateIntoWorkspace(
+  /**
+   * workspacePath must be already resolved.
+   */
+  static async populate(
     context: vscode.ExtensionContext,
     sessionSummary: t.SessionSummary,
     workspacePath: string,
@@ -58,7 +61,7 @@ export class Player implements PlayerI {
     public sessionSummary: t.SessionSummary,
   ) {}
 
-  start() {
+  async start() {
     assert(
       this.status === t.PlayerStatus.Ready ||
         this.status === t.PlayerStatus.Paused ||
@@ -70,7 +73,7 @@ export class Player implements PlayerI {
     {
       const disposable = vscode.commands.registerCommand('type', (e: { text: string }) => {
         const uri = vscode.window.activeTextEditor?.document.uri;
-        if (!uri || !this.session.getRelUri(uri)) {
+        if (!uri || !this.session.getPartialUri(uri)) {
           // approve the default type command
           vscode.commands.executeCommand('default:type', e);
         }
@@ -248,9 +251,7 @@ export class Player implements PlayerI {
       }
       case 'openDocument': {
         if (dir === Dir.Forwards) {
-          const absUri = this.session.getAbsUri(e.uri);
-          assert(absUri);
-          const vscTextDocument = await vscode.workspace.openTextDocument(absUri);
+          const vscTextDocument = await this.getVscTextDocumentByUri(e.uri);
           // const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument, { preserveFocus: true });
           // await vscTextEditor.edit(editBuilder => {
           //   editBuilder.replace(misc.getWholeTextDocumentRange(vscTextDocument), e.text);
@@ -332,15 +333,14 @@ export class Player implements PlayerI {
   // Note that the lifecycle of the returned document from vscode.workspace.openTextDocument() is owned
   // by the editor and not by the extension. That means an onDidClose event can occur at any time after opening it.
   // We probably should not cache the vscTextDocument itself.
-  // TODO avoid the path.resolve call inside misc.getAbsUri()
   async getVscTextDocumentByUri(uri: vscode.Uri): Promise<vscode.TextDocument> {
-    const absUri = this.session.getAbsUri(uri);
+    const absUri = this.session.getFullUri(uri);
     assert(absUri);
     return await vscode.workspace.openTextDocument(absUri);
   }
 
   findVscVisibleTextEditorByUri(uri: vscode.Uri) {
-    const absUri = this.session.getAbsUri(uri);
+    const absUri = this.session.getFullUri(uri);
     assert(absUri);
     return vscode.window.visibleTextEditors.find(x => misc.isEqualUri(x.document.uri, absUri));
   }

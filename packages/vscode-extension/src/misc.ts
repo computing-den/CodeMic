@@ -16,7 +16,7 @@ export function unreachable(arg: never, message: string = 'Unreachable'): never 
 }
 
 export function isEqualUri(a: vscode.Uri, b: vscode.Uri) {
-  return a.scheme === b.scheme && a.path === b.path;
+  return a.toString() === b.toString();
 }
 
 export function getRecordingsPath(): string {
@@ -51,28 +51,27 @@ export function duplicateRange(range: vscode.Range): vscode.Range {
   return new vscode.Range(range.start, range.end);
 }
 
-export function getRelUri(workspacePath: string, uri: vscode.Uri): vscode.Uri | undefined {
+export function getPartialUri(workspacePath: string, uri: vscode.Uri): vscode.Uri | undefined {
   // TODO remember that untitled uri's path may or may not be an actual path, it might just be a name
   assert(uri.scheme !== 'untitled', 'TODO: untitled uri is not yet supported.');
 
   if (uri.scheme === 'file') {
-    const p = path.relative(path.resolve(workspacePath), path.resolve(uri.path));
+    const p = path.relative(workspacePath, uri.path);
     if (!p.startsWith('../')) {
-      return vscode.Uri.from({ scheme: 'file', path: p });
+      return vscode.Uri.file(p);
     }
   }
   return undefined;
 }
 
-export function getAbsUri(workspacePath: string, uri: vscode.Uri): vscode.Uri | undefined {
+export function getFullUri(workspacePath: string, uri: vscode.Uri): vscode.Uri {
   // TODO remember that untitled uri's path may or may not be an actual path, it might just be a name
   assert(uri.scheme !== 'untitled', 'TODO: untitled uri is not yet supported.');
 
   if (uri.scheme === 'file') {
-    return vscode.Uri.from({ scheme: 'file', path: path.join(path.resolve(workspacePath), path.resolve(uri.path)) });
-  } else {
-    return undefined;
+    return vscode.Uri.file(path.join(workspacePath, uri.path));
   }
+  return uri;
 }
 
 export function uriFromVsc(uri: vscode.Uri): t.Uri {
@@ -82,8 +81,17 @@ export function uriFromVsc(uri: vscode.Uri): t.Uri {
   return { scheme: uri.scheme, path: uri.path };
 }
 
-// Returns a sorted list of all files. It excludes empty directories.
-export async function readDirRecursively(root: string, rel: string = '', res: string[] = []): Promise<string[]> {
+export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
+
+/**
+ * Returns a sorted list of all files. It excludes empty directories.
+ */
+export async function readDirRecursively(
+  root: string,
+  options: ReadDirOptions,
+  rel: string = '',
+  res: string[] = [],
+): Promise<string[]> {
   let filenames: string[] = [];
   try {
     filenames = await fs.promises.readdir(path.join(root, rel));
@@ -99,8 +107,10 @@ export async function readDirRecursively(root: string, rel: string = '', res: st
     const stat = await fs.promises.stat(childFull);
 
     if (stat.isDirectory()) {
-      await readDirRecursively(root, childRel, res);
-    } else if (stat.isFile()) {
+      await readDirRecursively(root, options, childRel, res);
+    }
+
+    if ((stat.isDirectory() && options.includeDirs) || (stat.isFile() && options.includeFiles)) {
       res.push(childRel);
     }
   }
@@ -108,7 +118,19 @@ export async function readDirRecursively(root: string, rel: string = '', res: st
 }
 
 // Returns a sorted list of all file URIs. It excludes empty directories.
-export async function readDirRecursivelyUri(root: string, rel: string = '', res: string[] = []): Promise<vscode.Uri[]> {
-  const files = await readDirRecursively(root);
-  return files.map(file => vscode.Uri.from({ scheme: 'file', path: file }));
+export async function readDirRecursivelyUri(root: string, options: ReadDirOptions): Promise<vscode.Uri[]> {
+  const files = await readDirRecursively(root, options);
+  return files.map(file => vscode.Uri.file(file));
+}
+
+// Given '/home/sean/abc/' will return '~/abc/'.
+// p must be absolute.
+export function shortenPath(p: string): string {
+  assert(path.isAbsolute(p));
+  const rel = path.relative(os.homedir(), p);
+  if (rel.startsWith('..' + path.sep)) {
+    return p;
+  } else {
+    return path.join('~', rel);
+  }
 }

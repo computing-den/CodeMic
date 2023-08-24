@@ -7,8 +7,8 @@ export function init(_postMessage: (req: t.FrontendRequest) => Promise<t.Backend
   postMessage = _postMessage;
 }
 
-export async function startRecorder() {
-  await postMessageAndUpdateStore({ type: 'record' });
+export async function startRecorder(workspacePath?: string) {
+  await postMessageAndUpdateStore({ type: 'record', workspacePath });
 }
 
 export async function pauseRecorder() {
@@ -44,7 +44,7 @@ export async function openRecorder() {
 //   return res.value;
 // }
 
-export async function startPlayer(workspacePath?: t.Uri) {
+export async function startPlayer(workspacePath?: string) {
   await postMessageAndUpdateStore({ type: 'play', workspacePath });
 }
 
@@ -58,6 +58,10 @@ export async function pausePlayer() {
 
 export async function seek(clock: number) {
   await postMessageAndUpdateStore({ type: 'seek', clock });
+}
+
+export async function showOpenDialog(options: t.OpenDialogOptions): Promise<t.Uri[] | undefined> {
+  return (await postMessageHelper({ type: 'showOpenDialog', options }, 'uris')).uris;
 }
 
 export async function getStore() {
