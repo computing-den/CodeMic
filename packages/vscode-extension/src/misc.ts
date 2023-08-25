@@ -84,9 +84,10 @@ export function uriFromVsc(uri: vscode.Uri): t.Uri {
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
 
 /**
- * Returns a sorted list of all files. It excludes empty directories.
+ * Returns a sorted list of all files.
+ * The returned items do NOT start with "/".
  */
-export async function readDirRecursively(
+async function readDirRecursively(
   root: string,
   options: ReadDirOptions,
   rel: string = '',
@@ -117,14 +118,19 @@ export async function readDirRecursively(
   return res;
 }
 
-// Returns a sorted list of all file URIs. It excludes empty directories.
+/**
+ * Returns a sorted list of all file URIs.
+ * The returned items start with "/".
+ */
 export async function readDirRecursivelyUri(root: string, options: ReadDirOptions): Promise<vscode.Uri[]> {
   const files = await readDirRecursively(root, options);
   return files.map(file => vscode.Uri.file(file));
 }
 
-// Given '/home/sean/abc/' will return '~/abc/'.
-// p must be absolute.
+/**
+ * Given '/home/sean/abc/' will return '~/abc/'.
+ * p must be absolute.
+ */
 export function shortenPath(p: string): string {
   assert(path.isAbsolute(p));
   const rel = path.relative(os.homedir(), p);

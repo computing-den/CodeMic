@@ -86,6 +86,7 @@ export class Session {
   textDocuments: TextDocument[] = [];
   textEditors: TextEditor[] = [];
   activeTextEditor?: TextEditor;
+
   // checkpoints: Checkpoint[];
   // debug: Map<vscode.TextEditor, number> = new Map();
 
@@ -118,7 +119,9 @@ export class Session {
     return Session.fromCheckpoint(checkpoint, events, workspacePath);
   }
 
-  // Modify the current session except for the events.
+  /**
+   * Modify the current session except for the events.
+   */
   restoreCheckpoint(checkpoint: Checkpoint) {
     const textDocuments = checkpoint.textDocuments.map(d => TextDocument.fromText(d.uri, d.text));
     const textEditors = checkpoint.textEditors.map(e => {
@@ -137,31 +140,116 @@ export class Session {
     this.activeTextEditor = activeTextEditor;
   }
 
-  async syncToVscodeAndDisk() {
-    // TODO
-    // delete documents in workspace
-    // {
-    //   const workspaceFiles = await misc.readDirRecursively(this.workspacePath, {includeDirs: true});
-    //   // TODO currently, all vscode.Uri paths start with / so we have to do the ugly slice trick here
-    //   //      remove this once we stop using vscode.Uri
-    //   const deletedFiles = workspaceFiles.filter(f => !this.textDocuments.some(d => d.uri.path.slice(1) === f));
-    //   for (const file of deletedFiles) {
-    //     // fs.promises.rm()
-    //     // TODO delete empty directories
-    //   }
-    // }
-    // // open all the documents currently open in the checkpoint
-    // {
-    //   for (const uri of this.session.initCheckpoint.openDocumentUris) {
-    //     const textDocument = await vscode.workspace.openTextDocument(this.session.getFullUri(uri));
-    //     this.openDocument(vscTextDocument);
-    //   }
-    // }
-    // // show the currectly active text editor
-    // {
-    //   const vscTextEditor = vscode.window.activeTextEditor;
-    //   if (vscTextEditor) this.showTextEditor(vscTextEditor);
-    // }
+  async syncToVscodeAndDisk(targetUris?: vscode.Uri[]) {
+    // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
+
+    // all tabs that are not in this.textEditors should be closed
+    for (const tabGroup of vscode.window.tabGroups.all) {
+      for (const tab of tabGroup.tabs) {
+        if (tab.input instanceof vscode.TabInputText) {
+          const partialUri = this.getPartialUri(tab.input.uri);
+          if (partialUri) {
+            if (!this.findTextEditorByUri(partialUri)) {
+              const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
+              await vscTextDocument.save();
+              await vscode.window.tabGroups.close(tab);
+            }
+          }
+        }
+      }
+    }
+
+    if (targetUris) {
+      // all files in targetUris that are no longer in this.textDocuments should be deleted
+      for (const targetUri of targetUris) {
+        if (!this.findTextDocumentByUri(targetUri)) {
+          await fs.promises.rm(targetUri.path, { force: true });
+        }
+      }
+    } else {
+      // targetUris is undefined when we need to restore a checkpoint completely, meaning that
+      // any file that is not in this.textDocuments should be deleted and any text editor not in
+      // this.textEditors should be closed.
+
+      // save all tabs and close them
+      // for (const tabGroup of vscode.window.tabGroups.all) {
+      //   for (const tab of tabGroup.tabs) {
+      //     if (tab.input instanceof vscode.TabInputText) {
+      //       const partialUri = this.getPartialUri(tab.input.uri);
+      //       if (partialUri) {
+      //         const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
+      //         await vscTextDocument.save();
+      //         await vscode.window.tabGroups.close(tab);
+      //       }
+      //     }
+      //   }
+      // }
+
+      // all files in workspace that are not in this.textDocuments should be deleted
+      const workspaceFileUris = await misc.readDirRecursivelyUri(this.workspacePath, { includeFiles: true });
+      for (const fileUri of workspaceFileUris) {
+        if (!this.findTextDocumentByUri(fileUri)) {
+          await fs.promises.rm(this.getFullUri(fileUri).path, { force: true });
+        }
+      }
+
+      // set targetUris to this.textDocument's uris
+      targetUris = this.textDocuments.map(d => d.uri);
+    }
+
+    // for now, just delete empty directories
+    const workspaceDirUris = await misc.readDirRecursivelyUri(this.workspacePath, { includeDirs: true });
+    for (const dirUri of workspaceDirUris) {
+      assert(os.platform() === 'linux', 'FIXME: the / separator is hardcoded here');
+      const dirIsEmpty = !this.textDocuments.some(
+        d => d.uri.scheme === dirUri.scheme && d.uri.path.startsWith(dirUri.path + '/'),
+      );
+      if (dirIsEmpty) await fs.promises.rm(this.getFullUri(dirUri).path, { force: true, recursive: true });
+    }
+
+    // for each targetUri
+    //   if there's a textDocument open in vscode, replace its content
+    //   else, mkdir and write to file
+    for (const targetUri of targetUris) {
+      const fullUri = this.getFullUri(targetUri);
+      const textDocument = this.findTextDocumentByUri(targetUri);
+      if (!textDocument) continue; // already deleted above
+
+      const vscTextDocument = vscode.workspace.textDocuments.find(d => misc.isEqualUri(d.uri, fullUri));
+      if (vscTextDocument) {
+        const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument, { preserveFocus: true });
+        await vscTextEditor.edit(editBuilder => {
+          const range = misc.getWholeTextDocumentRange(vscTextDocument);
+          editBuilder.replace(range, textDocument.getText());
+        });
+        await vscTextDocument.save();
+      } else {
+        await fs.promises.mkdir(path.dirname(fullUri.path), { recursive: true });
+        await fs.promises.writeFile(fullUri.path, textDocument.getText(), 'utf8');
+      }
+    }
+
+    // open all this.textEditors
+    for (const textEditor of this.textEditors) {
+      const fullUri = this.getFullUri(textEditor.document.uri);
+      await vscode.window.showTextDocument(fullUri, {
+        preview: false,
+        preserveFocus: true,
+        selection: textEditor.selections[0],
+        viewColumn: vscode.ViewColumn.One,
+      });
+    }
+
+    // show this.activeTextEditor
+    if (this.activeTextEditor) {
+      const fullUri = this.getFullUri(this.activeTextEditor.document.uri);
+      await vscode.window.showTextDocument(fullUri, {
+        preview: false,
+        preserveFocus: false,
+        selection: this.activeTextEditor.selections[0],
+        viewColumn: vscode.ViewColumn.One,
+      });
+    }
   }
 
   openTextDocument(vscTextDocument: vscode.TextDocument): TextDocument {
@@ -374,7 +462,6 @@ class Checkpoint {
   constructor(
     public textDocuments: CheckpointTextDocument[],
     public textEditors: CheckpointTextEditor[],
-    public openDocumentUris: vscode.Uri[],
     public activeTextEditorUri?: vscode.Uri,
   ) {}
 
@@ -389,17 +476,32 @@ class Checkpoint {
     }
 
     const textDocuments = await CheckpointTextDocument.fromWorkspace(workspacePath);
+
+    // Get textEditors from vscode.window.visibleTextEditors first. These have selections and visible range.
+    // Then get the rest from vscode.window.tabGroups. These don't have selections and range.
     const textEditors = _.compact(
       vscode.window.visibleTextEditors.map(e => CheckpointTextEditor.fromVsc(workspacePath, e)),
     );
+    const openTextDocumentUris: vscode.Uri[] = [];
+    for (const tabGroup of vscode.window.tabGroups.all) {
+      for (const tab of tabGroup.tabs) {
+        if (tab.input instanceof vscode.TabInputText) {
+          const partialUri = misc.getPartialUri(workspacePath, tab.input.uri);
+          if (partialUri) openTextDocumentUris.push(partialUri);
+        }
+      }
+    }
+    for (const uri of openTextDocumentUris) {
+      if (!textEditors.some(e => misc.isEqualUri(e.uri, uri))) {
+        textEditors.push(new CheckpointTextEditor(uri));
+      }
+    }
+
     const activeTextEditorUri =
       vscode.window.activeTextEditor?.document.uri &&
       misc.getPartialUri(workspacePath, vscode.window.activeTextEditor?.document.uri);
-    const openDocumentUris = _.compact(
-      vscode.workspace.textDocuments.map(d => misc.getPartialUri(workspacePath, d.uri)),
-    );
 
-    return new Checkpoint(textDocuments, textEditors, openDocumentUris, activeTextEditorUri);
+    return new Checkpoint(textDocuments, textEditors, activeTextEditorUri);
   }
 
   static fromSession(session: Session): Checkpoint {
@@ -414,11 +516,9 @@ class Checkpoint {
       visibleRange: e.visibleRange,
     }));
 
-    const openDocumentUris = session.textEditors.map(e => e.document.uri);
-
     const activeTextEditorUri = session.activeTextEditor?.document.uri;
 
-    return new Checkpoint(textDocuments, textEditors, openDocumentUris, activeTextEditorUri);
+    return new Checkpoint(textDocuments, textEditors, activeTextEditorUri);
   }
 
   static fromPlain(plain: PlainCheckpoint): Checkpoint {
@@ -432,8 +532,7 @@ class Checkpoint {
       visibleRange: rangeFromPlain(e.visibleRange),
     }));
     const activeTextEditorUri = plain.activeTextEditorUri && uriFromPlain(plain.activeTextEditorUri);
-    const openDocumentUris = plain.openDocumentUris.map(uriFromPlain);
-    return new Checkpoint(textDocuments, textEditors, openDocumentUris, activeTextEditorUri);
+    return new Checkpoint(textDocuments, textEditors, activeTextEditorUri);
   }
 
   toPlain(): PlainCheckpoint {
@@ -447,7 +546,6 @@ class Checkpoint {
         selections: selectionsToPlain(e.selections),
         visibleRange: rangeToPlain(e.visibleRange),
       })),
-      openDocumentUris: this.openDocumentUris.map(uriToPlain),
       activeTextEditorUri: this.activeTextEditorUri && uriToPlain(this.activeTextEditorUri),
     };
   }
@@ -468,7 +566,11 @@ class CheckpointTextDocument {
 }
 
 class CheckpointTextEditor {
-  constructor(public uri: vscode.Uri, public selections: vscode.Selection[], public visibleRange: vscode.Range) {}
+  constructor(
+    public uri: vscode.Uri,
+    public selections: vscode.Selection[] = [new vscode.Selection(0, 0, 0, 0)],
+    public visibleRange: vscode.Range = new vscode.Range(0, 0, 1, 0),
+  ) {}
 
   /**
    * workspacePath must be already resolved.
@@ -496,7 +598,6 @@ export type PlainCheckpoint = {
   // base: CheckpointBaseGit;
   textDocuments: PlainCheckpointTextDocument[];
   textEditors: PlainCheckpointTextEditor[];
-  openDocumentUris: PlainUri[];
   activeTextEditorUri?: PlainUri;
 };
 
