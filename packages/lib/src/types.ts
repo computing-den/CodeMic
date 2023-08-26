@@ -1,11 +1,28 @@
+// Type branding is a hack. The __brand__ property doesn't actually exist at runtime.
+export type Path = RelPath | AbsPath;
+export type RelPath = string & { readonly __brand__: 'rel' };
+export type AbsPath = string & { readonly __brand__: 'abs' };
+
+/**
+ * file:///home/sean/a    file path is always absolute.
+ * workspace:a/b/c        workspace path is always relative.
+ * untitled:Untitled      untitled has a name, not an actual path (this is different from vscode's untitled Uris which can be either a path or a name)
+ */
+export type Uri = string;
+
+export type ParsedUri =
+  | { scheme: 'file'; path: AbsPath }
+  | { scheme: 'workspace'; path: RelPath }
+  | { scheme: 'untitled'; name: string };
+
 export type FrontendRequest =
   | { type: 'seek'; clock: number }
   | { type: 'openWelcome' }
   | { type: 'openPlayer'; sessionId: string }
   | { type: 'openRecorder' }
   // | { type: 'askToCloseRecorder' }
-  | { type: 'play'; workspacePath?: string }
-  | { type: 'record'; workspacePath?: string }
+  | { type: 'play'; workspacePath?: AbsPath }
+  | { type: 'record'; workspacePath?: AbsPath }
   // | { type: 'closePlayer' }
   // | { type: 'closeRecorder' }
   | { type: 'pausePlayer' }
@@ -67,8 +84,8 @@ export type Recorder = {
   status: RecorderStatus;
   duration: number;
   name: string;
-  workspacePath?: string;
-  defaultWorkspacePath?: string;
+  workspacePath?: AbsPath;
+  defaultWorkspacePath?: AbsPath;
 };
 
 export enum PlayerStatus {
@@ -86,10 +103,6 @@ export type Player = {
   clock: number;
 };
 
-export type Uri =
-  | { scheme: 'file' | 'untitled'; path: string }
-  | { scheme: 'http' | 'https'; authority: string; path: string; query?: string; fragment?: string };
-
 export type TocItem = { title: string; clock: number };
 
 export type SessionSummary = {
@@ -102,7 +115,7 @@ export type SessionSummary = {
   };
   published: boolean;
   uri: Uri;
-  defaultWorkspacePath?: string;
+  defaultWorkspacePath?: AbsPath;
   duration: number;
   views: number;
   likes: number;
@@ -118,3 +131,93 @@ export type OpenDialogOptions = {
   filters?: { [name: string]: string[] };
   title?: string;
 };
+
+export type PlaybackEvent =
+  | StopEvent
+  | TextChangeEvent
+  | OpenDocumentEvent
+  | ShowTextEditor
+  | SelectEvent
+  | ScrollEvent
+  | SaveEvent;
+
+export type StopEvent = {
+  type: 'stop';
+  clock: number;
+};
+
+export type TextChangeEvent = {
+  type: 'textChange';
+  clock: number;
+  uri: Uri;
+  contentChanges: ContentChange[];
+  // revSelections: vscode.Selection[];
+};
+
+export type OpenDocumentEvent = {
+  type: 'openDocument';
+  clock: number;
+  uri: Uri;
+  // text: string;
+  eol: EndOfLine;
+};
+
+export type ShowTextEditor = {
+  type: 'showTextEditor';
+  clock: number;
+  uri: Uri;
+  selections: Selection[];
+  visibleRange: Range;
+  revUri?: Uri;
+  revSelections?: Selection[];
+  revVisibleRange?: Range;
+  // revSelections: Selection[];
+};
+
+export type SelectEvent = {
+  type: 'select';
+  clock: number;
+  uri: Uri;
+  selections: Selection[];
+  visibleRange: Range;
+  revSelections: Selection[];
+  revVisibleRange: Range;
+};
+
+export type ScrollEvent = {
+  type: 'scroll';
+  clock: number;
+  uri: Uri;
+  visibleRange: Range;
+  revVisibleRange: Range;
+};
+
+export type SaveEvent = {
+  type: 'save';
+  clock: number;
+  uri: Uri;
+};
+
+export type ContentChange = {
+  range: Range;
+  text: string;
+  revRange: Range;
+  revText: string;
+};
+
+export interface Position {
+  line: number;
+  character: number;
+}
+
+export interface Range {
+  start: Position;
+  end: Position;
+}
+
+export interface Selection {
+  anchor: Position;
+  active: Position;
+}
+
+export type EndOfLine = '\n' | '\r\n';

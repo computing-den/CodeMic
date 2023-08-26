@@ -7,7 +7,7 @@ export function init(_postMessage: (req: t.FrontendRequest) => Promise<t.Backend
   postMessage = _postMessage;
 }
 
-export async function startRecorder(workspacePath?: string) {
+export async function startRecorder(workspacePath?: t.AbsPath) {
   await postMessageAndUpdateStore({ type: 'record', workspacePath });
 }
 
@@ -44,7 +44,7 @@ export async function openRecorder() {
 //   return res.value;
 // }
 
-export async function startPlayer(workspacePath?: string) {
+export async function startPlayer(workspacePath?: t.AbsPath) {
   await postMessageAndUpdateStore({ type: 'play', workspacePath });
 }
 

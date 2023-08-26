@@ -1,13 +1,9 @@
 import { h, Fragment, Component } from 'preact';
-import { types as t, lib } from '@codecast/lib';
+import { types as t, path, lib } from '@codecast/lib';
 import FakeMedia from './fake-media.js';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
 import * as actions from './actions.js';
-import { updateStore } from './store.js';
-import { JsxElement } from 'typescript';
-import { EventEmitter } from 'vscode';
-// import type { WebviewApi } from 'vscode-webview';
 import _ from 'lodash';
 
 type Props = { store: t.Store; onExit: () => void };
@@ -40,16 +36,17 @@ export default class Recorder extends Component<Props> {
 
   pickWorkspacePath = async () => {
     const p = await actions.showOpenDialog({
-      defaultUri: this.state.workspacePath ? { scheme: 'file', path: this.state.workspacePath } : undefined,
+      defaultUri: this.state.workspacePath ? path.fileUriFromAbsPath(this.state.workspacePath) : undefined,
       canSelectFolders: true,
       canSelectFiles: false,
       title: 'Select workspace folder',
     });
     if (p?.length === 1) {
-      if (p[0].scheme !== 'file') {
-        throw new Error(`pickWorkspacePath: only local paths are supported. Instead received ${p[0].scheme}`);
+      const parsedUri = path.parseUri(p[0]);
+      if (parsedUri.scheme !== 'file') {
+        throw new Error(`pickWorkspacePath: only local paths are supported. Instead received ${parsedUri.scheme}`);
       }
-      this.setState({ workspacePath: p[0].path });
+      this.setState({ workspacePath: parsedUri.path });
     }
   };
 

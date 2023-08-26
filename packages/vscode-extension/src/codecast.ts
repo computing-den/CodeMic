@@ -5,8 +5,8 @@ import WebviewProvider from './webview_provider.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
-import { types as t } from '@codecast/lib';
-import path from 'path';
+import { types as t, lib, path } from '@codecast/lib';
+import nodePath from 'path';
 
 const SESSIONS: t.SessionSummary[] = [
   {
@@ -18,8 +18,8 @@ const SESSIONS: t.SessionSummary[] = [
       avatar: 'avatar1.png',
     },
     published: false,
-    uri: { scheme: 'file', path: '/home/sean/codecast/recordings/session.codecast' },
-    defaultWorkspacePath: '/home/sean/workspace/dumdb',
+    uri: 'file:///home/sean/codecast/recordings/session.codecast' as t.Uri,
+    defaultWorkspacePath: '/home/sean/workspace/dumdb' as t.AbsPath,
     duration: 78,
     views: 0,
     likes: 0,
@@ -45,8 +45,8 @@ const SESSIONS: t.SessionSummary[] = [
       avatar: 'avatar2.png',
     },
     published: false,
-    uri: { scheme: 'file', path: '/home/sean/codecast/recordings/session.codecast' },
-    defaultWorkspacePath: '/home/sean/workspace/dumdb',
+    uri: 'file:///home/sean/codecast/recordings/session.codecast' as t.Uri,
+    defaultWorkspacePath: '/home/sean/workspace/dumdb' as t.AbsPath,
     duration: 4023,
     views: 0,
     likes: 0,
@@ -61,8 +61,8 @@ const SESSIONS: t.SessionSummary[] = [
       avatar: 'https://cdn-icons-png.flaticon.com/512/924/924915.png',
     },
     published: true,
-    uri: { scheme: 'https', path: 'codecasts/8cd503ae-108a-49e0-b33f-af1320f66a68', authority: 'codecast.io' },
-    defaultWorkspacePath: '/home/sean/workspace/dumdb',
+    uri: 'file:///home/sean/codecast/recordings/session.codecast' as t.Uri,
+    defaultWorkspacePath: '/home/sean/workspace/dumdb' as t.AbsPath,
     duration: 62,
     views: 123,
     likes: 11,
@@ -78,7 +78,8 @@ const SESSIONS: t.SessionSummary[] = [
       avatar: 'avatar2.png',
     },
     published: true,
-    uri: { scheme: 'https', path: 'codecasts/8cd503ae-108a-49e0-b33f-af1320f66a68', authority: 'codecast.io' },
+    uri: 'file:///home/sean/codecast/recordings/session.codecast' as t.Uri,
+    defaultWorkspacePath: '/home/sean/workspace/dumdb' as t.AbsPath,
     duration: 662,
     views: 100,
     likes: 45,
@@ -150,7 +151,7 @@ class Codecast {
           this.player = await Player.populate(
             this.context,
             this.player.sessionSummary,
-            path.resolve(req.workspacePath),
+            path.abs(nodePath.resolve(req.workspacePath)),
           );
         }
         await this.player.start();
@@ -167,7 +168,7 @@ class Codecast {
             }
           }
           assert(req.workspacePath);
-          this.recorder = await Recorder.fromWorkspace(this.context, path.resolve(req.workspacePath));
+          this.recorder = await Recorder.fromWorkspace(this.context, path.abs(nodePath.resolve(req.workspacePath)));
         }
         await this.recorder.start();
         return this.respondWithStore();
@@ -219,15 +220,15 @@ class Codecast {
           canSelectFiles: req.options.canSelectFiles,
           canSelectFolders: req.options.canSelectFolders,
           canSelectMany: req.options.canSelectMany,
-          defaultUri: req.options.defaultUri && vscode.Uri.from(req.options.defaultUri),
+          defaultUri: req.options.defaultUri ? vscode.Uri.parse(req.options.defaultUri) : undefined,
           filters: req.options.filters,
           title: req.options.title,
         };
         const uris = await vscode.window.showOpenDialog(options);
-        return { type: 'uris', uris: uris?.map(misc.uriFromVsc) };
+        return { type: 'uris', uris: uris?.map(x => x.toString()) };
       }
       default: {
-        misc.unreachable(req);
+        lib.unreachable(req);
       }
     }
   }

@@ -1,10 +1,4 @@
 import { h, Fragment, Component } from 'preact';
-import { types as t, lib } from '@codecast/lib';
-import * as actions from './actions';
-import { updateStore } from './store';
-import { JsxElement } from 'typescript';
-import { EventEmitter } from 'vscode';
-// import type { WebviewApi } from 'vscode-webview';
 import _ from 'lodash';
 
 type SectionProps = {

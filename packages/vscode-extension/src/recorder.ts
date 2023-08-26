@@ -1,7 +1,8 @@
 import * as misc from './misc.js';
-import { types as t } from '@codecast/lib';
-import * as ir from './internal_representation.js';
+import { types as t, path, ir } from '@codecast/lib';
+import * as h from './vscode_helper.js';
 import * as vscode from 'vscode';
+import fs from 'fs';
 import _ from 'lodash';
 import assert from 'assert';
 
@@ -13,8 +14,8 @@ export interface RecorderI {
   pause(): void;
   stop(): Promise<void>;
   getClock(): number;
-  getWorkspacePath(): string | undefined;
-  getDefaultWorkspacePath(): string | undefined;
+  getWorkspacePath(): t.AbsPath | undefined;
+  getDefaultWorkspacePath(): t.AbsPath | undefined;
 }
 
 export class UninitializedRecorder implements RecorderI {
@@ -38,7 +39,7 @@ export class Recorder implements RecorderI {
 
   private disposables: vscode.Disposable[] = [];
   private scrolling: boolean = false;
-  private scrollStartRange?: vscode.Range;
+  private scrollStartRange?: t.Range;
   private startTimeMs: number = Date.now();
 
   constructor(public context: vscode.ExtensionContext, public session: ir.Session) {}
@@ -46,8 +47,8 @@ export class Recorder implements RecorderI {
   /**
    * workspacePath must be already resolved.
    */
-  static async fromWorkspace(context: vscode.ExtensionContext, workspacePath: string): Promise<Recorder> {
-    const session = await ir.Session.fromWorkspace(workspacePath);
+  static async fromWorkspace(context: vscode.ExtensionContext, workspacePath: t.AbsPath): Promise<Recorder> {
+    const session = await h.sessionFromWorkspace(workspacePath);
     return new Recorder(context, session);
   }
 
@@ -138,27 +139,22 @@ export class Recorder implements RecorderI {
 
     // const p = path.join(misc.getRecordingsPath(), moment().format('YYYY-MM-DD-HH:mm:ss'));
     const p = misc.getDefaultRecordingPath();
-    await this.session.writeToFile(p);
-    // vscode.window.showInformationMessage(`Saved to ${p}`);
+    await fs.promises.writeFile(p, JSON.stringify(this.session, null, 2), 'utf8');
   }
-
-  // shouldRecordDocument(vscTextDocument: vscode.TextDocument): boolean {
-  //   return Boolean(this.session.getPartialUri(vscTextDocument.uri));
-  // }
 
   textChange(
     vscTextDocument: vscode.TextDocument,
     vscContentChanges: readonly vscode.TextDocumentContentChangeEvent[],
   ) {
-    const uri = this.session.getPartialUri(vscTextDocument.uri);
-    if (!uri) return;
+    if (!h.shouldRecordVscUri(this.session.workspacePath, vscTextDocument.uri)) return;
 
+    const uri = h.uriFromVsc(this.session.workspacePath, vscTextDocument.uri);
     console.log(`adding textChange for ${uri}`);
 
     // Here, we assume that it is possible to get a textChange without a text editor
     // because vscode's event itself does not provide a text editor.
 
-    const irTextDocument = this.session.openTextDocument(vscTextDocument);
+    const irTextDocument = h.openTextDocumentFromVsc(this.session, vscTextDocument, uri);
     const irContentChanges = vscContentChanges.map(({ range, text }) => {
       const [revRange, revText] = irTextDocument.applyContentChange(range, text, true)!;
       return { range, text, revRange, revText };
@@ -173,12 +169,12 @@ export class Recorder implements RecorderI {
   }
 
   openDocument(vscTextDocument: vscode.TextDocument) {
-    const uri = this.session.getPartialUri(vscTextDocument.uri);
-    if (!uri) return;
+    if (!h.shouldRecordVscUri(this.session.workspacePath, vscTextDocument.uri)) return;
 
+    const uri = h.uriFromVsc(this.session.workspacePath, vscTextDocument.uri);
     console.log(`adding openDocument for ${uri}`);
 
-    const irTextDocument = this.session.openTextDocument(vscTextDocument);
+    const irTextDocument = h.openTextDocumentFromVsc(this.session, vscTextDocument, uri);
     this.pushEvent({
       type: 'openDocument',
       clock: this.getClock(),
@@ -188,18 +184,18 @@ export class Recorder implements RecorderI {
   }
 
   showTextEditor(vscTextEditor: vscode.TextEditor) {
-    const uri = this.session.getPartialUri(vscTextEditor.document.uri);
-    if (!uri) return;
+    if (!h.shouldRecordVscUri(this.session.workspacePath, vscTextEditor.document.uri)) return;
 
+    const uri = h.uriFromVsc(this.session.workspacePath, vscTextEditor.document.uri);
     console.log(`adding showTextEditor for ${uri}`);
 
     const revUri = this.session.activeTextEditor?.document.uri;
     const revSelections = this.session.activeTextEditor?.selections;
     const revVisibleRange = this.session.activeTextEditor?.visibleRange;
 
-    const selections = misc.duplicateSelections(vscTextEditor.selections);
-    const visibleRange = vscTextEditor.visibleRanges[0];
-    const irTextEditor = this.session.openTextEditor(vscTextEditor.document, selections, visibleRange);
+    const selections = h.selectionsFromVsc(vscTextEditor.selections);
+    const visibleRange = h.rangeFromVsc(vscTextEditor.visibleRanges[0]);
+    const irTextEditor = h.openTextEditorFromVsc(this.session, vscTextEditor.document, uri, selections, visibleRange);
     this.session.activeTextEditor = irTextEditor;
 
     this.pushEvent({
@@ -215,9 +211,9 @@ export class Recorder implements RecorderI {
   }
 
   select(vscTextEditor: vscode.TextEditor, selections: readonly vscode.Selection[]) {
-    const uri = this.session.getPartialUri(vscTextEditor.document.uri);
-    if (!uri) return;
+    if (!h.shouldRecordVscUri(this.session.workspacePath, vscTextEditor.document.uri)) return;
 
+    const uri = h.uriFromVsc(this.session.workspacePath, vscTextEditor.document.uri);
     console.log(`adding select for ${uri}`);
     console.log(
       `visibleRange: ${vscTextEditor.visibleRanges[0].start.line}:${vscTextEditor.visibleRanges[0].end.line}`,
@@ -226,7 +222,7 @@ export class Recorder implements RecorderI {
     const irTextEditor = this.session.getTextEditorByUri(uri);
     const revSelections = irTextEditor.selections;
     const revVisibleRanges = irTextEditor.visibleRange;
-    irTextEditor.select(misc.duplicateSelections(selections), vscTextEditor.visibleRanges[0]);
+    irTextEditor.select(h.selectionsFromVsc(selections), h.rangeFromVsc(vscTextEditor.visibleRanges[0]));
 
     this.pushEvent({
       type: 'select',
@@ -240,9 +236,9 @@ export class Recorder implements RecorderI {
   }
 
   saveTextDocument(vscTextDocument: vscode.TextDocument) {
-    const uri = this.session.getPartialUri(vscTextDocument.uri);
-    if (!uri) return;
+    if (!h.shouldRecordVscUri(this.session.workspacePath, vscTextDocument.uri)) return;
 
+    const uri = h.uriFromVsc(this.session.workspacePath, vscTextDocument.uri);
     console.log(`adding save for ${uri}`);
 
     this.pushEvent({
@@ -253,10 +249,10 @@ export class Recorder implements RecorderI {
   }
 
   scroll(vscTextEditor: vscode.TextEditor, visibleRanges: readonly vscode.Range[]) {
-    const uri = this.session.getPartialUri(vscTextEditor.document.uri);
-    if (!uri) return;
+    if (!h.shouldRecordVscUri(this.session.workspacePath, vscTextEditor.document.uri)) return;
 
-    const visibleRange = misc.duplicateRange(visibleRanges[0]);
+    const uri = h.uriFromVsc(this.session.workspacePath, vscTextEditor.document.uri);
+    const visibleRange = h.rangeFromVsc(visibleRanges[0]);
     console.log(`visible range: ${visibleRange.start.line}:${visibleRange.end.line}`);
 
     if (!this.scrolling) {
@@ -284,7 +280,7 @@ export class Recorder implements RecorderI {
     });
   }
 
-  getWorkspacePath(): string | undefined {
+  getWorkspacePath(): t.AbsPath | undefined {
     return this.session?.workspacePath;
   }
 
@@ -300,7 +296,7 @@ export class Recorder implements RecorderI {
     }
   }
 
-  pushEvent(e: ir.PlaybackEvent) {
+  pushEvent(e: t.PlaybackEvent) {
     if (e.type !== 'scroll') {
       this.scrolling = false;
       this.scrollStartRange = undefined;
@@ -309,6 +305,7 @@ export class Recorder implements RecorderI {
   }
 }
 
-function getDefaultWorkspacePath(): string | undefined {
-  return vscode.workspace.workspaceFolders?.[0].uri.path;
+function getDefaultWorkspacePath(): t.AbsPath | undefined {
+  const uri = vscode.workspace.workspaceFolders?.[0].uri;
+  return uri && uri.scheme === 'file' ? path.abs(uri.path) : undefined;
 }

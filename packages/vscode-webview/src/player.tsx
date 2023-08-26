@@ -1,11 +1,9 @@
 import { h, Fragment, Component } from 'preact';
-import { types as t, lib } from '@codecast/lib';
+import { types as t, path, lib } from '@codecast/lib';
 import FakeMedia from './fake-media.js';
 import Screen from './screen.js';
 import Section from './section.js';
 import * as actions from './actions.js';
-import { updateStore } from './store.js';
-import { EventEmitter } from 'vscode';
 // import type { WebviewApi } from 'vscode-webview';
 import _ from 'lodash';
 import moment from 'moment';
@@ -41,16 +39,17 @@ export default class Player extends Component<Props> {
 
   pickWorkspacePath = async () => {
     const p = await actions.showOpenDialog({
-      defaultUri: this.state.workspacePath ? { scheme: 'file', path: this.state.workspacePath } : undefined,
+      defaultUri: this.state.workspacePath ? path.fileUriFromAbsPath(this.state.workspacePath) : undefined,
       canSelectFolders: true,
       canSelectFiles: false,
       title: 'Select workspace folder',
     });
     if (p?.length === 1) {
-      if (p[0].scheme !== 'file') {
-        throw new Error(`pickWorkspacePath: only local paths are supported. Instead received ${p[0].scheme}`);
+      const parsedUri = path.parseUri(p[0]);
+      if (parsedUri.scheme !== 'file') {
+        throw new Error(`pickWorkspacePath: only local paths are supported. Instead received ${parsedUri.scheme}`);
       }
-      this.setState({ workspacePath: p[0].path });
+      this.setState({ workspacePath: parsedUri.path });
     }
   };
 

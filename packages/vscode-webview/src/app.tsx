@@ -1,14 +1,10 @@
 import { h, Fragment, Component } from 'preact';
 import { types as t, lib } from '@codecast/lib';
 import * as actions from './actions.js';
-import { updateStore } from './store.js';
 import Welcome from './welcome.jsx';
 import Recorder from './recorder.jsx';
 import Player from './player.jsx';
 
-import { JsxElement } from 'typescript';
-import { EventEmitter } from 'vscode';
-// import type { WebviewApi } from 'vscode-webview';
 import _ from 'lodash';
 
 type AppProps = {

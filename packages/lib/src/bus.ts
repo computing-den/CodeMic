@@ -37,6 +37,7 @@ export class Bus {
         const msg = await this.onMessage(parcel.msg);
         await this.postParcel({ id: parcel.id, msg });
       } catch (error: any) {
+        console.error(error);
         await this.postParcel({ id: parcel.id, error: error.message });
       }
     }

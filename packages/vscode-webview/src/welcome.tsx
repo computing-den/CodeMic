@@ -3,10 +3,6 @@ import { types as t, lib } from '@codecast/lib';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
 import * as actions from './actions';
-import { updateStore } from './store';
-import { JsxElement } from 'typescript';
-import { EventEmitter } from 'vscode';
-// import type { WebviewApi } from 'vscode-webview';
 import _ from 'lodash';
 import moment from 'moment';
 

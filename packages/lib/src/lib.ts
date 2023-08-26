@@ -1,5 +1,9 @@
 import _ from 'lodash';
 
+export function unreachable(arg: never, message: string = 'Unreachable'): never {
+  throw new Error(message);
+}
+
 export function timeout(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
