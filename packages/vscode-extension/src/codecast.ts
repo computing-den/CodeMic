@@ -19,7 +19,7 @@ const SESSIONS: t.SessionSummary[] = [
     },
     published: false,
     uri: 'file:///home/sean/codecast/recordings/session.codecast' as t.Uri,
-    defaultWorkspacePath: '/home/sean/workspace/dumdb' as t.AbsPath,
+    defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
     duration: 78,
     views: 0,
     likes: 0,
@@ -46,7 +46,7 @@ const SESSIONS: t.SessionSummary[] = [
     },
     published: false,
     uri: 'file:///home/sean/codecast/recordings/session.codecast' as t.Uri,
-    defaultWorkspacePath: '/home/sean/workspace/dumdb' as t.AbsPath,
+    defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
     duration: 4023,
     views: 0,
     likes: 0,
@@ -62,7 +62,7 @@ const SESSIONS: t.SessionSummary[] = [
     },
     published: true,
     uri: 'file:///home/sean/codecast/recordings/session.codecast' as t.Uri,
-    defaultWorkspacePath: '/home/sean/workspace/dumdb' as t.AbsPath,
+    defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
     duration: 62,
     views: 123,
     likes: 11,
@@ -79,7 +79,7 @@ const SESSIONS: t.SessionSummary[] = [
     },
     published: true,
     uri: 'file:///home/sean/codecast/recordings/session.codecast' as t.Uri,
-    defaultWorkspacePath: '/home/sean/workspace/dumdb' as t.AbsPath,
+    defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
     duration: 662,
     views: 100,
     likes: 45,
@@ -146,12 +146,12 @@ class Codecast {
       case 'play': {
         assert(this.player);
         if (this.player.status === t.PlayerStatus.Uninitialized) {
-          assert(req.workspacePath);
+          assert(req.root);
           assert(this.player.sessionSummary);
           this.player = await Player.populate(
             this.context,
             this.player.sessionSummary,
-            path.abs(nodePath.resolve(req.workspacePath)),
+            path.abs(nodePath.resolve(req.root)),
           );
         }
         await this.player.start();
@@ -167,8 +167,8 @@ class Codecast {
               return { type: 'error' };
             }
           }
-          assert(req.workspacePath);
-          this.recorder = await Recorder.fromWorkspace(this.context, path.abs(nodePath.resolve(req.workspacePath)));
+          assert(req.root);
+          this.recorder = await Recorder.fromDirAndVsc(this.context, path.abs(nodePath.resolve(req.root)));
         }
         await this.recorder.start();
         return this.respondWithStore();
@@ -297,8 +297,8 @@ class Codecast {
         status: this.recorder.status,
         duration: this.recorder.getClock(),
         name: 'Name (TODO)',
-        workspacePath: this.recorder.getWorkspacePath(),
-        defaultWorkspacePath: this.recorder.getDefaultWorkspacePath(),
+        root: this.recorder.getRoot(),
+        defaultRoot: this.recorder.getDefaultRoot(),
       },
       player: this.player && {
         sessionSummary: this.player.sessionSummary,

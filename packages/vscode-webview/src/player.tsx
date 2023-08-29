@@ -16,12 +16,12 @@ export default class Player extends Component<Props> {
 
   state = {
     localClock: 0,
-    workspacePath: this.props.store.player!.sessionSummary.defaultWorkspacePath,
+    root: this.props.store.player!.sessionSummary.defaultRoot,
   };
 
   startPlayer = async () => {
     if (this.props.store.player!.status === t.PlayerStatus.Uninitialized) {
-      await actions.startPlayer(this.state.workspacePath);
+      await actions.startPlayer(this.state.root);
     } else {
       if (this.isStoppedAlmostAtTheEnd()) await this.seek(0);
       await actions.startPlayer();
@@ -37,9 +37,9 @@ export default class Player extends Component<Props> {
     this.setState({ [target.dataset.field!]: target.value });
   };
 
-  pickWorkspacePath = async () => {
+  pickRoot = async () => {
     const p = await actions.showOpenDialog({
-      defaultUri: this.state.workspacePath ? path.fileUriFromAbsPath(this.state.workspacePath) : undefined,
+      defaultUri: this.state.root ? path.fileUriFromAbsPath(this.state.root) : undefined,
       canSelectFolders: true,
       canSelectFiles: false,
       title: 'Select workspace folder',
@@ -47,9 +47,9 @@ export default class Player extends Component<Props> {
     if (p?.length === 1) {
       const parsedUri = path.parseUri(p[0]);
       if (parsedUri.scheme !== 'file') {
-        throw new Error(`pickWorkspacePath: only local paths are supported. Instead received ${parsedUri.scheme}`);
+        throw new Error(`pickRoot: only local paths are supported. Instead received ${parsedUri.scheme}`);
       }
-      this.setState({ workspacePath: parsedUri.path });
+      this.setState({ root: parsedUri.path });
     }
   };
 
@@ -230,14 +230,9 @@ export default class Player extends Component<Props> {
             </div>
             <div className="forms">
               {player.status === t.PlayerStatus.Uninitialized && (
-                <vscode-text-field
-                  className="subsection"
-                  data-field="workspacePath"
-                  onChange={this.updateField}
-                  autofocus
-                >
+                <vscode-text-field className="subsection" data-field="root" onChange={this.updateField} autofocus>
                   Workspace
-                  <vscode-button slot="end" appearance="icon" title="Pick" onClick={this.pickWorkspacePath}>
+                  <vscode-button slot="end" appearance="icon" title="Pick" onClick={this.pickRoot}>
                     <span className="codicon codicon-search" />
                   </vscode-button>
                 </vscode-text-field>

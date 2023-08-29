@@ -21,8 +21,8 @@ export type FrontendRequest =
   | { type: 'openPlayer'; sessionId: string }
   | { type: 'openRecorder' }
   // | { type: 'askToCloseRecorder' }
-  | { type: 'play'; workspacePath?: AbsPath }
-  | { type: 'record'; workspacePath?: AbsPath }
+  | { type: 'play'; root?: AbsPath }
+  | { type: 'record'; root?: AbsPath }
   // | { type: 'closePlayer' }
   // | { type: 'closeRecorder' }
   | { type: 'pausePlayer' }
@@ -53,12 +53,12 @@ export type Store = {
   screen: Screen;
   welcome: Welcome;
 
-  // It is possible to have an uninitialized recorder which is still waiting for workspacePath and
+  // It is possible to have an uninitialized recorder which is still waiting for root and
   // possibly other fields to be filled out and workspace being scanned before starting.
   recorder: Recorder;
 
   // It is not possible to have even an uninitialized player without picking a session summary first.
-  // After picking a session summary, now we can have an uninitialized player until workspacePath is
+  // After picking a session summary, now we can have an uninitialized player until root is
   // selected and workspace is populated.
   player?: Player;
 
@@ -84,8 +84,8 @@ export type Recorder = {
   status: RecorderStatus;
   duration: number;
   name: string;
-  workspacePath?: AbsPath;
-  defaultWorkspacePath?: AbsPath;
+  root?: AbsPath;
+  defaultRoot?: AbsPath;
 };
 
 export enum PlayerStatus {
@@ -115,12 +115,19 @@ export type SessionSummary = {
   };
   published: boolean;
   uri: Uri;
-  defaultWorkspacePath?: AbsPath;
+  defaultRoot?: AbsPath;
   duration: number;
   views: number;
   likes: number;
   timestamp: string;
   toc?: TocItem[];
+};
+
+export type SessionJSON = {
+  summary: SessionSummary;
+  events: PlaybackEvent[];
+  initCheckpoint: Checkpoint;
+  defaultEol: EndOfLine;
 };
 
 export type OpenDialogOptions = {
@@ -205,19 +212,38 @@ export type ContentChange = {
   revText: string;
 };
 
-export interface Position {
+export type Position = {
   line: number;
   character: number;
-}
+};
 
-export interface Range {
+export type Range = {
   start: Position;
   end: Position;
-}
+};
 
-export interface Selection {
+export type Selection = {
   anchor: Position;
   active: Position;
-}
+};
+
+export type Checkpoint = {
+  textDocuments: CheckpointTextDocument[];
+  textEditors: CheckpointTextEditor[];
+  activeTextEditorUri?: Uri;
+};
+
+export type CheckpointTextDocument = {
+  uri: Uri;
+  text: string;
+};
+
+export type CheckpointTextEditor = {
+  uri: Uri;
+  selections: Selection[];
+  visibleRange: Range;
+  // = [{ anchor: { line: 0, character: 0 }, active: { line: 0, character: 0 } }],
+  // = { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },
+};
 
 export type EndOfLine = '\n' | '\r\n';

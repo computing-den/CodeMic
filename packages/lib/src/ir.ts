@@ -4,97 +4,67 @@ import * as lib from './lib.js';
 import * as path from './path.js';
 import assert from './assert.js';
 
-export class Position implements t.Position {
-  constructor(public line: number, public character: number) {}
-}
-
-export class Range implements t.Range {
-  constructor(public start: Position, public end: Position) {}
-}
-
-export class Selection implements t.Selection {
-  constructor(public anchor: Position, public active: Position) {}
-}
-
-export type EndOfLine = '\n' | '\r\n';
-
-export class Checkpoint {
-  constructor(
-    public textDocuments: CheckpointTextDocument[],
-    public textEditors: CheckpointTextEditor[],
-    public activeTextEditorUri?: t.Uri,
-  ) {}
-}
-
-export class CheckpointTextDocument {
-  constructor(public uri: t.Uri, public text: string) {}
-}
-
-export class CheckpointTextEditor {
-  constructor(public uri: t.Uri, public selections: Selection[], public visibleRange: Range) {}
-  // = [{ anchor: { line: 0, character: 0 }, active: { line: 0, character: 0 } }],
-  // = { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },
-}
-
 // Not every TextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
 export class Session {
   constructor(
-    public workspacePath: t.AbsPath,
-    public initCheckpoint: Checkpoint,
+    public root: t.AbsPath,
+    public initCheckpoint: t.Checkpoint,
     public events: t.PlaybackEvent[],
     public defaultEol: t.EndOfLine,
+    public summary: t.SessionSummary,
     public textDocuments: TextDocument[] = [],
     public textEditors: TextEditor[] = [],
     public activeTextEditor?: TextEditor,
   ) {}
 
   /**
-   * workspacePath must be already resolved.
+   * root must be already resolved.
    */
   static fromCheckpoint(
-    workspacePath: t.AbsPath,
-    checkpoint: Checkpoint,
+    root: t.AbsPath,
+    checkpoint: t.Checkpoint,
     events: t.PlaybackEvent[],
     defaultEol: t.EndOfLine,
+    summary: t.SessionSummary,
   ): Session {
-    const session = new Session(workspacePath, checkpoint, events, defaultEol);
+    const session = new Session(root, checkpoint, events, defaultEol, summary);
     session.restoreCheckpoint(checkpoint);
     return session;
   }
 
-  static fromJSON(workspacePath: t.AbsPath, json: JSON): Session {
-    // const events = playbackEventsFromPlain(plain.events);
-    // const checkpoint = Checkpoint.fromPlain(plain.initCheckpoint);
-    throw new Error('TODO: session.fromJSON()');
+  static fromJSON(root: t.AbsPath, json: t.SessionJSON): Session {
+    const { summary, events, initCheckpoint, defaultEol } = json;
+    const session = new Session(root, initCheckpoint, events, defaultEol, summary);
+    session.restoreCheckpoint(initCheckpoint);
+    return session;
   }
 
-  toJSON(): JSON {
-    throw new Error('TODO: session.toJSON()');
-    // return {
-    //   events: playbackEventsToPlain(this.events),
-    //   initCheckpoint: this.initCheckpoint.toPlain(),
-    // };
+  toJSON(): t.SessionJSON {
+    assert(this.summary);
+    return {
+      summary: this.summary,
+      events: this.events,
+      initCheckpoint: this.initCheckpoint,
+      defaultEol: this.defaultEol,
+    };
   }
 
-  toCheckpoint(): Checkpoint {
-    const textDocuments: CheckpointTextDocument[] = this.textDocuments.map(
-      d => new CheckpointTextDocument(d.uri, d.getText()),
+  toCheckpoint(): t.Checkpoint {
+    const textDocuments: t.CheckpointTextDocument[] = this.textDocuments.map(d =>
+      makeCheckpointTextDocument(d.uri, d.getText()),
     );
-
-    const textEditors: CheckpointTextEditor[] = this.textEditors.map(
-      e => new CheckpointTextEditor(e.document.uri, e.selections, e.visibleRange),
+    const textEditors: t.CheckpointTextEditor[] = this.textEditors.map(e =>
+      makeCheckpointTextEditor(e.document.uri, e.selections, e.visibleRange),
     );
-
     const activeTextEditorUri = this.activeTextEditor?.document.uri;
-
-    return new Checkpoint(textDocuments, textEditors, activeTextEditorUri);
+    return makeCheckpoint(textDocuments, textEditors, activeTextEditorUri);
   }
 
   /**
    * Modify the current session except for the events.
    */
-  restoreCheckpoint(checkpoint: Checkpoint) {
+  restoreCheckpoint(checkpoint: t.Checkpoint) {
     const textDocuments = checkpoint.textDocuments.map(d => TextDocument.fromText(d.uri, d.text, this.defaultEol));
     const textEditors = checkpoint.textEditors.map(e => {
       const textDocument = textDocuments.find(d => d.uri === e.uri);
@@ -148,11 +118,11 @@ export class Session {
   // }
 
   toWorkspaceUri(p: t.AbsPath): t.Uri {
-    return path.workspaceUriFromAbsPath(this.workspacePath, p);
+    return path.workspaceUriFromAbsPath(this.root, p);
   }
 
   // toAbsUri(uri: t.Uri): t.Uri {
-  //   return path.toAbsUri(this.workspacePath, uri);
+  //   return path.toAbsUri(this.root, uri);
   // }
 }
 
@@ -253,4 +223,51 @@ export class TextDocument {
 
     if (calcReverse) return [revRange!, revText!];
   }
+}
+
+export function makePosition(line: number, character: number): t.Position {
+  return { line, character };
+}
+
+export function makeRange(start: t.Position, end: t.Position): t.Range {
+  return { start, end };
+}
+
+export function makeRangeN(startLine: number, startCharacter: number, endLine: number, endCharacter: number): t.Range {
+  return { start: makePosition(startLine, startCharacter), end: makePosition(endLine, endCharacter) };
+}
+
+export function makeSelection(anchor: t.Position, active: t.Position): t.Selection {
+  return { anchor, active };
+}
+
+export function makeSelectionN(
+  anchorLine: number,
+  anchorCharacter: number,
+  activeLine: number,
+  activeCharacter: number,
+): t.Selection {
+  return { anchor: makePosition(anchorLine, anchorCharacter), active: makePosition(activeLine, activeCharacter) };
+}
+
+export function makeCheckpoint(
+  textDocuments: t.CheckpointTextDocument[],
+  textEditors: t.CheckpointTextEditor[],
+  activeTextEditorUri?: t.Uri,
+): t.Checkpoint {
+  return { textDocuments, textEditors, activeTextEditorUri };
+}
+
+export function makeCheckpointTextDocument(uri: t.Uri, text: string): t.CheckpointTextDocument {
+  return { uri, text };
+}
+
+export function makeCheckpointTextEditor(
+  uri: t.Uri,
+  selections: t.Selection[],
+  visibleRange: t.Range,
+): t.CheckpointTextEditor {
+  return { uri, selections, visibleRange };
+  // = [{ anchor: { line: 0, character: 0 }, active: { line: 0, character: 0 } }],
+  // = { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },
 }

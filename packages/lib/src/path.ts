@@ -15,6 +15,33 @@ export function fileUriFromAbsPath(p: t.AbsPath): t.Uri {
   return `file://${p}`;
 }
 
+export function isWorkspaceUri(uri: t.Uri): boolean {
+  return uri.startsWith('workspace:');
+}
+
+export function isFileUri(uri: t.Uri): boolean {
+  return uri.startsWith('file://');
+}
+
+export function isUntitledUri(uri: t.Uri): boolean {
+  return uri.startsWith('untitled:');
+}
+
+export function getWorkspaceUriPath(uri: t.Uri): t.RelPath {
+  assert(isWorkspaceUri(uri));
+  return uri.slice('workspace:'.length) as t.RelPath;
+}
+
+export function getFileUriPath(uri: t.Uri): t.AbsPath {
+  assert(isFileUri(uri));
+  return uri.slice('file://'.length) as t.AbsPath;
+}
+
+export function getUntitledUriName(uri: t.Uri): string {
+  assert(isUntitledUri(uri));
+  return uri.slice('untitled:'.length);
+}
+
 export function parseUri(uri: t.Uri): t.ParsedUri {
   if (uri.startsWith('workspace:')) {
     return { scheme: 'workspace', path: uri.slice('workspace:'.length) as t.RelPath };
@@ -24,6 +51,14 @@ export function parseUri(uri: t.Uri): t.ParsedUri {
     return { scheme: 'untitled', name: uri.slice('untitled:'.length) };
   }
   throw new Error(`parseUri: unknown URI scheme: ${uri}`);
+}
+
+/**
+ * Turns workspace URIs into file URIs. Doesn't touch other kinds of URIs.
+ */
+export function resolveUri(base: t.AbsPath, uri: t.Uri): t.Uri {
+  if (isWorkspaceUri(uri)) return fileUriFromAbsPath(join(base, getWorkspaceUriPath(uri)));
+  return uri;
 }
 
 // /**
