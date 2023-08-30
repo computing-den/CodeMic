@@ -446,7 +446,8 @@ ul.unstyled {
         background: var(--input-background);
         border: 0;
         color: var(--button-danger-color);
-        border: 1px solid var(--vscode-input-border);
+        border: 1px solid var(--button-danger-hover-color);
+        /* border: 1px solid var(--vscode-input-border); */
 
         &:hover {
           border: 1px solid var(--button-danger-hover-color);
@@ -455,7 +456,6 @@ ul.unstyled {
         }
         &::part(control):active,
         &::part(control):focus {
-          border: 1px solid var(--button-danger-hover-color);
           background: var(--input-background);
         }
       }

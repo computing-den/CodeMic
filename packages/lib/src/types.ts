@@ -52,14 +52,7 @@ export enum Screen {
 export type Store = {
   screen: Screen;
   welcome: Welcome;
-
-  // It is possible to have an uninitialized recorder which is still waiting for root and
-  // possibly other fields to be filled out and workspace being scanned before starting.
-  recorder: Recorder;
-
-  // It is not possible to have even an uninitialized player without picking a session summary first.
-  // After picking a session summary, now we can have an uninitialized player until root is
-  // selected and workspace is populated.
+  recorder?: Recorder;
   player?: Player;
 
   // welcome?: Welcome;

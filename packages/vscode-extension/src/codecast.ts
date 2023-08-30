@@ -1,6 +1,7 @@
 import * as misc from './misc.js';
-import { UninitializedRecorder, Recorder, RecorderI } from './recorder.js';
-import { UninitializedPlayer, Player, PlayerI } from './player.js';
+import Recorder from './recorder.js';
+import Player from './player.js';
+import Workspace from './workspace.js';
 import WebviewProvider from './webview_provider.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
@@ -87,10 +88,15 @@ const SESSIONS: t.SessionSummary[] = [
   },
 ];
 
+type PlayerSetup = {
+  sessionSummary: t.SessionSummary;
+};
+
 class Codecast {
   screen: t.Screen = t.Screen.Welcome;
-  recorder: RecorderI = new UninitializedRecorder();
-  player?: PlayerI;
+  recorder?: Recorder;
+  player?: Player;
+  playerSetup?: PlayerSetup;
   webview: WebviewProvider;
   sessionSummaries = {
     recent: [SESSIONS[0], SESSIONS[1], SESSIONS[2]],
@@ -126,7 +132,7 @@ class Codecast {
             _.find(this.sessionSummaries.featured, ['id', req.sessionId]);
           assert(sessionSummary);
 
-          this.player = new UninitializedPlayer(sessionSummary);
+          this.playerSetup = { sessionSummary };
           this.screen = t.Screen.Player;
         }
         return this.respondWithStore();
@@ -144,13 +150,12 @@ class Codecast {
       //   return this.respondWithStore();
       // }
       case 'play': {
-        assert(this.player);
-        if (this.player.status === t.PlayerStatus.Uninitialized) {
+        if (!this.player) {
+          assert(this.playerSetup?.sessionSummary);
           assert(req.root);
-          assert(this.player.sessionSummary);
           this.player = await Player.populate(
             this.context,
-            this.player.sessionSummary,
+            this.playerSetup.sessionSummary,
             path.abs(nodePath.resolve(req.root)),
           );
         }
@@ -158,7 +163,7 @@ class Codecast {
         return this.respondWithStore();
       }
       case 'record': {
-        if (this.recorder.status === t.RecorderStatus.Uninitialized) {
+        if (!this.recorder) {
           for (const vscTextDocument of vscode.workspace.textDocuments) {
             if (vscTextDocument.isDirty) {
               vscode.window.showInformationMessage(
@@ -182,7 +187,7 @@ class Codecast {
         return this.respondWithStore();
       }
       case 'pauseRecorder': {
-        this.recorder.pause();
+        this.recorder?.pause();
         return this.respondWithStore();
       }
       // case 'save': {
@@ -243,6 +248,7 @@ class Codecast {
   }
 
   async closeRecorder(): Promise<boolean> {
+    if (!this.recorder) return true;
     if (this.recorder.status === t.RecorderStatus.Recording) {
       const saveTitle = 'Save and exit';
       const answer = await vscode.window.showWarningMessage(
@@ -254,13 +260,14 @@ class Codecast {
       if (answer?.title !== saveTitle) return false;
     }
     await this.recorder.stop();
-    this.recorder = new UninitializedRecorder();
+    this.recorder = undefined;
     this.screen = t.Screen.Welcome;
     return true;
   }
 
   async closePlayer(): Promise<boolean> {
-    await this.player?.stop();
+    if (!this.player) return true;
+    await this.player.stop();
     this.player = undefined;
     this.screen = t.Screen.Welcome;
     return true;
@@ -288,23 +295,46 @@ class Codecast {
   }
 
   getStore(): t.Store {
+    let recorder: t.Recorder | undefined;
+    if (this.screen === t.Screen.Recorder && this.recorder) {
+      recorder = {
+        status: this.recorder.status,
+        duration: this.recorder.getClock(),
+        name: 'Name (TODO)',
+        root: this.recorder.getRoot(),
+        defaultRoot: Workspace.getDefaultRoot(),
+      };
+    } else if (this.screen === t.Screen.Recorder && !this.recorder) {
+      recorder = {
+        status: t.RecorderStatus.Uninitialized,
+        duration: 0,
+        name: 'Name (TODO)',
+        defaultRoot: Workspace.getDefaultRoot(),
+      };
+    }
+
+    let player: t.Player | undefined;
+    if (this.screen === t.Screen.Player && this.player) {
+      player = {
+        sessionSummary: this.player.workspace.session!.summary,
+        status: this.player.status,
+        clock: this.player.getClock(),
+      };
+    } else if (this.screen === t.Screen.Player && !this.player && this.playerSetup) {
+      player = {
+        sessionSummary: this.playerSetup.sessionSummary,
+        status: t.PlayerStatus.Uninitialized,
+        clock: 0,
+      };
+    }
+
     return {
       screen: this.screen,
       welcome: {
         ...this.sessionSummaries,
       },
-      recorder: {
-        status: this.recorder.status,
-        duration: this.recorder.getClock(),
-        name: 'Name (TODO)',
-        root: this.recorder.getRoot(),
-        defaultRoot: this.recorder.getDefaultRoot(),
-      },
-      player: this.player && {
-        sessionSummary: this.player.sessionSummary,
-        status: this.player.status,
-        clock: this.player.getClock(),
-      },
+      recorder,
+      player,
     };
   }
 }

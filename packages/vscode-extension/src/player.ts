@@ -9,29 +9,7 @@ enum Dir {
   Backwards,
 }
 
-export interface PlayerI {
-  status: t.PlayerStatus;
-  sessionSummary: t.SessionSummary;
-  start(): Promise<void>;
-  update(clock: number): Promise<void>;
-  pause(): void;
-  stop(): Promise<void>;
-  getClock(): number;
-}
-
-export class UninitializedPlayer implements PlayerI {
-  status = t.PlayerStatus.Uninitialized;
-  constructor(public sessionSummary: t.SessionSummary) {}
-  async start() {}
-  async update(clock: number) {}
-  pause() {}
-  async stop() {}
-  getClock() {
-    return 0;
-  }
-}
-
-export class Player implements PlayerI {
+class Player {
   status: t.PlayerStatus = t.PlayerStatus.Ready;
 
   private disposables: vscode.Disposable[] = [];
@@ -39,11 +17,7 @@ export class Player implements PlayerI {
   private clock: number = 0;
   private enqueueUpdate = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
-  constructor(
-    public context: vscode.ExtensionContext,
-    public workspace: Workspace,
-    public sessionSummary: t.SessionSummary,
-  ) {}
+  constructor(public context: vscode.ExtensionContext, public workspace: Workspace) {}
 
   /**
    * root must be already resolved.
@@ -56,7 +30,7 @@ export class Player implements PlayerI {
     assert(path.isFileUri(sessionSummary.uri), 'TODO only local files are currently supported.');
     const workspace = await Workspace.fromSessionFile(root, path.getFileUriPath(sessionSummary.uri));
     await workspace.syncSessionToVscodeAndDisk();
-    return new Player(context, workspace, sessionSummary);
+    return new Player(context, workspace);
   }
 
   async start() {
@@ -200,7 +174,7 @@ export class Player implements PlayerI {
       }
     }
 
-    this.clock = Math.max(0, Math.min(this.sessionSummary.duration, clock));
+    this.clock = Math.max(0, Math.min(this.workspace.session!.summary.duration, clock));
 
     if (this.eventIndex === n - 1) {
       await this.stop();
@@ -342,3 +316,5 @@ export class Player implements PlayerI {
     return this.clock;
   }
 }
+
+export default Player;

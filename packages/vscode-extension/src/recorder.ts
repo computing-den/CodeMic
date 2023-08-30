@@ -9,33 +9,7 @@ import { v4 as uuid } from 'uuid';
 
 const SCROLL_LINES_TRIGGER = 2;
 
-export interface RecorderI {
-  status: t.RecorderStatus;
-  start(): Promise<void>;
-  pause(): void;
-  stop(): Promise<void>;
-  getClock(): number;
-  getRoot(): t.AbsPath | undefined;
-  getDefaultRoot(): t.AbsPath | undefined;
-}
-
-export class UninitializedRecorder implements RecorderI {
-  status = t.RecorderStatus.Uninitialized;
-  async start() {}
-  pause() {}
-  async stop() {}
-  getClock() {
-    return 0;
-  }
-  getRoot() {
-    return undefined;
-  }
-  getDefaultRoot() {
-    return Workspace.getDefaultRoot();
-  }
-}
-
-export class Recorder implements RecorderI {
+class Recorder {
   status: t.RecorderStatus = t.RecorderStatus.Ready;
 
   private disposables: vscode.Disposable[] = [];
@@ -305,10 +279,6 @@ export class Recorder implements RecorderI {
     return this.workspace.root;
   }
 
-  getDefaultRoot() {
-    return Workspace.getDefaultRoot();
-  }
-
   getClock(): number {
     if (this.status === t.RecorderStatus.Recording) {
       return (Date.now() - this.startTimeMs) / 1000;
@@ -325,3 +295,5 @@ export class Recorder implements RecorderI {
     this.workspace.session!.events.push(e);
   }
 }
+
+export default Recorder;
