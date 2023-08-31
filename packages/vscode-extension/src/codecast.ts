@@ -3,90 +3,12 @@ import Recorder from './recorder.js';
 import Player from './player.js';
 import Workspace from './workspace.js';
 import WebviewProvider from './webview_provider.js';
+import Db from './db.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
 import { types as t, lib, path } from '@codecast/lib';
 import nodePath from 'path';
-
-const SESSIONS: t.SessionSummary[] = [
-  {
-    id: 'fd4659dd-150a-408b-aac3-1bc815a83be9',
-    title: 'DumDB part 2',
-    description: 'A small DB easy to use',
-    author: {
-      name: 'sean_shir',
-      avatar: 'avatar1.png',
-    },
-    published: false,
-    uri: 'file:///home/sean/codecast/recordings/session.codecast' as t.Uri,
-    defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
-    duration: 78,
-    views: 0,
-    likes: 0,
-    timestamp: '2023-07-08T14:22:35.344Z',
-    toc: [
-      { title: 'Intro', clock: 0 },
-      { title: 'Setting things up', clock: 3 },
-      { title: 'First function', clock: 8 },
-      { title: 'Second function', clock: 16 },
-      { title: 'Another thing here', clock: 100 },
-      { title: 'More stuff', clock: 200 },
-      { title: "Here's another topic", clock: 300 },
-      { title: 'And here is a very long topic that might not fit into a single line', clock: 4000 },
-      { title: 'Conclusion', clock: 8000 },
-    ],
-  },
-  {
-    id: '8cd503ae-108a-49e0-b33f-af1320f66a68',
-    title: 'cThruLisp',
-    description: 'An interesting take on lisp',
-    author: {
-      name: 'sean_shir',
-      avatar: 'avatar2.png',
-    },
-    published: false,
-    uri: 'file:///home/sean/codecast/recordings/session.codecast' as t.Uri,
-    defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
-    duration: 4023,
-    views: 0,
-    likes: 0,
-    timestamp: '2023-08-08T14:22:35.344Z',
-  },
-  {
-    id: '4167cb21-e47d-478c-a741-0e3f6c69079e',
-    title: 'DumDB part 1',
-    description: 'A small DB easy to use',
-    author: {
-      name: 'sean_shir',
-      avatar: 'https://cdn-icons-png.flaticon.com/512/924/924915.png',
-    },
-    published: true,
-    uri: 'file:///home/sean/codecast/recordings/session.codecast' as t.Uri,
-    defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
-    duration: 62,
-    views: 123,
-    likes: 11,
-    timestamp: '2023-06-06T14:22:35.344Z',
-  },
-  {
-    id: 'fa97abc4-d71d-4ff3-aebf-e5aadf77b3f7',
-    title: 'Some other project',
-    description:
-      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
-    author: {
-      name: 'jane',
-      avatar: 'avatar2.png',
-    },
-    published: true,
-    uri: 'file:///home/sean/codecast/recordings/session.codecast' as t.Uri,
-    defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
-    duration: 662,
-    views: 100,
-    likes: 45,
-    timestamp: '2023-08-06T10:22:35.344Z',
-  },
-];
 
 type PlayerSetup = {
   sessionSummary: t.SessionSummary;
@@ -98,13 +20,9 @@ class Codecast {
   player?: Player;
   playerSetup?: PlayerSetup;
   webview: WebviewProvider;
-  sessionSummaries = {
-    recent: [SESSIONS[0], SESSIONS[1], SESSIONS[2]],
-    workspace: [SESSIONS[0], SESSIONS[1]],
-    featured: [SESSIONS[2], SESSIONS[3]],
-  };
+  featuredSessions: t.SessionSummary[] = FEATURED_SESSIONS;
 
-  constructor(public context: vscode.ExtensionContext) {
+  constructor(public context: vscode.ExtensionContext, public db: Db) {
     context.subscriptions.push(vscode.commands.registerCommand('codecast.openView', this.openView.bind(this)));
 
     this.webview = new WebviewProvider(context.extensionUri, this.messageHandler.bind(this));
@@ -114,6 +32,10 @@ class Codecast {
         webviewOptions: { retainContextWhenHidden: true },
       }),
     );
+  }
+
+  static async fromContext(context: vscode.ExtensionContext): Promise<Codecast> {
+    return new Codecast(context, await Db.init());
   }
 
   async messageHandler(req: t.FrontendRequest): Promise<t.BackendResponse> {
@@ -126,12 +48,10 @@ class Codecast {
       }
       case 'openPlayer': {
         if (await this.closeCurrentScreen()) {
-          const sessionSummary =
-            _.find(this.sessionSummaries.recent, ['id', req.sessionId]) ||
-            _.find(this.sessionSummaries.workspace, ['id', req.sessionId]) ||
-            _.find(this.sessionSummaries.featured, ['id', req.sessionId]);
+          const sessionSummary = this.db.getSessionSummary(req.sessionId);
           assert(sessionSummary);
-
+          this.db.insertRecentSessionSummary(sessionSummary);
+          await this.db.write();
           this.playerSetup = { sessionSummary };
           this.screen = t.Screen.Player;
         }
@@ -155,6 +75,7 @@ class Codecast {
           assert(req.root);
           this.player = await Player.populate(
             this.context,
+            this.db,
             this.playerSetup.sessionSummary,
             path.abs(nodePath.resolve(req.root)),
           );
@@ -173,7 +94,7 @@ class Codecast {
             }
           }
           assert(req.root);
-          this.recorder = await Recorder.fromDirAndVsc(this.context, path.abs(nodePath.resolve(req.root)));
+          this.recorder = await Recorder.fromDirAndVsc(this.context, this.db, path.abs(nodePath.resolve(req.root)));
         }
         await this.recorder.start();
         return this.respondWithStore();
@@ -260,6 +181,12 @@ class Codecast {
       if (answer?.title !== saveTitle) return false;
     }
     await this.recorder.stop();
+    if (this.recorder.canSave()) {
+      await this.db.writeSession(this.recorder.workspace.session!.toJSON());
+      this.db.insertRecentSessionSummary(this.recorder.workspace.session!.summary);
+      this.db.insertWorkspaceSessionSummary(this.recorder.workspace.session!.summary);
+      await this.db.write();
+    }
     this.recorder = undefined;
     this.screen = t.Screen.Welcome;
     return true;
@@ -295,7 +222,7 @@ class Codecast {
   }
 
   getStore(): t.Store {
-    let recorder: t.Recorder | undefined;
+    let recorder: t.RecorderState | undefined;
     if (this.screen === t.Screen.Recorder && this.recorder) {
       recorder = {
         status: this.recorder.status,
@@ -313,7 +240,7 @@ class Codecast {
       };
     }
 
-    let player: t.Player | undefined;
+    let player: t.PlayerState | undefined;
     if (this.screen === t.Screen.Player && this.player) {
       player = {
         sessionSummary: this.player.workspace.session!.summary,
@@ -331,12 +258,90 @@ class Codecast {
     return {
       screen: this.screen,
       welcome: {
-        ...this.sessionSummaries,
+        recent: this.db.getRecentSessionSummaries(),
+        workspace: this.db.getWorkspaceSessionSummaries(),
+        featured: this.featuredSessions,
       },
       recorder,
       player,
     };
   }
 }
+
+// TODO delete this and fetch from internet
+const FEATURED_SESSIONS: t.SessionSummary[] = [
+  {
+    id: 'fd4659dd-150a-408b-aac3-1bc815a83be9',
+    title: 'DumDB part 2',
+    description: 'A small DB easy to use',
+    author: {
+      name: 'sean_shir',
+      avatar: 'avatar1.png',
+    },
+    published: false,
+    defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
+    duration: 78,
+    views: 0,
+    likes: 0,
+    timestamp: '2023-07-08T14:22:35.344Z',
+    toc: [
+      { title: 'Intro', clock: 0 },
+      { title: 'Setting things up', clock: 3 },
+      { title: 'First function', clock: 8 },
+      { title: 'Second function', clock: 16 },
+      { title: 'Another thing here', clock: 100 },
+      { title: 'More stuff', clock: 200 },
+      { title: "Here's another topic", clock: 300 },
+      { title: 'And here is a very long topic that might not fit into a single line', clock: 4000 },
+      { title: 'Conclusion', clock: 8000 },
+    ],
+  },
+  {
+    id: '8cd503ae-108a-49e0-b33f-af1320f66a68',
+    title: 'cThruLisp',
+    description: 'An interesting take on lisp',
+    author: {
+      name: 'sean_shir',
+      avatar: 'avatar2.png',
+    },
+    published: false,
+    defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
+    duration: 4023,
+    views: 0,
+    likes: 0,
+    timestamp: '2023-08-08T14:22:35.344Z',
+  },
+  {
+    id: '4167cb21-e47d-478c-a741-0e3f6c69079e',
+    title: 'DumDB part 1',
+    description: 'A small DB easy to use',
+    author: {
+      name: 'sean_shir',
+      avatar: 'https://cdn-icons-png.flaticon.com/512/924/924915.png',
+    },
+    published: true,
+    defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
+    duration: 62,
+    views: 123,
+    likes: 11,
+    timestamp: '2023-06-06T14:22:35.344Z',
+  },
+  {
+    id: 'fa97abc4-d71d-4ff3-aebf-e5aadf77b3f7',
+    title: 'Some other project',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+    author: {
+      name: 'jane',
+      avatar: 'avatar2.png',
+    },
+    published: true,
+    defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
+    duration: 662,
+    views: 100,
+    likes: 45,
+    timestamp: '2023-08-06T10:22:35.344Z',
+  },
+];
 
 export default Codecast;

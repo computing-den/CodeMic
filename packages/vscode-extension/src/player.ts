@@ -1,5 +1,6 @@
 import { types as t, path, lib, ir } from '@codecast/lib';
 import Workspace from './workspace.js';
+import Db from './db.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
@@ -17,20 +18,20 @@ class Player {
   private clock: number = 0;
   private enqueueUpdate = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
-  constructor(public context: vscode.ExtensionContext, public workspace: Workspace) {}
+  constructor(public context: vscode.ExtensionContext, public db: Db, public workspace: Workspace) {}
 
   /**
    * root must be already resolved.
    */
   static async populate(
     context: vscode.ExtensionContext,
+    db: Db,
     sessionSummary: t.SessionSummary,
     root: t.AbsPath,
   ): Promise<Player> {
-    assert(path.isFileUri(sessionSummary.uri), 'TODO only local files are currently supported.');
-    const workspace = await Workspace.fromSessionFile(root, path.getFileUriPath(sessionSummary.uri));
+    const workspace = await Workspace.fromSessionSummary(db, root, sessionSummary);
     await workspace.syncSessionToVscodeAndDisk();
-    return new Player(context, workspace);
+    return new Player(context, db, workspace);
   }
 
   async start() {

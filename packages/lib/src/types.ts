@@ -52,8 +52,8 @@ export enum Screen {
 export type Store = {
   screen: Screen;
   welcome: Welcome;
-  recorder?: Recorder;
-  player?: Player;
+  recorder?: RecorderState;
+  player?: PlayerState;
 
   // welcome?: Welcome;
   // login?: Login;
@@ -73,7 +73,7 @@ export enum RecorderStatus {
   Stopped,
 }
 
-export type Recorder = {
+export type RecorderState = {
   status: RecorderStatus;
   duration: number;
   name: string;
@@ -90,7 +90,7 @@ export enum PlayerStatus {
   Stopped,
 }
 
-export type Player = {
+export type PlayerState = {
   sessionSummary: SessionSummary;
   status: PlayerStatus;
   clock: number;
@@ -107,7 +107,7 @@ export type SessionSummary = {
     name: string;
   };
   published: boolean;
-  uri: Uri;
+  publishedUri?: Uri;
   defaultRoot?: AbsPath;
   duration: number;
   views: number;
@@ -115,6 +115,8 @@ export type SessionSummary = {
   timestamp: string;
   toc?: TocItem[];
 };
+
+export type SessionSummaryMap = { [key: string]: SessionSummary };
 
 export type SessionJSON = {
   summary: SessionSummary;
@@ -240,3 +242,8 @@ export type CheckpointTextEditor = {
 };
 
 export type EndOfLine = '\n' | '\r\n';
+
+export type Settings = {
+  history: string[];
+  workspace: string[];
+};

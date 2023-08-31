@@ -4,16 +4,20 @@ import * as vscode from 'vscode';
 
 let codecast: Codecast;
 
-export function activate(context: vscode.ExtensionContext) {
-  codecast = new Codecast(context);
+export async function activate(context: vscode.ExtensionContext) {
+  try {
+    codecast = await Codecast.fromContext(context);
 
-  // debug
-  //@ts-ignore
-  globalThis.context = context;
-  //@ts-ignore
-  globalThis.vscode = vscode;
-  //@ts-ignore
-  globalThis._ = _;
+    // debug
+    //@ts-ignore
+    globalThis.context = context;
+    //@ts-ignore
+    globalThis.vscode = vscode;
+    //@ts-ignore
+    globalThis._ = _;
+  } catch (error: any) {
+    vscode.window.showErrorMessage(error.message);
+  }
 }
 
 export function deactivate() {

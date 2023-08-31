@@ -1,5 +1,6 @@
 import Workspace from './workspace.js';
 import * as misc from './misc.js';
+import Db from './db.js';
 import { types as t, path, ir } from '@codecast/lib';
 import * as vscode from 'vscode';
 import fs from 'fs';
@@ -17,31 +18,30 @@ class Recorder {
   private scrollStartRange?: t.Range;
   private startTimeMs: number = Date.now();
 
-  constructor(public context: vscode.ExtensionContext, public workspace: Workspace) {}
+  constructor(public context: vscode.ExtensionContext, public db: Db, public workspace: Workspace) {}
 
   /**
    * root must be already resolved.
    */
-  static async fromDirAndVsc(context: vscode.ExtensionContext, root: t.AbsPath): Promise<Recorder> {
+  static async fromDirAndVsc(context: vscode.ExtensionContext, db: Db, root: t.AbsPath): Promise<Recorder> {
     const summary: t.SessionSummary = {
       id: uuid(),
       title: 'Untitled',
-      description: 'Not much here',
+      description: 'No description',
       author: {
         name: 'sean_shir',
         avatar: 'avatar1.png',
       },
       published: false,
-      uri: '',
       defaultRoot: root,
       duration: 0,
       views: 0,
       likes: 0,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString(), // will be overwritten at the end
       toc: [],
     };
     const workspace = await Workspace.fromDirAndVsc(root, summary);
-    return new Recorder(context, workspace);
+    return new Recorder(context, db, workspace);
   }
 
   async start() {
@@ -115,23 +115,18 @@ class Recorder {
 
   async stop() {
     if (this.workspace.session!.events.length > 0) {
-      this.pushEvent({
-        type: 'stop',
-        clock: this.getClock(),
-      });
+      const clock = this.getClock();
+      this.pushEvent({ type: 'stop', clock });
+      this.workspace.session!.summary.duration = clock;
+      this.workspace.session!.summary.timestamp = new Date().toISOString();
       this.status = t.RecorderStatus.Stopped;
-      await this.save();
     }
     this.dispose();
   }
 
-  async save() {
+  canSave(): boolean {
     // there must be more than a stop event
-    assert(this.workspace.session!.events.length > 1);
-
-    // const p = path.join(misc.getRecordingsPath(), moment().format('YYYY-MM-DD-HH:mm:ss'));
-    const p = misc.getDefaultRecordingPath();
-    await fs.promises.writeFile(p, JSON.stringify(this.workspace.session, null, 2), 'utf8');
+    return this.workspace.session!.events.length > 1;
   }
 
   textChange(

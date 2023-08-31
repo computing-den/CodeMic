@@ -91,24 +91,28 @@ export function resolveUri(base: t.AbsPath, uri: t.Uri): t.Uri {
 
 export const CUR_DIR = '.' as t.RelPath;
 
-export function rel(p: string | t.Path): t.RelPath {
-  const p2 = normalize(p);
-  assert(isRel(p2), `rel: given path is not relative: ${p}`);
-  return p2;
+export function rel(p: string, ...rest: string[]): t.RelPath {
+  p = normalize(p);
+  rest = rest.map(normalize);
+  assert(isRel(p), `abs: first part is not relative: ${p}`);
+  assert(rest.every(isRel), `abs: remaining parts must be relative, instead got: ${rest.join(', ')}`);
+  return join(p, ...rest);
 }
 
-export function abs(p: string | t.Path): t.AbsPath {
-  const p2 = normalize(p);
-  assert(isAbs(p2), `abs: given path is not absolute: ${p}`);
-  return p2;
+export function abs(p: string, ...rest: string[]): t.AbsPath {
+  p = normalize(p);
+  rest = rest.map(normalize);
+  assert(rest.every(isRel), `abs: remaining parts must be relative, instead got: ${rest.join(', ')}`);
+  assert(isAbs(p), `abs: first part is not absolute: ${p}`);
+  return join(p, ...rest);
 }
 
-export function isRel(p: t.Path): p is t.RelPath {
-  return p && p[0] !== '/';
+export function isRel(p: string): p is t.RelPath {
+  return Boolean(p && p[0] !== '/');
 }
 
-export function isAbs(p: t.Path): p is t.AbsPath {
-  return p && p[0] === '/';
+export function isAbs(p: string): p is t.AbsPath {
+  return Boolean(p && p[0] === '/');
 }
 
 /**

@@ -7,13 +7,13 @@ import { types as t } from '@codecast/lib';
 import _ from 'lodash';
 import assert from 'assert';
 
-export function getRecordingsPath(): t.AbsPath {
-  return path.join(os.homedir(), 'codecast', 'recordings') as t.AbsPath;
-}
+// export function getRecordingsPath(): t.AbsPath {
+//   return path.join(os.homedir(), 'codecast', 'recordings') as t.AbsPath;
+// }
 
-export function getDefaultRecordingPath(): t.AbsPath {
-  return path.join(getRecordingsPath(), 'session.codecast') as t.AbsPath;
-}
+// export function getDefaultRecordingPath(): t.AbsPath {
+//   return path.join(getRecordingsPath(), 'session.codecast') as t.AbsPath;
+// }
 
 export async function getGitAPI(): Promise<git.API> {
   const extension = vscode.extensions.getExtension('vscode.git') as vscode.Extension<git.GitExtension>;

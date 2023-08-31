@@ -2,6 +2,7 @@ import { types as t, path, ir, lib, assert } from '@codecast/lib';
 import os from 'os';
 import * as fs from 'fs';
 import * as misc from './misc.js';
+import Db from './db.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 
@@ -10,8 +11,8 @@ export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
 export default class Workspace {
   constructor(public root: t.AbsPath, public session?: ir.Session) {}
 
-  static async fromSessionFile(root: t.AbsPath, file: t.AbsPath): Promise<Workspace> {
-    const json = JSON.parse(await fs.promises.readFile(file, 'utf8'));
+  static async fromSessionSummary(db: Db, root: t.AbsPath, sessionSummary: t.SessionSummary): Promise<Workspace> {
+    const json = await db.readSession(sessionSummary.id);
     const session = ir.Session.fromJSON(root, json);
     return new Workspace(root, session);
   }
