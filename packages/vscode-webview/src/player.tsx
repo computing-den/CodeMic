@@ -16,12 +16,17 @@ export default class Player extends Component<Props> {
 
   state = {
     localClock: 0,
-    root: this.props.store.player!.sessionSummary.defaultRoot,
+    root: this.props.store.player!.history?.root,
   };
 
   startPlayer = async () => {
     if (this.props.store.player!.status === t.PlayerStatus.Uninitialized) {
-      await actions.startPlayer(this.state.root);
+      if (this.state.root) {
+        await actions.startPlayer(this.state.root);
+      } else {
+        // TODO show error to user
+        console.error('Select a workspace folder');
+      }
     } else {
       if (this.isStoppedAlmostAtTheEnd()) await this.seek(0);
       await actions.startPlayer();
@@ -188,8 +193,8 @@ export default class Player extends Component<Props> {
                   <img src={ss.author.avatar} />
                 </div>
                 <div className="card-content">
-                  <div className="title">{ss.title}</div>
-                  <div className="description">{ss.description}</div>
+                  <div className="title">{ss.title || 'Untitled'}</div>
+                  <div className="description">{ss.description || 'No description'}</div>
                   <div className="footer">
                     <span className="footer-item author">{ss.author.name}</span>
                     <span className="footer-item timestamp">{moment(ss.timestamp).fromNow()}</span>
@@ -230,7 +235,13 @@ export default class Player extends Component<Props> {
             </div>
             <div className="forms">
               {player.status === t.PlayerStatus.Uninitialized && (
-                <vscode-text-field className="subsection" data-field="root" onChange={this.updateField} autofocus>
+                <vscode-text-field
+                  className="subsection"
+                  data-field="root"
+                  onChange={this.updateField}
+                  value={this.state.root}
+                  autofocus
+                >
                   Workspace
                   <vscode-button slot="end" appearance="icon" title="Pick" onClick={this.pickRoot}>
                     <span className="codicon codicon-search" />

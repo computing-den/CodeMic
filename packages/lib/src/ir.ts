@@ -33,8 +33,8 @@ export class Session {
     return session;
   }
 
-  static fromJSON(root: t.AbsPath, json: t.SessionJSON): Session {
-    const { summary, events, initCheckpoint, defaultEol } = json;
+  static fromJSON(root: t.AbsPath, json: t.SessionJSON, summary: t.SessionSummary): Session {
+    const { events, initCheckpoint, defaultEol } = json;
     const session = new Session(root, initCheckpoint, events, defaultEol, summary);
     session.restoreCheckpoint(initCheckpoint);
     return session;
@@ -43,7 +43,6 @@ export class Session {
   toJSON(): t.SessionJSON {
     assert(this.summary);
     return {
-      summary: this.summary,
       events: this.events,
       initCheckpoint: this.initCheckpoint,
       defaultEol: this.defaultEol,

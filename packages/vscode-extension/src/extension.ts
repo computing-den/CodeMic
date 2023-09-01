@@ -16,10 +16,16 @@ export async function activate(context: vscode.ExtensionContext) {
     //@ts-ignore
     globalThis._ = _;
   } catch (error: any) {
+    console.error(error);
     vscode.window.showErrorMessage(error.message);
   }
 }
 
-export function deactivate() {
-  codecast?.deactivate();
+export async function deactivate() {
+  try {
+    await codecast?.deactivate();
+  } catch (error: any) {
+    console.error(error);
+    vscode.window.showErrorMessage(error.message);
+  }
 }

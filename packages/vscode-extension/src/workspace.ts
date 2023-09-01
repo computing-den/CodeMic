@@ -13,7 +13,7 @@ export default class Workspace {
 
   static async fromSessionSummary(db: Db, root: t.AbsPath, sessionSummary: t.SessionSummary): Promise<Workspace> {
     const json = await db.readSession(sessionSummary.id);
-    const session = ir.Session.fromJSON(root, json);
+    const session = ir.Session.fromJSON(root, json, sessionSummary);
     return new Workspace(root, session);
   }
 

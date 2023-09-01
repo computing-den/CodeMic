@@ -20,25 +20,35 @@ class Recorder {
 
   constructor(public context: vscode.ExtensionContext, public db: Db, public workspace: Workspace) {}
 
+  static makeSessionSummaryUIPart(): t.SessionSummaryUIPart {
+    return {
+      title: '',
+      description: '',
+      toc: [],
+    };
+  }
+
   /**
    * root must be already resolved.
    */
-  static async fromDirAndVsc(context: vscode.ExtensionContext, db: Db, root: t.AbsPath): Promise<Recorder> {
+  static async fromDirAndVsc(
+    context: vscode.ExtensionContext,
+    db: Db,
+    root: t.AbsPath,
+    sessionSummaryUIPart: t.SessionSummaryUIPart,
+  ): Promise<Recorder> {
     const summary: t.SessionSummary = {
+      ...sessionSummaryUIPart,
       id: uuid(),
-      title: 'Untitled',
-      description: 'No description',
       author: {
         name: 'sean_shir',
         avatar: 'avatar1.png',
       },
       published: false,
-      defaultRoot: root,
       duration: 0,
       views: 0,
       likes: 0,
       timestamp: new Date().toISOString(), // will be overwritten at the end
-      toc: [],
     };
     const workspace = await Workspace.fromDirAndVsc(root, summary);
     return new Recorder(context, db, workspace);

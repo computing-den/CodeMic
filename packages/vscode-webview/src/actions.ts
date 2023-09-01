@@ -7,8 +7,8 @@ export function init(_postMessage: (req: t.FrontendRequest) => Promise<t.Backend
   postMessage = _postMessage;
 }
 
-export async function startRecorder(root?: t.AbsPath) {
-  await postMessageAndUpdateStore({ type: 'record', root });
+export async function startRecorder(root?: t.AbsPath, sessionSummaryUIPart?: t.SessionSummaryUIPart) {
+  await postMessageAndUpdateStore({ type: 'record', root, sessionSummaryUIPart });
 }
 
 export async function pauseRecorder() {
@@ -39,10 +39,9 @@ export async function openRecorder() {
   await postMessageAndUpdateStore({ type: 'openRecorder' });
 }
 
-// export async function askToCloseRecorder(): Promise<boolean> {
-//   const res = await postMessageHelper({ type: 'askToCloseRecorder' }, 'boolean');
-//   return res.value;
-// }
+export async function updateRecorderSessionSummaryUIPart(sessionSummaryUIPart: t.SessionSummaryUIPart) {
+  await postMessageHelper({ type: 'updateRecorderSessionSummaryUIPart', sessionSummaryUIPart }, 'ok');
+}
 
 export async function startPlayer(root?: t.AbsPath) {
   await postMessageAndUpdateStore({ type: 'play', root });
@@ -51,10 +50,6 @@ export async function startPlayer(root?: t.AbsPath) {
 export async function pausePlayer() {
   await postMessageAndUpdateStore({ type: 'pausePlayer' });
 }
-
-// export async function closePlayer() {
-//   await postMessageAndUpdateStore({ type: 'closePlayer' });
-// }
 
 export async function seek(clock: number) {
   await postMessageAndUpdateStore({ type: 'seek', clock });

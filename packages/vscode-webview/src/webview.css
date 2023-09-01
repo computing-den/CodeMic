@@ -360,8 +360,8 @@ ul.unstyled {
       font-size: 0.9em;
       white-space: nowrap;
 
-      &.footer-item-title {
-        font-size: unset;
+      &:first-child {
+        min-width: 80px;
       }
 
       &.badge {

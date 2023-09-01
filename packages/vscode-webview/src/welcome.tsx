@@ -2,9 +2,9 @@ import { h, Fragment, Component } from 'preact';
 import { types as t, lib } from '@codecast/lib';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
+import TimeFromNow from './time_from_now.jsx';
 import * as actions from './actions';
 import _ from 'lodash';
-import moment from 'moment';
 
 type Props = { store: t.Store; onExit: () => void };
 export default class Welcome extends Component<Props> {
@@ -12,8 +12,10 @@ export default class Welcome extends Component<Props> {
   //   await actions.openPlayer(uri);
   // };
 
+  componentDidMount() {}
+
   render() {
-    const { recent, workspace, featured } = this.props.store.welcome;
+    const { workspace, featured, history } = this.props.store.welcome;
     return (
       <Screen className="welcome">
         <Section className="search-section">
@@ -24,9 +26,8 @@ export default class Welcome extends Component<Props> {
             </vscode-button>
           </Section.Body>
         </Section>
-        <SessionsSection title="RECENTLY WATCHED" sessions={recent} />
-        <SessionsSection title="WORKSPACE" sessions={workspace} />
-        <SessionsSection title="FEATURED" sessions={featured} />
+        <SessionsSection title="WORKSPACE" history={history} sessions={workspace} />
+        <SessionsSection title="FEATURED" history={history} sessions={featured} />
       </Screen>
     );
 
@@ -69,18 +70,27 @@ export default class Welcome extends Component<Props> {
 
 type SessionsSectionProps = {
   title: string;
-  sessions: t.SessionSummary[];
+  sessions: t.SessionSummaryMap;
+  history: t.SessionHistory;
   bordered?: boolean;
 };
 
+type SessionAndHistory = { session: t.SessionSummary; history?: t.SessionHistoryItem }[];
+
 class SessionsSection extends Component<SessionsSectionProps> {
   render() {
+    let sessionAndHistory: SessionAndHistory = _.map(this.props.sessions, session => ({
+      session,
+      history: this.props.history[session.id],
+    }));
+    sessionAndHistory = _.orderBy(sessionAndHistory, [({ history }) => history?.lastOpenedTimestamp || ''], ['desc']);
+
     return (
       <Section className="sessions-section" bordered={this.props.bordered}>
         <Section.Header title={this.props.title} collapsible />
         <Section.Body>
-          {this.props.sessions.map(session => (
-            <SessionItem session={session} />
+          {sessionAndHistory.map(({ session, history }) => (
+            <SessionItem history={history} session={session} />
           ))}
         </Section.Body>
       </Section>
@@ -90,6 +100,7 @@ class SessionsSection extends Component<SessionsSectionProps> {
 
 type SessionItemProps = {
   session: t.SessionSummary;
+  history?: t.SessionHistoryItem;
 };
 
 class SessionItem extends Component<SessionItemProps> {
@@ -98,20 +109,29 @@ class SessionItem extends Component<SessionItemProps> {
     actions.openPlayer(this.props.session.id);
   };
   render() {
-    const { session } = this.props;
+    const { session, history } = this.props;
+
     return (
       <div className="card card-bare card-with-media has-hover-actions session-item" onClick={this.openPlayer}>
         <div className="media">
           <img src={session.author.avatar} />
         </div>
         <div className="card-content">
-          <div className="title">{session.title}</div>
-          <div className="description">{session.description}</div>
+          <div className="title">{session.title || 'Untitled'}</div>
+          <div className="description">{session.description || 'No Description'}</div>
           <div className="footer">
-            <span className="footer-item author">{session.author.name}</span>
+            <span className="footer-item timestamp">
+              {history?.lastOpenedTimestamp ? (
+                <span>
+                  Last opened <TimeFromNow timestamp={history.lastOpenedTimestamp} />
+                </span>
+              ) : (
+                <TimeFromNow timestamp={session.timestamp} />
+              )}
+            </span>
           </div>
           <div className="footer">
-            <span className="footer-item timestamp">{moment(session.timestamp).fromNow()}</span>
+            <span className="footer-item author">{session.author.name}</span>
             <div className="footer-item badge">
               <span className="codicon codicon-eye va-top m-right_small" />
               <span className="count">{session.views}</span>

@@ -12,14 +12,13 @@ export default class Recorder extends Component<Props> {
 
   state = {
     localClock: 0,
-    root: this.props.store.recorder!.defaultRoot,
-    title: '',
-    description: '',
+    root: this.props.store.recorder!.history?.root || this.props.store.recorder!.defaultRoot,
+    sessionSummaryUIPart: this.props.store.recorder!.sessionSummaryUIPart,
   };
 
   startRecorder = async () => {
     if (this.props.store.recorder!.status === t.RecorderStatus.Uninitialized) {
-      await actions.startRecorder(this.state.root);
+      await actions.startRecorder(this.state.root, this.state.sessionSummaryUIPart);
     } else {
       await actions.startRecorder();
     }
@@ -29,10 +28,22 @@ export default class Recorder extends Component<Props> {
     await actions.pauseRecorder();
   };
 
-  updateField = (e: InputEvent) => {
+  updateSessionSummaryUIPartField = (e: InputEvent) => {
     const target = e.target as HTMLInputElement;
-    this.setState({ [target.dataset.field!]: target.value });
+    this.setState({
+      sessionSummaryUIPart: { ...this.state.sessionSummaryUIPart, [target.dataset.field!]: target.value },
+    });
+    this.sendSessionSummaryUpdate();
   };
+
+  sendSessionSummaryUpdate = _.throttle(
+    () => actions.updateRecorderSessionSummaryUIPart(this.state.sessionSummaryUIPart),
+    300,
+    {
+      leading: true,
+      trailing: true,
+    },
+  );
 
   pickRoot = async () => {
     const p = await actions.showOpenDialog({
@@ -91,7 +102,6 @@ export default class Recorder extends Component<Props> {
     const recorder = this.props.store.recorder!;
     const { status } = recorder;
 
-    const timeStr = lib.formatTimeSeconds(this.state.localClock);
     let toggleFn: () => void, toggleIcon: string;
     if (status === t.RecorderStatus.Uninitialized) {
       [toggleFn, toggleIcon] = [this.startRecorder, 'codicon-circle-large-filled'];
@@ -146,7 +156,7 @@ export default class Recorder extends Component<Props> {
             <vscode-text-field
               className="subsection"
               value={this.state.root}
-              onChange={this.updateField}
+              onChange={this.updateSessionSummaryUIPartField}
               data-field="root"
               disabled={status !== t.RecorderStatus.Uninitialized}
               autofocus
@@ -156,10 +166,13 @@ export default class Recorder extends Component<Props> {
                 <span className="codicon codicon-search" />
               </vscode-button>
             </vscode-text-field>
+            <p className="subsection help">
+              Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
+            </p>
             <vscode-text-field
               className="subsection"
-              value={this.state.title}
-              onChange={this.updateField}
+              value={this.state.sessionSummaryUIPart.title}
+              onChange={this.updateSessionSummaryUIPartField}
               data-field="title"
             >
               Title
@@ -168,15 +181,12 @@ export default class Recorder extends Component<Props> {
               className="subsection"
               rows={5}
               resize="vertical"
-              value={this.state.description}
-              onChange={this.updateField}
+              value={this.state.sessionSummaryUIPart.description}
+              onChange={this.updateSessionSummaryUIPartField}
               data-field="description"
             >
               Description
             </vscode-text-area>
-            <p className="subsection help">
-              Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
-            </p>
           </Section.Body>
         </Section>
       </Screen>

@@ -20,15 +20,11 @@ export type FrontendRequest =
   | { type: 'openWelcome' }
   | { type: 'openPlayer'; sessionId: string }
   | { type: 'openRecorder' }
-  // | { type: 'askToCloseRecorder' }
   | { type: 'play'; root?: AbsPath }
-  | { type: 'record'; root?: AbsPath }
-  // | { type: 'closePlayer' }
-  // | { type: 'closeRecorder' }
+  | { type: 'record'; root?: AbsPath; sessionSummaryUIPart?: SessionSummaryUIPart }
   | { type: 'pausePlayer' }
   | { type: 'pauseRecorder' }
-  // | { type: 'save' }
-  // | { type: 'discard' }
+  | { type: 'updateRecorderSessionSummaryUIPart'; sessionSummaryUIPart: SessionSummaryUIPart }
   | { type: 'playbackUpdate'; clock: number }
   | { type: 'getStore' }
   | { type: 'showOpenDialog'; options: OpenDialogOptions };
@@ -60,9 +56,9 @@ export type Store = {
 };
 
 export type Welcome = {
-  recent: SessionSummary[];
-  workspace: SessionSummary[];
-  featured: SessionSummary[];
+  workspace: SessionSummaryMap;
+  featured: SessionSummaryMap;
+  history: SessionHistory;
 };
 
 export enum RecorderStatus {
@@ -75,10 +71,10 @@ export enum RecorderStatus {
 
 export type RecorderState = {
   status: RecorderStatus;
-  duration: number;
-  name: string;
+  sessionSummaryUIPart: SessionSummaryUIPart;
   root?: AbsPath;
   defaultRoot?: AbsPath;
+  history?: SessionHistoryItem;
 };
 
 export enum PlayerStatus {
@@ -91,8 +87,9 @@ export enum PlayerStatus {
 }
 
 export type PlayerState = {
-  sessionSummary: SessionSummary;
   status: PlayerStatus;
+  sessionSummary: SessionSummary;
+  history?: SessionHistoryItem;
   clock: number;
 };
 
@@ -108,18 +105,22 @@ export type SessionSummary = {
   };
   published: boolean;
   publishedUri?: Uri;
-  defaultRoot?: AbsPath;
   duration: number;
   views: number;
   likes: number;
   timestamp: string;
-  toc?: TocItem[];
+  toc: TocItem[];
 };
 
 export type SessionSummaryMap = { [key: string]: SessionSummary };
 
+export type SessionSummaryUIPart = {
+  title: string;
+  description: string;
+  toc: TocItem[];
+};
+
 export type SessionJSON = {
-  summary: SessionSummary;
   events: PlaybackEvent[];
   initCheckpoint: Checkpoint;
   defaultEol: EndOfLine;
@@ -244,6 +245,16 @@ export type CheckpointTextEditor = {
 export type EndOfLine = '\n' | '\r\n';
 
 export type Settings = {
-  history: string[];
-  workspace: string[];
+  history: SessionHistory;
+};
+
+export type SessionHistory = { [key: string]: SessionHistoryItem };
+
+export type SessionHistoryItem = {
+  id: string;
+  lastOpenedTimestamp?: string; // opened in player / recorder
+  recordedTimestamp?: string;
+  lastWatchedTimestamp?: string;
+  lastWatchedClock?: number;
+  root?: AbsPath;
 };
