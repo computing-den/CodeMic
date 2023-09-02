@@ -39,8 +39,8 @@ export async function openPlayer(sessionId: string) {
   await postMessageAndUpdateStore({ type: 'openPlayer', sessionId });
 }
 
-export async function openRecorder() {
-  await postMessageAndUpdateStore({ type: 'openRecorder' });
+export async function openRecorder(sessionId?: string, fork?: boolean, forkClock?: number) {
+  await postMessageAndUpdateStore({ type: 'openRecorder', sessionId, fork, forkClock });
 }
 
 export async function updateRecorderSessionSummary(sessionSummary: t.SessionSummary) {

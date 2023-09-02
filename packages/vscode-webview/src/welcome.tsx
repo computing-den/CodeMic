@@ -108,6 +108,14 @@ class SessionItem extends Component<SessionItemProps> {
     e.stopPropagation();
     actions.openPlayer(this.props.session.id);
   };
+  editSession = (e: Event) => {
+    e.stopPropagation();
+    actions.openRecorder(this.props.session.id);
+  };
+  forkSession = (e: Event) => {
+    e.stopPropagation();
+    actions.openRecorder(this.props.session.id, true);
+  };
   render() {
     const { session, history } = this.props;
 
@@ -145,10 +153,18 @@ class SessionItem extends Component<SessionItemProps> {
             <vscode-button appearance="icon" title="Play" onClick={this.openPlayer}>
               <span className="codicon codicon-play" />
             </vscode-button>
-            <vscode-button appearance="icon" title="Continue recording and editing this session">
+            <vscode-button
+              appearance="icon"
+              title="Continue recording and editing this session"
+              onClick={this.editSession}
+            >
               <span className="codicon codicon-edit" />
             </vscode-button>
-            <vscode-button appearance="icon" title="Fork: create a new session based on this one">
+            <vscode-button
+              appearance="icon"
+              title="Fork: create a new session based on this one"
+              onClick={this.forkSession}
+            >
               <span className="codicon codicon-repo-forked" />
             </vscode-button>
             <vscode-button appearance="icon" title="Delete this session">

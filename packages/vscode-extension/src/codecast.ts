@@ -17,7 +17,9 @@ type PlayerSetup = {
 
 type RecorderSetup = {
   sessionSummary: t.SessionSummary;
-  fork: boolean;
+  baseSessionSummary?: t.SessionSummary;
+  fork?: boolean;
+  forkClock?: number;
 };
 
 class Codecast {
@@ -65,8 +67,15 @@ class Codecast {
       }
       case 'openRecorder': {
         if (await this.closeCurrentScreen()) {
-          const sessionSummary = Recorder.makeSessionSummary();
-          this.recorderSetup = { sessionSummary, fork: false };
+          let sessionSummary: t.SessionSummary;
+          let baseSessionSummary: t.SessionSummary | undefined;
+          if (req.sessionId) {
+            baseSessionSummary = this.db.sessionSummaries[req.sessionId];
+            sessionSummary = Recorder.makeSessionSummary(baseSessionSummary, req.fork);
+          } else {
+            sessionSummary = Recorder.makeSessionSummary();
+          }
+          this.recorderSetup = { sessionSummary, baseSessionSummary, fork: req.fork, forkClock: req.forkClock };
           this.screen = t.Screen.Recorder;
         }
 
@@ -118,6 +127,9 @@ class Codecast {
             this.db,
             path.abs(nodePath.resolve(req.root)),
             req.sessionSummary,
+            this.recorderSetup.baseSessionSummary,
+            this.recorderSetup.fork,
+            this.recorderSetup.forkClock,
           );
         }
         await this.recorder.start();

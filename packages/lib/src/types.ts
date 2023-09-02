@@ -19,7 +19,7 @@ export type FrontendRequest =
   | { type: 'seek'; clock: number }
   | { type: 'openWelcome' }
   | { type: 'openPlayer'; sessionId: string }
-  | { type: 'openRecorder' }
+  | { type: 'openRecorder'; sessionId?: string; fork?: boolean; forkClock?: number }
   | { type: 'play'; root?: AbsPath }
   | { type: 'record'; root?: AbsPath; sessionSummary?: SessionSummary }
   | { type: 'pausePlayer' }

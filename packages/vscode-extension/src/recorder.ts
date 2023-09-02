@@ -16,13 +16,13 @@ class Recorder {
   private disposables: vscode.Disposable[] = [];
   private scrolling: boolean = false;
   private scrollStartRange?: t.Range;
-  private startTimeMs: number = Date.now();
 
   constructor(
     public context: vscode.ExtensionContext,
     public db: Db,
     public workspace: Workspace,
     public isDirty: boolean,
+    private startTimeMs: number,
   ) {}
 
   /**
@@ -33,13 +33,25 @@ class Recorder {
     db: Db,
     root: t.AbsPath,
     sessionSummary: t.SessionSummary,
-    baseSession?: t.SessionJSON,
+    baseSessionSummary?: t.SessionSummary,
     fork?: boolean,
     forkAtClock?: number,
-  ): Promise<Recorder> {
-    const workspace = await Workspace.fromDirAndVsc(root, sessionSummary);
-    const isDirty = Boolean(!baseSession || (baseSession && fork));
-    return new Recorder(context, db, workspace, isDirty);
+  ): Promise<Recorder | undefined> {
+    assert(forkAtClock !== undefined, 'TODO fork at specific time.');
+
+    let workspace: Workspace | undefined;
+    let isDirty = true;
+    let startTimeMs: number;
+    if (baseSessionSummary) {
+      forkAtClock ??= sessionSummary.duration;
+      workspace = await Workspace.populateSessionSummary(db, sessionSummary, root, forkAtClock);
+      isDirty = Boolean(fork);
+      startTimeMs = Date.now() - baseSessionSummary.duration * 1000;
+    } else {
+      workspace = await Workspace.fromDirAndVsc(sessionSummary, root);
+      startTimeMs = Date.now();
+    }
+    return workspace && new Recorder(context, db, workspace, isDirty, startTimeMs);
   }
 
   static makeSessionSummary(base?: t.SessionSummary, fork?: boolean): t.SessionSummary {
