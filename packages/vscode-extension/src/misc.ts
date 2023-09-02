@@ -36,3 +36,13 @@ export function shortenPath(p: string): string {
     return path.join('~', rel);
   }
 }
+
+export async function fileExists(p: t.AbsPath): Promise<boolean> {
+  try {
+    await fs.promises.access(p);
+    return true;
+  } catch (error: any) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  return false;
+}

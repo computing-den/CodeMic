@@ -2,7 +2,7 @@ import { h, Fragment, Component } from 'preact';
 import { types as t, lib } from '@codecast/lib';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
-import TimeFromNow from './time_from_now.jsx';
+import TimeFromNow from './time_from_now.js';
 import * as actions from './actions';
 import _ from 'lodash';
 
@@ -126,7 +126,7 @@ class SessionItem extends Component<SessionItemProps> {
                   Last opened <TimeFromNow timestamp={history.lastOpenedTimestamp} />
                 </span>
               ) : (
-                <TimeFromNow timestamp={session.timestamp} />
+                <TimeFromNow timestamp={session.timestamp} capitalize />
               )}
             </span>
           </div>
@@ -145,10 +145,10 @@ class SessionItem extends Component<SessionItemProps> {
             <vscode-button appearance="icon" title="Play" onClick={this.openPlayer}>
               <span className="codicon codicon-play" />
             </vscode-button>
-            <vscode-button appearance="icon" title="Continue recording this session">
-              <span className="codicon codicon-device-camera-video" />
+            <vscode-button appearance="icon" title="Continue recording and editing this session">
+              <span className="codicon codicon-edit" />
             </vscode-button>
-            <vscode-button appearance="icon" title="Fork: record a new session at the end of this one">
+            <vscode-button appearance="icon" title="Fork: create a new session based on this one">
               <span className="codicon codicon-repo-forked" />
             </vscode-button>
             <vscode-button appearance="icon" title="Delete this session">

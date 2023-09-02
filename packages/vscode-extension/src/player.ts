@@ -4,6 +4,7 @@ import Db from './db.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
+import fs from 'fs';
 
 enum Dir {
   Forwards,
@@ -22,13 +23,33 @@ class Player {
 
   /**
    * root must be already resolved.
+   * May return undefined if user decides not to overwrite root or create it.
    */
   static async populate(
     context: vscode.ExtensionContext,
     db: Db,
     sessionSummary: t.SessionSummary,
     root: t.AbsPath,
-  ): Promise<Player> {
+  ): Promise<Player | undefined> {
+    try {
+      const files = await fs.promises.readdir(root);
+      if (files.length) {
+        // root exists and is a directory but it's not empty.
+        if (!(await shouldOverwriteRoot(root))) return undefined;
+      }
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        // root doesn't exist. Ask user if they want to create it.
+        if (!(await shouldCreateRoot(root))) return undefined;
+        await fs.promises.mkdir(root, { recursive: true });
+      } else if (code === 'ENOTDIR') {
+        // Exists, but it's not a directory
+        vscode.window.showErrorMessage(`"${root}" exists but it's not a folder.`);
+        return undefined;
+      }
+    }
+
     const workspace = await Workspace.fromSessionSummary(db, root, sessionSummary);
     await workspace.syncSessionToVscodeAndDisk();
     return new Player(context, db, workspace);
@@ -316,6 +337,32 @@ class Player {
   getClock(): number {
     return this.clock;
   }
+}
+
+async function shouldOverwriteRoot(root: t.AbsPath): Promise<boolean> {
+  const overwriteTitle = 'Overwrite';
+  const answer = await vscode.window.showWarningMessage(
+    `"${root}" is not empty. Do you want to overwrite it?`,
+    {
+      modal: true,
+      detail:
+        'All files in the folder will be overwritten except for those specified in .gitignore and .codecastignore.',
+    },
+    { title: overwriteTitle },
+    { title: 'Cancel', isCloseAffordance: true },
+  );
+  return answer?.title === overwriteTitle;
+}
+
+async function shouldCreateRoot(root: t.AbsPath): Promise<boolean> {
+  const createPathTitle = 'Create path';
+  const answer = await vscode.window.showWarningMessage(
+    `"${root}" does not exist. Do you want to create it?`,
+    { modal: true },
+    { title: createPathTitle },
+    { title: 'Cancel', isCloseAffordance: true },
+  );
+  return answer?.title === createPathTitle;
 }
 
 export default Player;

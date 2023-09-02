@@ -15,9 +15,15 @@ type PlayerSetup = {
   sessionSummary: t.SessionSummary;
 };
 
+type RecorderSetup = {
+  sessionSummary: t.SessionSummary;
+  fork: boolean;
+};
+
 class Codecast {
   screen: t.Screen = t.Screen.Welcome;
   recorder?: Recorder;
+  recorderSetup?: RecorderSetup;
   player?: Player;
   playerSetup?: PlayerSetup;
   webview: WebviewProvider;
@@ -59,35 +65,19 @@ class Codecast {
       }
       case 'openRecorder': {
         if (await this.closeCurrentScreen()) {
+          const sessionSummary = Recorder.makeSessionSummary();
+          this.recorderSetup = { sessionSummary, fork: false };
           this.screen = t.Screen.Recorder;
         }
+
         return this.respondWithStore();
       }
-      // case 'closePlayer': {
-      //   if (this.player) {
-      //     // nothing to do
-      //   }
-      //   return this.respondWithStore();
-      // }
       case 'play': {
         if (!this.player) {
           assert(req.root);
-          assert(this.playerSetup?.sessionSummary);
-          try {
-            await fs.promises.access(req.root);
-          } catch (error: any) {
-            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-            const createPathTitle = 'Create path';
-            const answer = await vscode.window.showWarningMessage(
-              `${req.root} does not exist. Do you want to create it?`,
-              { modal: true },
-              { title: createPathTitle },
-              { title: 'Cancel', isCloseAffordance: true },
-            );
-            if (answer?.title !== createPathTitle) throw new Error('Canceled');
-            await fs.promises.mkdir(req.root, { recursive: true });
-          }
+          assert(this.playerSetup);
 
+          // May return undefined if user decides not to overwrite root
           this.player = await Player.populate(
             this.context,
             this.db,
@@ -95,16 +85,19 @@ class Codecast {
             path.abs(nodePath.resolve(req.root)),
           );
         }
-        await this.player.start();
-        const session = this.player.workspace.session!;
-        const timestamp = new Date().toISOString();
-        this.db.mergeSessionHistory({
-          id: session.summary.id,
-          lastOpenedTimestamp: timestamp,
-          lastWatchedTimestamp: timestamp,
-          root: this.player.workspace.root,
-        });
-        await this.db.write();
+
+        if (this.player) {
+          await this.player.start();
+          const session = this.player.workspace.session!;
+          const timestamp = new Date().toISOString();
+          this.db.mergeSessionHistory({
+            id: session.summary.id,
+            lastOpenedTimestamp: timestamp,
+            lastWatchedTimestamp: timestamp,
+            root: this.player.workspace.root,
+          });
+          await this.db.write();
+        }
         return this.respondWithStore();
       }
       case 'record': {
@@ -118,12 +111,13 @@ class Codecast {
             }
           }
           assert(req.root);
-          assert(req.sessionSummaryUIPart);
+          assert(req.sessionSummary);
+          assert(this.recorderSetup);
           this.recorder = await Recorder.fromDirAndVsc(
             this.context,
             this.db,
             path.abs(nodePath.resolve(req.root)),
-            req.sessionSummaryUIPart,
+            req.sessionSummary,
           );
         }
         await this.recorder.start();
@@ -156,15 +150,11 @@ class Codecast {
         this.recorder.pause();
         return this.respondWithStore();
       }
-      // case 'save': {
-      //   if (this.recorder) {
-      //     this.recorder.save();
-      //     return this.respondWithStore();
-      //   } else {
-      //     vscode.window.showInformationMessage('Codecast is not recording.');
-      //     return { type: 'error' };
-      //   }
-      // }
+      case 'saveRecorder': {
+        assert(this.recorder);
+        await this.recorder.save();
+        return { type: 'ok' };
+      }
       // case 'discard': {
       //   if (this.recorder) {
       //     this.recorder.stop();
@@ -199,10 +189,12 @@ class Codecast {
         const uris = await vscode.window.showOpenDialog(options);
         return { type: 'uris', uris: uris?.map(x => x.toString()) };
       }
-      case 'updateRecorderSessionSummaryUIPart': {
-        // if there's no recorder, just ignore it, we'll receive sessionSummaryUIPart when recording starts
+      case 'updateRecorderSessionSummary': {
+        // if there's no recorder, just ignore it, we'll receive sessionSummary when recording starts
         if (this.recorder) {
-          Object.assign(this.recorder.workspace.session!, req.sessionSummaryUIPart);
+          this.recorder.setSessionSummary(req.sessionSummary);
+        } else {
+          this.recorderSetup!.sessionSummary = req.sessionSummary;
         }
         return { type: 'ok' };
       }
@@ -222,42 +214,66 @@ class Codecast {
   }
 
   async closeRecorder(): Promise<boolean> {
+    let shouldExit = true;
+
     if (this.recorder) {
-      if (this.recorder.status === t.RecorderStatus.Recording) {
-        const saveTitle = 'Save and exit';
+      const wasRecording = this.recorder.status === t.RecorderStatus.Recording;
+
+      // Pause the frontend while we figure out if we should save the session.
+      if (wasRecording) {
+        this.recorder.pause();
+        await this.webview.postMessageHelper({ type: 'updateStore', store: this.getStore() }, 'ok');
+      }
+
+      let shouldSave = !this.recorder.isSessionEmpty() && this.recorder.isDirty;
+      if (shouldSave) {
+        // Ask to save the session.
+        const saveTitle = 'Save';
+        const dontSaveTitle = "Don't Save";
+        const cancelTitle = 'Cancel';
         const answer = await vscode.window.showWarningMessage(
-          'Recording is in progress. Do you wish to stop the session?',
-          { modal: true, detail: 'The session will be saved if you stop recording.' },
+          'Do you wish to save this session?',
+          { modal: true, detail: "Your changes will be lost if you don't save them." },
           { title: saveTitle },
-          { title: 'Cancel', isCloseAffordance: true },
+          { title: cancelTitle, isCloseAffordance: true },
+          { title: dontSaveTitle },
         );
-        if (answer?.title !== saveTitle) return false;
+        shouldExit = answer?.title !== cancelTitle;
+        shouldSave = answer?.title === saveTitle;
       }
-      await this.recorder.stop();
-      if (this.recorder.canSave()) {
-        const session = this.recorder.workspace.session!;
-        await this.db.writeSession(session.toJSON(), session.summary);
-        this.db.mergeSessionHistory({
-          id: session.summary.id,
-          lastOpenedTimestamp: new Date().toISOString(),
-          recordedTimestamp: new Date().toISOString(),
-          root: session.root,
-        });
-        await this.db.write();
+
+      // If we want to exit recorder, stop intercepting editor events and if we want to save, inject a stop event into the session.
+      // Otherwise, resume recording if we were initially recording.
+      if (shouldExit) {
+        await this.recorder.stop(shouldSave);
+      } else if (wasRecording) {
+        this.recorder.start();
+        await this.webview.postMessageHelper({ type: 'updateStore', store: this.getStore() }, 'ok');
       }
-      this.recorder = undefined;
+
+      // Save
+      if (shouldSave) {
+        await this.recorder.save();
+      }
     }
 
-    this.screen = t.Screen.Welcome;
-    return true;
+    if (shouldExit) {
+      this.recorder = undefined;
+      this.recorderSetup = undefined;
+      this.screen = t.Screen.Welcome;
+      return true;
+    }
+
+    return false;
   }
 
   async closePlayer(): Promise<boolean> {
     if (this.player) {
       await this.player.stop();
-      this.player = undefined;
     }
 
+    this.playerSetup = undefined;
+    this.player = undefined;
     this.screen = t.Screen.Welcome;
     return true;
   }
@@ -288,14 +304,14 @@ class Codecast {
     if (this.screen === t.Screen.Recorder && this.recorder) {
       recorder = {
         status: this.recorder.status,
-        sessionSummaryUIPart: this.recorder.workspace.session!.summary,
+        sessionSummary: this.recorder.workspace.session!.summary,
         root: this.recorder.getRoot(),
         defaultRoot: Workspace.getDefaultRoot(),
       };
-    } else if (this.screen === t.Screen.Recorder && !this.recorder) {
+    } else if (this.screen === t.Screen.Recorder && !this.recorder && this.recorderSetup) {
       recorder = {
         status: t.RecorderStatus.Uninitialized,
-        sessionSummaryUIPart: Recorder.makeSessionSummaryUIPart(),
+        sessionSummary: this.recorderSetup.sessionSummary,
         defaultRoot: Workspace.getDefaultRoot(),
       };
     }

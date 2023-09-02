@@ -1,7 +1,8 @@
 import { h, Fragment, Component } from 'preact';
 import moment from 'moment';
+import _ from 'lodash';
 
-type Props = { timestamp: string };
+type Props = { timestamp: string; capitalize?: boolean };
 export default class TimeFromNow extends Component<Props> {
   updateInterval: any;
 
@@ -13,7 +14,8 @@ export default class TimeFromNow extends Component<Props> {
   };
 
   calc(): string {
-    return moment(this.props.timestamp).fromNow();
+    const text = moment(this.props.timestamp).fromNow();
+    return this.props.capitalize ? _.capitalize(text) : text;
   }
 
   componentDidMount() {

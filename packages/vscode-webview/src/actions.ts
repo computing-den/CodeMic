@@ -7,12 +7,16 @@ export function init(_postMessage: (req: t.FrontendRequest) => Promise<t.Backend
   postMessage = _postMessage;
 }
 
-export async function startRecorder(root?: t.AbsPath, sessionSummaryUIPart?: t.SessionSummaryUIPart) {
-  await postMessageAndUpdateStore({ type: 'record', root, sessionSummaryUIPart });
+export async function startRecorder(root?: t.AbsPath, sessionSummary?: t.SessionSummary) {
+  await postMessageAndUpdateStore({ type: 'record', root, sessionSummary });
 }
 
 export async function pauseRecorder() {
   await postMessageAndUpdateStore({ type: 'pauseRecorder' });
+}
+
+export async function saveRecorder() {
+  await postMessageHelper({ type: 'saveRecorder' }, 'ok');
 }
 
 // export async function closeRecorder() {
@@ -39,8 +43,8 @@ export async function openRecorder() {
   await postMessageAndUpdateStore({ type: 'openRecorder' });
 }
 
-export async function updateRecorderSessionSummaryUIPart(sessionSummaryUIPart: t.SessionSummaryUIPart) {
-  await postMessageHelper({ type: 'updateRecorderSessionSummaryUIPart', sessionSummaryUIPart }, 'ok');
+export async function updateRecorderSessionSummary(sessionSummary: t.SessionSummary) {
+  await postMessageHelper({ type: 'updateRecorderSessionSummary', sessionSummary }, 'ok');
 }
 
 export async function startPlayer(root?: t.AbsPath) {

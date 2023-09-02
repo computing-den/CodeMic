@@ -21,10 +21,11 @@ export type FrontendRequest =
   | { type: 'openPlayer'; sessionId: string }
   | { type: 'openRecorder' }
   | { type: 'play'; root?: AbsPath }
-  | { type: 'record'; root?: AbsPath; sessionSummaryUIPart?: SessionSummaryUIPart }
+  | { type: 'record'; root?: AbsPath; sessionSummary?: SessionSummary }
   | { type: 'pausePlayer' }
   | { type: 'pauseRecorder' }
-  | { type: 'updateRecorderSessionSummaryUIPart'; sessionSummaryUIPart: SessionSummaryUIPart }
+  | { type: 'saveRecorder' }
+  | { type: 'updateRecorderSessionSummary'; sessionSummary: SessionSummary }
   | { type: 'playbackUpdate'; clock: number }
   | { type: 'getStore' }
   | { type: 'showOpenDialog'; options: OpenDialogOptions };
@@ -35,7 +36,7 @@ export type BackendResponse =
   | { type: 'boolean'; value: boolean }
   | { type: 'uris'; uris?: Uri[] };
 
-export type BackendRequest = { type: 'error' };
+export type BackendRequest = { type: 'updateStore'; store: Store } | { type: 'todo' };
 export type FrontendResponse = { type: 'error' } | { type: 'ok' };
 
 export enum Screen {
@@ -71,7 +72,7 @@ export enum RecorderStatus {
 
 export type RecorderState = {
   status: RecorderStatus;
-  sessionSummaryUIPart: SessionSummaryUIPart;
+  sessionSummary: SessionSummary;
   root?: AbsPath;
   defaultRoot?: AbsPath;
   history?: SessionHistoryItem;
@@ -113,12 +114,6 @@ export type SessionSummary = {
 };
 
 export type SessionSummaryMap = { [key: string]: SessionSummary };
-
-export type SessionSummaryUIPart = {
-  title: string;
-  description: string;
-  toc: TocItem[];
-};
 
 export type SessionJSON = {
   events: PlaybackEvent[];

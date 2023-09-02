@@ -4,6 +4,8 @@ import _ from 'lodash';
 import { v4 as uuid } from 'uuid';
 import { types as t, bus as b } from '@codecast/lib';
 
+type HasType<R, T extends string> = R & { type: T };
+
 class WebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'codecast-view';
 
@@ -39,6 +41,36 @@ class WebviewProvider implements vscode.WebviewViewProvider {
   //   assert(this.bus);
   //   return this.bus.post(e) as Promise<t.FrontendResponse>;
   // }
+
+  // async function getStore() {
+  //   await ({ type: 'getStore' });
+  // }
+
+  postMessage(req: t.BackendRequest): Promise<t.FrontendResponse> {
+    return this.bus!.post(req) as Promise<t.FrontendResponse>;
+  }
+
+  async postMessageHelper<T extends string>(
+    req: t.BackendRequest,
+    expectedType: T,
+  ): Promise<HasType<t.FrontendResponse, T>> {
+    const res = await this.postMessage(req);
+    if (res.type === 'error') {
+      throw new Error(`Got error for request ${JSON.stringify(req)}`);
+    }
+    this.assertResType(req, res, expectedType);
+    return res;
+  }
+
+  assertResType<T extends string>(
+    req: t.BackendRequest,
+    res: t.FrontendResponse,
+    type: T,
+  ): asserts res is HasType<t.FrontendResponse, T> {
+    if (res.type !== type) {
+      throw new Error(`Unknown response for request: ${JSON.stringify(req)}: ${JSON.stringify(res)}`);
+    }
+  }
 
   private postParcel(parcel: b.Parcel): Promise<boolean> {
     assert(this.view);

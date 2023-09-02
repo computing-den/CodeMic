@@ -1,8 +1,8 @@
 import { h, render } from 'preact';
-import { types as t, bus as b } from '@codecast/lib';
+import { types as t, bus as b, lib } from '@codecast/lib';
 import { provideVSCodeDesignSystem, allComponents } from '@vscode/webview-ui-toolkit';
 import App from './app.js';
-import { getStore, listenToStore } from './store.js';
+import { getStore, updateStore, listenToStore } from './store.js';
 import * as actions from './actions.js';
 
 provideVSCodeDesignSystem().register(allComponents);
@@ -30,7 +30,16 @@ function postParcel(parcel: b.Parcel): Promise<boolean> {
 async function messageHandler(req: t.BackendRequest): Promise<t.FrontendResponse> {
   console.log('webview received: ', req);
 
-  // no backend requests to handle yet
-
-  return { type: 'ok' };
+  switch (req.type) {
+    case 'updateStore': {
+      updateStore(() => req.store);
+      return { type: 'ok' };
+    }
+    case 'todo': {
+      return { type: 'ok' };
+    }
+    default: {
+      lib.unreachable(req);
+    }
+  }
 }

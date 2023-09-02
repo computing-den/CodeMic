@@ -18,15 +18,12 @@ class Recorder {
   private scrollStartRange?: t.Range;
   private startTimeMs: number = Date.now();
 
-  constructor(public context: vscode.ExtensionContext, public db: Db, public workspace: Workspace) {}
-
-  static makeSessionSummaryUIPart(): t.SessionSummaryUIPart {
-    return {
-      title: '',
-      description: '',
-      toc: [],
-    };
-  }
+  constructor(
+    public context: vscode.ExtensionContext,
+    public db: Db,
+    public workspace: Workspace,
+    public isDirty: boolean,
+  ) {}
 
   /**
    * root must be already resolved.
@@ -35,23 +32,44 @@ class Recorder {
     context: vscode.ExtensionContext,
     db: Db,
     root: t.AbsPath,
-    sessionSummaryUIPart: t.SessionSummaryUIPart,
+    sessionSummary: t.SessionSummary,
+    baseSession?: t.SessionJSON,
+    fork?: boolean,
+    forkAtClock?: number,
   ): Promise<Recorder> {
-    const summary: t.SessionSummary = {
-      ...sessionSummaryUIPart,
-      id: uuid(),
-      author: {
-        name: 'sean_shir',
-        avatar: 'avatar1.png',
-      },
-      published: false,
-      duration: 0,
-      views: 0,
-      likes: 0,
-      timestamp: new Date().toISOString(), // will be overwritten at the end
-    };
-    const workspace = await Workspace.fromDirAndVsc(root, summary);
-    return new Recorder(context, db, workspace);
+    const workspace = await Workspace.fromDirAndVsc(root, sessionSummary);
+    const isDirty = Boolean(!baseSession || (baseSession && fork));
+    return new Recorder(context, db, workspace, isDirty);
+  }
+
+  static makeSessionSummary(base?: t.SessionSummary, fork?: boolean): t.SessionSummary {
+    if (base) {
+      return {
+        ...base,
+        id: fork ? uuid() : base.id,
+        author: {
+          name: 'sean_shir',
+          avatar: 'avatar1.png',
+        },
+        timestamp: new Date().toISOString(), // will be overwritten at the end
+      };
+    } else {
+      return {
+        id: uuid(),
+        title: '',
+        description: '',
+        author: {
+          name: 'sean_shir',
+          avatar: 'avatar1.png',
+        },
+        published: false,
+        duration: 0,
+        views: 0,
+        likes: 0,
+        timestamp: new Date().toISOString(), // will be overwritten at the end
+        toc: [],
+      };
+    }
   }
 
   async start() {
@@ -123,8 +141,9 @@ class Recorder {
     this.disposables = [];
   }
 
-  async stop() {
-    if (this.workspace.session!.events.length > 0) {
+  async stop(injectStopEvent: boolean) {
+    const lastEvent = _.last(this.workspace.session!.events);
+    if (injectStopEvent && lastEvent && lastEvent.type !== 'stop') {
       const clock = this.getClock();
       this.pushEvent({ type: 'stop', clock });
       this.workspace.session!.summary.duration = clock;
@@ -134,9 +153,38 @@ class Recorder {
     this.dispose();
   }
 
-  canSave(): boolean {
+  async save() {
+    // Inform user there was nothing to save
+    if (this.isSessionEmpty() || !this.isDirty) {
+      vscode.window.showInformationMessage('Nothing to save.');
+    } else {
+      const session = this.workspace.session!;
+      await this.db.writeSession(session.toJSON(), session.summary);
+      this.db.mergeSessionHistory({
+        id: session.summary.id,
+        lastOpenedTimestamp: new Date().toISOString(),
+        recordedTimestamp: new Date().toISOString(),
+        root: session.root,
+      });
+      await this.db.write();
+      // We can't set isDirty it to false here, because it doesn't inject the stop event.
+      // this.isDirty = false;
+      vscode.window.showInformationMessage('Saved session.');
+    }
+  }
+
+  setSessionSummary(sessionSummary: t.SessionSummary) {
+    this.isDirty = true;
+    this.workspace.session!.summary = sessionSummary;
+  }
+
+  isSessionEmpty(): boolean {
     // there must be more than a stop event
-    return this.workspace.session!.events.length > 1;
+    return (
+      !this.workspace.session ||
+      !this.workspace.session.events.length ||
+      this.workspace.session.events[0].type === 'stop'
+    );
   }
 
   textChange(
@@ -152,7 +200,8 @@ class Recorder {
     // because vscode's event itself does not provide a text editor.
 
     const irTextDocument = this.workspace.openTextDocumentFromVsc(vscTextDocument, uri);
-    const irContentChanges = vscContentChanges.map(({ range, text }) => {
+    const irContentChanges = vscContentChanges.map(({ range: vscRange, text }) => {
+      const range = this.workspace.rangeFromVsc(vscRange);
       const [revRange, revText] = irTextDocument.applyContentChange(range, text, true)!;
       return { range, text, revRange, revText };
     });
@@ -297,6 +346,7 @@ class Recorder {
       this.scrolling = false;
       this.scrollStartRange = undefined;
     }
+    this.isDirty = true;
     this.workspace.session!.events.push(e);
   }
 }

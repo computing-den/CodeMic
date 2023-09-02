@@ -47,6 +47,10 @@ body {
   flex-direction: column;
 }
 
+.bump-left {
+  margin-left: auto;
+}
+
 .screen {
   flex: 1;
   display: flex;
@@ -161,11 +165,24 @@ body {
       }
 
       .subsection.help {
-        margin-top: var(--spacing-x-small);
+        color: var(--input-placeholder-foreground);
+        margin-top: var(--spacing-small);
+        margin-bottom: var(--spacing-large);
         font-size: 0.9em;
         & code {
           font-size: inherit;
           color: inherit;
+        }
+      }
+
+      .subsection.buttons {
+        display: flex;
+
+        & vscode-button + vscode-button {
+          margin-left: var(--spacing-medium);
+        }
+        & vscode-button.bump-left {
+          margin-left: auto;
         }
       }
     }
@@ -282,6 +299,7 @@ ul.unstyled {
     .media {
       display: flex;
       align-items: flex-start;
+      flex-shrink: 0;
 
       & img {
         width: 42px;
@@ -291,6 +309,15 @@ ul.unstyled {
         margin-right: var(--spacing-large);
         border-radius: 50%;
         border: 1px solid var(--vscode-input-border);
+
+        @media (max-width: 200px) {
+          display: none;
+        }
+        @media (max-width: 250px) {
+          width: 24px;
+          height: 24px;
+          margin-right: var(--spacing-medium);
+        }
       }
     }
 

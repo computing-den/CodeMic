@@ -1,8 +1,9 @@
 import { h, Fragment, Component } from 'preact';
 import { types as t, path, lib } from '@codecast/lib';
-import FakeMedia from './fake-media.js';
-import Screen from './screen.js';
-import Section from './section.js';
+import FakeMedia from './fake-media.jsx';
+import TimeFromNow from './time_from_now.jsx';
+import Screen from './screen.jsx';
+import Section from './section.jsx';
 import * as actions from './actions.js';
 // import type { WebviewApi } from 'vscode-webview';
 import _ from 'lodash';
@@ -158,6 +159,7 @@ export default class Player extends Component<Props> {
 
   componentWillUnmount() {
     document.removeEventListener('mousemove', this.mouseMoved);
+    this.media.pause();
   }
 
   render() {
@@ -195,9 +197,14 @@ export default class Player extends Component<Props> {
                 <div className="card-content">
                   <div className="title">{ss.title || 'Untitled'}</div>
                   <div className="description">{ss.description || 'No description'}</div>
+
+                  <div className="footer">
+                    <span className="footer-item timestamp">
+                      <TimeFromNow timestamp={ss.timestamp} capitalize />
+                    </span>
+                  </div>
                   <div className="footer">
                     <span className="footer-item author">{ss.author.name}</span>
-                    <span className="footer-item timestamp">{moment(ss.timestamp).fromNow()}</span>
                     <div className="footer-item badge">
                       <span className="codicon codicon-eye va-top m-right_small" />
                       <span className="count">{ss.views}</span>
@@ -238,7 +245,7 @@ export default class Player extends Component<Props> {
                 <vscode-text-field
                   className="subsection"
                   data-field="root"
-                  onChange={this.updateField}
+                  onInput={this.updateField}
                   value={this.state.root}
                   autofocus
                 >

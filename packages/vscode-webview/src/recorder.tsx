@@ -12,13 +12,16 @@ export default class Recorder extends Component<Props> {
 
   state = {
     localClock: 0,
-    root: this.props.store.recorder!.history?.root || this.props.store.recorder!.defaultRoot,
-    sessionSummaryUIPart: this.props.store.recorder!.sessionSummaryUIPart,
+    root:
+      this.props.store.recorder!.root ||
+      this.props.store.recorder!.history?.root ||
+      this.props.store.recorder!.defaultRoot,
+    sessionSummary: this.props.store.recorder!.sessionSummary,
   };
 
   startRecorder = async () => {
     if (this.props.store.recorder!.status === t.RecorderStatus.Uninitialized) {
-      await actions.startRecorder(this.state.root, this.state.sessionSummaryUIPart);
+      await actions.startRecorder(this.state.root, this.state.sessionSummary);
     } else {
       await actions.startRecorder();
     }
@@ -28,16 +31,33 @@ export default class Recorder extends Component<Props> {
     await actions.pauseRecorder();
   };
 
-  updateSessionSummaryUIPartField = (e: InputEvent) => {
+  save = async () => {
+    await actions.saveRecorder();
+  };
+
+  updateRoot = (e: InputEvent) => {
     const target = e.target as HTMLInputElement;
+    console.log('updateRoot', target.value);
+    this.setState({ root: target.value });
+  };
+
+  updateSessionSummary = (e: InputEvent) => {
+    const target = e.target as HTMLInputElement;
+    console.log('updateSessionSummary: ', target.dataset.field, target.value);
     this.setState({
-      sessionSummaryUIPart: { ...this.state.sessionSummaryUIPart, [target.dataset.field!]: target.value },
+      sessionSummary: { ...this.state.sessionSummary, [target.dataset.field!]: target.value },
     });
     this.sendSessionSummaryUpdate();
   };
 
   sendSessionSummaryUpdate = _.throttle(
-    () => actions.updateRecorderSessionSummaryUIPart(this.state.sessionSummaryUIPart),
+    async () => {
+      try {
+        await actions.updateRecorderSessionSummary(this.state.sessionSummary);
+      } catch (error) {
+        console.error(error);
+      }
+    },
     300,
     {
       leading: true,
@@ -94,8 +114,13 @@ export default class Recorder extends Component<Props> {
   }
 
   componentDidMount() {
+    console.log('Recorder componentDidMount');
     this.enableOrDisableMedia();
     // this.props.setOnExit(this.onExit);
+  }
+
+  componentWillUnmount() {
+    this.media.pause();
   }
 
   render() {
@@ -153,10 +178,20 @@ export default class Recorder extends Component<Props> {
                 <span className="text large">{lib.formatTimeSeconds(this.state.localClock, true)}</span>
               </div>
             </div>
+            <div className="subsection buttons">
+              <vscode-button appearance="secondary">Open studio</vscode-button>
+              <vscode-button appearance="secondary" onClick={this.save}>
+                Save
+              </vscode-button>
+              <vscode-button className="bump-left" appearance="primary">
+                Publish
+              </vscode-button>
+            </div>
+            <p className="subsection help">Add audio and further adjustments in the studio.</p>
             <vscode-text-field
               className="subsection"
               value={this.state.root}
-              onChange={this.updateSessionSummaryUIPartField}
+              onInput={this.updateRoot}
               data-field="root"
               disabled={status !== t.RecorderStatus.Uninitialized}
               autofocus
@@ -171,8 +206,8 @@ export default class Recorder extends Component<Props> {
             </p>
             <vscode-text-field
               className="subsection"
-              value={this.state.sessionSummaryUIPart.title}
-              onChange={this.updateSessionSummaryUIPartField}
+              value={this.state.sessionSummary.title}
+              onInput={this.updateSessionSummary}
               data-field="title"
             >
               Title
@@ -181,8 +216,8 @@ export default class Recorder extends Component<Props> {
               className="subsection"
               rows={5}
               resize="vertical"
-              value={this.state.sessionSummaryUIPart.description}
-              onChange={this.updateSessionSummaryUIPartField}
+              value={this.state.sessionSummary.description}
+              onInput={this.updateSessionSummary}
               data-field="description"
             >
               Description

@@ -306,8 +306,11 @@ export default class Workspace {
       }
     }
 
-    const activeTextEditorUri =
-      vscode.window.activeTextEditor?.document.uri && this.uriFromVsc(vscode.window.activeTextEditor?.document.uri);
+    const activeTextEditorVscUri = vscode.window.activeTextEditor?.document.uri;
+    let activeTextEditorUri;
+    if (activeTextEditorVscUri && this.shouldRecordVscUri(activeTextEditorVscUri)) {
+      activeTextEditorUri = this.uriFromVsc(activeTextEditorVscUri);
+    }
 
     return ir.makeCheckpoint(textDocuments, textEditors, activeTextEditorUri);
   }
