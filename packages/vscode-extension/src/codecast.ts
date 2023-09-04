@@ -58,8 +58,6 @@ class Codecast {
         if (await this.closeCurrentScreen()) {
           const sessionSummary = this.db.sessionSummaries[req.sessionId];
           assert(sessionSummary);
-          this.db.mergeSessionHistory({ id: sessionSummary.id, lastOpenedTimestamp: new Date().toISOString() });
-          await this.db.write();
           this.playerSetup = { sessionSummary };
           this.screen = t.Screen.Player;
         }
@@ -97,15 +95,6 @@ class Codecast {
 
         if (this.player) {
           await this.player.start();
-          const session = this.player.workspace.session!;
-          const timestamp = new Date().toISOString();
-          this.db.mergeSessionHistory({
-            id: session.summary.id,
-            lastOpenedTimestamp: timestamp,
-            lastWatchedTimestamp: timestamp,
-            root: this.player.workspace.root,
-          });
-          await this.db.write();
         }
         return this.respondWithStore();
       }
@@ -132,34 +121,25 @@ class Codecast {
             this.recorderSetup.forkClock,
           );
         }
-        await this.recorder.start();
+
+        if (this.recorder) {
+          await this.recorder.start();
+        }
         return this.respondWithStore();
       }
       case 'seek': {
         assert(this.player);
         await this.player.update(req.clock);
-
-        this.db.mergeSessionHistory({
-          id: this.player.workspace.session!.summary.id,
-          lastWatchedClock: this.player.getClock(),
-        });
-        await this.db.writeDelayed();
-
         return this.respondWithStore();
       }
       case 'pausePlayer': {
         assert(this.player);
-        this.player.pause();
-        this.db.mergeSessionHistory({
-          id: this.player.workspace.session!.summary.id,
-          lastWatchedClock: this.player.getClock(),
-        });
-        await this.db.writeDelayed();
+        await this.player.pause();
         return this.respondWithStore();
       }
       case 'pauseRecorder': {
         assert(this.recorder);
-        this.recorder.pause();
+        await this.recorder.pause();
         return this.respondWithStore();
       }
       case 'saveRecorder': {
@@ -233,7 +213,7 @@ class Codecast {
 
       // Pause the frontend while we figure out if we should save the session.
       if (wasRecording) {
-        this.recorder.pause();
+        await this.recorder.pause();
         await this.webview.postMessageHelper({ type: 'updateStore', store: this.getStore() }, 'ok');
       }
 

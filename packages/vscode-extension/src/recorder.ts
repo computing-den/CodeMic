@@ -1,6 +1,6 @@
 import Workspace from './workspace.js';
 import * as misc from './misc.js';
-import Db from './db.js';
+import Db, { type WriteOptions } from './db.js';
 import { types as t, path, ir } from '@codecast/lib';
 import * as vscode from 'vscode';
 import fs from 'fs';
@@ -141,9 +141,11 @@ class Recorder {
 
     // register disposables
     this.context.subscriptions.push(...this.disposables);
+
+    await this.saveHistoryOpenClose();
   }
 
-  pause() {
+  async pause() {
     this.status = t.RecorderStatus.Paused;
     this.dispose();
   }
@@ -163,6 +165,7 @@ class Recorder {
       this.status = t.RecorderStatus.Stopped;
     }
     this.dispose();
+    await this.saveHistoryOpenClose();
   }
 
   async save() {
@@ -172,13 +175,7 @@ class Recorder {
     } else {
       const session = this.workspace.session!;
       await this.db.writeSession(session.toJSON(), session.summary);
-      this.db.mergeSessionHistory({
-        id: session.summary.id,
-        lastOpenedTimestamp: new Date().toISOString(),
-        recordedTimestamp: new Date().toISOString(),
-        root: session.root,
-      });
-      await this.db.write();
+      await this.saveHistoryOpenClose();
       // We can't set isDirty it to false here, because it doesn't inject the stop event.
       // this.isDirty = false;
       vscode.window.showInformationMessage('Saved session.');
@@ -353,13 +350,22 @@ class Recorder {
     }
   }
 
-  pushEvent(e: t.PlaybackEvent) {
+  private pushEvent(e: t.PlaybackEvent) {
     if (e.type !== 'scroll') {
       this.scrolling = false;
       this.scrollStartRange = undefined;
     }
     this.isDirty = true;
     this.workspace.session!.events.push(e);
+  }
+
+  private async saveHistoryOpenClose() {
+    this.db.mergeSessionHistory({
+      id: this.workspace.session!.summary.id,
+      lastRecordedTimestamp: new Date().toISOString(),
+      root: this.workspace.root,
+    });
+    await this.db.write();
   }
 }
 

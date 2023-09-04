@@ -8,6 +8,11 @@ export type DbData = {
   settings: t.Settings;
 };
 
+export type WriteOptions = {
+  ifDirtyForLong?: boolean;
+  waitMs?: number;
+};
+
 export default class Db {
   lastWriteTime = 0;
   constructor(public sessionSummaries: t.SessionSummaryMap, public settings: t.Settings) {}
@@ -19,16 +24,16 @@ export default class Db {
     return new Db(sessionSummaries, settings);
   }
 
-  write = lib.taskQueue(async () => {
+  write = lib.taskQueue(async (options?: WriteOptions) => {
+    const ifDirtyForLong = options?.ifDirtyForLong ?? false;
+    const waitMs = options?.waitMs ?? 5000;
+    if (ifDirtyForLong && Date.now() < this.lastWriteTime + waitMs) return;
+
     // If there are multiple files, stringify everything first before calling any async function
     const settingsStr = stringify(this.settings);
     await writeDataFile('settings.json', settingsStr);
     this.lastWriteTime = Date.now();
   });
-
-  async writeDelayed(maxDelayMs: number = 5000) {
-    if (Date.now() > this.lastWriteTime + maxDelayMs) this.write();
-  }
 
   async writeSession(session: t.SessionJSON, sessionSummary: t.SessionSummary) {
     // If there are multiple files, stringify everything first before calling any async function

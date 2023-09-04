@@ -1,6 +1,6 @@
 import { types as t, path, lib, ir } from '@codecast/lib';
 import Workspace from './workspace.js';
-import Db from './db.js';
+import Db, { type WriteOptions } from './db.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
@@ -57,6 +57,8 @@ class Player {
 
     // register disposables
     this.context.subscriptions.push(...this.disposables);
+
+    await this.saveHistoryOpenClose();
   }
 
   dispose() {
@@ -65,14 +67,16 @@ class Player {
     this.disposables = [];
   }
 
-  pause() {
+  async pause() {
     this.status = t.PlayerStatus.Paused;
     this.dispose();
+    await this.saveHistoryClock();
   }
 
   async stop() {
     this.status = t.PlayerStatus.Stopped;
     this.dispose();
+    await this.saveHistoryClock();
   }
 
   async update(clock: number) {
@@ -181,6 +185,9 @@ class Player {
     if (this.eventIndex === n - 1) {
       await this.stop();
     }
+
+    // save history
+    await this.saveHistoryClock({ ifDirtyForLong: true });
   }
 
   private async applyEvent(e: t.PlaybackEvent, dir: Dir) {
@@ -316,6 +323,23 @@ class Player {
 
   getClock(): number {
     return this.clock;
+  }
+
+  private async saveHistoryClock(options?: WriteOptions) {
+    this.db.mergeSessionHistory({
+      id: this.workspace.session!.summary.id,
+      lastWatchedClock: this.clock,
+    });
+    await this.db.write(options);
+  }
+
+  private async saveHistoryOpenClose() {
+    this.db.mergeSessionHistory({
+      id: this.workspace.session!.summary.id,
+      lastWatchedTimestamp: new Date().toISOString(),
+      root: this.workspace.root,
+    });
+    await this.db.write();
   }
 }
 

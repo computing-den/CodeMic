@@ -83,7 +83,11 @@ class SessionsSection extends Component<SessionsSectionProps> {
       session,
       history: this.props.history[session.id],
     }));
-    sessionAndHistory = _.orderBy(sessionAndHistory, [({ history }) => history?.lastOpenedTimestamp || ''], ['desc']);
+    sessionAndHistory = _.orderBy(
+      sessionAndHistory,
+      [({ history }) => (history && lib.getSessionHistoryItemLastOpenTimestamp(history)) || ''],
+      ['desc'],
+    );
 
     return (
       <Section className="sessions-section" bordered={this.props.bordered}>
@@ -119,6 +123,8 @@ class SessionItem extends Component<SessionItemProps> {
   render() {
     const { session, history } = this.props;
 
+    const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
+
     return (
       <div className="card card-bare card-with-media has-hover-actions session-item" onClick={this.openPlayer}>
         <div className="media">
@@ -129,9 +135,9 @@ class SessionItem extends Component<SessionItemProps> {
           <div className="description">{session.description || 'No Description'}</div>
           <div className="footer">
             <span className="footer-item timestamp">
-              {history?.lastOpenedTimestamp ? (
+              {lastOpenedTimestamp ? (
                 <span>
-                  Last opened <TimeFromNow timestamp={history.lastOpenedTimestamp} />
+                  Last opened <TimeFromNow timestamp={lastOpenedTimestamp} />
                 </span>
               ) : (
                 <TimeFromNow timestamp={session.timestamp} capitalize />

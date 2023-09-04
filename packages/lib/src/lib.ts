@@ -1,4 +1,5 @@
 import _ from 'lodash';
+import * as t from './types.js';
 
 export function unreachable(arg: never, message: string = 'Unreachable'): never {
   throw new Error(message);
@@ -82,4 +83,8 @@ export function formatTimeSeconds(time: number, full: boolean = false): string {
   const sStr = String(s).padStart(2, '0');
 
   return h || full ? `${hStr}:${mStr}:${sStr}` : `${mStr}:${sStr}`;
+}
+
+export function getSessionHistoryItemLastOpenTimestamp(h: t.SessionHistoryItem): string | undefined {
+  return _.max([h.lastRecordedTimestamp, h.lastWatchedTimestamp]);
 }

@@ -247,8 +247,7 @@ export type SessionHistory = { [key: string]: SessionHistoryItem };
 
 export type SessionHistoryItem = {
   id: string;
-  lastOpenedTimestamp?: string; // opened in player / recorder
-  recordedTimestamp?: string;
+  lastRecordedTimestamp?: string;
   lastWatchedTimestamp?: string;
   lastWatchedClock?: number;
   root?: AbsPath;
