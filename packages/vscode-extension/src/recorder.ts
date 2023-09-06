@@ -1,7 +1,7 @@
 import Workspace from './workspace.js';
 import * as misc from './misc.js';
 import Db, { type WriteOptions } from './db.js';
-import { types as t, path, ir } from '@codecast/lib';
+import { types as t, path, ir, lib } from '@codecast/lib';
 import * as vscode from 'vscode';
 import fs from 'fs';
 import _ from 'lodash';
@@ -208,10 +208,10 @@ class Recorder {
     // Here, we assume that it is possible to get a textChange without a text editor
     // because vscode's event itself does not provide a text editor.
 
-    const irTextDocument = this.workspace.openTextDocumentFromVsc(vscTextDocument, uri);
+    const irTextDocument = this.openDocumentWithUri(vscTextDocument, uri, false);
     const irContentChanges = vscContentChanges.map(({ range: vscRange, text }) => {
       const range = this.workspace.rangeFromVsc(vscRange);
-      const [revRange, revText] = irTextDocument.applyContentChange(range, text, true)!;
+      const [revRange, revText] = irTextDocument.applyContentChange(range, text, true);
       return { range, text, revRange, revText };
     });
 
@@ -229,13 +229,7 @@ class Recorder {
     const uri = this.workspace.uriFromVsc(vscTextDocument.uri);
     console.log(`adding openDocument for ${uri}`);
 
-    const irTextDocument = this.workspace.openTextDocumentFromVsc(vscTextDocument, uri);
-    this.pushEvent({
-      type: 'openDocument',
-      clock: this.getClock(),
-      uri,
-      eol: irTextDocument.eol,
-    });
+    this.openDocumentWithUri(vscTextDocument, uri, true);
   }
 
   showTextEditor(vscTextEditor: vscode.TextEditor) {
@@ -248,17 +242,17 @@ class Recorder {
     const revSelections = this.workspace.session!.activeTextEditor?.selections;
     const revVisibleRange = this.workspace.session!.activeTextEditor?.visibleRange;
 
-    const selections = this.workspace.selectionsFromVsc(vscTextEditor.selections);
-    const visibleRange = this.workspace.rangeFromVsc(vscTextEditor.visibleRanges[0]);
-    const irTextEditor = this.workspace.openTextEditorFromVsc(vscTextEditor.document, uri, selections, visibleRange);
+    // Possibly inserts an openDocument or textChange event if the document wasn't found in internal session or
+    // its contents were different.
+    const irTextEditor = this.openTextEditorHelper(vscTextEditor, uri, true);
     this.workspace.session!.activeTextEditor = irTextEditor;
 
     this.pushEvent({
       type: 'showTextEditor',
       clock: this.getClock(),
       uri,
-      selections,
-      visibleRange,
+      selections: irTextEditor.selections,
+      visibleRange: irTextEditor.visibleRange,
       revUri,
       revSelections,
       revVisibleRange,
@@ -366,6 +360,75 @@ class Recorder {
       root: this.workspace.root,
     });
     await this.db.write();
+  }
+
+  /**
+   * Inserts an 'openDocument' event only if session does not have the document open.
+   * When checkContent is true, it will compare the content of the vsc text document with that of the internal document
+   * and if they are different, it will update internal document and insert a textChange event.
+   * Even if openDocument was not emitted before, it might still exist in the internal session if it was scanned
+   * from the disk.
+   * So, 'openDocument' event always has the text field since if the document was already in checkpoint, no
+   * 'openDocument' event would be generated at all.
+   * Assumes a valid uri which has already been approved by this.workspace.shouldRecordVscUri().
+   */
+  private openDocumentWithUri(
+    vscTextDocument: vscode.TextDocument,
+    uri: t.Uri,
+    checkContent: boolean,
+  ): ir.TextDocument {
+    let irTextDocument = this.workspace.session!.findTextDocumentByUri(uri);
+
+    if (irTextDocument) {
+      if (checkContent) {
+        const linesMatch =
+          irTextDocument.lines.length === vscTextDocument.lineCount &&
+          irTextDocument.lines.every((line, i) => line === vscTextDocument.lineAt(i).text);
+        if (!linesMatch) {
+          // TOOD I think this might happen if the file is changed externally, but maybe vscode automatically
+          //      detects that and emits a textChange event, or maybe it'll emit a second openDocument.
+          //      What if it changed on disk before it was opened in vscode? vscode wouldn't be able to detect changes anyways.
+
+          const range = irTextDocument.getRange();
+          const text = vscTextDocument.getText();
+          const [revRange, revText] = irTextDocument.applyContentChange(range, text, true);
+          this.pushEvent({
+            type: 'textChange',
+            clock: this.getClock(),
+            uri,
+            contentChanges: [{ range, text, revRange, revText }],
+          });
+        }
+      }
+    } else {
+      irTextDocument = this.workspace.textDocumentFromVsc(vscTextDocument, uri);
+      this.workspace.session!.textDocuments.push(irTextDocument);
+      this.pushEvent({
+        type: 'openDocument',
+        clock: this.getClock(),
+        text: vscTextDocument.getText(),
+        uri,
+        eol: irTextDocument.eol,
+      });
+    }
+    return irTextDocument;
+  }
+
+  /**
+   * It does not push a showTextEditor event but it might push an 'openDocument' or a 'textChange' event.
+   */
+  private openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri, checkContent: boolean): ir.TextEditor {
+    const selections = this.workspace.selectionsFromVsc(vscTextEditor.selections);
+    const visibleRange = this.workspace.rangeFromVsc(vscTextEditor.visibleRanges[0]);
+    const textDocument = this.openDocumentWithUri(vscTextEditor.document, uri, checkContent);
+    let textEditor = this.workspace.session!.findTextEditorByUri(textDocument.uri);
+    if (!textEditor) {
+      textEditor = new ir.TextEditor(textDocument, selections, visibleRange);
+      this.workspace.session!.textEditors.push(textEditor);
+    } else {
+      textEditor.select(selections, visibleRange);
+    }
+    return textEditor;
   }
 }
 

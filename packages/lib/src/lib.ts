@@ -88,3 +88,26 @@ export function formatTimeSeconds(time: number, full: boolean = false): string {
 export function getSessionHistoryItemLastOpenTimestamp(h: t.SessionHistoryItem): string | undefined {
   return _.max([h.lastRecordedTimestamp, h.lastWatchedTimestamp]);
 }
+
+export function dispatchPlaybackEvent(
+  applier: t.ApplyPlaybackEvent,
+  e: t.PlaybackEvent,
+  direction: t.Direction,
+): Promise<void> {
+  switch (e.type) {
+    case 'stop':
+      return applier.applyStopEvent(e, direction);
+    case 'textChange':
+      return applier.applyTextChangeEvent(e, direction);
+    case 'openDocument':
+      return applier.applyOpenDocumentEvent(e, direction);
+    case 'showTextEditor':
+      return applier.applyShowTextEditorEvent(e, direction);
+    case 'select':
+      return applier.applySelectEvent(e, direction);
+    case 'scroll':
+      return applier.applyScrollEvent(e, direction);
+    case 'save':
+      return applier.applySaveEvent(e, direction);
+  }
+}

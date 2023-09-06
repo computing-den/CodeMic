@@ -134,7 +134,7 @@ export type PlaybackEvent =
   | StopEvent
   | TextChangeEvent
   | OpenDocumentEvent
-  | ShowTextEditor
+  | ShowTextEditorEvent
   | SelectEvent
   | ScrollEvent
   | SaveEvent;
@@ -156,11 +156,11 @@ export type OpenDocumentEvent = {
   type: 'openDocument';
   clock: number;
   uri: Uri;
-  // text: string;
+  text: string;
   eol: EndOfLine;
 };
 
-export type ShowTextEditor = {
+export type ShowTextEditorEvent = {
   type: 'showTextEditor';
   clock: number;
   uri: Uri;
@@ -195,6 +195,21 @@ export type SaveEvent = {
   clock: number;
   uri: Uri;
 };
+
+export enum Direction {
+  Forwards,
+  Backwards,
+}
+
+export interface ApplyPlaybackEvent {
+  applyStopEvent(e: StopEvent, direction: Direction): Promise<void>;
+  applyTextChangeEvent(e: TextChangeEvent, direction: Direction): Promise<void>;
+  applyOpenDocumentEvent(e: OpenDocumentEvent, direction: Direction): Promise<void>;
+  applyShowTextEditorEvent(e: ShowTextEditorEvent, direction: Direction): Promise<void>;
+  applySelectEvent(e: SelectEvent, direction: Direction): Promise<void>;
+  applyScrollEvent(e: ScrollEvent, direction: Direction): Promise<void>;
+  applySaveEvent(e: SaveEvent, direction: Direction): Promise<void>;
+}
 
 export type ContentChange = {
   range: Range;

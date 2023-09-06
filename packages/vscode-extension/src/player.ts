@@ -6,12 +6,7 @@ import _ from 'lodash';
 import assert from 'assert';
 import fs from 'fs';
 
-enum Dir {
-  Forwards,
-  Backwards,
-}
-
-class Player {
+class Player implements t.ApplyPlaybackEvent {
   status: t.PlayerStatus = t.PlayerStatus.Ready;
 
   private disposables: vscode.Disposable[] = [];
@@ -87,6 +82,148 @@ class Player {
       console.error(error);
       this.pause();
     }
+  }
+
+  async applyPlaybackEvent(e: t.PlaybackEvent, direction: t.Direction) {
+    console.log(`Applying ${t.Direction[direction]}: `, JSON.stringify(e));
+    return lib.dispatchPlaybackEvent(this, e, direction);
+  }
+
+  async applyStopEvent(e: t.StopEvent, direction: t.Direction) {
+    await this.stop();
+  }
+
+  async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction) {
+    if (e.contentChanges.length > 1) {
+      throw new Error('applyTextChangeEvent: TODO textChange does not yet support contentChanges.length > 1');
+    }
+
+    // Apply to session
+    await this.workspace.session!.applyTextChangeEvent(e, direction);
+
+    // We use WorkspaceEdit here because we don't necessarily want to focus on the text editor yet.
+    // There will be a separate select event after this if the editor had focus during recording.
+
+    const vscUri = this.workspace.uriToVsc(e.uri);
+    const edit = new vscode.WorkspaceEdit();
+    if (direction === t.Direction.Forwards) {
+      for (const cc of e.contentChanges) {
+        edit.replace(vscUri, this.workspace.rangeToVsc(cc.range), cc.text);
+      }
+    } else {
+      for (const cc of e.contentChanges) {
+        // TODO shouldn't we apply these in reverse order?
+        edit.replace(vscUri, this.workspace.rangeToVsc(cc.revRange), cc.revText);
+      }
+    }
+    await vscode.workspace.applyEdit(edit);
+  }
+
+  /**
+   * 'openDocument' event always has the text field since if the document was already in checkpoint, no
+   * 'openDocument' event would be generated at all.
+   */
+  async applyOpenDocumentEvent(e: t.OpenDocumentEvent, direction: t.Direction) {
+    if (direction === t.Direction.Forwards) {
+      // Apply to session
+      await this.workspace.session!.applyOpenDocumentEvent(e, direction);
+
+      // Open vsc document first.
+      const vscTextDocument = await vscode.workspace.openTextDocument(this.workspace.uriToVsc(e.uri));
+
+      // We use WorkspaceEdit here because we don't necessarily want to open the text editor yet.
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(vscTextDocument.uri, this.workspace.getVscTextDocumentRange(vscTextDocument), e.text);
+      await vscode.workspace.applyEdit(edit);
+    } else {
+      await this.workspace.closeVscTextEditorByUri(e.uri, true);
+    }
+  }
+
+  async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction) {
+    await this.workspace.session!.applyShowTextEditorEvent(e, direction);
+
+    if (direction === t.Direction.Forwards) {
+      const vscTextEditor = await vscode.window.showTextDocument(this.workspace.uriToVsc(e.uri), {
+        preview: false,
+        preserveFocus: false,
+      });
+      vscTextEditor.selections = this.workspace.selectionsToVsc(e.selections);
+      await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
+    } else if (e.revUri) {
+      const vscTextEditor = await vscode.window.showTextDocument(this.workspace.uriToVsc(e.revUri), {
+        preview: false,
+        preserveFocus: false,
+      });
+      vscTextEditor.selections = this.workspace.selectionsToVsc(e.revSelections!);
+      await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange!.start.line, at: 'top' });
+    }
+  }
+
+  async applySelectEvent(e: t.SelectEvent, direction: t.Direction) {
+    await this.workspace.session!.applySelectEvent(e, direction);
+
+    const vscTextEditor = await vscode.window.showTextDocument(this.workspace.uriToVsc(e.uri), {
+      preview: false,
+      preserveFocus: false,
+    });
+
+    if (direction === t.Direction.Forwards) {
+      vscTextEditor.selections = this.workspace.selectionsToVsc(e.selections);
+      await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
+    } else {
+      vscTextEditor.selections = this.workspace.selectionsToVsc(e.revSelections);
+      await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
+    }
+  }
+
+  async applyScrollEvent(e: t.ScrollEvent, direction: t.Direction) {
+    await this.workspace.session!.applyScrollEvent(e, direction);
+
+    await vscode.window.showTextDocument(this.workspace.uriToVsc(e.uri), { preview: false, preserveFocus: false });
+
+    if (direction === t.Direction.Forwards) {
+      await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
+    } else {
+      await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
+    }
+  }
+
+  async applySaveEvent(e: t.SaveEvent, direction: t.Direction) {
+    const vscTextDocument = await vscode.workspace.openTextDocument(this.workspace.uriToVsc(e.uri));
+    if (!(await vscTextDocument.save())) {
+      throw new Error(`Could not save ${e.uri}`);
+    }
+  }
+
+  getClock(): number {
+    return this.clock;
+  }
+
+  /**
+   * Note that the lifecycle of the returned document from vscode.workspace.openTextDocument() is owned
+   * by the editor and not by the extension. That means an onDidClose event can occur at any time after opening it.
+   * We probably should not cache the vscTextDocument itself.
+   */
+  // private async openVscTextDocumentByUri(uri: t.Uri): Promise<vscode.TextDocument> {
+  //   return await vscode.workspace.openTextDocument(this.workspace.uriToVsc(uri));
+  // }
+
+  private async saveHistoryClock(options?: WriteOptions) {
+    this.db.mergeSessionHistory({
+      id: this.workspace.session!.summary.id,
+      lastWatchedClock: this.clock,
+    });
+    await this.db.write(options);
+  }
+
+  private async saveHistoryOpenClose() {
+    this.db.mergeSessionHistory({
+      id: this.workspace.session!.summary.id,
+      lastWatchedTimestamp: new Date().toISOString(),
+      root: this.workspace.root,
+    });
+    await this.db.write();
   }
 
   private async updateImmediately(clock: number) {
@@ -169,13 +306,13 @@ class Player {
     if (i < 0 || clock > clockAt(i)) {
       // go forwards
       for (i = i + 1; i < n && clock >= clockAt(i); i++) {
-        await this.applyEvent(this.workspace.session!.events[i], Dir.Forwards);
+        await this.applyPlaybackEvent(this.workspace.session!.events[i], t.Direction.Forwards);
         this.eventIndex = i;
       }
     } else if (clock < clockAt(i)) {
       // go backwards
       for (; i >= 0 && clock <= clockAt(i); i--) {
-        await this.applyEvent(this.workspace.session!.events[i], Dir.Backwards);
+        await this.applyPlaybackEvent(this.workspace.session!.events[i], t.Direction.Backwards);
         this.eventIndex = i - 1;
       }
     }
@@ -188,158 +325,6 @@ class Player {
 
     // save history
     await this.saveHistoryClock({ ifDirtyForLong: true });
-  }
-
-  private async applyEvent(e: t.PlaybackEvent, dir: Dir) {
-    console.log(`Applying ${Dir[dir]}: `, JSON.stringify(e));
-
-    switch (e.type) {
-      case 'stop': {
-        await this.stop();
-        break;
-      }
-      case 'textChange': {
-        if (e.contentChanges.length > 1) {
-          throw new Error('applyEvent: textChange does not yet support contentChanges.length > 1');
-        }
-
-        // Here, we assume that it is possible to get a textChange without a text editor
-        // because vscode's event itself does not provide a text editor.
-
-        const irTextDocument = this.workspace.session!.getTextDocumentByUri(e.uri);
-        const vscTextDocument = await this.workspace.openVscTextDocumentByUri(e.uri);
-        const vscTextEditor =
-          this.workspace.findVscTextEditorByUri(vscode.window.visibleTextEditors, e.uri) ||
-          (await vscode.window.showTextDocument(vscTextDocument, { preserveFocus: true }));
-
-        if (dir === Dir.Forwards) {
-          for (const cc of e.contentChanges) {
-            irTextDocument.applyContentChange(cc.range, cc.text, false);
-            await vscTextEditor.edit(editBuilder => {
-              editBuilder.replace(this.workspace.rangeToVsc(cc.range), cc.text);
-            });
-          }
-        } else {
-          for (const cc of e.contentChanges) {
-            irTextDocument.applyContentChange(cc.revRange, cc.revText, false);
-            await vscTextEditor.edit(editBuilder => {
-              editBuilder.replace(this.workspace.rangeToVsc(cc.revRange), cc.revText);
-            });
-          }
-        }
-
-        break;
-      }
-      case 'openDocument': {
-        if (dir === Dir.Forwards) {
-          const vscTextDocument = await this.workspace.openVscTextDocumentByUri(e.uri);
-          // const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument, { preserveFocus: true });
-          // await vscTextEditor.edit(editBuilder => {
-          //   editBuilder.replace(misc.getWholeTextDocumentRange(vscTextDocument), e.text);
-          // });
-          this.workspace.openTextDocumentFromVsc(vscTextDocument, e.uri);
-        } else {
-          // nothing
-        }
-        break;
-      }
-      case 'showTextEditor': {
-        if (dir === Dir.Forwards) {
-          const vscTextDocument = await this.workspace.openVscTextDocumentByUri(e.uri);
-          const irTextEditor = this.workspace.openTextEditorFromVsc(
-            vscTextDocument,
-            e.uri,
-            e.selections,
-            e.visibleRange,
-          );
-          this.workspace.session!.activeTextEditor = irTextEditor;
-
-          const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument);
-          vscTextEditor.selections = this.workspace.selectionsToVsc(e.selections);
-          await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
-        } else if (e.revUri) {
-          const vscTextDocument = await this.workspace.openVscTextDocumentByUri(e.revUri);
-          const irTextEditor = this.workspace.openTextEditorFromVsc(
-            vscTextDocument,
-            e.revUri,
-            e.revSelections!,
-            e.revVisibleRange!,
-          );
-          this.workspace.session!.activeTextEditor = irTextEditor;
-
-          const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument);
-          vscTextEditor.selections = this.workspace.selectionsToVsc(e.revSelections!);
-          await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange!.start.line, at: 'top' });
-        }
-
-        break;
-      }
-      case 'select': {
-        const vscTextDocument = await this.workspace.openVscTextDocumentByUri(e.uri);
-        const irTextEditor = this.workspace.session!.getTextEditorByUri(e.uri);
-        const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument);
-
-        if (dir === Dir.Forwards) {
-          irTextEditor.selections = e.selections;
-          irTextEditor.visibleRange = e.visibleRange;
-
-          vscTextEditor.selections = this.workspace.selectionsToVsc(e.selections);
-          await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
-        } else {
-          irTextEditor.selections = e.revSelections;
-          irTextEditor.visibleRange = e.revVisibleRange;
-
-          vscTextEditor.selections = this.workspace.selectionsToVsc(e.revSelections);
-          await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
-        }
-        break;
-      }
-      case 'scroll': {
-        const vscTextDocument = await this.workspace.openVscTextDocumentByUri(e.uri);
-        const irTextEditor = this.workspace.session!.getTextEditorByUri(e.uri);
-        await vscode.window.showTextDocument(vscTextDocument);
-
-        if (dir === Dir.Forwards) {
-          irTextEditor.visibleRange = e.visibleRange;
-          await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
-        } else {
-          irTextEditor.visibleRange = e.revVisibleRange;
-          await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
-        }
-        break;
-      }
-      case 'save': {
-        const vscTextDocument = await this.workspace.openVscTextDocumentByUri(e.uri);
-        if (!(await vscTextDocument.save())) {
-          throw new Error(`Could not save ${e.uri}`);
-        }
-        break;
-      }
-
-      default:
-        lib.unreachable(e, `Unknown playback event type: ${(e as any).type || ''}`);
-    }
-  }
-
-  getClock(): number {
-    return this.clock;
-  }
-
-  private async saveHistoryClock(options?: WriteOptions) {
-    this.db.mergeSessionHistory({
-      id: this.workspace.session!.summary.id,
-      lastWatchedClock: this.clock,
-    });
-    await this.db.write(options);
-  }
-
-  private async saveHistoryOpenClose() {
-    this.db.mergeSessionHistory({
-      id: this.workspace.session!.summary.id,
-      lastWatchedTimestamp: new Date().toISOString(),
-      root: this.workspace.root,
-    });
-    await this.db.write();
   }
 }
 

@@ -1,12 +1,12 @@
 import _ from 'lodash';
-import type * as t from './types.js';
+import * as t from './types.js';
 import * as lib from './lib.js';
 import * as path from './path.js';
 import assert from './assert.js';
 
 // Not every TextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
-export class Session {
+export class Session implements t.ApplyPlaybackEvent {
   constructor(
     public root: t.AbsPath,
     public initCheckpoint: t.Checkpoint,
@@ -111,6 +111,20 @@ export class Session {
     return textEditor;
   }
 
+  openTextEditorByUri(uri: t.Uri, selections?: t.Selection[], visibleRange?: t.Range): TextEditor {
+    let textEditor = this.findTextEditorByUri(uri);
+    if (textEditor && selections && visibleRange) {
+      textEditor.select(selections, visibleRange);
+    }
+
+    if (!textEditor) {
+      textEditor = new TextEditor(this.getTextDocumentByUri(uri), selections, visibleRange);
+      this.textEditors.push(textEditor);
+    }
+
+    return textEditor;
+  }
+
   // async writeToFile(filename: string) {
   //   const plainSession = this.toPlain();
   //   await fs.promises.writeFile(filename, JSON.stringify(plainSession, null, 2), 'utf8');
@@ -120,16 +134,89 @@ export class Session {
     return path.workspaceUriFromAbsPath(this.root, p);
   }
 
-  // toAbsUri(uri: t.Uri): t.Uri {
-  //   return path.toAbsUri(this.root, uri);
-  // }
+  closeTextDocumentByUri(uri: t.Uri) {
+    this.closeTextEditorByUri(uri);
+    this.textDocuments = this.textDocuments.filter(x => x.uri !== uri);
+  }
+
+  closeTextEditorByUri(uri: t.Uri) {
+    this.textEditors = this.textEditors.filter(x => x.document.uri !== uri);
+    if (this.activeTextEditor?.document.uri === uri) {
+      this.activeTextEditor = undefined;
+    }
+  }
+
+  async applyStopEvent(e: t.StopEvent, direction: t.Direction) {
+    // nothing
+  }
+
+  async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction) {
+    if (e.contentChanges.length > 1) {
+      throw new Error('applyTextChangeEvent: textChange does not yet support contentChanges.length > 1');
+    }
+    const textDocument = this.getTextDocumentByUri(e.uri);
+    if (direction === t.Direction.Forwards) {
+      for (const cc of e.contentChanges) {
+        textDocument.applyContentChange(cc.range, cc.text, false);
+      }
+    } else {
+      for (const cc of e.contentChanges) {
+        textDocument.applyContentChange(cc.revRange, cc.revText, false);
+      }
+    }
+  }
+
+  async applyOpenDocumentEvent(e: t.OpenDocumentEvent, direction: t.Direction) {
+    const textDocument = this.findTextDocumentByUri(e.uri);
+    if (direction === t.Direction.Forwards) {
+      if (!textDocument) {
+        this.textDocuments.push(TextDocument.fromText(e.uri, e.text, e.eol));
+      }
+    } else {
+      if (textDocument) this.closeTextDocumentByUri(e.uri);
+    }
+  }
+
+  async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction) {
+    if (direction === t.Direction.Forwards) {
+      this.activeTextEditor = this.openTextEditorByUri(e.uri, e.selections, e.visibleRange);
+    } else if (e.revUri) {
+      this.activeTextEditor = this.openTextEditorByUri(e.revUri, e.revSelections!, e.revVisibleRange!);
+    }
+  }
+
+  async applySelectEvent(e: t.SelectEvent, direction: t.Direction) {
+    const textEditor = this.getTextEditorByUri(e.uri);
+    if (direction === t.Direction.Forwards) {
+      textEditor.select(e.selections, e.visibleRange);
+    } else {
+      textEditor.select(e.revSelections, e.revVisibleRange);
+    }
+  }
+
+  async applyScrollEvent(e: t.ScrollEvent, direction: t.Direction) {
+    const textEditor = this.getTextEditorByUri(e.uri);
+    if (direction === t.Direction.Forwards) {
+      textEditor.scroll(e.visibleRange);
+    } else {
+      textEditor.scroll(e.revVisibleRange);
+    }
+  }
+
+  async applySaveEvent(e: t.SaveEvent, direction: t.Direction) {
+    // nothing
+  }
 }
 
 /**
  * The document will be the same for the entire lifetime of this text editor.
  */
 export class TextEditor {
-  constructor(public document: TextDocument, public selections: t.Selection[], public visibleRange: t.Range) {}
+  constructor(
+    public document: TextDocument,
+    public selections: t.Selection[] = [makeSelectionN(0, 0, 0, 0)],
+    public visibleRange: t.Range = makeRangeN(0, 0, 1, 0),
+  ) {}
 
   select(selections: t.Selection[], visibleRange: t.Range) {
     this.selections = selections;
@@ -177,7 +264,9 @@ export class TextDocument {
     );
   }
 
-  applyContentChange(range: t.Range, text: string, calcReverse: boolean): [range: t.Range, text: string] | undefined {
+  applyContentChange(range: t.Range, text: string, calcReverse: true): [range: t.Range, text: string];
+  applyContentChange(range: t.Range, text: string, calcReverse: false): undefined;
+  applyContentChange(range: t.Range, text: string, calcReverse: boolean) {
     assert(this.isRangeValid(range), 'applyContentChange: invalid range');
     const { lines } = this;
     const newLines = text.split(/\r?\n/);
@@ -211,16 +300,19 @@ export class TextDocument {
     }
 
     // Calculate revRange.
-    let revRange: t.Range | undefined;
     if (calcReverse) {
       const endPosition = {
         line: range.end.line + extraLineCount,
         character: newLines[newLines.length - 1].length - lastLineSuffix.length,
       };
-      revRange = { start: range.start, end: endPosition };
+      const revRange = { start: range.start, end: endPosition };
+      return [revRange, revText!];
     }
+  }
 
-    if (calcReverse) return [revRange!, revText!];
+  getRange(): t.Range {
+    if (!this.lines.length) return makeRangeN(0, 0, 0, 0);
+    return makeRangeN(0, 0, this.lines.length - 1, this.lines[this.lines.length - 1].length);
   }
 }
 
@@ -263,10 +355,8 @@ export function makeCheckpointTextDocument(uri: t.Uri, text: string): t.Checkpoi
 
 export function makeCheckpointTextEditor(
   uri: t.Uri,
-  selections: t.Selection[],
-  visibleRange: t.Range,
+  selections: t.Selection[] = [makeSelectionN(0, 0, 0, 0)],
+  visibleRange: t.Range = makeRangeN(0, 0, 1, 0),
 ): t.CheckpointTextEditor {
   return { uri, selections, visibleRange };
-  // = [{ anchor: { line: 0, character: 0 }, active: { line: 0, character: 0 } }],
-  // = { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },
 }

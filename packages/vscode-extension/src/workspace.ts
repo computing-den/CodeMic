@@ -21,13 +21,13 @@ export default class Workspace {
       const files = await fs.promises.readdir(root);
       if (files.length) {
         // root exists and is a directory but it's not empty.
-        if (!(await shouldOverwriteRoot(root))) return undefined;
+        if (!(await askToOverwriteRoot(root))) return undefined;
       }
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
       if (code === 'ENOENT') {
         // root doesn't exist. Ask user if they want to create it.
-        if (!(await shouldCreateRoot(root))) return undefined;
+        if (!(await askToCreateRoot(root))) return undefined;
         await fs.promises.mkdir(root, { recursive: true });
       } else if (code === 'ENOTDIR') {
         // Exists, but it's not a directory
@@ -120,7 +120,11 @@ export default class Workspace {
 
   uriToVsc(uri: t.Uri): vscode.Uri {
     assert(path.isWorkspaceUri(uri), 'TODO only supports workspace uri');
-    return vscode.Uri.parse(path.resolveUri(this.root, uri));
+    return vscode.Uri.parse(this.resolveUri(uri));
+  }
+
+  resolveUri(uri: t.Uri): t.Uri {
+    return path.resolveUri(this.root, uri);
   }
 
   eolFromVsc(eol: vscode.EndOfLine): t.EndOfLine {
@@ -132,7 +136,7 @@ export default class Workspace {
   // }
 
   findVscTextDocumentByUri(uri: t.Uri): vscode.TextDocument | undefined {
-    uri = path.resolveUri(this.root, uri);
+    uri = this.resolveUri(uri);
     return vscode.workspace.textDocuments.find(d => d.uri.toString() === uri);
   }
 
@@ -153,42 +157,51 @@ export default class Workspace {
     );
   }
 
-  /**
-   * Note that the lifecycle of the returned document from vscode.workspace.openTextDocument() is owned
-   * by the editor and not by the extension. That means an onDidClose event can occur at any time after opening it.
-   * We probably should not cache the vscTextDocument itself.
-   */
-  async openVscTextDocumentByUri(uri: t.Uri): Promise<vscode.TextDocument> {
-    return await vscode.workspace.openTextDocument(this.uriToVsc(uri));
+  async closeVscTextEditorByUri(uri: t.Uri, skipConfirmation: boolean = false) {
+    uri = this.resolveUri(uri);
+    for (const tabGroup of vscode.window.tabGroups.all) {
+      for (const tab of tabGroup.tabs) {
+        if (tab.input instanceof vscode.TabInputText) {
+          if (tab.input.uri.toString() === uri) {
+            if (skipConfirmation) {
+              assert(tab.input.uri.scheme === 'file', 'TODO cannot skip save confirmation of non-file documents');
+              const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
+              await vscTextDocument.save();
+            }
+            await vscode.window.tabGroups.close(tab);
+          }
+        }
+      }
+    }
   }
 
-  openTextDocumentFromVsc(vscTextDocument: vscode.TextDocument, uri: t.Uri): ir.TextDocument {
-    let textDocument = this.session!.findTextDocumentByUri(uri);
-    if (!textDocument) {
-      textDocument = this.textDocumentFromVsc(vscTextDocument, uri);
-      this.session!.textDocuments.push(textDocument);
-    }
-    return textDocument;
-  }
+  // openTextDocumentFromVsc(vscTextDocument: vscode.TextDocument, uri: t.Uri): ir.TextDocument {
+  //   let textDocument = this.session!.findTextDocumentByUri(uri);
+  //   if (!textDocument) {
+  //     textDocument = this.textDocumentFromVsc(vscTextDocument, uri);
+  //     this.session!.textDocuments.push(textDocument);
+  //   }
+  //   return textDocument;
+  // }
 
-  openTextEditorFromVsc(
-    vscTextDocument: vscode.TextDocument,
-    uri: t.Uri,
-    selections: t.Selection[],
-    visibleRange: t.Range,
-  ): ir.TextEditor {
-    // const selections = selectionsFromVsc(vscTextEditor.selections);
-    // const visibleRange = rangeFromVsc(vscTextEditor.visibleRanges[0]);
-    const textDocument = this.openTextDocumentFromVsc(vscTextDocument, uri);
-    let textEditor = this.session!.findTextEditorByUri(textDocument.uri);
-    if (!textEditor) {
-      textEditor = new ir.TextEditor(textDocument, selections, visibleRange);
-      this.session!.textEditors.push(textEditor);
-    } else {
-      textEditor.select(selections, visibleRange);
-    }
-    return textEditor;
-  }
+  // openTextEditorFromVsc(
+  //   vscTextDocument: vscode.TextDocument,
+  //   uri: t.Uri,
+  //   selections: t.Selection[],
+  //   visibleRange: t.Range,
+  // ): ir.TextEditor {
+  //   // const selections = selectionsFromVsc(vscTextEditor.selections);
+  //   // const visibleRange = rangeFromVsc(vscTextEditor.visibleRanges[0]);
+  //   const textDocument = this.openTextDocumentFromVsc(vscTextDocument, uri);
+  //   let textEditor = this.session!.findTextEditorByUri(textDocument.uri);
+  //   if (!textEditor) {
+  //     textEditor = new ir.TextEditor(textDocument, selections, visibleRange);
+  //     this.session!.textEditors.push(textEditor);
+  //   } else {
+  //     textEditor.select(selections, visibleRange);
+  //   }
+  //   return textEditor;
+  // }
 
   async syncSessionToVscodeAndDisk(targetUris?: t.Uri[]) {
     // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
@@ -214,7 +227,7 @@ export default class Workspace {
       for (const targetUri of targetUris) {
         if (!this.session!.findTextDocumentByUri(targetUri)) {
           if (path.isWorkspaceUri(targetUri)) {
-            await fs.promises.rm(path.getFileUriPath(path.resolveUri(this.root, targetUri)), { force: true });
+            await fs.promises.rm(path.getFileUriPath(this.resolveUri(targetUri)), { force: true });
           }
         }
       }
@@ -276,7 +289,7 @@ export default class Workspace {
         });
         await vscTextDocument.save();
       } else {
-        const absPath = path.getFileUriPath(path.resolveUri(this.root, targetUri));
+        const absPath = path.getFileUriPath(this.resolveUri(targetUri));
         await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
         await fs.promises.writeFile(absPath, textDocument.getText(), 'utf8');
       }
@@ -329,13 +342,7 @@ export default class Workspace {
     }
     for (const uri of tabUris) {
       if (!textEditors.some(e => e.uri === uri)) {
-        textEditors.push(
-          ir.makeCheckpointTextEditor(
-            uri,
-            [ir.makeSelection(ir.makePosition(0, 0), ir.makePosition(0, 0))],
-            ir.makeRange(ir.makePosition(0, 0), ir.makePosition(1, 0)),
-          ),
-        );
+        textEditors.push(ir.makeCheckpointTextEditor(uri));
       }
     }
 
@@ -402,7 +409,7 @@ export default class Workspace {
   }
 }
 
-async function shouldOverwriteRoot(root: t.AbsPath): Promise<boolean> {
+async function askToOverwriteRoot(root: t.AbsPath): Promise<boolean> {
   const overwriteTitle = 'Overwrite';
   const answer = await vscode.window.showWarningMessage(
     `"${root}" is not empty. Do you want to overwrite it?`,
@@ -417,7 +424,7 @@ async function shouldOverwriteRoot(root: t.AbsPath): Promise<boolean> {
   return answer?.title === overwriteTitle;
 }
 
-async function shouldCreateRoot(root: t.AbsPath): Promise<boolean> {
+async function askToCreateRoot(root: t.AbsPath): Promise<boolean> {
   const createPathTitle = 'Create path';
   const answer = await vscode.window.showWarningMessage(
     `"${root}" does not exist. Do you want to create it?`,

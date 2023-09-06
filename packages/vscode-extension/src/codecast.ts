@@ -102,7 +102,7 @@ class Codecast {
         if (!this.recorder) {
           for (const vscTextDocument of vscode.workspace.textDocuments) {
             if (vscTextDocument.isDirty) {
-              vscode.window.showInformationMessage(
+              vscode.window.showErrorMessage(
                 'There are unsaved files in the current workspace. Please save them first and then try again.',
               );
               return { type: 'error' };
