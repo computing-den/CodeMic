@@ -283,10 +283,9 @@ export default class Workspace {
 
       const vscTextDocument = this.findVscTextDocumentByUri(targetUri);
       if (vscTextDocument) {
-        const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument, { preserveFocus: true });
-        await vscTextEditor.edit(editBuilder => {
-          editBuilder.replace(this.getVscTextDocumentRange(vscTextDocument), textDocument.getText());
-        });
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), textDocument.getText());
+        await vscode.workspace.applyEdit(edit);
         await vscTextDocument.save();
       } else {
         const absPath = path.getFileUriPath(this.resolveUri(targetUri));
