@@ -37,14 +37,19 @@ class Recorder {
     fork?: boolean,
     forkAtClock?: number,
   ): Promise<Recorder | undefined> {
-    assert(forkAtClock === undefined, 'TODO fork at specific time.');
-
     let workspace: Workspace | undefined;
     let isDirty = true;
     let startTimeMs: number;
     if (baseSessionSummary) {
       forkAtClock ??= sessionSummary.duration;
-      workspace = await Workspace.populateSessionSummary(db, sessionSummary, root, forkAtClock);
+      workspace = await Workspace.populateSession(
+        db,
+        root,
+        sessionSummary,
+        baseSessionSummary,
+        forkAtClock,
+        forkAtClock,
+      );
       isDirty = Boolean(fork);
       startTimeMs = Date.now() - baseSessionSummary.duration * 1000;
     } else {
@@ -54,16 +59,19 @@ class Recorder {
     return workspace && new Recorder(context, db, workspace, isDirty, startTimeMs);
   }
 
-  static makeSessionSummary(base?: t.SessionSummary, fork?: boolean): t.SessionSummary {
+  static makeSessionSummary(base?: t.SessionSummary, fork?: boolean, forkClock?: number): t.SessionSummary {
     if (base) {
       return {
         ...base,
         id: fork ? uuid() : base.id,
+        title: fork ? `Fork: ${base.title}` : base.title,
+        duration: forkClock ?? base.duration,
         author: {
           name: 'sean_shir',
           avatar: 'avatar1.png',
         },
         timestamp: new Date().toISOString(), // will be overwritten at the end
+        forkedFrom: fork ? base.id : undefined,
       };
     } else {
       return {

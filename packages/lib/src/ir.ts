@@ -146,6 +146,50 @@ export class Session implements t.ApplyPlaybackEvent {
     }
   }
 
+  clockAt(i: number): number {
+    return this.events[i].clock;
+  }
+
+  getSeekData(i: number, toClock: number): t.SeekData {
+    const events = [];
+    const n = this.events.length;
+    let direction = t.Direction.Forwards;
+    if (i < 0 || toClock > this.clockAt(i)) {
+      // go forwards
+      for (let j = i + 1; j < n && toClock >= this.clockAt(j); j++) {
+        events.push(this.events[j]);
+        i = j;
+      }
+    } else if (toClock < this.clockAt(i)) {
+      // go backwards
+      direction = t.Direction.Backwards;
+      for (; i >= 0 && toClock <= this.clockAt(i); i--) {
+        events.push(this.events[i]);
+      }
+    }
+
+    const clock = Math.max(0, Math.min(this.summary.duration, toClock));
+    const stop = i === n - 1;
+
+    return { events, direction, i, clock, stop };
+  }
+
+  async seek(seekData: t.SeekData, uriSet?: t.UriSet) {
+    for (const event of seekData.events) {
+      await lib.dispatchPlaybackEvent(this, event, seekData.direction, uriSet);
+    }
+  }
+
+  /**
+   * Cuts all events whose clock is > clock.
+   * Sets summary.duration to clock as well.
+   */
+  cut(clock: number) {
+    const i = this.events.findIndex(e => e.clock > clock);
+    if (i >= 0) this.events.length = i;
+    this.summary.duration = clock;
+  }
+
   async applyStopEvent(e: t.StopEvent, direction: t.Direction, uriSet?: t.UriSet) {
     // nothing
   }

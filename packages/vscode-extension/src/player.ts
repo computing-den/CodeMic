@@ -23,10 +23,10 @@ class Player implements t.ApplyPlaybackEvent {
   static async populate(
     context: vscode.ExtensionContext,
     db: Db,
-    sessionSummary: t.SessionSummary,
     root: t.AbsPath,
+    sessionSummary: t.SessionSummary,
   ): Promise<Player | undefined> {
-    const workspace = await Workspace.populateSessionSummary(db, sessionSummary, root);
+    const workspace = await Workspace.populateSession(db, root, sessionSummary);
     return workspace && new Player(context, db, workspace);
   }
 
@@ -300,14 +300,12 @@ class Player implements t.ApplyPlaybackEvent {
     // console.log('Player: update ', clock);
 
     let i = this.eventIndex;
-    const seekData = this.getSeekData(i, clock);
+    const seekData = this.workspace.session!.getSeekData(i, clock);
 
     if (Math.abs(seekData.clock - this.clock) > 10 && seekData.events.length > 10) {
       // Update by seeking the internal session first, then syncing the session to vscode and disk
       const uriSet: t.UriSet = {};
-      for (const event of seekData.events) {
-        await lib.dispatchPlaybackEvent(this.workspace.session!, event, seekData.direction, uriSet);
-      }
+      await this.workspace.session!.seek(seekData, uriSet);
       await this.workspace.syncSessionToVscodeAndDisk(Object.keys(uriSet));
     } else {
       // Apply updates one at a time
@@ -343,37 +341,6 @@ class Player implements t.ApplyPlaybackEvent {
 
     // save history
     await this.saveHistoryClock({ ifDirtyForLong: true });
-  }
-
-  private clockAt(i: number): number {
-    return this.workspace.session!.events[i].clock;
-  }
-
-  private getSeekData(
-    i: number,
-    toClock: number,
-  ): { events: t.PlaybackEvent[]; direction: t.Direction; i: number; clock: number; stop: boolean } {
-    const events = [];
-    const n = this.workspace.session!.events.length;
-    let direction = t.Direction.Forwards;
-    if (i < 0 || toClock > this.clockAt(i)) {
-      // go forwards
-      for (let j = i + 1; j < n && toClock >= this.clockAt(j); j++) {
-        events.push(this.workspace.session!.events[j]);
-        i = j;
-      }
-    } else if (toClock < this.clockAt(i)) {
-      // go backwards
-      direction = t.Direction.Backwards;
-      for (; i >= 0 && toClock <= this.clockAt(i); i--) {
-        events.push(this.workspace.session!.events[i]);
-      }
-    }
-
-    const clock = Math.max(0, Math.min(this.workspace.session!.summary.duration, toClock));
-    const stop = i === n - 1;
-
-    return { events, direction, i, clock, stop };
   }
 }
 

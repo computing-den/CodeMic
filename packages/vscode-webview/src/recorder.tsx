@@ -8,10 +8,13 @@ import _ from 'lodash';
 
 type Props = { store: t.Store; onExit: () => void };
 export default class Recorder extends Component<Props> {
-  media: FakeMedia = new FakeMedia(this.handleMediaProgress.bind(this));
+  media: FakeMedia = new FakeMedia(
+    this.handleMediaProgress.bind(this),
+    this.props.store.recorder!.sessionSummary.duration,
+  );
 
   state = {
-    localClock: 0,
+    localClock: this.props.store.recorder!.sessionSummary.duration,
     root:
       this.props.store.recorder!.root ||
       this.props.store.recorder!.history?.root ||

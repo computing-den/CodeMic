@@ -28,7 +28,8 @@ export type FrontendRequest =
   | { type: 'updateRecorderSessionSummary'; sessionSummary: SessionSummary }
   | { type: 'playbackUpdate'; clock: number }
   | { type: 'getStore' }
-  | { type: 'showOpenDialog'; options: OpenDialogOptions };
+  | { type: 'showOpenDialog'; options: OpenDialogOptions }
+  | { type: 'confirmForkFromPlayer'; clock: number };
 export type BackendResponse =
   | { type: 'getStore'; store: Store }
   | { type: 'error' }
@@ -73,6 +74,8 @@ export enum RecorderStatus {
 export type RecorderState = {
   status: RecorderStatus;
   sessionSummary: SessionSummary;
+  fork?: boolean;
+  forkClock?: number;
   root?: AbsPath;
   defaultRoot?: AbsPath;
   history?: SessionHistoryItem;
@@ -111,6 +114,7 @@ export type SessionSummary = {
   likes: number;
   timestamp: string;
   toc: TocItem[];
+  forkedFrom?: string;
 };
 
 export type SessionSummaryMap = { [key: string]: SessionSummary };
@@ -269,3 +273,5 @@ export type SessionHistoryItem = {
   lastWatchedClock?: number;
   root?: AbsPath;
 };
+
+export type SeekData = { events: PlaybackEvent[]; direction: Direction; i: number; clock: number; stop: boolean };

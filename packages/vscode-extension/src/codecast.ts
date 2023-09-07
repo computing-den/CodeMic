@@ -65,14 +65,8 @@ class Codecast {
       }
       case 'openRecorder': {
         if (await this.closeCurrentScreen()) {
-          let sessionSummary: t.SessionSummary;
-          let baseSessionSummary: t.SessionSummary | undefined;
-          if (req.sessionId) {
-            baseSessionSummary = this.db.sessionSummaries[req.sessionId];
-            sessionSummary = Recorder.makeSessionSummary(baseSessionSummary, req.fork);
-          } else {
-            sessionSummary = Recorder.makeSessionSummary();
-          }
+          const baseSessionSummary = req.sessionId ? this.db.sessionSummaries[req.sessionId] : undefined;
+          const sessionSummary = Recorder.makeSessionSummary(baseSessionSummary, req.fork, req.forkClock);
           this.recorderSetup = { sessionSummary, baseSessionSummary, fork: req.fork, forkClock: req.forkClock };
           this.screen = t.Screen.Recorder;
         }
@@ -88,8 +82,8 @@ class Codecast {
           this.player = await Player.populate(
             this.context,
             this.db,
-            this.playerSetup.sessionSummary,
             path.abs(nodePath.resolve(req.root)),
+            this.playerSetup.sessionSummary,
           );
         }
 
@@ -189,6 +183,23 @@ class Codecast {
           this.recorderSetup!.sessionSummary = req.sessionSummary;
         }
         return { type: 'ok' };
+      }
+      case 'confirmForkFromPlayer': {
+        const status = this.player?.status;
+        if (status !== t.PlayerStatus.Playing) return { type: 'boolean', value: true };
+        await this.player!.pause();
+
+        const forkTitle = 'Fork';
+        const answer = await vscode.window.showWarningMessage(
+          `Do you wish to stop playing and fork the current session at ${lib.formatTimeSeconds(req.clock)}?`,
+          { modal: true },
+          { title: 'Cancel', isCloseAffordance: true },
+          { title: forkTitle },
+        );
+        if (answer?.title != forkTitle && status === t.PlayerStatus.Playing) {
+          await this.player!.start();
+        }
+        return { type: 'boolean', value: answer?.title === forkTitle };
       }
       default: {
         lib.unreachable(req);
@@ -304,6 +315,8 @@ class Codecast {
       recorder = {
         status: t.RecorderStatus.Uninitialized,
         sessionSummary: this.recorderSetup.sessionSummary,
+        fork: this.recorderSetup.fork,
+        forkClock: this.recorderSetup.forkClock,
         defaultRoot: Workspace.getDefaultRoot(),
       };
     }

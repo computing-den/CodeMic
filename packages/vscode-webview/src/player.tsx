@@ -70,7 +70,7 @@ export default class Player extends Component<Props> {
     shadow.style.height = `${p * 100}%`;
   };
 
-  clicked = async (e: MouseEvent) => {
+  progressBarClicked = async (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const clock = this.getClockOfMouse(e);
@@ -123,9 +123,11 @@ export default class Player extends Component<Props> {
     await this.seek(item.clock);
   };
 
-  // seekBackend = async (clock: number) => {
-  //   (actions.seek, 200);
-  // }
+  fork = async () => {
+    if (await actions.confirmForkFromPlayer(this.state.localClock)) {
+      await actions.openRecorder(this.props.store.player!.sessionSummary.id, true, this.state.localClock);
+    }
+  };
 
   isStoppedAlmostAtTheEnd(): boolean {
     return (
@@ -176,7 +178,7 @@ export default class Player extends Component<Props> {
 
     return (
       <Screen className="player">
-        <div className="progress-bar" ref={this.handleProgressBarRef} onClick={this.clicked}>
+        <div className="progress-bar" ref={this.handleProgressBarRef} onClick={this.progressBarClicked}>
           <div className="bar">
             <div className="shadow" />
             <div className="filled" style={filledStyle} />
@@ -223,7 +225,11 @@ export default class Player extends Component<Props> {
                   </vscode-button>
                 </div>
                 <div className="actions">
-                  <vscode-button appearance="icon" title="Fork: record a new session starting at this point">
+                  <vscode-button
+                    appearance="icon"
+                    title="Fork: record a new session starting at this point"
+                    onClick={this.fork}
+                  >
                     <span className="codicon codicon-repo-forked" />
                   </vscode-button>
                   <vscode-button appearance="icon" title="Bookmark">

@@ -11,12 +11,15 @@ export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
 export default class Workspace {
   constructor(public root: t.AbsPath, public session?: ir.Session) {}
 
-  static async populateSessionSummary(
+  static async populateSession(
     db: Db,
-    sessionSummary: t.SessionSummary,
     root: t.AbsPath,
-    clock?: number,
+    sessionSummary: t.SessionSummary,
+    baseSessionSummary?: t.SessionSummary,
+    seekClock?: number,
+    cutClock?: number,
   ): Promise<Workspace | undefined> {
+    // user confirmations and root direction creation
     try {
       const files = await fs.promises.readdir(root);
       if (files.length) {
@@ -36,19 +39,25 @@ export default class Workspace {
       }
     }
 
-    const workspace = await Workspace.fromSessionSummary(db, sessionSummary, root);
-    if (clock) {
-      throw new Error('TODO seek ir.Session');
+    // read session, or read the base session and cut it to cutClock.
+    const json = await db.readSession(baseSessionSummary?.id || sessionSummary.id);
+    const session = ir.Session.fromJSON(root, json, sessionSummary);
+    if (cutClock !== undefined) session.cut(cutClock);
+    const workspace = new Workspace(root, session);
+
+    // seek if necessary
+    let targetUris: t.Uri[] | undefined;
+    if (seekClock) {
+      const uriSet: t.UriSet = {};
+      const seekData = workspace.session!.getSeekData(0, seekClock);
+      await workspace.session!.seek(seekData, uriSet);
+      targetUris = Object.keys(uriSet);
     }
-    await workspace.syncSessionToVscodeAndDisk();
+
+    // sync, save and return
+    await workspace.syncSessionToVscodeAndDisk(targetUris);
     await workspace.saveAllRelevantVscTabs();
     return workspace;
-  }
-
-  static async fromSessionSummary(db: Db, sessionSummary: t.SessionSummary, root: t.AbsPath): Promise<Workspace> {
-    const json = await db.readSession(sessionSummary.id);
-    const session = ir.Session.fromJSON(root, json, sessionSummary);
-    return new Workspace(root, session);
   }
 
   static async fromDirAndVsc(summary: t.SessionSummary, root: t.AbsPath): Promise<Workspace> {

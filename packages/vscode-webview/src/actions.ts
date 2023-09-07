@@ -67,6 +67,10 @@ export async function getStore() {
   await postMessageAndUpdateStore({ type: 'getStore' });
 }
 
+export async function confirmForkFromPlayer(clock: number): Promise<boolean> {
+  return (await postMessageHelper({ type: 'confirmForkFromPlayer', clock }, 'boolean')).value;
+}
+
 async function postMessageAndUpdateStore(req: t.FrontendRequest) {
   const res = await postMessageHelper(req, 'getStore');
   updateStore(() => res.store);
