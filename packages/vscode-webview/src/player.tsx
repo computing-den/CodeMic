@@ -95,7 +95,7 @@ export default class Player extends Component<Props> {
       this.seeking = true;
       const localClock = Math.max(0, Math.min(clock, this.props.store.player!.sessionSummary.duration));
       await actions.seek(localClock);
-      this.media.time = localClock * 1000;
+      this.media.timeMs = localClock * 1000;
       this.setState({ localClock });
     } finally {
       this.seeking = false;
@@ -126,6 +126,12 @@ export default class Player extends Component<Props> {
   fork = async () => {
     if (await actions.confirmForkFromPlayer(this.state.localClock)) {
       await actions.openRecorder(this.props.store.player!.sessionSummary.id, true, this.state.localClock);
+    }
+  };
+
+  edit = async () => {
+    if (await actions.confirmEditFromPlayer()) {
+      await actions.openRecorder(this.props.store.player!.sessionSummary.id);
     }
   };
 
@@ -227,10 +233,21 @@ export default class Player extends Component<Props> {
                 <div className="actions">
                   <vscode-button
                     appearance="icon"
-                    title="Fork: record a new session starting at this point"
+                    title={
+                      player.status === t.PlayerStatus.Playing
+                        ? `Fork: record a new session starting at this point`
+                        : `Fork: record a new session starting at ${lib.formatTimeSeconds(this.state.localClock)}`
+                    }
                     onClick={this.fork}
                   >
                     <span className="codicon codicon-repo-forked" />
+                  </vscode-button>
+                  <vscode-button
+                    appearance="icon"
+                    title="Edit: continue recording and editing this session"
+                    onClick={this.edit}
+                  >
+                    <span className="codicon codicon-edit" />
                   </vscode-button>
                   <vscode-button appearance="icon" title="Bookmark">
                     <span className="codicon codicon-bookmark" />

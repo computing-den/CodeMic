@@ -147,7 +147,7 @@ export class Session implements t.ApplyPlaybackEvent {
   }
 
   clockAt(i: number): number {
-    return this.events[i].clock;
+    return this.events[i]?.clock ?? 0;
   }
 
   getSeekData(i: number, toClock: number): t.SeekData {
@@ -169,7 +169,7 @@ export class Session implements t.ApplyPlaybackEvent {
     }
 
     const clock = Math.max(0, Math.min(this.summary.duration, toClock));
-    const stop = i === n - 1;
+    const stop = clock >= this.summary.duration;
 
     return { events, direction, i, clock, stop };
   }
@@ -188,10 +188,6 @@ export class Session implements t.ApplyPlaybackEvent {
     const i = this.events.findIndex(e => e.clock > clock);
     if (i >= 0) this.events.length = i;
     this.summary.duration = clock;
-  }
-
-  async applyStopEvent(e: t.StopEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    // nothing
   }
 
   async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {

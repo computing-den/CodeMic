@@ -4,12 +4,12 @@ export default class FakeMedia {
 
   static intervalMs: number = 200;
 
-  constructor(private listener: (time: number) => void, public time: number = 0) {
+  constructor(private listener: (timeMs: number) => void, public timeMs: number = 0) {
     // this.start();
   }
 
-  // set(time: number) {
-  //   this.time += (performance.now() - )
+  // set(timeMs: number) {
+  //   this.timeMs += (performance.now() - )
   // }
 
   start() {
@@ -27,10 +27,10 @@ export default class FakeMedia {
   }
 
   private handle = () => {
-    const time = performance.now();
-    this.time += time - this.lastTime;
-    this.lastTime = time;
-    this.listener(this.time);
+    const timeMs = performance.now();
+    this.timeMs += timeMs - this.lastTime;
+    this.lastTime = timeMs;
+    this.listener(this.timeMs);
     this.request = setTimeout(this.handle, FakeMedia.intervalMs);
   };
 }

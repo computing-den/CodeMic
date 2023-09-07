@@ -16,13 +16,14 @@ class Recorder {
   private disposables: vscode.Disposable[] = [];
   private scrolling: boolean = false;
   private scrollStartRange?: t.Range;
+  private lastStartTimeMs: number = 0;
 
   constructor(
     public context: vscode.ExtensionContext,
     public db: Db,
     public workspace: Workspace,
-    public isDirty: boolean,
-    private startTimeMs: number,
+    private lastStopClock: number = 0,
+    private lastSavedClock: number = lastStopClock,
   ) {}
 
   /**
@@ -33,36 +34,37 @@ class Recorder {
     db: Db,
     root: t.AbsPath,
     sessionSummary: t.SessionSummary,
-    baseSessionSummary?: t.SessionSummary,
+  ): Promise<Recorder> {
+    let workspace = await Workspace.fromDirAndVsc(sessionSummary, root);
+    return new Recorder(context, db, workspace);
+  }
+
+  /**
+   * root must be already resolved.
+   */
+  static async populateSession(
+    context: vscode.ExtensionContext,
+    db: Db,
+    root: t.AbsPath,
+    sessionSummary: t.SessionSummary,
+    baseSessionSummary: t.SessionSummary,
     fork?: boolean,
     forkAtClock?: number,
   ): Promise<Recorder | undefined> {
     let workspace: Workspace | undefined;
-    let isDirty = true;
-    let startTimeMs: number;
-    if (baseSessionSummary) {
-      forkAtClock ??= sessionSummary.duration;
-      workspace = await Workspace.populateSession(
-        db,
-        root,
-        sessionSummary,
-        baseSessionSummary,
-        forkAtClock,
-        forkAtClock,
-      );
-      isDirty = Boolean(fork);
-      startTimeMs = Date.now() - baseSessionSummary.duration * 1000;
-    } else {
-      workspace = await Workspace.fromDirAndVsc(sessionSummary, root);
-      startTimeMs = Date.now();
-    }
-    return workspace && new Recorder(context, db, workspace, isDirty, startTimeMs);
+    let clock = forkAtClock;
+    clock ??= sessionSummary.duration;
+    workspace = await Workspace.populateSession(db, root, sessionSummary, baseSessionSummary, clock, clock);
+    return workspace && new Recorder(context, db, workspace, clock);
   }
 
+  /**
+   * Always returns a new object; no shared state with base
+   */
   static makeSessionSummary(base?: t.SessionSummary, fork?: boolean, forkClock?: number): t.SessionSummary {
     if (base) {
       return {
-        ...base,
+        ..._.cloneDeep(base),
         id: fork ? uuid() : base.id,
         title: fork ? `Fork: ${base.title}` : base.title,
         duration: forkClock ?? base.duration,
@@ -96,6 +98,7 @@ class Recorder {
     assert(this.status === t.RecorderStatus.Ready || this.status === t.RecorderStatus.Paused);
 
     this.status = t.RecorderStatus.Recording;
+    this.lastStartTimeMs = Date.now();
 
     // listen for open document events
     {
@@ -154,6 +157,11 @@ class Recorder {
   }
 
   async pause() {
+    // Careful: session.summary's duration is not up-to-date until we call save()
+    if (this.status === t.RecorderStatus.Recording) {
+      const clock = this.getClock();
+      this.lastStopClock = clock;
+    }
     this.status = t.RecorderStatus.Paused;
     this.dispose();
   }
@@ -163,45 +171,33 @@ class Recorder {
     this.disposables = [];
   }
 
-  async stop(injectStopEvent: boolean) {
-    const lastEvent = _.last(this.workspace.session!.events);
-    if (injectStopEvent && lastEvent && lastEvent.type !== 'stop') {
-      const clock = this.getClock();
-      this.pushEvent({ type: 'stop', clock });
-      this.workspace.session!.summary.duration = clock;
-      this.workspace.session!.summary.timestamp = new Date().toISOString();
-      this.status = t.RecorderStatus.Stopped;
-    }
-    this.dispose();
+  async stop() {
+    // Careful: session.summary's duration is not up-to-date until we call save()
+    this.pause();
+    this.status = t.RecorderStatus.Stopped;
     await this.saveHistoryOpenClose();
   }
 
+  /**
+   * May be called without pause() or stop().
+   */
   async save() {
-    // Inform user there was nothing to save
-    if (this.isSessionEmpty() || !this.isDirty) {
-      vscode.window.showInformationMessage('Nothing to save.');
-    } else {
-      const session = this.workspace.session!;
-      await this.db.writeSession(session.toJSON(), session.summary);
-      await this.saveHistoryOpenClose();
-      // We can't set isDirty it to false here, because it doesn't inject the stop event.
-      // this.isDirty = false;
-      vscode.window.showInformationMessage('Saved session.');
-    }
+    const session = this.workspace.session!;
+    const clock = this.getClock();
+    session.summary.duration = clock;
+    session.summary.timestamp = new Date().toISOString();
+    await this.db.writeSession(session.toJSON(), session.summary);
+    await this.saveHistoryOpenClose();
+    this.lastSavedClock = clock;
   }
 
   setSessionSummary(sessionSummary: t.SessionSummary) {
-    this.isDirty = true;
     this.workspace.session!.summary = sessionSummary;
+    console.log('setSessionSummary: ', sessionSummary);
   }
 
   isSessionEmpty(): boolean {
-    // there must be more than a stop event
-    return (
-      !this.workspace.session ||
-      !this.workspace.session.events.length ||
-      this.workspace.session.events[0].type === 'stop'
-    );
+    return !this.workspace.session || this.workspace.session.events.length === 0;
   }
 
   textChange(
@@ -346,10 +342,14 @@ class Recorder {
 
   getClock(): number {
     if (this.status === t.RecorderStatus.Recording) {
-      return (Date.now() - this.startTimeMs) / 1000;
+      return (Date.now() - this.lastStartTimeMs) / 1000 + this.lastStopClock;
     } else {
-      return _.last(this.workspace.session!.events)?.clock ?? 0;
+      return this.lastStopClock;
     }
+  }
+
+  isDirty(): boolean {
+    return this.getClock() > this.lastSavedClock;
   }
 
   private pushEvent(e: t.PlaybackEvent) {
@@ -357,7 +357,6 @@ class Recorder {
       this.scrolling = false;
       this.scrollStartRange = undefined;
     }
-    this.isDirty = true;
     this.workspace.session!.events.push(e);
   }
 

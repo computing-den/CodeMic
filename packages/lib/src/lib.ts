@@ -96,8 +96,6 @@ export function dispatchPlaybackEvent(
   uriSet?: t.UriSet,
 ): Promise<void> {
   switch (e.type) {
-    case 'stop':
-      return applier.applyStopEvent(e, direction, uriSet);
     case 'textChange':
       return applier.applyTextChangeEvent(e, direction, uriSet);
     case 'openDocument':

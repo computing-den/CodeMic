@@ -36,19 +36,21 @@ export default class Db {
   });
 
   async writeSession(session: t.SessionJSON, sessionSummary: t.SessionSummary) {
+    console.log('writeSession: ', session, sessionSummary);
     // If there are multiple files, stringify everything first before calling any async function
     const sessionStr = stringify(session);
     const sessionSummaryStr = stringify(sessionSummary);
 
     await writeSessionFile(sessionSummary.id, 'session.json', sessionStr);
     await writeSessionFile(sessionSummary.id, 'summary.json', sessionSummaryStr);
-    this.sessionSummaries[sessionSummary.id] ??= sessionSummary;
+    this.sessionSummaries[sessionSummary.id] = sessionSummary;
   }
 
   async writeSessionSummary(sessionSummary: t.SessionSummary) {
     // If there are multiple files, stringify everything first before calling any async function
     const sessionSummaryStr = stringify(sessionSummary);
     await writeSessionFile(sessionSummary.id, 'summary.json', sessionSummaryStr);
+    this.sessionSummaries[sessionSummary.id] = sessionSummary;
   }
 
   async readSession(id: string): Promise<t.SessionJSON> {

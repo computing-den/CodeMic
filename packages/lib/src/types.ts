@@ -29,7 +29,8 @@ export type FrontendRequest =
   | { type: 'playbackUpdate'; clock: number }
   | { type: 'getStore' }
   | { type: 'showOpenDialog'; options: OpenDialogOptions }
-  | { type: 'confirmForkFromPlayer'; clock: number };
+  | { type: 'confirmForkFromPlayer'; clock: number }
+  | { type: 'confirmEditFromPlayer' };
 export type BackendResponse =
   | { type: 'getStore'; store: Store }
   | { type: 'error' }
@@ -135,18 +136,12 @@ export type OpenDialogOptions = {
 };
 
 export type PlaybackEvent =
-  | StopEvent
   | TextChangeEvent
   | OpenDocumentEvent
   | ShowTextEditorEvent
   | SelectEvent
   | ScrollEvent
   | SaveEvent;
-
-export type StopEvent = {
-  type: 'stop';
-  clock: number;
-};
 
 export type TextChangeEvent = {
   type: 'textChange';
@@ -208,7 +203,6 @@ export enum Direction {
 export type UriSet = { [key: Uri]: true };
 
 export interface ApplyPlaybackEvent {
-  applyStopEvent(e: StopEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyTextChangeEvent(e: TextChangeEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyOpenDocumentEvent(e: OpenDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyShowTextEditorEvent(e: ShowTextEditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;

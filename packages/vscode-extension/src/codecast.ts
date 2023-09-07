@@ -105,15 +105,24 @@ class Codecast {
           assert(req.root);
           assert(req.sessionSummary);
           assert(this.recorderSetup);
-          this.recorder = await Recorder.fromDirAndVsc(
-            this.context,
-            this.db,
-            path.abs(nodePath.resolve(req.root)),
-            req.sessionSummary,
-            this.recorderSetup.baseSessionSummary,
-            this.recorderSetup.fork,
-            this.recorderSetup.forkClock,
-          );
+          if (this.recorderSetup.baseSessionSummary) {
+            this.recorder = await Recorder.populateSession(
+              this.context,
+              this.db,
+              path.abs(nodePath.resolve(req.root)),
+              req.sessionSummary,
+              this.recorderSetup.baseSessionSummary,
+              this.recorderSetup.fork,
+              this.recorderSetup.forkClock,
+            );
+          } else {
+            this.recorder = await Recorder.fromDirAndVsc(
+              this.context,
+              this.db,
+              path.abs(nodePath.resolve(req.root)),
+              req.sessionSummary,
+            );
+          }
         }
 
         if (this.recorder) {
@@ -137,8 +146,13 @@ class Codecast {
         return this.respondWithStore();
       }
       case 'saveRecorder': {
-        assert(this.recorder);
-        await this.recorder.save();
+        if (this.recorder?.isDirty()) {
+          await this.recorder.save();
+          vscode.window.showInformationMessage('Saved session.');
+        } else {
+          vscode.window.showInformationMessage('Nothing to save.');
+        }
+
         return { type: 'ok' };
       }
       // case 'discard': {
@@ -189,17 +203,34 @@ class Codecast {
         if (status !== t.PlayerStatus.Playing) return { type: 'boolean', value: true };
         await this.player!.pause();
 
-        const forkTitle = 'Fork';
+        const confirmTitle = 'Fork';
         const answer = await vscode.window.showWarningMessage(
           `Do you wish to stop playing and fork the current session at ${lib.formatTimeSeconds(req.clock)}?`,
           { modal: true },
           { title: 'Cancel', isCloseAffordance: true },
-          { title: forkTitle },
+          { title: confirmTitle },
         );
-        if (answer?.title != forkTitle && status === t.PlayerStatus.Playing) {
+        if (answer?.title != confirmTitle && status === t.PlayerStatus.Playing) {
           await this.player!.start();
         }
-        return { type: 'boolean', value: answer?.title === forkTitle };
+        return { type: 'boolean', value: answer?.title === confirmTitle };
+      }
+      case 'confirmEditFromPlayer': {
+        const status = this.player?.status;
+        if (status !== t.PlayerStatus.Playing) return { type: 'boolean', value: true };
+        await this.player!.pause();
+
+        const confirmTitle = 'Edit';
+        const answer = await vscode.window.showWarningMessage(
+          `Do you wish to stop playing and edit the current session?`,
+          { modal: true },
+          { title: 'Cancel', isCloseAffordance: true },
+          { title: confirmTitle },
+        );
+        if (answer?.title != confirmTitle && status === t.PlayerStatus.Playing) {
+          await this.player!.start();
+        }
+        return { type: 'boolean', value: answer?.title === confirmTitle };
       }
       default: {
         lib.unreachable(req);
@@ -228,7 +259,7 @@ class Codecast {
         await this.webview.postMessageHelper({ type: 'updateStore', store: this.getStore() }, 'ok');
       }
 
-      let shouldSave = !this.recorder.isSessionEmpty() && this.recorder.isDirty;
+      let shouldSave = this.recorder.isDirty();
       if (shouldSave) {
         // Ask to save the session.
         const saveTitle = 'Save';
@@ -245,10 +276,10 @@ class Codecast {
         shouldSave = answer?.title === saveTitle;
       }
 
-      // If we want to exit recorder, stop intercepting editor events and if we want to save, inject a stop event into the session.
+      // If we want to exit recorder, stop recording and intercepting editor events.
       // Otherwise, resume recording if we were initially recording.
       if (shouldExit) {
-        await this.recorder.stop(shouldSave);
+        await this.recorder.stop();
       } else if (wasRecording) {
         this.recorder.start();
         await this.webview.postMessageHelper({ type: 'updateStore', store: this.getStore() }, 'ok');
@@ -257,6 +288,7 @@ class Codecast {
       // Save
       if (shouldSave) {
         await this.recorder.save();
+        vscode.window.showInformationMessage('Saved session.');
       }
     }
 

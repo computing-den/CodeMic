@@ -89,10 +89,6 @@ class Player implements t.ApplyPlaybackEvent {
     return lib.dispatchPlaybackEvent(this, e, direction);
   }
 
-  async applyStopEvent(e: t.StopEvent, direction: t.Direction) {
-    await this.stop();
-  }
-
   async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction) {
     if (e.contentChanges.length > 1) {
       throw new Error('applyTextChangeEvent: TODO textChange does not yet support contentChanges.length > 1');

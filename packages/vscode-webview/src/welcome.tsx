@@ -161,17 +161,17 @@ class SessionItem extends Component<SessionItemProps> {
             </vscode-button>
             <vscode-button
               appearance="icon"
-              title="Continue recording and editing this session"
-              onClick={this.editSession}
-            >
-              <span className="codicon codicon-edit" />
-            </vscode-button>
-            <vscode-button
-              appearance="icon"
               title="Fork: create a new session based on this one"
               onClick={this.forkSession}
             >
               <span className="codicon codicon-repo-forked" />
+            </vscode-button>
+            <vscode-button
+              appearance="icon"
+              title="Edit: continue recording and editing this session"
+              onClick={this.editSession}
+            >
+              <span className="codicon codicon-edit" />
             </vscode-button>
             <vscode-button appearance="icon" title="Delete this session">
               <span className="codicon codicon-close" />

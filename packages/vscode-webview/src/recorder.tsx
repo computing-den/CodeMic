@@ -10,7 +10,7 @@ type Props = { store: t.Store; onExit: () => void };
 export default class Recorder extends Component<Props> {
   media: FakeMedia = new FakeMedia(
     this.handleMediaProgress.bind(this),
-    this.props.store.recorder!.sessionSummary.duration,
+    this.props.store.recorder!.sessionSummary.duration * 1000,
   );
 
   state = {
@@ -47,10 +47,9 @@ export default class Recorder extends Component<Props> {
   updateSessionSummary = (e: InputEvent) => {
     const target = e.target as HTMLInputElement;
     console.log('updateSessionSummary: ', target.dataset.field, target.value);
-    this.setState({
-      sessionSummary: { ...this.state.sessionSummary, [target.dataset.field!]: target.value },
+    this.setState({ sessionSummary: { ...this.state.sessionSummary, [target.dataset.field!]: target.value } }, () => {
+      this.sendSessionSummaryUpdate();
     });
-    this.sendSessionSummaryUpdate();
   };
 
   sendSessionSummaryUpdate = _.throttle(
@@ -108,6 +107,7 @@ export default class Recorder extends Component<Props> {
 
   handleMediaProgress(ms: number) {
     if (this.props.store.recorder!.status === t.RecorderStatus.Recording) {
+      console.log('handleMediaProgress: ', ms);
       this.setState({ localClock: ms / 1000 });
     }
   }
