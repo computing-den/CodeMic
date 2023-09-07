@@ -201,14 +201,16 @@ export enum Direction {
   Backwards,
 }
 
+export type UriSet = { [key: Uri]: true };
+
 export interface ApplyPlaybackEvent {
-  applyStopEvent(e: StopEvent, direction: Direction): Promise<void>;
-  applyTextChangeEvent(e: TextChangeEvent, direction: Direction): Promise<void>;
-  applyOpenDocumentEvent(e: OpenDocumentEvent, direction: Direction): Promise<void>;
-  applyShowTextEditorEvent(e: ShowTextEditorEvent, direction: Direction): Promise<void>;
-  applySelectEvent(e: SelectEvent, direction: Direction): Promise<void>;
-  applyScrollEvent(e: ScrollEvent, direction: Direction): Promise<void>;
-  applySaveEvent(e: SaveEvent, direction: Direction): Promise<void>;
+  applyStopEvent(e: StopEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyTextChangeEvent(e: TextChangeEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyOpenDocumentEvent(e: OpenDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyShowTextEditorEvent(e: ShowTextEditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applySelectEvent(e: SelectEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyScrollEvent(e: ScrollEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applySaveEvent(e: SaveEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
 }
 
 export type ContentChange = {

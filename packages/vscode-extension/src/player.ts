@@ -300,31 +300,80 @@ class Player implements t.ApplyPlaybackEvent {
     // console.log('Player: update ', clock);
 
     let i = this.eventIndex;
-    const n = this.workspace.session!.events.length;
-    const clockAt = (j: number) => this.workspace.session!.events[j].clock;
+    const seekData = this.getSeekData(i, clock);
 
-    if (i < 0 || clock > clockAt(i)) {
-      // go forwards
-      for (i = i + 1; i < n && clock >= clockAt(i); i++) {
-        await this.applyPlaybackEvent(this.workspace.session!.events[i], t.Direction.Forwards);
-        this.eventIndex = i;
+    if (Math.abs(seekData.clock - this.clock) > 10 && seekData.events.length > 10) {
+      // Update by seeking the internal session first, then syncing the session to vscode and disk
+      const uriSet: t.UriSet = {};
+      for (const event of seekData.events) {
+        await lib.dispatchPlaybackEvent(this.workspace.session!, event, seekData.direction, uriSet);
       }
-    } else if (clock < clockAt(i)) {
-      // go backwards
-      for (; i >= 0 && clock <= clockAt(i); i--) {
-        await this.applyPlaybackEvent(this.workspace.session!.events[i], t.Direction.Backwards);
-        this.eventIndex = i - 1;
+      await this.workspace.syncSessionToVscodeAndDisk(Object.keys(uriSet));
+    } else {
+      // Apply updates one at a time
+      for (const event of seekData.events) {
+        await this.applyPlaybackEvent(event, seekData.direction);
       }
     }
 
-    this.clock = Math.max(0, Math.min(this.workspace.session!.summary.duration, clock));
+    this.eventIndex = seekData.i;
+    this.clock = seekData.clock;
 
-    if (this.eventIndex === n - 1) {
-      await this.stop();
-    }
+    if (seekData.stop) await this.stop();
+
+    // if (i < 0 || clock > this.clockAt(i)) {
+    //   // go forwards
+    //   for (i = i + 1; i < n && clock >= this.clockAt(i); i++) {
+    //     await this.applyPlaybackEvent(this.workspace.session!.events[i], t.Direction.Forwards);
+    //     this.eventIndex = i;
+    //   }
+    // } else if (clock < this.clockAt(i)) {
+    //   // go backwards
+    //   for (; i >= 0 && clock <= this.clockAt(i); i--) {
+    //     await this.applyPlaybackEvent(this.workspace.session!.events[i], t.Direction.Backwards);
+    //     this.eventIndex = i - 1;
+    //   }
+    // }
+
+    // this.clock = Math.max(0, Math.min(this.workspace.session!.summary.duration, clock));
+
+    // if (this.eventIndex === n - 1) {
+    //   await this.stop();
+    // }
 
     // save history
     await this.saveHistoryClock({ ifDirtyForLong: true });
+  }
+
+  private clockAt(i: number): number {
+    return this.workspace.session!.events[i].clock;
+  }
+
+  private getSeekData(
+    i: number,
+    toClock: number,
+  ): { events: t.PlaybackEvent[]; direction: t.Direction; i: number; clock: number; stop: boolean } {
+    const events = [];
+    const n = this.workspace.session!.events.length;
+    let direction = t.Direction.Forwards;
+    if (i < 0 || toClock > this.clockAt(i)) {
+      // go forwards
+      for (let j = i + 1; j < n && toClock >= this.clockAt(j); j++) {
+        events.push(this.workspace.session!.events[j]);
+        i = j;
+      }
+    } else if (toClock < this.clockAt(i)) {
+      // go backwards
+      direction = t.Direction.Backwards;
+      for (; i >= 0 && toClock <= this.clockAt(i); i--) {
+        events.push(this.workspace.session!.events[i]);
+      }
+    }
+
+    const clock = Math.max(0, Math.min(this.workspace.session!.summary.duration, toClock));
+    const stop = i === n - 1;
+
+    return { events, direction, i, clock, stop };
   }
 }
 

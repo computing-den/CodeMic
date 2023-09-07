@@ -41,6 +41,7 @@ export default class Workspace {
       throw new Error('TODO seek ir.Session');
     }
     await workspace.syncSessionToVscodeAndDisk();
+    await workspace.saveAllRelevantVscTabs();
     return workspace;
   }
 
@@ -136,8 +137,12 @@ export default class Workspace {
   // }
 
   findVscTextDocumentByUri(uri: t.Uri): vscode.TextDocument | undefined {
-    uri = this.resolveUri(uri);
-    return vscode.workspace.textDocuments.find(d => d.uri.toString() === uri);
+    return this.findVscTextDocumentByVscUri(this.uriToVsc(uri));
+  }
+
+  findVscTextDocumentByVscUri(uri: vscode.Uri): vscode.TextDocument | undefined {
+    const uriStr = uri.toString();
+    return vscode.workspace.textDocuments.find(d => d.uri.toString() === uriStr);
   }
 
   findVscTextEditorByUri(textEditors: readonly vscode.TextEditor[], uri: t.Uri): vscode.TextEditor | undefined {
@@ -209,14 +214,12 @@ export default class Workspace {
     // all tabs that are not in this.textEditors should be closed
     for (const tabGroup of vscode.window.tabGroups.all) {
       for (const tab of tabGroup.tabs) {
-        if (tab.input instanceof vscode.TabInputText) {
-          if (this.shouldRecordVscUri(tab.input.uri)) {
-            const uri = this.uriFromVsc(tab.input.uri);
-            if (!this.session!.findTextEditorByUri(uri)) {
-              const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
-              await vscTextDocument.save();
-              await vscode.window.tabGroups.close(tab);
-            }
+        if (tab.input instanceof vscode.TabInputText && this.shouldRecordVscUri(tab.input.uri)) {
+          const uri = this.uriFromVsc(tab.input.uri);
+          if (!this.session!.findTextEditorByUri(uri)) {
+            const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
+            await vscTextDocument.save();
+            await vscode.window.tabGroups.close(tab);
           }
         }
       }
@@ -275,34 +278,41 @@ export default class Workspace {
     // for each targetUri
     //   if there's a textDocument open in vscode, replace its content
     //   else, mkdir and write to file
-    for (const targetUri of targetUris) {
-      assert(path.isWorkspaceUri(targetUri), 'TODO currently, we only support workspace URIs');
+    {
+      const edit = new vscode.WorkspaceEdit();
+      for (const targetUri of targetUris) {
+        assert(path.isWorkspaceUri(targetUri), 'TODO currently, we only support workspace URIs');
 
-      const textDocument = this.session!.findTextDocumentByUri(targetUri);
-      if (!textDocument) continue; // already deleted above
+        const textDocument = this.session!.findTextDocumentByUri(targetUri);
+        if (!textDocument) continue; // already deleted above
 
-      const vscTextDocument = this.findVscTextDocumentByUri(targetUri);
-      if (vscTextDocument) {
-        const edit = new vscode.WorkspaceEdit();
-        edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), textDocument.getText());
-        await vscode.workspace.applyEdit(edit);
-        await vscTextDocument.save();
-      } else {
-        const absPath = path.getFileUriPath(this.resolveUri(targetUri));
-        await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
-        await fs.promises.writeFile(absPath, textDocument.getText(), 'utf8');
+        const vscTextDocument = this.findVscTextDocumentByUri(targetUri);
+        if (vscTextDocument) {
+          edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), textDocument.getText());
+        } else {
+          const absPath = path.getFileUriPath(this.resolveUri(targetUri));
+          await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
+          await fs.promises.writeFile(absPath, textDocument.getText(), 'utf8');
+        }
       }
+      await vscode.workspace.applyEdit(edit);
+      // await vscTextDocument.save();
     }
 
-    // open all this.textEditors
-    for (const textEditor of this.session!.textEditors) {
-      const vscUri = this.uriToVsc(textEditor.document.uri);
-      await vscode.window.showTextDocument(vscUri, {
-        preview: false,
-        preserveFocus: true,
-        selection: this.selectionToVsc(textEditor.selections[0]),
-        viewColumn: vscode.ViewColumn.One,
-      });
+    // open all this.textEditors in vscdoe
+    {
+      const tabUris = this.getRelevantTabUris();
+      for (const textEditor of this.session!.textEditors) {
+        if (!tabUris.includes(textEditor.document.uri)) {
+          const vscUri = this.uriToVsc(textEditor.document.uri);
+          await vscode.window.showTextDocument(vscUri, {
+            preview: false,
+            preserveFocus: true,
+            selection: this.selectionToVsc(textEditor.selections[0]),
+            viewColumn: vscode.ViewColumn.One,
+          });
+        }
+      }
     }
 
     // show this.activeTextEditor
@@ -314,6 +324,14 @@ export default class Workspace {
         selection: this.selectionToVsc(this.session!.activeTextEditor.selections[0]),
         viewColumn: vscode.ViewColumn.One,
       });
+    }
+  }
+
+  async saveAllRelevantVscTabs() {
+    const uris = this.getRelevantTabVscUris();
+    for (const uri of uris) {
+      const vscTextDocument = this.findVscTextDocumentByVscUri(uri);
+      await vscTextDocument?.save();
     }
   }
 
@@ -331,14 +349,8 @@ export default class Workspace {
     const textEditors = vscode.window.visibleTextEditors
       .filter(e => this.shouldRecordVscUri(e.document.uri))
       .map(e => this.createCheckpointTextEditor(e));
-    const tabUris: t.Uri[] = [];
-    for (const tabGroup of vscode.window.tabGroups.all) {
-      for (const tab of tabGroup.tabs) {
-        if (tab.input instanceof vscode.TabInputText && this.shouldRecordVscUri(tab.input.uri)) {
-          tabUris.push(this.uriFromVsc(tab.input.uri));
-        }
-      }
-    }
+
+    const tabUris = this.getRelevantTabUris();
     for (const uri of tabUris) {
       if (!textEditors.some(e => e.uri === uri)) {
         textEditors.push(ir.makeCheckpointTextEditor(uri));
@@ -405,6 +417,22 @@ export default class Workspace {
       }
     }
     return res;
+  }
+
+  getRelevantTabUris(): t.Uri[] {
+    return this.getRelevantTabVscUris().map(this.uriFromVsc.bind(this));
+  }
+
+  getRelevantTabVscUris(): vscode.Uri[] {
+    const uris: vscode.Uri[] = [];
+    for (const tabGroup of vscode.window.tabGroups.all) {
+      for (const tab of tabGroup.tabs) {
+        if (tab.input instanceof vscode.TabInputText && this.shouldRecordVscUri(tab.input.uri)) {
+          uris.push(tab.input.uri);
+        }
+      }
+    }
+    return uris;
   }
 }
 

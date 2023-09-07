@@ -146,14 +146,15 @@ export class Session implements t.ApplyPlaybackEvent {
     }
   }
 
-  async applyStopEvent(e: t.StopEvent, direction: t.Direction) {
+  async applyStopEvent(e: t.StopEvent, direction: t.Direction, uriSet?: t.UriSet) {
     // nothing
   }
 
-  async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction) {
+  async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (e.contentChanges.length > 1) {
       throw new Error('applyTextChangeEvent: textChange does not yet support contentChanges.length > 1');
     }
+    if (uriSet) uriSet[e.uri] = true;
     const textDocument = this.getTextDocumentByUri(e.uri);
     if (direction === t.Direction.Forwards) {
       for (const cc of e.contentChanges) {
@@ -166,26 +167,31 @@ export class Session implements t.ApplyPlaybackEvent {
     }
   }
 
-  async applyOpenDocumentEvent(e: t.OpenDocumentEvent, direction: t.Direction) {
+  async applyOpenDocumentEvent(e: t.OpenDocumentEvent, direction: t.Direction, uriSet?: t.UriSet) {
+    if (uriSet) uriSet[e.uri] = true;
     const textDocument = this.findTextDocumentByUri(e.uri);
     if (direction === t.Direction.Forwards) {
       if (!textDocument) {
         this.textDocuments.push(TextDocument.fromText(e.uri, e.text, e.eol));
       }
     } else {
-      if (textDocument) this.closeTextDocumentByUri(e.uri);
+      // TODO should we remove the document?
+      // if (textDocument) this.closeTextDocumentByUri(e.uri);
     }
   }
 
-  async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction) {
+  async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (direction === t.Direction.Forwards) {
+      if (uriSet) uriSet[e.uri] = true;
       this.activeTextEditor = this.openTextEditorByUri(e.uri, e.selections, e.visibleRange);
     } else if (e.revUri) {
+      if (uriSet) uriSet[e.revUri] = true;
       this.activeTextEditor = this.openTextEditorByUri(e.revUri, e.revSelections!, e.revVisibleRange!);
     }
   }
 
-  async applySelectEvent(e: t.SelectEvent, direction: t.Direction) {
+  async applySelectEvent(e: t.SelectEvent, direction: t.Direction, uriSet?: t.UriSet) {
+    if (uriSet) uriSet[e.uri] = true;
     const textEditor = this.getTextEditorByUri(e.uri);
     if (direction === t.Direction.Forwards) {
       textEditor.select(e.selections, e.visibleRange);
@@ -194,7 +200,8 @@ export class Session implements t.ApplyPlaybackEvent {
     }
   }
 
-  async applyScrollEvent(e: t.ScrollEvent, direction: t.Direction) {
+  async applyScrollEvent(e: t.ScrollEvent, direction: t.Direction, uriSet?: t.UriSet) {
+    if (uriSet) uriSet[e.uri] = true;
     const textEditor = this.getTextEditorByUri(e.uri);
     if (direction === t.Direction.Forwards) {
       textEditor.scroll(e.visibleRange);
@@ -203,7 +210,8 @@ export class Session implements t.ApplyPlaybackEvent {
     }
   }
 
-  async applySaveEvent(e: t.SaveEvent, direction: t.Direction) {
+  async applySaveEvent(e: t.SaveEvent, direction: t.Direction, uriSet?: t.UriSet) {
+    if (uriSet) uriSet[e.uri] = true;
     // nothing
   }
 }

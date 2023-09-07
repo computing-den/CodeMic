@@ -37,7 +37,7 @@ class Recorder {
     fork?: boolean,
     forkAtClock?: number,
   ): Promise<Recorder | undefined> {
-    assert(forkAtClock !== undefined, 'TODO fork at specific time.');
+    assert(forkAtClock === undefined, 'TODO fork at specific time.');
 
     let workspace: Workspace | undefined;
     let isDirty = true;

@@ -93,21 +93,22 @@ export function dispatchPlaybackEvent(
   applier: t.ApplyPlaybackEvent,
   e: t.PlaybackEvent,
   direction: t.Direction,
+  uriSet?: t.UriSet,
 ): Promise<void> {
   switch (e.type) {
     case 'stop':
-      return applier.applyStopEvent(e, direction);
+      return applier.applyStopEvent(e, direction, uriSet);
     case 'textChange':
-      return applier.applyTextChangeEvent(e, direction);
+      return applier.applyTextChangeEvent(e, direction, uriSet);
     case 'openDocument':
-      return applier.applyOpenDocumentEvent(e, direction);
+      return applier.applyOpenDocumentEvent(e, direction, uriSet);
     case 'showTextEditor':
-      return applier.applyShowTextEditorEvent(e, direction);
+      return applier.applyShowTextEditorEvent(e, direction, uriSet);
     case 'select':
-      return applier.applySelectEvent(e, direction);
+      return applier.applySelectEvent(e, direction, uriSet);
     case 'scroll':
-      return applier.applyScrollEvent(e, direction);
+      return applier.applyScrollEvent(e, direction, uriSet);
     case 'save':
-      return applier.applySaveEvent(e, direction);
+      return applier.applySaveEvent(e, direction, uriSet);
   }
 }
