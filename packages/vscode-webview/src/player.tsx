@@ -249,7 +249,7 @@ export default class Player extends Component<Props> {
                   >
                     <span className="codicon codicon-edit" />
                   </vscode-button>
-                  <vscode-button appearance="icon" title="Bookmark">
+                  <vscode-button appearance="icon" title="Bookmark at this point">
                     <span className="codicon codicon-bookmark" />
                   </vscode-button>
                   <vscode-button appearance="icon" title="Like">

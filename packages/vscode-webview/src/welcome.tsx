@@ -2,22 +2,18 @@ import { h, Fragment, Component } from 'preact';
 import { types as t, lib } from '@codecast/lib';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
+// import LatencyTest from './latency_test.jsx';
 import TimeFromNow from './time_from_now.js';
 import * as actions from './actions';
 import _ from 'lodash';
 
 type Props = { store: t.Store; onExit: () => void };
 export default class Welcome extends Component<Props> {
-  // openPlayer = async (uri?: t.Uri) => {
-  //   await actions.openPlayer(uri);
-  // };
-
-  componentDidMount() {}
-
   render() {
     const { workspace, featured, history } = this.props.store.welcome;
     return (
       <Screen className="welcome">
+        {/*<LatencyTest store={this.props.store} />*/}
         <Section className="search-section">
           <Section.Body>
             <vscode-text-field placeholder="Search" autofocus></vscode-text-field>
@@ -176,6 +172,9 @@ class SessionItem extends Component<SessionItemProps> {
               onClick={this.editSession}
             >
               <span className="codicon codicon-edit" />
+            </vscode-button>
+            <vscode-button appearance="icon" title="Like">
+              <span className="codicon codicon-heart" />
             </vscode-button>
             <vscode-button appearance="icon" title="Delete this session" onClick={this.deleteSession}>
               <span className="codicon codicon-close" />

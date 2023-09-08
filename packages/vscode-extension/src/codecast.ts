@@ -29,6 +29,7 @@ class Codecast {
   player?: Player;
   playerSetup?: PlayerSetup;
   webview: WebviewProvider;
+  test: any = 0;
 
   constructor(public context: vscode.ExtensionContext, public db: Db) {
     context.subscriptions.push(vscode.commands.registerCommand('codecast.openView', this.openView.bind(this)));
@@ -47,7 +48,7 @@ class Codecast {
   }
 
   async messageHandler(req: t.FrontendRequest): Promise<t.BackendResponse> {
-    console.log('extension received: ', req);
+    // console.log('extension received: ', req);
 
     switch (req.type) {
       case 'openWelcome': {
@@ -246,6 +247,10 @@ class Codecast {
         }
         return this.respondWithStore();
       }
+      case 'test': {
+        this.test = req.value;
+        return this.respondWithStore();
+      }
       default: {
         lib.unreachable(req);
       }
@@ -393,6 +398,7 @@ class Codecast {
       },
       recorder,
       player,
+      test: this.test,
     };
   }
 }

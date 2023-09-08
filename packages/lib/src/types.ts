@@ -31,7 +31,8 @@ export type FrontendRequest =
   | { type: 'getStore' }
   | { type: 'showOpenDialog'; options: OpenDialogOptions }
   | { type: 'confirmForkFromPlayer'; clock: number }
-  | { type: 'confirmEditFromPlayer' };
+  | { type: 'confirmEditFromPlayer' }
+  | { type: 'test'; value: any };
 export type BackendResponse =
   | { type: 'getStore'; store: Store }
   | { type: 'error' }
@@ -54,6 +55,7 @@ export type Store = {
   welcome: Welcome;
   recorder?: RecorderState;
   player?: PlayerState;
+  test?: any;
 
   // welcome?: Welcome;
   // login?: Login;

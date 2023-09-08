@@ -63,6 +63,10 @@ export async function seek(clock: number) {
   await postMessageAndUpdateStore({ type: 'seek', clock });
 }
 
+export async function test(value: any): Promise<t.Store> {
+  return await postMessageAndUpdateStore({ type: 'test', value: value });
+}
+
 export async function showOpenDialog(options: t.OpenDialogOptions): Promise<t.Uri[] | undefined> {
   return (await postMessageHelper({ type: 'showOpenDialog', options }, 'uris')).uris;
 }
@@ -79,9 +83,9 @@ export async function confirmEditFromPlayer(): Promise<boolean> {
   return (await postMessageHelper({ type: 'confirmEditFromPlayer' }, 'boolean')).value;
 }
 
-async function postMessageAndUpdateStore(req: t.FrontendRequest) {
+async function postMessageAndUpdateStore(req: t.FrontendRequest): Promise<t.Store> {
   const res = await postMessageHelper(req, 'getStore');
-  updateStore(() => res.store);
+  return updateStore(() => res.store);
 }
 
 type HasType<R, T extends string> = R & { type: T };
