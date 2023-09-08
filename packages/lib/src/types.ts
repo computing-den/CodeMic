@@ -27,6 +27,7 @@ export type FrontendRequest =
   | { type: 'saveRecorder' }
   | { type: 'updateRecorderSessionSummary'; sessionSummary: SessionSummary }
   | { type: 'playbackUpdate'; clock: number }
+  | { type: 'deleteSession'; sessionId: string }
   | { type: 'getStore' }
   | { type: 'showOpenDialog'; options: OpenDialogOptions }
   | { type: 'confirmForkFromPlayer'; clock: number }

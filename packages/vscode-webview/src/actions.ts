@@ -55,6 +55,10 @@ export async function pausePlayer() {
   await postMessageAndUpdateStore({ type: 'pausePlayer' });
 }
 
+export async function deleteSession(sessionId: string) {
+  await postMessageAndUpdateStore({ type: 'deleteSession', sessionId });
+}
+
 export async function seek(clock: number) {
   await postMessageAndUpdateStore({ type: 'seek', clock });
 }

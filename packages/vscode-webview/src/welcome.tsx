@@ -120,6 +120,10 @@ class SessionItem extends Component<SessionItemProps> {
     e.stopPropagation();
     actions.openRecorder(this.props.session.id, true);
   };
+  deleteSession = (e: Event) => {
+    e.stopPropagation();
+    actions.deleteSession(this.props.session.id);
+  };
   render() {
     const { session, history } = this.props;
 
@@ -173,7 +177,7 @@ class SessionItem extends Component<SessionItemProps> {
             >
               <span className="codicon codicon-edit" />
             </vscode-button>
-            <vscode-button appearance="icon" title="Delete this session">
+            <vscode-button appearance="icon" title="Delete this session" onClick={this.deleteSession}>
               <span className="codicon codicon-close" />
             </vscode-button>
           </div>

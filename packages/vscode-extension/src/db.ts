@@ -60,6 +60,11 @@ export default class Db {
   mergeSessionHistory(h: t.SessionHistoryItem) {
     this.settings.history[h.id] = { ...this.settings.history[h.id], ...h };
   }
+
+  async deleteSession(id: string) {
+    delete this.sessionSummaries[id];
+    await fs.promises.rm(path.abs(userPaths.data, 'sessions', id), { force: true, recursive: true });
+  }
 }
 
 async function readAndParseJSON<T>(p: t.AbsPath, defaultFn?: () => T): Promise<T> {

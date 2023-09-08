@@ -205,7 +205,7 @@ class Codecast {
 
         const confirmTitle = 'Fork';
         const answer = await vscode.window.showWarningMessage(
-          `Do you wish to stop playing and fork the current session at ${lib.formatTimeSeconds(req.clock)}?`,
+          `Do you want to stop playing and fork the current session at ${lib.formatTimeSeconds(req.clock)}?`,
           { modal: true },
           { title: 'Cancel', isCloseAffordance: true },
           { title: confirmTitle },
@@ -222,7 +222,7 @@ class Codecast {
 
         const confirmTitle = 'Edit';
         const answer = await vscode.window.showWarningMessage(
-          `Do you wish to stop playing and edit the current session?`,
+          `Do you want to stop playing and edit the current session?`,
           { modal: true },
           { title: 'Cancel', isCloseAffordance: true },
           { title: confirmTitle },
@@ -231,6 +231,20 @@ class Codecast {
           await this.player!.start();
         }
         return { type: 'boolean', value: answer?.title === confirmTitle };
+      }
+      case 'deleteSession': {
+        const sessionSummary = this.db.sessionSummaries[req.sessionId];
+        const confirmTitle = 'Delete';
+        const answer = await vscode.window.showWarningMessage(
+          `Do you want to delete session "${sessionSummary?.title || 'Untitled'}"?`,
+          { modal: true },
+          { title: 'Cancel', isCloseAffordance: true },
+          { title: confirmTitle },
+        );
+        if (answer?.title === confirmTitle) {
+          await this.db.deleteSession(req.sessionId);
+        }
+        return this.respondWithStore();
       }
       default: {
         lib.unreachable(req);
@@ -266,7 +280,7 @@ class Codecast {
         const dontSaveTitle = "Don't Save";
         const cancelTitle = 'Cancel';
         const answer = await vscode.window.showWarningMessage(
-          'Do you wish to save this session?',
+          'Do you want to save this session?',
           { modal: true, detail: "Your changes will be lost if you don't save them." },
           { title: saveTitle },
           { title: cancelTitle, isCloseAffordance: true },
