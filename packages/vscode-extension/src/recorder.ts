@@ -16,26 +16,25 @@ class Recorder {
   private disposables: vscode.Disposable[] = [];
   private scrolling: boolean = false;
   private scrollStartRange?: t.Range;
-  private lastStartTimeMs: number = 0;
+
+  get session(): ir.Session {
+    return this.workspace.session!;
+  }
 
   constructor(
     public context: vscode.ExtensionContext,
     public db: Db,
     public workspace: Workspace,
-    private lastStopClock: number = 0,
-    private lastSavedClock: number = lastStopClock,
+    private clock: number = 0,
+    private lastSavedClock: number = clock,
   ) {}
 
   /**
    * root must be already resolved.
    */
-  static async fromDirAndVsc(
-    context: vscode.ExtensionContext,
-    db: Db,
-    root: t.AbsPath,
-    sessionSummary: t.SessionSummary,
-  ): Promise<Recorder> {
-    let workspace = await Workspace.fromDirAndVsc(sessionSummary, root);
+  static async fromDirAndVsc(context: vscode.ExtensionContext, db: Db, setup: t.RecorderSetup): Promise<Recorder> {
+    assert(setup.root);
+    const workspace = await Workspace.fromDirAndVsc(setup.sessionSummary, setup.root);
     return new Recorder(context, db, workspace);
   }
 
@@ -45,16 +44,11 @@ class Recorder {
   static async populateSession(
     context: vscode.ExtensionContext,
     db: Db,
-    root: t.AbsPath,
-    sessionSummary: t.SessionSummary,
-    baseSessionSummary: t.SessionSummary,
-    fork?: boolean,
-    forkAtClock?: number,
+    { root, sessionSummary, baseSessionSummary, forkClock }: t.RecorderSetup,
   ): Promise<Recorder | undefined> {
-    let workspace: Workspace | undefined;
-    let clock = forkAtClock;
-    clock ??= sessionSummary.duration;
-    workspace = await Workspace.populateSession(db, root, sessionSummary, baseSessionSummary, clock, clock);
+    assert(root);
+    const clock = forkClock ?? sessionSummary.duration;
+    const workspace = await Workspace.populateSession(db, root, sessionSummary, baseSessionSummary, clock, clock);
     return workspace && new Recorder(context, db, workspace, clock);
   }
 
@@ -98,7 +92,6 @@ class Recorder {
     assert(this.status === t.RecorderStatus.Ready || this.status === t.RecorderStatus.Paused);
 
     this.status = t.RecorderStatus.Recording;
-    this.lastStartTimeMs = Date.now();
 
     // listen for open document events
     {
@@ -157,11 +150,6 @@ class Recorder {
   }
 
   async pause() {
-    // Careful: session.summary's duration is not up-to-date until we call save()
-    if (this.status === t.RecorderStatus.Recording) {
-      const clock = this.getClock();
-      this.lastStopClock = clock;
-    }
     this.status = t.RecorderStatus.Paused;
     this.dispose();
   }
@@ -172,7 +160,6 @@ class Recorder {
   }
 
   async stop() {
-    // Careful: session.summary's duration is not up-to-date until we call save()
     this.pause();
     this.status = t.RecorderStatus.Stopped;
     await this.saveHistoryOpenClose();
@@ -182,22 +169,21 @@ class Recorder {
    * May be called without pause() or stop().
    */
   async save() {
-    const session = this.workspace.session!;
-    const clock = this.getClock();
-    session.summary.duration = clock;
-    session.summary.timestamp = new Date().toISOString();
-    await this.db.writeSession(session.toJSON(), session.summary);
+    this.session.summary.timestamp = new Date().toISOString();
+    await this.db.writeSession(this.session.toJSON(), this.session.summary);
     await this.saveHistoryOpenClose();
-    this.lastSavedClock = clock;
+    this.lastSavedClock = this.getClock();
   }
 
-  setSessionSummary(sessionSummary: t.SessionSummary) {
-    this.workspace.session!.summary = sessionSummary;
-    console.log('setSessionSummary: ', sessionSummary);
+  updateState(changes: t.RecorderUpdate) {
+    if (changes.title !== undefined) this.session.summary.title = changes.title;
+    if (changes.description !== undefined) this.session.summary.description = changes.description;
+    if (changes.clock !== undefined) this.session.summary.duration = this.clock = changes.clock;
+    if (changes.root !== undefined) throw new Error('Recorder.updateState cannot changes root');
   }
 
   isSessionEmpty(): boolean {
-    return !this.workspace.session || this.workspace.session.events.length === 0;
+    return this.session.events.length === 0;
   }
 
   textChange(
@@ -242,14 +228,14 @@ class Recorder {
     const uri = this.workspace.uriFromVsc(vscTextEditor.document.uri);
     console.log(`adding showTextEditor for ${uri}`);
 
-    const revUri = this.workspace.session!.activeTextEditor?.document.uri;
-    const revSelections = this.workspace.session!.activeTextEditor?.selections;
-    const revVisibleRange = this.workspace.session!.activeTextEditor?.visibleRange;
+    const revUri = this.session.activeTextEditor?.document.uri;
+    const revSelections = this.session.activeTextEditor?.selections;
+    const revVisibleRange = this.session.activeTextEditor?.visibleRange;
 
     // Possibly inserts an openDocument or textChange event if the document wasn't found in internal session or
     // its contents were different.
     const irTextEditor = this.openTextEditorHelper(vscTextEditor, uri, true);
-    this.workspace.session!.activeTextEditor = irTextEditor;
+    this.session.activeTextEditor = irTextEditor;
 
     this.pushEvent({
       type: 'showTextEditor',
@@ -272,7 +258,7 @@ class Recorder {
       `visibleRange: ${vscTextEditor.visibleRanges[0].start.line}:${vscTextEditor.visibleRanges[0].end.line}`,
     );
 
-    const irTextEditor = this.workspace.session!.getTextEditorByUri(uri);
+    const irTextEditor = this.session.getTextEditorByUri(uri);
     const revSelections = irTextEditor.selections;
     const revVisibleRanges = irTextEditor.visibleRange;
     irTextEditor.select(
@@ -323,7 +309,7 @@ class Recorder {
 
     console.log(`adding scroll for ${uri}`);
 
-    const irTextEditor = this.workspace.session!.getTextEditorByUri(uri);
+    const irTextEditor = this.session.getTextEditorByUri(uri);
     const revVisibleRange = irTextEditor.visibleRange;
     irTextEditor.scroll(visibleRange);
 
@@ -341,11 +327,12 @@ class Recorder {
   }
 
   getClock(): number {
-    if (this.status === t.RecorderStatus.Recording) {
-      return (Date.now() - this.lastStartTimeMs) / 1000 + this.lastStopClock;
-    } else {
-      return this.lastStopClock;
-    }
+    return this.clock;
+    // if (this.status === t.RecorderStatus.Recording) {
+    //   return (Date.now() - this.lastStartTimeMs) / 1000 + this.clock;
+    // } else {
+    //   return this.clock;
+    // }
   }
 
   isDirty(): boolean {
@@ -357,12 +344,12 @@ class Recorder {
       this.scrolling = false;
       this.scrollStartRange = undefined;
     }
-    this.workspace.session!.events.push(e);
+    this.session.events.push(e);
   }
 
   private async saveHistoryOpenClose() {
     this.db.mergeSessionHistory({
-      id: this.workspace.session!.summary.id,
+      id: this.session.summary.id,
       lastRecordedTimestamp: new Date().toISOString(),
       root: this.workspace.root,
     });
@@ -384,7 +371,7 @@ class Recorder {
     uri: t.Uri,
     checkContent: boolean,
   ): ir.TextDocument {
-    let irTextDocument = this.workspace.session!.findTextDocumentByUri(uri);
+    let irTextDocument = this.session.findTextDocumentByUri(uri);
 
     if (irTextDocument) {
       if (checkContent) {
@@ -409,7 +396,7 @@ class Recorder {
       }
     } else {
       irTextDocument = this.workspace.textDocumentFromVsc(vscTextDocument, uri);
-      this.workspace.session!.textDocuments.push(irTextDocument);
+      this.session.textDocuments.push(irTextDocument);
       this.pushEvent({
         type: 'openDocument',
         clock: this.getClock(),
@@ -428,10 +415,10 @@ class Recorder {
     const selections = this.workspace.selectionsFromVsc(vscTextEditor.selections);
     const visibleRange = this.workspace.rangeFromVsc(vscTextEditor.visibleRanges[0]);
     const textDocument = this.openDocumentWithUri(vscTextEditor.document, uri, checkContent);
-    let textEditor = this.workspace.session!.findTextEditorByUri(textDocument.uri);
+    let textEditor = this.session.findTextEditorByUri(textDocument.uri);
     if (!textEditor) {
       textEditor = new ir.TextEditor(textDocument, selections, visibleRange);
-      this.workspace.session!.textEditors.push(textEditor);
+      this.session.textEditors.push(textEditor);
     } else {
       textEditor.select(selections, visibleRange);
     }

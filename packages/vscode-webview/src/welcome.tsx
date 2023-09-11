@@ -9,8 +9,11 @@ import _ from 'lodash';
 
 type Props = { store: t.Store; onExit: () => void };
 export default class Welcome extends Component<Props> {
+  get welcome(): t.Welcome {
+    return this.props.store.welcome!;
+  }
+
   render() {
-    const { workspace, featured, history } = this.props.store.welcome;
     return (
       <Screen className="welcome">
         {/*<LatencyTest store={this.props.store} />*/}
@@ -22,45 +25,10 @@ export default class Welcome extends Component<Props> {
             </vscode-button>
           </Section.Body>
         </Section>
-        <SessionsSection title="WORKSPACE" history={history} sessions={workspace} />
-        <SessionsSection title="FEATURED" history={history} sessions={featured} />
+        <SessionsSection title="WORKSPACE" history={this.welcome.history} sessions={this.welcome.workspace} />
+        <SessionsSection title="FEATURED" history={this.welcome.history} sessions={this.welcome.featured} />
       </Screen>
     );
-
-    // return (
-    //   <div className="screen welcome">
-    //     <div className="section">
-    //       <h2>Start</h2>
-    //       <ul className="unstyled">
-    //         <li>
-    //           <vscode-link href="#" onClick={this.openRecorder}>
-    //             <span className="codicon codicon-device-camera-video va-top m-right" />
-    //             Record new session
-    //           </vscode-link>
-    //         </li>
-    //         <li>
-    //           <vscode-link href="#" onClick={() => this.openPlayer()}>
-    //             <span className="codicon codicon-folder-opened va-top m-right" />
-    //             Open session
-    //           </vscode-link>
-    //         </li>
-    //       </ul>
-    //     </div>
-    //     <div className="section recent">
-    //       <h2>Recent</h2>
-    //       <ul className="unstyled">
-    //         {recentFiles.map(({ name, dir, uri }) => (
-    //           <li>
-    //             <vscode-link href="#" onClick={() => this.openPlayer(uri)}>
-    //               {name}
-    //             </vscode-link>
-    //             {dir}
-    //           </li>
-    //         ))}
-    //       </ul>
-    //     </div>
-    //   </div>
-    // );
   }
 }
 

@@ -1,5 +1,3 @@
-import fs from 'fs';
-import * as misc from './misc.js';
 import Recorder from './recorder.js';
 import Player from './player.js';
 import Workspace from './workspace.js';
@@ -9,25 +7,13 @@ import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
 import { types as t, lib, path } from '@codecast/lib';
-import nodePath from 'path';
-
-type PlayerSetup = {
-  sessionSummary: t.SessionSummary;
-};
-
-type RecorderSetup = {
-  sessionSummary: t.SessionSummary;
-  baseSessionSummary?: t.SessionSummary;
-  fork?: boolean;
-  forkClock?: number;
-};
 
 class Codecast {
   screen: t.Screen = t.Screen.Welcome;
   recorder?: Recorder;
-  recorderSetup?: RecorderSetup;
+  recorderSetup?: t.RecorderSetup;
   player?: Player;
-  playerSetup?: PlayerSetup;
+  playerSetup?: t.PlayerSetup;
   webview: WebviewProvider;
   test: any = 0;
 
@@ -59,7 +45,11 @@ class Codecast {
         if (await this.closeCurrentScreen()) {
           const sessionSummary = this.db.sessionSummaries[req.sessionId];
           assert(sessionSummary);
-          this.playerSetup = { sessionSummary };
+          this.playerSetup = {
+            sessionSummary,
+            root: this.db.settings.history[sessionSummary.id]?.root,
+            // set history in getStore() so that it's always up-to-date
+          };
           this.screen = t.Screen.Player;
         }
         return this.respondWithStore();
@@ -68,7 +58,15 @@ class Codecast {
         if (await this.closeCurrentScreen()) {
           const baseSessionSummary = req.sessionId ? this.db.sessionSummaries[req.sessionId] : undefined;
           const sessionSummary = Recorder.makeSessionSummary(baseSessionSummary, req.fork, req.forkClock);
-          this.recorderSetup = { sessionSummary, baseSessionSummary, fork: req.fork, forkClock: req.forkClock };
+          const history = this.getFirstHistoryItemById(sessionSummary.id, baseSessionSummary?.id);
+          this.recorderSetup = {
+            sessionSummary,
+            baseSessionSummary,
+            fork: req.fork,
+            forkClock: req.forkClock,
+            root: history?.root || Workspace.getDefaultRoot(),
+            // set history in getStore() so that it's always up-to-date
+          };
           this.screen = t.Screen.Recorder;
         }
 
@@ -76,16 +74,10 @@ class Codecast {
       }
       case 'play': {
         if (!this.player) {
-          assert(req.root);
           assert(this.playerSetup);
 
           // May return undefined if user decides not to overwrite root
-          this.player = await Player.populate(
-            this.context,
-            this.db,
-            path.abs(nodePath.resolve(req.root)),
-            this.playerSetup.sessionSummary,
-          );
+          this.player = await Player.populate(this.context, this.db, this.playerSetup);
         }
 
         if (this.player) {
@@ -103,37 +95,17 @@ class Codecast {
               return { type: 'error' };
             }
           }
-          assert(req.root);
-          assert(req.sessionSummary);
           assert(this.recorderSetup);
           if (this.recorderSetup.baseSessionSummary) {
-            this.recorder = await Recorder.populateSession(
-              this.context,
-              this.db,
-              path.abs(nodePath.resolve(req.root)),
-              req.sessionSummary,
-              this.recorderSetup.baseSessionSummary,
-              this.recorderSetup.fork,
-              this.recorderSetup.forkClock,
-            );
+            this.recorder = await Recorder.populateSession(this.context, this.db, this.recorderSetup);
           } else {
-            this.recorder = await Recorder.fromDirAndVsc(
-              this.context,
-              this.db,
-              path.abs(nodePath.resolve(req.root)),
-              req.sessionSummary,
-            );
+            this.recorder = await Recorder.fromDirAndVsc(this.context, this.db, this.recorderSetup);
           }
         }
 
         if (this.recorder) {
           await this.recorder.start();
         }
-        return this.respondWithStore();
-      }
-      case 'seek': {
-        assert(this.player);
-        await this.player.update(req.clock);
         return this.respondWithStore();
       }
       case 'pausePlayer': {
@@ -156,25 +128,6 @@ class Codecast {
 
         return { type: 'ok' };
       }
-      // case 'discard': {
-      //   if (this.recorder) {
-      //     this.recorder.stop();
-      //     this.recorder = undefined;
-      //     return this.respondWithStore();
-      //   } else {
-      //     vscode.window.showInformationMessage('Codecast is not recording.');
-      //     return { type: 'error' };
-      //   }
-      // }
-      case 'playbackUpdate': {
-        // if (this.player?.status !== t.PlayerStatus.Playing) {
-        //   console.error('got playbackUpdate but player is not playing');
-        //   return { type: 'error' };
-        // }
-        assert(this.player);
-        this.player.update(req.clock);
-        return this.respondWithStore();
-      }
       case 'getStore': {
         return this.respondWithStore();
       }
@@ -190,14 +143,25 @@ class Codecast {
         const uris = await vscode.window.showOpenDialog(options);
         return { type: 'uris', uris: uris?.map(x => x.toString()) };
       }
-      case 'updateRecorderSessionSummary': {
-        // if there's no recorder, just ignore it, we'll receive sessionSummary when recording starts
+      case 'updateRecorder': {
         if (this.recorder) {
-          this.recorder.setSessionSummary(req.sessionSummary);
+          this.recorder.updateState(req.changes);
         } else {
-          this.recorderSetup!.sessionSummary = req.sessionSummary;
+          if (req.changes.title !== undefined) this.recorderSetup!.sessionSummary.title = req.changes.title;
+          if (req.changes.description !== undefined)
+            this.recorderSetup!.sessionSummary.description = req.changes.description;
+          if (req.changes.root !== undefined) this.recorderSetup!.root = req.changes.root;
         }
-        return { type: 'ok' };
+        return this.respondWithStore();
+      }
+      case 'updatePlayer': {
+        if (this.player) {
+          await this.player.updateState(req.changes);
+        } else {
+          if (req.changes.root !== undefined) this.playerSetup!.root = req.changes.root;
+          if (req.changes.clock !== undefined) throw new Error('TODO seek before player instantiation');
+        }
+        return this.respondWithStore();
       }
       case 'confirmForkFromPlayer': {
         const status = this.player?.status;
@@ -353,49 +317,72 @@ class Codecast {
     return { type: 'getStore', store: this.getStore() };
   }
 
+  getFirstHistoryItemById(...ids: (string | undefined)[]): t.SessionHistoryItem | undefined {
+    return _.compact(ids)
+      .map(id => this.db.settings.history[id])
+      .find(Boolean);
+  }
+
   getStore(): t.Store {
     let recorder: t.RecorderState | undefined;
-    if (this.screen === t.Screen.Recorder && this.recorder) {
-      recorder = {
-        status: this.recorder.status,
-        sessionSummary: this.recorder.workspace.session!.summary,
-        root: this.recorder.getRoot(),
-        defaultRoot: Workspace.getDefaultRoot(),
-      };
-    } else if (this.screen === t.Screen.Recorder && !this.recorder && this.recorderSetup) {
-      recorder = {
-        status: t.RecorderStatus.Uninitialized,
-        sessionSummary: this.recorderSetup.sessionSummary,
-        fork: this.recorderSetup.fork,
-        forkClock: this.recorderSetup.forkClock,
-        defaultRoot: Workspace.getDefaultRoot(),
-      };
+    if (this.screen === t.Screen.Recorder) {
+      if (this.recorder) {
+        recorder = {
+          status: this.recorder.status,
+          sessionSummary: this.recorder.workspace.session!.summary,
+          clock: this.recorder.getClock(),
+          root: this.recorder.getRoot(),
+          history: this.db.settings.history[this.recorder.workspace.session!.summary.id],
+        };
+      } else if (this.recorderSetup) {
+        recorder = {
+          status: t.RecorderStatus.Uninitialized,
+          sessionSummary: this.recorderSetup.sessionSummary,
+          clock: this.recorderSetup.forkClock ?? this.recorderSetup.baseSessionSummary?.duration ?? 0,
+          root: this.recorderSetup.root,
+          fork: this.recorderSetup.fork,
+          forkClock: this.recorderSetup.forkClock,
+          history: this.getFirstHistoryItemById(
+            this.recorderSetup.sessionSummary.id,
+            this.recorderSetup.baseSessionSummary?.id,
+          ),
+        };
+      }
     }
 
     let player: t.PlayerState | undefined;
-    if (this.screen === t.Screen.Player && this.player) {
-      player = {
-        sessionSummary: this.player.workspace.session!.summary,
-        history: this.db.settings.history[this.player.workspace.session!.summary.id],
-        status: this.player.status,
-        clock: this.player.getClock(),
-      };
-    } else if (this.screen === t.Screen.Player && !this.player && this.playerSetup) {
-      player = {
-        sessionSummary: this.playerSetup.sessionSummary,
-        history: this.db.settings.history[this.playerSetup.sessionSummary.id],
-        status: t.PlayerStatus.Uninitialized,
-        clock: 0,
+    if (this.screen === t.Screen.Player) {
+      if (this.player) {
+        player = {
+          status: this.player.status,
+          sessionSummary: this.player.workspace.session!.summary,
+          clock: this.player.getClock(),
+          root: this.player.workspace.root,
+          history: this.db.settings.history[this.player.workspace.session!.summary.id],
+        };
+      } else if (this.playerSetup) {
+        player = {
+          status: t.PlayerStatus.Uninitialized,
+          sessionSummary: this.playerSetup.sessionSummary,
+          clock: 0,
+          root: this.playerSetup.root,
+          history: this.db.settings.history[this.playerSetup.sessionSummary.id],
+        };
+      }
+    }
+
+    let welcome: t.Welcome | undefined;
+    if (this.screen === t.Screen.Welcome) {
+      welcome = {
+        workspace: this.db.sessionSummaries,
+        featured: FEATURED_SESSIONS,
+        history: this.db.settings.history,
       };
     }
 
     return {
       screen: this.screen,
-      welcome: {
-        workspace: this.db.sessionSummaries,
-        featured: FEATURED_SESSIONS,
-        history: this.db.settings.history,
-      },
+      welcome,
       recorder,
       player,
       test: this.test,

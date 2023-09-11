@@ -16,17 +16,16 @@ export type ParsedUri =
   | { scheme: 'untitled'; name: string };
 
 export type FrontendRequest =
-  | { type: 'seek'; clock: number }
   | { type: 'openWelcome' }
   | { type: 'openPlayer'; sessionId: string }
   | { type: 'openRecorder'; sessionId?: string; fork?: boolean; forkClock?: number }
-  | { type: 'play'; root?: AbsPath }
-  | { type: 'record'; root?: AbsPath; sessionSummary?: SessionSummary }
+  | { type: 'play' }
+  | { type: 'record' }
   | { type: 'pausePlayer' }
   | { type: 'pauseRecorder' }
   | { type: 'saveRecorder' }
-  | { type: 'updateRecorderSessionSummary'; sessionSummary: SessionSummary }
-  | { type: 'playbackUpdate'; clock: number }
+  | { type: 'updateRecorder'; changes: RecorderUpdate }
+  | { type: 'updatePlayer'; changes: PlayerUpdate }
   | { type: 'deleteSession'; sessionId: string }
   | { type: 'getStore' }
   | { type: 'showOpenDialog'; options: OpenDialogOptions }
@@ -52,7 +51,7 @@ export enum Screen {
 // A separate field for each page
 export type Store = {
   screen: Screen;
-  welcome: Welcome;
+  welcome?: Welcome;
   recorder?: RecorderState;
   player?: PlayerState;
   test?: any;
@@ -78,11 +77,26 @@ export enum RecorderStatus {
 export type RecorderState = {
   status: RecorderStatus;
   sessionSummary: SessionSummary;
+  clock: number;
+  root?: string;
   fork?: boolean;
   forkClock?: number;
-  root?: AbsPath;
-  defaultRoot?: AbsPath;
   history?: SessionHistoryItem;
+};
+
+export type RecorderUpdate = {
+  title?: string;
+  description?: string;
+  root?: string;
+  clock?: number;
+};
+
+export type RecorderSetup = {
+  sessionSummary: SessionSummary;
+  baseSessionSummary?: SessionSummary;
+  fork?: boolean;
+  forkClock?: number;
+  root?: string;
 };
 
 export enum PlayerStatus {
@@ -97,8 +111,19 @@ export enum PlayerStatus {
 export type PlayerState = {
   status: PlayerStatus;
   sessionSummary: SessionSummary;
-  history?: SessionHistoryItem;
   clock: number;
+  root?: string;
+  history?: SessionHistoryItem;
+};
+
+export type PlayerUpdate = {
+  root?: string;
+  clock?: number;
+};
+
+export type PlayerSetup = {
+  sessionSummary: SessionSummary;
+  root?: string;
 };
 
 export type TocItem = { title: string; clock: number };

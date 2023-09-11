@@ -5,6 +5,7 @@ import * as misc from './misc.js';
 import Db from './db.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
+import nodePath from 'path';
 
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
 
@@ -13,12 +14,13 @@ export default class Workspace {
 
   static async populateSession(
     db: Db,
-    root: t.AbsPath,
+    rootStr: string,
     sessionSummary: t.SessionSummary,
     baseSessionSummary?: t.SessionSummary,
     seekClock?: number,
     cutClock?: number,
   ): Promise<Workspace | undefined> {
+    const root = path.abs(nodePath.resolve(rootStr));
     // user confirmations and root direction creation
     try {
       const files = await fs.promises.readdir(root);
@@ -60,7 +62,8 @@ export default class Workspace {
     return workspace;
   }
 
-  static async fromDirAndVsc(summary: t.SessionSummary, root: t.AbsPath): Promise<Workspace> {
+  static async fromDirAndVsc(summary: t.SessionSummary, rootStr: string): Promise<Workspace> {
+    const root = path.abs(nodePath.resolve(rootStr));
     const workspace = new Workspace(root);
     const checkpoint = await workspace.createCheckpointFromDirAndVsc();
     workspace.session = ir.Session.fromCheckpoint(root, checkpoint, [], os.EOL as t.EndOfLine, summary);

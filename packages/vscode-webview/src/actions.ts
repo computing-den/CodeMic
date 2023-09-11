@@ -7,8 +7,8 @@ export function init(_postMessage: (req: t.FrontendRequest) => Promise<t.Backend
   postMessage = _postMessage;
 }
 
-export async function startRecorder(root?: t.AbsPath, sessionSummary?: t.SessionSummary) {
-  await postMessageAndUpdateStore({ type: 'record', root, sessionSummary });
+export async function startRecorder() {
+  await postMessageAndUpdateStore({ type: 'record' });
 }
 
 export async function pauseRecorder() {
@@ -43,12 +43,16 @@ export async function openRecorder(sessionId?: string, fork?: boolean, forkClock
   await postMessageAndUpdateStore({ type: 'openRecorder', sessionId, fork, forkClock });
 }
 
-export async function updateRecorderSessionSummary(sessionSummary: t.SessionSummary) {
-  await postMessageHelper({ type: 'updateRecorderSessionSummary', sessionSummary }, 'ok');
+export async function updateRecorder(changes: t.RecorderUpdate) {
+  await postMessageAndUpdateStore({ type: 'updateRecorder', changes });
 }
 
-export async function startPlayer(root?: t.AbsPath) {
-  await postMessageAndUpdateStore({ type: 'play', root });
+export async function updatePlayer(changes: t.PlayerUpdate) {
+  await postMessageAndUpdateStore({ type: 'updatePlayer', changes });
+}
+
+export async function startPlayer() {
+  await postMessageAndUpdateStore({ type: 'play' });
 }
 
 export async function pausePlayer() {
@@ -57,10 +61,6 @@ export async function pausePlayer() {
 
 export async function deleteSession(sessionId: string) {
   await postMessageAndUpdateStore({ type: 'deleteSession', sessionId });
-}
-
-export async function seek(clock: number) {
-  await postMessageAndUpdateStore({ type: 'seek', clock });
 }
 
 export async function test(value: any): Promise<t.Store> {

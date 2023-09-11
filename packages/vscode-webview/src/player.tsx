@@ -5,9 +5,7 @@ import TimeFromNow from './time_from_now.jsx';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
 import * as actions from './actions.js';
-// import type { WebviewApi } from 'vscode-webview';
 import _ from 'lodash';
-import moment from 'moment';
 
 type Props = { store: t.Store; onExit: () => void };
 export default class Player extends Component<Props> {
@@ -15,15 +13,14 @@ export default class Player extends Component<Props> {
   media = new FakeMedia(this.handleMediaProgress.bind(this));
   seeking = false;
 
-  state = {
-    localClock: 0,
-    root: this.props.store.player!.history?.root,
-  };
+  get player(): t.PlayerState {
+    return this.props.store.player!;
+  }
 
   startPlayer = async () => {
-    if (this.props.store.player!.status === t.PlayerStatus.Uninitialized) {
-      if (this.state.root) {
-        await actions.startPlayer(this.state.root);
+    if (this.player.status === t.PlayerStatus.Uninitialized) {
+      if (this.player.root) {
+        await actions.startPlayer();
       } else {
         // TODO show error to user
         console.error('Select a workspace folder');
@@ -38,24 +35,22 @@ export default class Player extends Component<Props> {
     await actions.pausePlayer();
   };
 
-  updateField = (e: InputEvent) => {
-    const target = e.target as HTMLInputElement;
-    this.setState({ [target.dataset.field!]: target.value });
+  rootChanged = async (e: InputEvent) => {
+    await actions.updatePlayer({ root: (e.target as HTMLInputElement).value });
   };
 
   pickRoot = async () => {
     const p = await actions.showOpenDialog({
-      defaultUri: this.state.root ? path.fileUriFromAbsPath(this.state.root) : undefined,
+      defaultUri: this.player.root ? path.fileUriFromAbsPath(path.abs(this.player.root)) : undefined,
       canSelectFolders: true,
       canSelectFiles: false,
       title: 'Select workspace folder',
     });
     if (p?.length === 1) {
-      const parsedUri = path.parseUri(p[0]);
-      if (parsedUri.scheme !== 'file') {
-        throw new Error(`pickRoot: only local paths are supported. Instead received ${parsedUri.scheme}`);
+      if (!path.isFileUri(p[0] as t.Uri)) {
+        throw new Error(`pickRoot: only local paths are supported. Instead received ${p[0]}`);
       }
-      this.setState({ root: parsedUri.path });
+      await actions.updateRecorder({ root: path.getFileUriPath(p[0] as t.Uri) });
     }
   };
 
@@ -74,14 +69,11 @@ export default class Player extends Component<Props> {
     e.preventDefault();
     e.stopPropagation();
     const clock = this.getClockOfMouse(e);
-
     await this.seek(clock);
-    // this.media.time = clock * 1000;
-    // this.setState({ localClock: clock });
   };
 
   seek = async (clock: number) => {
-    if (this.props.store.player!.status === t.PlayerStatus.Uninitialized) {
+    if (this.player.status === t.PlayerStatus.Uninitialized) {
       // TODO populate the workspace automatically or prompt the user
       console.error('Workspace not populated yet');
       return;
@@ -93,10 +85,9 @@ export default class Player extends Component<Props> {
   seekTaskQueueDontUseDirectly = lib.taskQueue(async (clock: number) => {
     try {
       this.seeking = true;
-      const localClock = Math.max(0, Math.min(clock, this.props.store.player!.sessionSummary.duration));
-      await actions.seek(localClock);
-      this.media.timeMs = localClock * 1000;
-      this.setState({ localClock });
+      clock = Math.max(0, Math.min(clock, this.player.sessionSummary.duration));
+      await actions.updatePlayer({ clock });
+      this.media.timeMs = clock * 1000;
     } finally {
       this.seeking = false;
     }
@@ -104,7 +95,7 @@ export default class Player extends Component<Props> {
 
   getClockOfMouse = (e: MouseEvent): number => {
     const p = this.getPosNormOfMouse(e);
-    return this.props.store.player!.sessionSummary.duration * p;
+    return this.player.sessionSummary.duration * p;
   };
 
   getPosNormOfMouse = (e: MouseEvent): number => {
@@ -124,26 +115,25 @@ export default class Player extends Component<Props> {
   };
 
   fork = async () => {
-    if (await actions.confirmForkFromPlayer(this.state.localClock)) {
-      await actions.openRecorder(this.props.store.player!.sessionSummary.id, true, this.state.localClock);
+    if (await actions.confirmForkFromPlayer(this.player.clock)) {
+      await actions.openRecorder(this.player.sessionSummary.id, true, this.player.clock);
     }
   };
 
   edit = async () => {
     if (await actions.confirmEditFromPlayer()) {
-      await actions.openRecorder(this.props.store.player!.sessionSummary.id);
+      await actions.openRecorder(this.player.sessionSummary.id);
     }
   };
 
   isStoppedAlmostAtTheEnd(): boolean {
     return (
-      this.props.store.player!.status === t.PlayerStatus.Stopped &&
-      this.props.store.player!.clock >= this.props.store.player!.sessionSummary.duration - 0.5
+      this.player.status === t.PlayerStatus.Stopped && this.player.clock >= this.player.sessionSummary.duration - 0.5
     );
   }
 
   enableOrDisableMedia() {
-    const isPlaying = Boolean(this.props.store.player!.status === t.PlayerStatus.Playing);
+    const isPlaying = Boolean(this.player.status === t.PlayerStatus.Playing);
     if (isPlaying !== this.media.isActive()) {
       if (isPlaying) this.media.start();
       else this.media.pause();
@@ -151,7 +141,7 @@ export default class Player extends Component<Props> {
   }
 
   async handleMediaProgress(ms: number) {
-    if (!this.seeking && this.props.store.player!.status === t.PlayerStatus.Playing) {
+    if (!this.seeking && this.player.status === t.PlayerStatus.Playing) {
       await this.seek(ms / 1000);
     }
   }
@@ -171,12 +161,11 @@ export default class Player extends Component<Props> {
   }
 
   render() {
-    const player = this.props.store.player!;
-    const filledStyle = { height: `${(this.state.localClock / player.sessionSummary.duration) * 100}%` };
-    const ss = player.sessionSummary;
+    const filledStyle = { height: `${(this.player.clock / this.player.sessionSummary.duration) * 100}%` };
+    const ss = this.player.sessionSummary;
 
     let toggleFn: () => void, toggleIcon: string;
-    if (player.status === t.PlayerStatus.Playing) {
+    if (this.player.status === t.PlayerStatus.Playing) {
       [toggleFn, toggleIcon] = [this.pausePlayer, 'codicon-debug-pause'];
     } else {
       [toggleFn, toggleIcon] = [this.startPlayer, 'codicon-play'];
@@ -234,9 +223,9 @@ export default class Player extends Component<Props> {
                   <vscode-button
                     appearance="icon"
                     title={
-                      player.status === t.PlayerStatus.Playing
+                      this.player.status === t.PlayerStatus.Playing
                         ? `Fork: record a new session starting at this point`
-                        : `Fork: record a new session starting at ${lib.formatTimeSeconds(this.state.localClock)}`
+                        : `Fork: record a new session starting at ${lib.formatTimeSeconds(this.player.clock)}`
                     }
                     onClick={this.fork}
                   >
@@ -258,18 +247,18 @@ export default class Player extends Component<Props> {
                 </div>
                 <div className="time">
                   <span className="text">
-                    {lib.formatTimeSeconds(this.state.localClock)} / {lib.formatTimeSeconds(ss.duration)}
+                    {lib.formatTimeSeconds(this.player.clock)} / {lib.formatTimeSeconds(ss.duration)}
                   </span>
                 </div>
               </div>
             </div>
             <div className="forms">
-              {player.status === t.PlayerStatus.Uninitialized && (
+              {this.player.status === t.PlayerStatus.Uninitialized && (
                 <vscode-text-field
                   className="subsection"
                   data-field="root"
-                  onInput={this.updateField}
-                  value={this.state.root}
+                  onInput={this.rootChanged}
+                  value={this.player.root}
                   autofocus
                 >
                   Workspace

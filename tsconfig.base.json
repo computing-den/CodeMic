@@ -15,7 +15,9 @@
     "allowJs": false,
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "noUnusedParameters": false,
+    "noUnusedLocals": false
   }
   // "exclude": ["node_modules", ".vscode-test", "webview", "lib"]
 }

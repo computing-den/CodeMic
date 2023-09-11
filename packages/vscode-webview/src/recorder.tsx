@@ -8,26 +8,23 @@ import _ from 'lodash';
 
 type Props = { store: t.Store; onExit: () => void };
 export default class Recorder extends Component<Props> {
-  media: FakeMedia = new FakeMedia(
-    this.handleMediaProgress.bind(this),
-    this.props.store.recorder!.sessionSummary.duration * 1000,
-  );
+  media: FakeMedia = new FakeMedia(this.handleMediaProgress.bind(this), this.recorder.sessionSummary.duration * 1000);
 
-  state = {
-    localClock: this.props.store.recorder!.sessionSummary.duration,
-    root:
-      this.props.store.recorder!.root ||
-      this.props.store.recorder!.history?.root ||
-      this.props.store.recorder!.defaultRoot,
-    sessionSummary: this.props.store.recorder!.sessionSummary,
-  };
+  get recorder(): t.RecorderState {
+    return this.props.store.recorder!;
+  }
+
+  // state = {
+  //   localClock: this.recorder.sessionSummary.duration,
+  //   root:
+  //     this.recorder.root ||
+  //     this.recorder.history?.root ||
+  //     this.recorder.defaultRoot,
+  //   sessionSummary: this.recorder.sessionSummary,
+  // };
 
   startRecorder = async () => {
-    if (this.props.store.recorder!.status === t.RecorderStatus.Uninitialized) {
-      await actions.startRecorder(this.state.root, this.state.sessionSummary);
-    } else {
-      await actions.startRecorder();
-    }
+    await actions.startRecorder();
   };
 
   pauseRecorder = async () => {
@@ -38,48 +35,30 @@ export default class Recorder extends Component<Props> {
     await actions.saveRecorder();
   };
 
-  updateRoot = (e: InputEvent) => {
-    const target = e.target as HTMLInputElement;
-    console.log('updateRoot', target.value);
-    this.setState({ root: target.value });
+  titleChanged = async (e: InputEvent) => {
+    await actions.updateRecorder({ title: (e.target as HTMLInputElement).value });
   };
 
-  updateSessionSummary = (e: InputEvent) => {
-    const target = e.target as HTMLInputElement;
-    console.log('updateSessionSummary: ', target.dataset.field, target.value);
-    this.setState({ sessionSummary: { ...this.state.sessionSummary, [target.dataset.field!]: target.value } }, () => {
-      this.sendSessionSummaryUpdate();
-    });
+  descriptionChanged = async (e: InputEvent) => {
+    await actions.updateRecorder({ description: (e.target as HTMLInputElement).value });
   };
 
-  sendSessionSummaryUpdate = _.throttle(
-    async () => {
-      try {
-        await actions.updateRecorderSessionSummary(this.state.sessionSummary);
-      } catch (error) {
-        console.error(error);
-      }
-    },
-    300,
-    {
-      leading: true,
-      trailing: true,
-    },
-  );
+  rootChanged = async (e: InputEvent) => {
+    await actions.updateRecorder({ root: (e.target as HTMLInputElement).value });
+  };
 
   pickRoot = async () => {
     const p = await actions.showOpenDialog({
-      defaultUri: this.state.root ? path.fileUriFromAbsPath(this.state.root) : undefined,
+      defaultUri: this.recorder.root ? path.fileUriFromAbsPath(path.abs(this.recorder.root)) : undefined,
       canSelectFolders: true,
       canSelectFiles: false,
       title: 'Select workspace folder',
     });
     if (p?.length === 1) {
-      const parsedUri = path.parseUri(p[0]);
-      if (parsedUri.scheme !== 'file') {
-        throw new Error(`pickRoot: only local paths are supported. Instead received ${parsedUri.scheme}`);
+      if (!path.isFileUri(p[0] as t.Uri)) {
+        throw new Error(`pickRoot: only local paths are supported. Instead received ${p[0]}`);
       }
-      this.setState({ root: parsedUri.path });
+      await actions.updateRecorder({ root: path.getFileUriPath(p[0] as t.Uri) });
     }
   };
 
@@ -98,17 +77,21 @@ export default class Recorder extends Component<Props> {
   // };
 
   enableOrDisableMedia() {
-    const isRecording = Boolean(this.props.store.recorder!.status === t.RecorderStatus.Recording);
+    const isRecording = Boolean(this.recorder.status === t.RecorderStatus.Recording);
     if (isRecording !== this.media.isActive()) {
-      if (isRecording) this.media.start();
-      else this.media.pause();
+      this.media.timeMs = this.recorder.clock * 1000;
+      if (isRecording) {
+        this.media.start();
+      } else {
+        this.media.pause();
+      }
     }
   }
 
-  handleMediaProgress(ms: number) {
-    if (this.props.store.recorder!.status === t.RecorderStatus.Recording) {
+  async handleMediaProgress(ms: number) {
+    if (this.recorder.status === t.RecorderStatus.Recording) {
       console.log('handleMediaProgress: ', ms);
-      this.setState({ localClock: ms / 1000 });
+      await actions.updateRecorder({ clock: ms / 1000 });
     }
   }
 
@@ -127,8 +110,7 @@ export default class Recorder extends Component<Props> {
   }
 
   render() {
-    const recorder = this.props.store.recorder!;
-    const { status } = recorder;
+    const { status } = this.recorder;
 
     let toggleFn: () => void, toggleIcon: string;
     if (status === t.RecorderStatus.Uninitialized) {
@@ -158,7 +140,7 @@ export default class Recorder extends Component<Props> {
                   className="toggle-button for-recorder"
                   onClick={toggleFn}
                   appearance="icon"
-                  disabled={!this.state.root}
+                  disabled={!this.recorder.root}
                 >
                   <div className={`codicon ${toggleIcon}`} />
                 </vscode-button>
@@ -178,7 +160,7 @@ export default class Recorder extends Component<Props> {
                     status === t.RecorderStatus.Recording ? 'active' : ''
                   }`}
                 />
-                <span className="text large">{lib.formatTimeSeconds(this.state.localClock, true)}</span>
+                <span className="text large">{lib.formatTimeSeconds(this.recorder.clock, true)}</span>
               </div>
             </div>
             <div className="subsection buttons">
@@ -193,8 +175,8 @@ export default class Recorder extends Component<Props> {
             <p className="subsection help">Add audio and further adjustments in the studio.</p>
             <vscode-text-field
               className="subsection"
-              value={this.state.root}
-              onInput={this.updateRoot}
+              value={this.recorder.root}
+              onInput={this.rootChanged}
               data-field="root"
               disabled={status !== t.RecorderStatus.Uninitialized}
               autofocus
@@ -209,8 +191,8 @@ export default class Recorder extends Component<Props> {
             </p>
             <vscode-text-field
               className="subsection"
-              value={this.state.sessionSummary.title}
-              onInput={this.updateSessionSummary}
+              value={this.recorder.sessionSummary.title}
+              onInput={this.titleChanged}
               data-field="title"
             >
               Title
@@ -219,8 +201,8 @@ export default class Recorder extends Component<Props> {
               className="subsection"
               rows={5}
               resize="vertical"
-              value={this.state.sessionSummary.description}
-              onInput={this.updateSessionSummary}
+              value={this.recorder.sessionSummary.description}
+              onInput={this.descriptionChanged}
               data-field="description"
             >
               Description

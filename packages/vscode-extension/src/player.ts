@@ -20,13 +20,9 @@ class Player implements t.ApplyPlaybackEvent {
    * root must be already resolved.
    * May return undefined if user decides not to overwrite root or create it.
    */
-  static async populate(
-    context: vscode.ExtensionContext,
-    db: Db,
-    root: t.AbsPath,
-    sessionSummary: t.SessionSummary,
-  ): Promise<Player | undefined> {
-    const workspace = await Workspace.populateSession(db, root, sessionSummary);
+  static async populate(context: vscode.ExtensionContext, db: Db, setup: t.PlayerSetup): Promise<Player | undefined> {
+    assert(setup.root);
+    const workspace = await Workspace.populateSession(db, setup.root, setup.sessionSummary);
     return workspace && new Player(context, db, workspace);
   }
 
@@ -74,13 +70,14 @@ class Player implements t.ApplyPlaybackEvent {
     await this.saveHistoryClock();
   }
 
-  async update(clock: number) {
+  async updateState(changes: t.PlayerUpdate) {
     try {
-      await this.enqueueUpdate(clock);
+      if (changes.root !== undefined) throw new Error('Player: cannot modify root while playing');
+      if (changes.clock !== undefined) await this.enqueueUpdate(changes.clock);
     } catch (error) {
-      vscode.window.showErrorMessage('Sorry, something went wrong.', { detail: (error as Error).message });
       console.error(error);
-      this.pause();
+      vscode.window.showErrorMessage('Sorry, something went wrong.', { detail: (error as Error).message });
+      await this.pause();
     }
   }
 
