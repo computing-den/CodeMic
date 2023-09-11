@@ -1,6 +1,7 @@
 import { h, Fragment, Component } from 'preact';
 import { types as t, path, lib } from '@codecast/lib';
-import FakeMedia from './fake-media.jsx';
+// import FakeMedia from './fake_media.jsx';
+import Media, { MediaStatus } from './media.jsx';
 import TimeFromNow from './time_from_now.jsx';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
@@ -10,7 +11,7 @@ import _ from 'lodash';
 type Props = { store: t.Store; onExit: () => void };
 export default class Player extends Component<Props> {
   progressBar?: Element;
-  media = new FakeMedia(this.handleMediaProgress.bind(this));
+  media?: Media;
   seeking = false;
 
   get player(): t.PlayerState {
@@ -29,6 +30,8 @@ export default class Player extends Component<Props> {
       if (this.isStoppedAlmostAtTheEnd()) await this.seek(0);
       await actions.startPlayer();
     }
+
+    this.media!.start();
   };
 
   pausePlayer = async () => {
@@ -87,7 +90,7 @@ export default class Player extends Component<Props> {
       this.seeking = true;
       clock = Math.max(0, Math.min(clock, this.player.sessionSummary.duration));
       await actions.updatePlayer({ clock });
-      this.media.timeMs = clock * 1000;
+      // this.media!.clock = clock;
     } finally {
       this.seeking = false;
     }
@@ -126,38 +129,44 @@ export default class Player extends Component<Props> {
     }
   };
 
+  handleMediaProgress = async (clock: number) => {
+    console.log(!this.seeking, this.player.status, t.PlayerStatus.Playing, clock);
+    if (!this.seeking && this.player.status === t.PlayerStatus.Playing) {
+      await this.seek(clock);
+    }
+  };
+
   isStoppedAlmostAtTheEnd(): boolean {
     return (
       this.player.status === t.PlayerStatus.Stopped && this.player.clock >= this.player.sessionSummary.duration - 0.5
     );
   }
 
-  enableOrDisableMedia() {
-    const isPlaying = Boolean(this.player.status === t.PlayerStatus.Playing);
-    if (isPlaying !== this.media.isActive()) {
-      if (isPlaying) this.media.start();
-      else this.media.pause();
-    }
-  }
-
-  async handleMediaProgress(ms: number) {
-    if (!this.seeking && this.player.status === t.PlayerStatus.Playing) {
-      await this.seek(ms / 1000);
-    }
-  }
+  // TODO the problem is that media.start() or media.pause() may not take effect immediately, causing the media.start() to be
+  // called multiple times.\
+  // NOTE: audio element's start() returns a promise
+  // enableOrDisableMedia() {
+  //   if (this.media) {
+  //     if (this.player.status === t.PlayerStatus.Playing) {
+  //       this.media.start();
+  //     } else {
+  //       this.media.pause();
+  //     }
+  //   }
+  // }
 
   componentDidUpdate() {
-    this.enableOrDisableMedia();
+    // this.enableOrDisableMedia();
   }
 
   componentDidMount() {
     document.addEventListener('mousemove', this.mouseMoved);
-    this.enableOrDisableMedia();
+    this.media ??= new Media(this.props.store.audio, 0, this.handleMediaProgress);
   }
 
   componentWillUnmount() {
     document.removeEventListener('mousemove', this.mouseMoved);
-    this.media.pause();
+    this.media!.stop();
   }
 
   render() {
@@ -173,6 +182,7 @@ export default class Player extends Component<Props> {
 
     return (
       <Screen className="player">
+        <audio id="audio"></audio>
         <div className="progress-bar" ref={this.handleProgressBarRef} onClick={this.progressBarClicked}>
           <div className="bar">
             <div className="shadow" />

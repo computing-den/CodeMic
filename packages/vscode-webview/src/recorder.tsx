@@ -1,6 +1,6 @@
 import { h, Fragment, Component } from 'preact';
 import { types as t, path, lib } from '@codecast/lib';
-import FakeMedia from './fake-media.js';
+import FakeMedia from './fake_media.js';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
 import * as actions from './actions.js';

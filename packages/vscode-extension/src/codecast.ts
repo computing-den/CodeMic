@@ -386,6 +386,7 @@ class Codecast {
       recorder,
       player,
       test: this.test,
+      audio: this.webview.asWebviewUri(vscode.Uri.file('/home/sean/.local/share/codecast/sample.mp3'))?.toString()!,
     };
   }
 }

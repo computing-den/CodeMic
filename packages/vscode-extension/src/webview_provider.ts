@@ -3,6 +3,7 @@ import assert from 'assert';
 import _ from 'lodash';
 import { v4 as uuid } from 'uuid';
 import { types as t, bus as b } from '@codecast/lib';
+import userPaths from './user_paths.js';
 
 type HasType<R, T extends string> = R & { type: T };
 
@@ -26,10 +27,11 @@ class WebviewProvider implements vscode.WebviewViewProvider {
       // Allow scripts in the webview
       enableScripts: true,
 
-      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, '..', '..')],
+      // Allow access to files from these directories
+      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, '..', '..'), vscode.Uri.file(userPaths.data)],
     };
 
-    webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
+    webviewView.webview.html = this.getHtmlForWebview();
     webviewView.webview.onDidReceiveMessage(this.bus.handleParcel.bind(this.bus));
   }
 
@@ -72,13 +74,17 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  public asWebviewUri(uri: vscode.Uri): vscode.Uri | undefined {
+    return this.view?.webview.asWebviewUri(uri);
+  }
+
   private postParcel(parcel: b.Parcel): Promise<boolean> {
     assert(this.view);
     return this.view.webview.postMessage(parcel) as Promise<boolean>;
   }
 
-  private getHtmlForWebview(webview: vscode.Webview) {
-    const getPath = (...args: string[]) => webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, ...args));
+  private getHtmlForWebview() {
+    const getPath = (...args: string[]) => this.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, ...args))!;
 
     const resourcesUri = getPath('..', 'vscode-webview', 'resources');
     const webviewJs = getPath('..', 'vscode-webview', 'out', 'webview.js');

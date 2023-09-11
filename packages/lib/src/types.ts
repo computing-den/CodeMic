@@ -55,6 +55,7 @@ export type Store = {
   recorder?: RecorderState;
   player?: PlayerState;
   test?: any;
+  audio: string;
 
   // welcome?: Welcome;
   // login?: Login;
