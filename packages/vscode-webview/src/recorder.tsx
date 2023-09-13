@@ -3,7 +3,7 @@ import { types as t, path, lib } from '@codecast/lib';
 import FakeMedia from './fake_media.js';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
-import * as actions from './actions.js';
+import postMessage from './api.js';
 import _ from 'lodash';
 
 type Props = { store: t.Store; onExit: () => void };
@@ -24,41 +24,47 @@ export default class Recorder extends Component<Props> {
   // };
 
   startRecorder = async () => {
-    await actions.startRecorder();
+    await postMessage({ type: 'record' });
   };
 
   pauseRecorder = async () => {
-    await actions.pauseRecorder();
+    await postMessage({ type: 'pauseRecorder' });
   };
 
   save = async () => {
-    await actions.saveRecorder();
+    await postMessage({ type: 'saveRecorder' });
   };
 
   titleChanged = async (e: InputEvent) => {
-    await actions.updateRecorder({ title: (e.target as HTMLInputElement).value });
+    const changes = { title: (e.target as HTMLInputElement).value };
+    await postMessage({ type: 'updateRecorder', changes });
   };
 
   descriptionChanged = async (e: InputEvent) => {
-    await actions.updateRecorder({ description: (e.target as HTMLInputElement).value });
+    const changes = { description: (e.target as HTMLInputElement).value };
+    await postMessage({ type: 'updateRecorder', changes });
   };
 
   rootChanged = async (e: InputEvent) => {
-    await actions.updateRecorder({ root: (e.target as HTMLInputElement).value });
+    const changes = { root: (e.target as HTMLInputElement).value };
+    await postMessage({ type: 'updateRecorder', changes });
   };
 
   pickRoot = async () => {
-    const p = await actions.showOpenDialog({
-      defaultUri: this.recorder.root ? path.fileUriFromAbsPath(path.abs(this.recorder.root)) : undefined,
-      canSelectFolders: true,
-      canSelectFiles: false,
-      title: 'Select workspace folder',
+    const { uris } = await postMessage({
+      type: 'showOpenDialog',
+      options: {
+        defaultUri: this.recorder.root ? path.fileUriFromAbsPath(path.abs(this.recorder.root)) : undefined,
+        canSelectFolders: true,
+        canSelectFiles: false,
+        title: 'Select workspace folder',
+      },
     });
-    if (p?.length === 1) {
-      if (!path.isFileUri(p[0] as t.Uri)) {
-        throw new Error(`pickRoot: only local paths are supported. Instead received ${p[0]}`);
+    if (uris?.length === 1) {
+      if (!path.isFileUri(uris[0] as t.Uri)) {
+        throw new Error(`pickRoot: only local paths are supported. Instead received ${uris[0]}`);
       }
-      await actions.updateRecorder({ root: path.getFileUriPath(p[0] as t.Uri) });
+      await postMessage({ type: 'updateRecorder', changes: { root: path.getFileUriPath(uris[0] as t.Uri) } });
     }
   };
 
@@ -91,7 +97,7 @@ export default class Recorder extends Component<Props> {
   async handleMediaProgress(ms: number) {
     if (this.recorder.status === t.RecorderStatus.Recording) {
       console.log('handleMediaProgress: ', ms);
-      await actions.updateRecorder({ clock: ms / 1000 });
+      await postMessage({ type: 'updateRecorder', changes: { clock: ms / 1000 } });
     }
   }
 

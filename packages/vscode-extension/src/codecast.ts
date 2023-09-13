@@ -77,7 +77,13 @@ class Codecast {
           assert(this.playerSetup);
 
           // May return undefined if user decides not to overwrite root
-          this.player = await Player.populate(this.context, this.db, this.playerSetup);
+          this.player = await Player.populate(
+            this.context,
+            this.db,
+            this.playerSetup,
+            this.webview.postMessage.bind(this.webview),
+            this.webview.asWebviewUri(vscode.Uri.file('/home/sean/.local/share/codecast/sample.mp3'))?.toString()!,
+          );
         }
 
         if (this.player) {
@@ -118,6 +124,11 @@ class Codecast {
         await this.recorder.pause();
         return this.respondWithStore();
       }
+      case 'seekPlayer': {
+        assert(this.player);
+        await this.player.seek(req.clock);
+        return this.respondWithStore();
+      }
       case 'saveRecorder': {
         if (this.recorder?.isDirty()) {
           await this.recorder.save();
@@ -126,7 +137,7 @@ class Codecast {
           vscode.window.showInformationMessage('Nothing to save.');
         }
 
-        return { type: 'ok' };
+        return this.respondWithStore();
       }
       case 'getStore': {
         return this.respondWithStore();
@@ -159,7 +170,7 @@ class Codecast {
           await this.player.updateState(req.changes);
         } else {
           if (req.changes.root !== undefined) this.playerSetup!.root = req.changes.root;
-          if (req.changes.clock !== undefined) throw new Error('TODO seek before player instantiation');
+          // if (req.changes.clock !== undefined) throw new Error('TODO seek before player instantiation');
         }
         return this.respondWithStore();
       }
@@ -211,6 +222,12 @@ class Codecast {
         }
         return this.respondWithStore();
       }
+      case 'frontendMediaEvent': {
+        assert(this.player);
+
+        await this.player.handleFrontendMediaEvent(req.event);
+        return this.respondWithStore();
+      }
       case 'test': {
         this.test = req.value;
         return this.respondWithStore();
@@ -239,7 +256,7 @@ class Codecast {
       // Pause the frontend while we figure out if we should save the session.
       if (wasRecording) {
         await this.recorder.pause();
-        await this.webview.postMessageHelper({ type: 'updateStore', store: this.getStore() }, 'ok');
+        await this.webview.postMessage({ type: 'updateStore', store: this.getStore() });
       }
 
       let shouldSave = this.recorder.isDirty();
@@ -265,7 +282,7 @@ class Codecast {
         await this.recorder.stop();
       } else if (wasRecording) {
         this.recorder.start();
-        await this.webview.postMessageHelper({ type: 'updateStore', store: this.getStore() }, 'ok');
+        await this.webview.postMessage({ type: 'updateStore', store: this.getStore() });
       }
 
       // Save
@@ -314,7 +331,7 @@ class Codecast {
   }
 
   respondWithStore(): t.BackendResponse {
-    return { type: 'getStore', store: this.getStore() };
+    return { type: 'store', store: this.getStore() };
   }
 
   getFirstHistoryItemById(...ids: (string | undefined)[]): t.SessionHistoryItem | undefined {
@@ -386,7 +403,6 @@ class Codecast {
       recorder,
       player,
       test: this.test,
-      audio: this.webview.asWebviewUri(vscode.Uri.file('/home/sean/.local/share/codecast/sample.mp3'))?.toString()!,
     };
   }
 }

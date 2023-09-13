@@ -1,6 +1,6 @@
 import { h, Fragment, Component } from 'preact';
 import { types as t, lib } from '@codecast/lib';
-import * as actions from './actions.js';
+import postMessage from './api.js';
 import Welcome from './welcome.jsx';
 import Recorder from './recorder.jsx';
 import Player from './player.jsx';
@@ -16,7 +16,7 @@ export default class App extends Component<AppProps> {
   onExit?: () => Promise<boolean>;
 
   openWelcome = async () => {
-    await actions.openWelcome();
+    await postMessage({ type: 'openWelcome' });
   };
 
   // openRecorder = async () => {

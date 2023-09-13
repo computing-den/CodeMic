@@ -4,7 +4,7 @@ import Screen from './screen.jsx';
 import Section from './section.jsx';
 // import LatencyTest from './latency_test.jsx';
 import TimeFromNow from './time_from_now.js';
-import * as actions from './actions';
+import postMessage from './api.js';
 import _ from 'lodash';
 
 type Props = { store: t.Store; onExit: () => void };
@@ -20,7 +20,7 @@ export default class Welcome extends Component<Props> {
         <Section className="search-section">
           <Section.Body>
             <vscode-text-field placeholder="Search" autofocus></vscode-text-field>
-            <vscode-button onClick={() => actions.openRecorder()} title="Record a new session">
+            <vscode-button onClick={() => postMessage({ type: 'openRecorder' })} title="Record a new session">
               <span className="codicon codicon-device-camera-video" />
             </vscode-button>
           </Section.Body>
@@ -74,19 +74,19 @@ type SessionItemProps = {
 class SessionItem extends Component<SessionItemProps> {
   openPlayer = (e: Event) => {
     e.stopPropagation();
-    actions.openPlayer(this.props.session.id);
+    postMessage({ type: 'openPlayer', sessionId: this.props.session.id });
   };
   editSession = (e: Event) => {
     e.stopPropagation();
-    actions.openRecorder(this.props.session.id);
+    postMessage({ type: 'openRecorder', sessionId: this.props.session.id });
   };
   forkSession = (e: Event) => {
     e.stopPropagation();
-    actions.openRecorder(this.props.session.id, true);
+    postMessage({ type: 'openRecorder', sessionId: this.props.session.id, fork: true });
   };
   deleteSession = (e: Event) => {
     e.stopPropagation();
-    actions.deleteSession(this.props.session.id);
+    postMessage({ type: 'deleteSession', sessionId: this.props.session.id });
   };
   render() {
     const { session, history } = this.props;

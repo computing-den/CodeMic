@@ -15,32 +15,66 @@ export type ParsedUri =
   | { scheme: 'workspace'; path: RelPath }
   | { scheme: 'untitled'; name: string };
 
-export type FrontendRequest =
-  | { type: 'openWelcome' }
-  | { type: 'openPlayer'; sessionId: string }
-  | { type: 'openRecorder'; sessionId?: string; fork?: boolean; forkClock?: number }
-  | { type: 'play' }
-  | { type: 'record' }
-  | { type: 'pausePlayer' }
-  | { type: 'pauseRecorder' }
-  | { type: 'saveRecorder' }
-  | { type: 'updateRecorder'; changes: RecorderUpdate }
-  | { type: 'updatePlayer'; changes: PlayerUpdate }
-  | { type: 'deleteSession'; sessionId: string }
-  | { type: 'getStore' }
-  | { type: 'showOpenDialog'; options: OpenDialogOptions }
-  | { type: 'confirmForkFromPlayer'; clock: number }
-  | { type: 'confirmEditFromPlayer' }
-  | { type: 'test'; value: any };
-export type BackendResponse =
-  | { type: 'getStore'; store: Store }
-  | { type: 'error' }
-  | { type: 'ok' }
-  | { type: 'boolean'; value: boolean }
-  | { type: 'uris'; uris?: Uri[] };
+// Having the response types separately improves typescript error messages.
+export type StoreResponse = { type: 'store'; store: Store };
+export type UrisResponse = { type: 'uris'; uris?: Uri[] };
+export type BooleanResponse = { type: 'boolean'; value: boolean };
+export type OKResponse = { type: 'ok' };
+export type ErrorResponse = { type: 'error' };
 
-export type BackendRequest = { type: 'updateStore'; store: Store } | { type: 'todo' };
-export type FrontendResponse = { type: 'error' } | { type: 'ok' };
+export type FrontendToBackend =
+  | { request: { type: 'openWelcome' }; response: StoreResponse }
+  | { request: { type: 'openPlayer'; sessionId: string }; response: StoreResponse }
+  | {
+      request: { type: 'openRecorder'; sessionId?: string; fork?: boolean; forkClock?: number };
+      response: StoreResponse;
+    }
+  | { request: { type: 'play' }; response: StoreResponse }
+  | { request: { type: 'record' }; response: StoreResponse }
+  | { request: { type: 'pausePlayer' }; response: StoreResponse }
+  | { request: { type: 'seekPlayer'; clock: number }; response: StoreResponse }
+  | { request: { type: 'pauseRecorder' }; response: StoreResponse }
+  | { request: { type: 'saveRecorder' }; response: StoreResponse }
+  | { request: { type: 'updateRecorder'; changes: RecorderUpdate }; response: StoreResponse }
+  | { request: { type: 'updatePlayer'; changes: PlayerUpdate }; response: StoreResponse }
+  | { request: { type: 'deleteSession'; sessionId: string }; response: StoreResponse }
+  | { request: { type: 'getStore' }; response: StoreResponse }
+  | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }
+  | { request: { type: 'confirmForkFromPlayer'; clock: number }; response: BooleanResponse }
+  | { request: { type: 'confirmEditFromPlayer' }; response: BooleanResponse }
+  | { request: { type: 'frontendMediaEvent'; event: FrontendMediaEvent }; response: StoreResponse }
+  | { request: { type: 'test'; value: any }; response: StoreResponse };
+
+export type BackendToFrontend =
+  | { request: { type: 'updateStore'; store: Store }; response: OKResponse }
+  | { request: { type: 'backendMediaEvent'; event: BackendMediaEvent }; response: OKResponse }
+  | { request: { type: 'todo' }; response: OKResponse };
+
+export type FrontendRequest = FrontendToBackend['request'];
+export type BackendResponse = FrontendToBackend['response'] | ErrorResponse;
+
+export type BackendRequest = BackendToFrontend['request'];
+export type FrontendResponse = BackendToFrontend['response'] | ErrorResponse;
+
+export type BackendResponseFor<Req extends FrontendRequest> = Extract<
+  FrontendToBackend,
+  { request: { type: Req['type'] } }
+>['response'];
+
+export type FrontendResponseFor<Req extends BackendRequest> = Extract<
+  BackendToFrontend,
+  { request: { type: Req['type'] } }
+>['response'];
+
+export type PostMessageOptions = {
+  performDefaultActions: boolean;
+};
+
+export type PostMessageToFrontend = <Req extends BackendRequest>(req: Req) => Promise<FrontendResponseFor<Req>>;
+export type PostMessageToBackend = <Req extends FrontendRequest>(
+  req: Req,
+  options?: PostMessageOptions,
+) => Promise<BackendResponseFor<Req>>;
 
 export enum Screen {
   Welcome,
@@ -55,7 +89,6 @@ export type Store = {
   recorder?: RecorderState;
   player?: PlayerState;
   test?: any;
-  audio: string;
 
   // welcome?: Welcome;
   // login?: Login;
@@ -119,7 +152,7 @@ export type PlayerState = {
 
 export type PlayerUpdate = {
   root?: string;
-  clock?: number;
+  // clock?: number;
 };
 
 export type PlayerSetup = {
@@ -298,3 +331,32 @@ export type SessionHistoryItem = {
 };
 
 export type SeekData = { events: PlaybackEvent[]; direction: Direction; i: number; clock: number; stop: boolean };
+
+export type FrontendMediaEvent =
+  | { type: 'loadstart' }
+  | { type: 'durationchange' }
+  | { type: 'loadedmetadata' }
+  | { type: 'loadeddata' }
+  | { type: 'progress' }
+  | { type: 'canplay' }
+  | { type: 'canplaythrough' }
+  | { type: 'suspend' }
+  | { type: 'abort' }
+  | { type: 'error'; error: string }
+  | { type: 'emptied' }
+  | { type: 'stalled' }
+  | { type: 'timeupdate'; clock: number }
+  | { type: 'playing' }
+  | { type: 'waiting' }
+  | { type: 'play' }
+  | { type: 'pause' }
+  | { type: 'ended' }
+  | { type: 'volumechange'; volume: number }
+  | { type: 'seeking' }
+  | { type: 'seeked' };
+
+export type BackendMediaEvent =
+  | { type: 'load'; src: string }
+  | { type: 'play' }
+  | { type: 'pause' }
+  | { type: 'seek'; clock: number };

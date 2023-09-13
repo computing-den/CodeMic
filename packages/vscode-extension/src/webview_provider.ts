@@ -5,17 +5,15 @@ import { v4 as uuid } from 'uuid';
 import { types as t, bus as b } from '@codecast/lib';
 import userPaths from './user_paths.js';
 
-type HasType<R, T extends string> = R & { type: T };
-
 class WebviewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'codecast-view';
+  static readonly viewType = 'codecast-view';
 
   view?: vscode.WebviewView;
   bus?: b.Bus;
 
   constructor(public readonly extensionUri: vscode.Uri, public messageHandler: b.MessageHandler) {}
 
-  public resolveWebviewView(
+  resolveWebviewView(
     webviewView: vscode.WebviewView,
     context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken,
@@ -35,46 +33,20 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(this.bus.handleParcel.bind(this.bus));
   }
 
-  public show() {
+  show() {
     this.view?.show();
   }
 
-  // public async postMessage(e: t.BackendEvent): Promise<t.FrontendResponse> {
-  //   assert(this.bus);
-  //   return this.bus.post(e) as Promise<t.FrontendResponse>;
-  // }
+  async postMessage<Req extends t.BackendRequest>(req: Req): Promise<t.FrontendResponseFor<Req>> {
+    const res = (await this.bus!.post(req)) as t.FrontendResponseFor<Req> | t.ErrorResponse;
 
-  // async function getStore() {
-  //   await ({ type: 'getStore' });
-  // }
-
-  postMessage(req: t.BackendRequest): Promise<t.FrontendResponse> {
-    return this.bus!.post(req) as Promise<t.FrontendResponse>;
-  }
-
-  async postMessageHelper<T extends string>(
-    req: t.BackendRequest,
-    expectedType: T,
-  ): Promise<HasType<t.FrontendResponse, T>> {
-    const res = await this.postMessage(req);
     if (res.type === 'error') {
       throw new Error(`Got error for request ${JSON.stringify(req)}`);
     }
-    this.assertResType(req, res, expectedType);
     return res;
   }
 
-  assertResType<T extends string>(
-    req: t.BackendRequest,
-    res: t.FrontendResponse,
-    type: T,
-  ): asserts res is HasType<t.FrontendResponse, T> {
-    if (res.type !== type) {
-      throw new Error(`Unknown response for request: ${JSON.stringify(req)}: ${JSON.stringify(res)}`);
-    }
-  }
-
-  public asWebviewUri(uri: vscode.Uri): vscode.Uri | undefined {
+  asWebviewUri(uri: vscode.Uri): vscode.Uri | undefined {
     return this.view?.webview.asWebviewUri(uri);
   }
 

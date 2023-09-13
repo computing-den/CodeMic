@@ -1,113 +1,88 @@
 import { types as t } from '@codecast/lib';
 import { updateStore } from './store.js';
 
-let postMessage: (req: t.FrontendRequest) => Promise<t.BackendResponse>;
+// let postMessageBase: (req: t.FrontendRequest) => Promise<t.BackendResponse>;
 
-export function init(_postMessage: (req: t.FrontendRequest) => Promise<t.BackendResponse>) {
-  postMessage = _postMessage;
-}
-
-export async function startRecorder() {
-  await postMessageAndUpdateStore({ type: 'record' });
-}
-
-export async function pauseRecorder() {
-  await postMessageAndUpdateStore({ type: 'pauseRecorder' });
-}
-
-export async function saveRecorder() {
-  await postMessageHelper({ type: 'saveRecorder' }, 'ok');
-}
-
-// export async function closeRecorder() {
-//   await postMessageAndUpdateStore({ type: 'closeRecorder' });
+// export function init(_postMessageBase: (req: t.FrontendRequest) => Promise<t.BackendResponse>) {
+//   postMessageBase = _postMessageBase;
 // }
 
-// export async function saveRecording() {
-//   await postMessageAndUpdateStore({ type: 'save' });
+// export async function startRecorder() {
+//   await postMessageAndUpdateStore({ type: 'record' });
 // }
 
-// export async function discardRecorder() {
-//   await postMessageAndUpdateStore({ type: 'discard' });
+// export async function pauseRecorder() {
+//   await postMessageAndUpdateStore({ type: 'pauseRecorder' });
 // }
 
-export async function openWelcome() {
-  await postMessageAndUpdateStore({ type: 'openWelcome' });
-}
+// export async function saveRecorder() {
+//   await postMessage({ type: 'saveRecorder' }, 'ok');
+// }
 
-export async function openPlayer(sessionId: string) {
-  await postMessageAndUpdateStore({ type: 'openPlayer', sessionId });
-}
+// // export async function closeRecorder() {
+// //   await postMessageAndUpdateStore({ type: 'closeRecorder' });
+// // }
 
-export async function openRecorder(sessionId?: string, fork?: boolean, forkClock?: number) {
-  await postMessageAndUpdateStore({ type: 'openRecorder', sessionId, fork, forkClock });
-}
+// // export async function saveRecording() {
+// //   await postMessageAndUpdateStore({ type: 'save' });
+// // }
 
-export async function updateRecorder(changes: t.RecorderUpdate) {
-  await postMessageAndUpdateStore({ type: 'updateRecorder', changes });
-}
+// // export async function discardRecorder() {
+// //   await postMessageAndUpdateStore({ type: 'discard' });
+// // }
 
-export async function updatePlayer(changes: t.PlayerUpdate) {
-  await postMessageAndUpdateStore({ type: 'updatePlayer', changes });
-}
+// export async function openWelcome() {
+//   await postMessageAndUpdateStore({ type: 'openWelcome' });
+// }
 
-export async function startPlayer() {
-  await postMessageAndUpdateStore({ type: 'play' });
-}
+// export async function openPlayer(sessionId: string) {
+//   await postMessageAndUpdateStore({ type: 'openPlayer', sessionId });
+// }
 
-export async function pausePlayer() {
-  await postMessageAndUpdateStore({ type: 'pausePlayer' });
-}
+// export async function openRecorder(sessionId?: string, fork?: boolean, forkClock?: number) {
+//   await postMessageAndUpdateStore({ type: 'openRecorder', sessionId, fork, forkClock });
+// }
 
-export async function deleteSession(sessionId: string) {
-  await postMessageAndUpdateStore({ type: 'deleteSession', sessionId });
-}
+// export async function updateRecorder(changes: t.RecorderUpdate) {
+//   await postMessageAndUpdateStore({ type: 'updateRecorder', changes });
+// }
 
-export async function test(value: any): Promise<t.Store> {
-  return await postMessageAndUpdateStore({ type: 'test', value: value });
-}
+// export async function updatePlayer(changes: t.PlayerUpdate) {
+//   await postMessageAndUpdateStore({ type: 'updatePlayer', changes });
+// }
 
-export async function showOpenDialog(options: t.OpenDialogOptions): Promise<t.Uri[] | undefined> {
-  return (await postMessageHelper({ type: 'showOpenDialog', options }, 'uris')).uris;
-}
+// export async function startPlayer() {
+//   await postMessageAndUpdateStore({ type: 'play' });
+// }
 
-export async function getStore() {
-  await postMessageAndUpdateStore({ type: 'getStore' });
-}
+// export async function pausePlayer() {
+//   await postMessageAndUpdateStore({ type: 'pausePlayer' });
+// }
 
-export async function confirmForkFromPlayer(clock: number): Promise<boolean> {
-  return (await postMessageHelper({ type: 'confirmForkFromPlayer', clock }, 'boolean')).value;
-}
+// export async function deleteSession(sessionId: string) {
+//   await postMessageAndUpdateStore({ type: 'deleteSession', sessionId });
+// }
 
-export async function confirmEditFromPlayer(): Promise<boolean> {
-  return (await postMessageHelper({ type: 'confirmEditFromPlayer' }, 'boolean')).value;
-}
+// export async function test(value: any): Promise<t.Store> {
+//   return await postMessageAndUpdateStore({ type: 'test', value: value });
+// }
 
-async function postMessageAndUpdateStore(req: t.FrontendRequest): Promise<t.Store> {
-  const res = await postMessageHelper(req, 'getStore');
-  return updateStore(() => res.store);
-}
+// export async function showOpenDialog(options: t.OpenDialogOptions): Promise<t.Uri[] | undefined> {
+//   return (await postMessage({ type: 'showOpenDialog', options }, 'uris')).uris;
+// }
 
-type HasType<R, T extends string> = R & { type: T };
+// export async function getStore() {
+//   await postMessageAndUpdateStore({ type: 'getStore' });
+// }
 
-async function postMessageHelper<T extends string>(
-  req: t.FrontendRequest,
-  expectedType: T,
-): Promise<HasType<t.BackendResponse, T>> {
-  const res = await postMessage(req);
-  if (res.type === 'error') {
-    throw new Error(`Got error for request ${JSON.stringify(req)}`);
-  }
-  assertResType(req, res, expectedType);
-  return res;
-}
+// export async function confirmForkFromPlayer(clock: number): Promise<boolean> {
+//   return (await postMessage({ type: 'confirmForkFromPlayer', clock }, 'boolean')).value;
+// }
 
-function assertResType<T extends string>(
-  req: t.FrontendRequest,
-  res: t.BackendResponse,
-  type: T,
-): asserts res is HasType<t.BackendResponse, T> {
-  if (res.type !== type) {
-    throw new Error(`Unknown response for request: ${JSON.stringify(req)}: ${JSON.stringify(res)}`);
-  }
-}
+// export async function confirmEditFromPlayer(): Promise<boolean> {
+//   return (await postMessage({ type: 'confirmEditFromPlayer' }, 'boolean')).value;
+// }
+
+// export async function mediaEvent(event: t.FrontendMediaEvent) {
+//   await postMessageAndUpdateStore({ type: 'mediaEvent', event });
+// }

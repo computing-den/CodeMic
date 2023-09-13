@@ -18,6 +18,6 @@ export function updateStore(recipe: (draft: t.Store) => void): t.Store {
   return store;
 }
 
-export function listenToStore(l: Listener) {
+export function setStoreListener(l: Listener) {
   listener = l;
 }

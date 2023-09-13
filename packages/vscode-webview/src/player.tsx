@@ -1,17 +1,17 @@
 import { h, Fragment, Component } from 'preact';
 import { types as t, path, lib } from '@codecast/lib';
 // import FakeMedia from './fake_media.jsx';
-import Media, { MediaStatus } from './media.jsx';
+import Media from './media.jsx';
 import TimeFromNow from './time_from_now.jsx';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
-import * as actions from './actions.js';
+import postMessage from './api.js';
 import _ from 'lodash';
 
 type Props = { store: t.Store; onExit: () => void };
 export default class Player extends Component<Props> {
   progressBar?: Element;
-  media?: Media;
+  media = new Media();
   seeking = false;
 
   get player(): t.PlayerState {
@@ -21,39 +21,42 @@ export default class Player extends Component<Props> {
   startPlayer = async () => {
     if (this.player.status === t.PlayerStatus.Uninitialized) {
       if (this.player.root) {
-        await actions.startPlayer();
+        await postMessage({ type: 'play' });
       } else {
         // TODO show error to user
         console.error('Select a workspace folder');
       }
     } else {
       if (this.isStoppedAlmostAtTheEnd()) await this.seek(0);
-      await actions.startPlayer();
+      await postMessage({ type: 'play' });
     }
 
-    this.media!.start();
+    // this.media!.start();
   };
 
   pausePlayer = async () => {
-    await actions.pausePlayer();
+    await postMessage({ type: 'pausePlayer' });
   };
 
   rootChanged = async (e: InputEvent) => {
-    await actions.updatePlayer({ root: (e.target as HTMLInputElement).value });
+    await postMessage({ type: 'updatePlayer', changes: { root: (e.target as HTMLInputElement).value } });
   };
 
   pickRoot = async () => {
-    const p = await actions.showOpenDialog({
-      defaultUri: this.player.root ? path.fileUriFromAbsPath(path.abs(this.player.root)) : undefined,
-      canSelectFolders: true,
-      canSelectFiles: false,
-      title: 'Select workspace folder',
+    const { uris } = await postMessage({
+      type: 'showOpenDialog',
+      options: {
+        defaultUri: this.player.root ? path.fileUriFromAbsPath(path.abs(this.player.root)) : undefined,
+        canSelectFolders: true,
+        canSelectFiles: false,
+        title: 'Select workspace folder',
+      },
     });
-    if (p?.length === 1) {
-      if (!path.isFileUri(p[0] as t.Uri)) {
-        throw new Error(`pickRoot: only local paths are supported. Instead received ${p[0]}`);
+    if (uris?.length === 1) {
+      if (!path.isFileUri(uris[0] as t.Uri)) {
+        throw new Error(`pickRoot: only local paths are supported. Instead received ${uris[0]}`);
       }
-      await actions.updateRecorder({ root: path.getFileUriPath(p[0] as t.Uri) });
+      await postMessage({ type: 'updatePlayer', changes: { root: path.getFileUriPath(uris[0] as t.Uri) } });
     }
   };
 
@@ -81,20 +84,25 @@ export default class Player extends Component<Props> {
       console.error('Workspace not populated yet');
       return;
     }
-    this.seekTaskQueueDontUseDirectly.clear();
-    await this.seekTaskQueueDontUseDirectly(clock);
+    // this.seekTaskQueueDontUseDirectly.clear();
+
+    // await postMessage({ type: 'pausePlayer' });
+    await postMessage({ type: 'seekPlayer', clock });
+    // await postMessage({ type: 'play' });
+
+    // await this.seekTaskQueueDontUseDirectly(clock);
   };
 
-  seekTaskQueueDontUseDirectly = lib.taskQueue(async (clock: number) => {
-    try {
-      this.seeking = true;
-      clock = Math.max(0, Math.min(clock, this.player.sessionSummary.duration));
-      await actions.updatePlayer({ clock });
-      // this.media!.clock = clock;
-    } finally {
-      this.seeking = false;
-    }
-  }, 1);
+  // seekTaskQueueDontUseDirectly = lib.taskQueue(async (clock: number) => {
+  //   try {
+  //     this.seeking = true;
+  //     clock = Math.max(0, Math.min(clock, this.player.sessionSummary.duration));
+  //     await postMessage({ type: 'seekPlayer', clock });
+  //     // this.media!.clock = clock;
+  //   } finally {
+  //     this.seeking = false;
+  //   }
+  // }, 1);
 
   getClockOfMouse = (e: MouseEvent): number => {
     const p = this.getPosNormOfMouse(e);
@@ -118,23 +126,30 @@ export default class Player extends Component<Props> {
   };
 
   fork = async () => {
-    if (await actions.confirmForkFromPlayer(this.player.clock)) {
-      await actions.openRecorder(this.player.sessionSummary.id, true, this.player.clock);
+    const res = await postMessage({ type: 'confirmForkFromPlayer', clock: this.player.clock });
+    if (res.value) {
+      await postMessage({
+        type: 'openRecorder',
+        sessionId: this.player.sessionSummary.id,
+        fork: true,
+        forkClock: this.player.clock,
+      });
     }
   };
 
   edit = async () => {
-    if (await actions.confirmEditFromPlayer()) {
-      await actions.openRecorder(this.player.sessionSummary.id);
+    const res = await postMessage({ type: 'confirmEditFromPlayer' });
+    if (res.value) {
+      await postMessage({ type: 'openRecorder', sessionId: this.player.sessionSummary.id });
     }
   };
 
-  handleMediaProgress = async (clock: number) => {
-    console.log(!this.seeking, this.player.status, t.PlayerStatus.Playing, clock);
-    if (!this.seeking && this.player.status === t.PlayerStatus.Playing) {
-      await this.seek(clock);
-    }
-  };
+  // handleMediaProgress = async (clock: number) => {
+  //   console.log(!this.seeking, this.player.status, t.PlayerStatus.Playing, clock);
+  //   if (!this.seeking && this.player.status === t.PlayerStatus.Playing) {
+  //     await this.seek(clock);
+  //   }
+  // };
 
   isStoppedAlmostAtTheEnd(): boolean {
     return (
@@ -161,7 +176,6 @@ export default class Player extends Component<Props> {
 
   componentDidMount() {
     document.addEventListener('mousemove', this.mouseMoved);
-    this.media ??= new Media(this.props.store.audio, 0, this.handleMediaProgress);
   }
 
   componentWillUnmount() {
@@ -183,12 +197,14 @@ export default class Player extends Component<Props> {
     return (
       <Screen className="player">
         <audio id="audio"></audio>
-        <div className="progress-bar" ref={this.handleProgressBarRef} onClick={this.progressBarClicked}>
-          <div className="bar">
-            <div className="shadow" />
-            <div className="filled" style={filledStyle} />
+        {this.player.status !== t.PlayerStatus.Uninitialized && (
+          <div className="progress-bar" ref={this.handleProgressBarRef} onClick={this.progressBarClicked}>
+            <div className="bar">
+              <div className="shadow" />
+              <div className="filled" style={filledStyle} />
+            </div>
           </div>
-        </div>
+        )}
         <Section className="main-section">
           <Section.Header
             title="PLAYER"

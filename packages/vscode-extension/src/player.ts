@@ -14,19 +14,33 @@ class Player implements t.ApplyPlaybackEvent {
   private clock: number = 0;
   private enqueueUpdate = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
-  constructor(public context: vscode.ExtensionContext, public db: Db, public workspace: Workspace) {}
+  constructor(
+    public context: vscode.ExtensionContext,
+    public db: Db,
+    public workspace: Workspace,
+    private postMessage: t.PostMessageToFrontend,
+    private audioSrc: string,
+  ) {}
 
   /**
    * root must be already resolved.
    * May return undefined if user decides not to overwrite root or create it.
    */
-  static async populate(context: vscode.ExtensionContext, db: Db, setup: t.PlayerSetup): Promise<Player | undefined> {
+  static async populate(
+    context: vscode.ExtensionContext,
+    db: Db,
+    setup: t.PlayerSetup,
+    postMessage: t.PostMessageToFrontend,
+    audioSrc: string,
+  ): Promise<Player | undefined> {
     assert(setup.root);
     const workspace = await Workspace.populateSession(db, setup.root, setup.sessionSummary);
-    return workspace && new Player(context, db, workspace);
+    postMessage({ type: 'backendMediaEvent', event: { type: 'load', src: audioSrc.toString() } });
+    return workspace && new Player(context, db, workspace, postMessage, audioSrc);
   }
 
   async start() {
+    const oldStatus = this.status;
     assert(
       this.status === t.PlayerStatus.Ready ||
         this.status === t.PlayerStatus.Paused ||
@@ -49,6 +63,8 @@ class Player implements t.ApplyPlaybackEvent {
     // register disposables
     this.context.subscriptions.push(...this.disposables);
 
+    await this.postMessage({ type: 'backendMediaEvent', event: { type: 'play' } });
+
     await this.saveHistoryOpenClose();
   }
 
@@ -59,13 +75,17 @@ class Player implements t.ApplyPlaybackEvent {
   }
 
   async pause() {
-    this.status = t.PlayerStatus.Paused;
-    this.dispose();
-    await this.saveHistoryClock();
+    await this.postMessage({ type: 'backendMediaEvent', event: { type: 'pause' } });
+    await this.afterPauseOrStop(t.PlayerStatus.Paused);
   }
 
   async stop() {
-    this.status = t.PlayerStatus.Stopped;
+    await this.postMessage({ type: 'backendMediaEvent', event: { type: 'pause' } });
+    await this.afterPauseOrStop(t.PlayerStatus.Stopped);
+  }
+
+  async afterPauseOrStop(status: t.PlayerStatus) {
+    this.status = status;
     this.dispose();
     await this.saveHistoryClock();
   }
@@ -73,11 +93,119 @@ class Player implements t.ApplyPlaybackEvent {
   async updateState(changes: t.PlayerUpdate) {
     try {
       if (changes.root !== undefined) throw new Error('Player: cannot modify root while playing');
-      if (changes.clock !== undefined) await this.enqueueUpdate(changes.clock);
+      // if (changes.clock !== undefined) await this.enqueueUpdate(changes.clock);
     } catch (error) {
       console.error(error);
-      vscode.window.showErrorMessage('Sorry, something went wrong.', { detail: (error as Error).message });
+      vscode.window.showErrorMessage('ERROR', { detail: (error as Error).message });
       await this.pause();
+    }
+  }
+
+  async seek(clock: number) {
+    console.log('player.ts: seek: ', clock);
+    await this.postMessage({ type: 'backendMediaEvent', event: { type: 'seek', clock } });
+  }
+
+  async handleFrontendMediaEvent(e: t.FrontendMediaEvent) {
+    try {
+      switch (e.type) {
+        case 'loadstart': {
+          console.log('loadstart');
+          return;
+        }
+        case 'durationchange': {
+          console.log('durationchange');
+          return;
+        }
+        case 'loadedmetadata': {
+          console.log('loadedmetadata');
+          return;
+        }
+        case 'loadeddata': {
+          console.log('loadeddata');
+          return;
+        }
+        case 'progress': {
+          console.log('progress');
+          return;
+        }
+        case 'canplay': {
+          console.log('canplay');
+          return;
+        }
+        case 'canplaythrough': {
+          console.log('canplaythrough');
+          return;
+        }
+        case 'suspend': {
+          console.log('suspend');
+          return;
+        }
+        case 'abort': {
+          console.log('abort');
+          await this.afterPauseOrStop(t.PlayerStatus.Stopped);
+          return;
+        }
+        case 'emptied': {
+          console.log('emptied');
+          return;
+        }
+        case 'stalled': {
+          console.log('stalled');
+          return;
+        }
+        case 'playing': {
+          console.log('playing');
+          return;
+        }
+        case 'waiting': {
+          console.log('waiting');
+          return;
+        }
+        case 'play': {
+          console.log('play');
+          return;
+        }
+        case 'pause': {
+          console.log('pause');
+          return;
+        }
+        case 'ended': {
+          console.log('ended');
+          await this.afterPauseOrStop(t.PlayerStatus.Paused);
+          return;
+        }
+        case 'seeking': {
+          console.log('seeking');
+          return;
+        }
+        case 'seeked': {
+          console.log('seeked');
+          return;
+        }
+        case 'timeupdate': {
+          console.log('timeupdate', e.clock);
+          await this.enqueueUpdate(e.clock);
+          return;
+        }
+        case 'volumechange': {
+          console.log('volumechange', e.volume);
+          return;
+        }
+        case 'error': {
+          console.log('error');
+          // await this.afterPauseOrStop(t.PlayerStatus.Stopped);
+          // error will be caught and will call this.pause()
+          throw new Error(e.error);
+        }
+        default: {
+          lib.unreachable(e);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      vscode.window.showErrorMessage('ERROR', { detail: (error as Error).message });
+      await this.stop();
     }
   }
 
@@ -290,8 +418,6 @@ class Player implements t.ApplyPlaybackEvent {
     // apply reverse:
     // new eventIndex:          ^
 
-    // console.log('Player: update ', clock);
-
     let i = this.eventIndex;
     const seekData = this.workspace.session!.getSeekData(i, clock);
 
@@ -311,26 +437,6 @@ class Player implements t.ApplyPlaybackEvent {
     this.clock = seekData.clock;
 
     if (seekData.stop) await this.stop();
-
-    // if (i < 0 || clock > this.clockAt(i)) {
-    //   // go forwards
-    //   for (i = i + 1; i < n && clock >= this.clockAt(i); i++) {
-    //     await this.applyPlaybackEvent(this.workspace.session!.events[i], t.Direction.Forwards);
-    //     this.eventIndex = i;
-    //   }
-    // } else if (clock < this.clockAt(i)) {
-    //   // go backwards
-    //   for (; i >= 0 && clock <= this.clockAt(i); i--) {
-    //     await this.applyPlaybackEvent(this.workspace.session!.events[i], t.Direction.Backwards);
-    //     this.eventIndex = i - 1;
-    //   }
-    // }
-
-    // this.clock = Math.max(0, Math.min(this.workspace.session!.summary.duration, clock));
-
-    // if (this.eventIndex === n - 1) {
-    //   await this.stop();
-    // }
 
     // save history
     await this.saveHistoryClock({ ifDirtyForLong: true });

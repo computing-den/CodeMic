@@ -1,6 +1,6 @@
 import { types as t, lib } from '@codecast/lib';
 import { h, Fragment, Component } from 'preact';
-import * as actions from './actions';
+import postMessage from './api.js';
 import _ from 'lodash';
 
 type Props = { store: t.Store };
@@ -13,7 +13,7 @@ export default class LatencyTest extends Component<Props> {
   step = async () => {
     if (this.props.store.test < 5000) {
       const start = performance.now();
-      await actions.test(this.props.store.test + 1);
+      await postMessage({ type: 'test', value: this.props.store.test + 1 });
       this.roundtripTimes.push(performance.now() - start);
     } else {
       summarize(this.renderTimes, 'renderTimes');
