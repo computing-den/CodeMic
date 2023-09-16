@@ -37,6 +37,7 @@ export type FrontendToBackend =
   | { request: { type: 'saveRecorder' }; response: StoreResponse }
   | { request: { type: 'updateRecorder'; changes: RecorderUpdate }; response: StoreResponse }
   | { request: { type: 'updatePlayer'; changes: PlayerUpdate }; response: StoreResponse }
+  // | { request: { type: 'toggleRecorderStudio' }; response: StoreResponse }
   | { request: { type: 'deleteSession'; sessionId: string }; response: StoreResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
   | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }
@@ -116,6 +117,7 @@ export type RecorderState = {
   fork?: boolean;
   forkClock?: number;
   history?: SessionHistoryItem;
+  // studio: boolean;
 };
 
 export type RecorderUpdate = {

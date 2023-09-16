@@ -115,6 +115,7 @@ export default class Player extends Component<Props> {
   };
 
   isMouseOnProgressBar = (e: MouseEvent): boolean => {
+    if (!this.progressBar) return false;
     const rect = this.progressBar!.getBoundingClientRect();
     const p = [e.clientX - rect.x, e.clientY - rect.y];
     return p[0] >= 0 && p[0] <= rect.width && p[1] >= 0 && p[1] <= rect.height;
@@ -212,88 +213,85 @@ export default class Player extends Component<Props> {
             collapsible
           />
           <Section.Body>
-            <div className="controls-and-details">
-              <div className="details card card-bare card-no-padding card-with-media">
-                <div className="media">
-                  <img src={ss.author.avatar} />
-                </div>
-                <div className="card-content">
-                  <div className="title">{ss.title || 'Untitled'}</div>
-                  <div className="description">{ss.description || 'No description'}</div>
-
-                  <div className="footer">
-                    <span className="footer-item timestamp">
-                      <TimeFromNow timestamp={ss.timestamp} capitalize />
-                    </span>
-                  </div>
-                  <div className="footer">
-                    <span className="footer-item author">{ss.author.name}</span>
-                    <div className="footer-item badge">
-                      <span className="codicon codicon-eye va-top m-right_small" />
-                      <span className="count">{ss.views}</span>
-                    </div>
-                    <div className="footer-item badge">
-                      <span className="codicon codicon-heart va-top m-right_small" />
-                      <span className="count">{ss.likes}</span>
-                    </div>
-                  </div>
-                </div>
+            <div className="subsection details card card-bare card-no-padding card-with-media">
+              <div className="media">
+                <img src={ss.author.avatar} />
               </div>
-              <div className="control-toolbar">
-                <div className="toggle-button-container">
-                  <vscode-button className="toggle-button for-player" onClick={toggleFn} appearance="icon">
-                    <div className={`codicon ${toggleIcon}`} />
-                  </vscode-button>
-                </div>
-                <div className="actions">
-                  <vscode-button
-                    appearance="icon"
-                    title={
-                      this.player.status === t.PlayerStatus.Playing
-                        ? `Fork: record a new session starting at this point`
-                        : `Fork: record a new session starting at ${lib.formatTimeSeconds(this.player.clock)}`
-                    }
-                    onClick={this.fork}
-                  >
-                    <span className="codicon codicon-repo-forked" />
-                  </vscode-button>
-                  <vscode-button
-                    appearance="icon"
-                    title="Edit: continue recording and editing this session"
-                    onClick={this.edit}
-                  >
-                    <span className="codicon codicon-edit" />
-                  </vscode-button>
-                  <vscode-button appearance="icon" title="Bookmark at this point">
-                    <span className="codicon codicon-bookmark" />
-                  </vscode-button>
-                  <vscode-button appearance="icon" title="Like">
-                    <span className="codicon codicon-heart" />
-                  </vscode-button>
-                </div>
-                <div className="time">
-                  <span className="text">
-                    {lib.formatTimeSeconds(this.player.clock)} / {lib.formatTimeSeconds(ss.duration)}
-                  </span>
+              <div className="card-content">
+                <div className="title large">{ss.title || 'Untitled'}</div>
+                <div className="footer">
+                  <span className="footer-item large author">{ss.author.name}</span>
                 </div>
               </div>
             </div>
-            <div className="forms">
-              {this.player.status === t.PlayerStatus.Uninitialized && (
-                <vscode-text-field
-                  className="subsection"
-                  data-field="root"
-                  onInput={this.rootChanged}
-                  value={this.player.root}
-                  autofocus
+            <div className="subsection control-toolbar">
+              <div className="toggle-button-container">
+                <vscode-button className="toggle-button for-player" onClick={toggleFn} appearance="icon">
+                  <div className={`codicon ${toggleIcon}`} />
+                </vscode-button>
+              </div>
+              <div className="actions">
+                <vscode-button
+                  appearance="icon"
+                  title={
+                    this.player.status === t.PlayerStatus.Playing
+                      ? `Fork: record a new session starting at this point`
+                      : `Fork: record a new session starting at ${lib.formatTimeSeconds(this.player.clock)}`
+                  }
+                  onClick={this.fork}
                 >
-                  Workspace
-                  <vscode-button slot="end" appearance="icon" title="Pick" onClick={this.pickRoot}>
-                    <span className="codicon codicon-search" />
-                  </vscode-button>
-                </vscode-text-field>
-              )}
+                  <span className="codicon codicon-repo-forked" />
+                </vscode-button>
+                <vscode-button
+                  appearance="icon"
+                  title="Edit: continue recording and editing this session"
+                  onClick={this.edit}
+                >
+                  <span className="codicon codicon-edit" />
+                </vscode-button>
+                <vscode-button appearance="icon" title="Bookmark at this point">
+                  <span className="codicon codicon-bookmark" />
+                </vscode-button>
+                <vscode-button appearance="icon" title="Like">
+                  <span className="codicon codicon-heart" />
+                </vscode-button>
+              </div>
+              <div className="time">
+                <span className="text">
+                  {lib.formatTimeSeconds(this.player.clock)} / {lib.formatTimeSeconds(ss.duration)}
+                </span>
+              </div>
             </div>
+            <div className="subsection description">
+              <div className="header">
+                <span className="item bold timestamp">
+                  <TimeFromNow timestamp={ss.timestamp} capitalize />
+                </span>
+                <div className="item badge bump-left">
+                  <span className="codicon codicon-eye va-top m-right_small" />
+                  <span className="count">{ss.views}</span>
+                </div>
+                <div className="item">
+                  <span className="codicon codicon-heart va-top m-right_small" />
+                  <span className="count">{ss.likes}</span>
+                </div>
+              </div>
+              <div className="body">{ss.description}</div>
+            </div>
+            {this.player.status === t.PlayerStatus.Uninitialized && (
+              <vscode-text-field
+                className="subsection"
+                data-field="root"
+                onInput={this.rootChanged}
+                value={this.player.root}
+                autofocus
+              >
+                Workspace
+                <vscode-button slot="end" appearance="icon" title="Pick" onClick={this.pickRoot}>
+                  <span className="codicon codicon-search" />
+                </vscode-button>
+              </vscode-text-field>
+            )}
           </Section.Body>
         </Section>
         <Section className="contents-section">

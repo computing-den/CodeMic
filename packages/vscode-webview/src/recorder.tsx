@@ -68,6 +68,10 @@ export default class Recorder extends Component<Props> {
     }
   };
 
+  toggleStudio = async () => {
+    // TODO
+  };
+
   // saveRecording = async () => {
   //   await actions.saveRecording();
   // };
@@ -116,19 +120,31 @@ export default class Recorder extends Component<Props> {
   }
 
   render() {
-    const { status } = this.recorder;
+    const { status, sessionSummary } = this.recorder;
 
-    let toggleFn: () => void, toggleIcon: string;
-    if (status === t.RecorderStatus.Uninitialized) {
-      [toggleFn, toggleIcon] = [this.startRecorder, 'codicon-circle-large-filled'];
-    } else if (status === t.RecorderStatus.Ready) {
-      [toggleFn, toggleIcon] = [this.startRecorder, 'codicon-circle-large-filled'];
-    } else if (status === t.RecorderStatus.Paused) {
-      [toggleFn, toggleIcon] = [this.startRecorder, 'codicon-circle-large-filled'];
-    } else if (status === t.RecorderStatus.Recording) {
-      [toggleFn, toggleIcon] = [this.pauseRecorder, 'codicon-debug-pause'];
-    } else {
-      throw new Error(`Cannot render recorder status: ${status}`);
+    const canToggle = Boolean(this.recorder.root);
+
+    let toggleFn: () => void, toggleIcon: string, tooltip: string;
+    switch (status) {
+      case t.RecorderStatus.Uninitialized:
+      case t.RecorderStatus.Ready:
+      case t.RecorderStatus.Paused: {
+        toggleFn = this.startRecorder;
+        toggleIcon = 'codicon-circle-large-filled';
+        tooltip = !canToggle
+          ? 'Pick a workspace first'
+          : sessionSummary.duration
+          ? `Continue recording at ${lib.formatTimeSeconds(sessionSummary.duration)}`
+          : 'Start recording';
+        break;
+      }
+      case t.RecorderStatus.Recording:
+        toggleFn = this.pauseRecorder;
+        toggleIcon = 'codicon-debug-pause';
+        tooltip = 'Pause';
+        break;
+      default:
+        throw new Error(`Cannot render recorder status: ${status}`);
     }
 
     return (
@@ -146,7 +162,8 @@ export default class Recorder extends Component<Props> {
                   className="toggle-button for-recorder"
                   onClick={toggleFn}
                   appearance="icon"
-                  disabled={!this.recorder.root}
+                  disabled={!canToggle}
+                  title={tooltip}
                 >
                   <div className={`codicon ${toggleIcon}`} />
                 </vscode-button>
@@ -170,7 +187,9 @@ export default class Recorder extends Component<Props> {
               </div>
             </div>
             <div className="subsection buttons">
-              <vscode-button appearance="secondary">Open studio</vscode-button>
+              <vscode-button appearance="secondary" onClick={this.toggleStudio}>
+                Open studio
+              </vscode-button>
               <vscode-button appearance="secondary" onClick={this.save}>
                 Save
               </vscode-button>
