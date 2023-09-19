@@ -1,0 +1,31 @@
+.session-description {
+  /* margin: var(--spacing-large) var(--container-padding) var(--spacing-medium) var(--container-padding); */
+  border: 1px solid var(--vscode-input-border);
+  padding: var(--spacing-medium);
+  background: var(--input-background);
+  overflow: hidden;
+  /* border-radius: var(--card-border-radius); */
+
+  > .header {
+    display: flex;
+    align-items: center;
+    /* opacity: 0.6; */
+
+    > .item {
+      & + .item {
+        margin-left: var(--spacing-medium);
+      }
+
+      &.timestamp {
+        font-weight: bold;
+      }
+
+      &.views {
+        margin-left: auto;
+      }
+    }
+  }
+  > .body {
+    margin-top: var(--spacing-small);
+  }
+}

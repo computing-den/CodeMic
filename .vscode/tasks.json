@@ -31,7 +31,9 @@
       "isBackground": false,
       "dependsOn": ["tsc"],
       "presentation": {
-        "reveal": "never"
+        "reveal": "silent",
+        "revealProblems": "onProblem",
+        "close": true
       },
       "group": {
         "kind": "build",

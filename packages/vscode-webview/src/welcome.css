@@ -1,0 +1,28 @@
+.welcome {
+  .search-section .section-body {
+    padding: 0 var(--container-padding-hor);
+
+    .search-subsection {
+      display: flex;
+      align-items: center;
+
+      & vscode-text-field {
+        flex: 1;
+      }
+
+      & vscode-button {
+        margin-left: var(--spacing-medium);
+      }
+    }
+  }
+
+  .sessions-section {
+    /* .session-item { */
+    /*   flex-direction: row; */
+    /*   .card-content { */
+    /*     display: flex; */
+    /*     flex-direction: column; */
+    /*   } */
+    /* } */
+  }
+}

@@ -1,0 +1,94 @@
+:root {
+  --spacing-x-small: 2px;
+  --spacing-small: 4px;
+  --spacing-medium: 8px;
+  --spacing-large: 16px;
+  --spacing-x-large: 24px;
+  --spacing-xx-large: 32px;
+  --card-border-radius: 5px;
+  --toggle-button-size: 34px;
+  --progress-bar-full-width: 16px;
+  --progress-bar-hover-width: 30px;
+  --progress-bar-small-width: 3px;
+  --button-danger-color: #f85149;
+  --button-danger-hover-color: #f85149e6;
+  --button-danger-border: #f85149;
+  --container-padding-ver: var(--spacing-large);
+  --container-padding-ver-small: var(--spacing-small);
+  --container-padding-hor: var(--container-padding);
+}
+
+body.vscode-light {
+}
+body.vscode-dark {
+}
+
+html,
+body {
+  min-height: 100vh;
+}
+
+body {
+  background-color: transparent;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#app {
+  flex: 1;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.bump-left {
+  margin-left: auto;
+}
+
+ul.unstyled {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  & li {
+  }
+}
+
+.codicon.m-right {
+  margin-right: var(--spacing-medium);
+}
+
+.codicon.m-right_x-small {
+  margin-right: var(--spacing-small);
+}
+
+.codicon.m-right_small {
+  margin-right: var(--spacing-small);
+}
+
+.codicon.va-top {
+  vertical-align: top;
+}
+
+vscode-panels {
+  /* margin-top: var(--spacing-large); */
+
+  &::part(tablist) {
+    width: 100%;
+    border-bottom: 1px solid var(--vscode-input-border);
+    /* padding: 0; */
+    padding-top: 0;
+  }
+
+  & vscode-panel-view {
+    flex-direction: column;
+    /* padding: var(--container-padding) 0; */
+  }
+}
+
+button {
+  min-width: 0;
+}

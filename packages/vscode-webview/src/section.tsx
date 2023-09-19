@@ -1,4 +1,5 @@
-import { h, Fragment, Component } from 'preact';
+import { h, Fragment, Component, JSX } from 'preact';
+import { cn } from './misc.js';
 import _ from 'lodash';
 
 type SectionProps = {
@@ -30,7 +31,7 @@ class Header extends Component<HeaderProps> {
   static ExitButton = ExitButton;
   render() {
     return (
-      <div className={`header ${this.props.collapsible ? 'collapsible' : ''}`}>
+      <div className={`section-header ${this.props.collapsible ? 'collapsible' : ''}`}>
         <span className="collapse-icon codicon codicon-chevron-down m-right_x-small va-top" />
         <h3>{this.props.title}</h3>
         {!_.isEmpty(this.props.buttons) && <div className="actions">{this.props.buttons}</div>}
@@ -39,9 +40,30 @@ class Header extends Component<HeaderProps> {
   }
 }
 
-class Body extends Component {
+export type BodyProps = {
+  className?: string;
+  // padded?: boolean;
+  // horPadded?: boolean;
+  // topPadded?: boolean;
+  // topPaddedSmall?: boolean;
+};
+
+export class Body extends Component<BodyProps> {
   render() {
-    return <div className="body">{this.props.children}</div>;
+    return (
+      <div
+        className={cn(
+          'section-body',
+          // this.props.padded && 'section-body_padded',
+          // this.props.horPadded && 'section-body_hor-padded',
+          // this.props.topPadded && 'section-body_top-padded',
+          // this.props.topPaddedSmall && 'section-body_top-padded_small',
+          this.props.className,
+        )}
+      >
+        {this.props.children}
+      </div>
+    );
   }
 }
 

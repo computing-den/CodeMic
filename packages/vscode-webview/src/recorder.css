@@ -1,0 +1,33 @@
+.recorder {
+  /* padding-top: var(--spacing-medium); */
+
+  & vscode-panel-view.details {
+    padding: var(--container-padding-ver) var(--container-padding-hor) 0 var(--container-padding-hor);
+  }
+
+  & vscode-panel-view.editor {
+    padding: var(--container-padding-ver) var(--container-padding-hor) 0 var(--container-padding-hor);
+  }
+
+  & vscode-text-area.title {
+    &::part(control) {
+      /* margin-top: var(--spacing-large); */
+      font-weight: bold;
+      font-size: 1.1em;
+    }
+  }
+  & vscode-text-area.description {
+    /* margin-top: var(--spacing-large); */
+  }
+
+  .subsection.buttons {
+    display: flex;
+
+    & vscode-button + vscode-button {
+      margin-left: var(--spacing-medium);
+    }
+    & vscode-button.bump-left {
+      margin-left: auto;
+    }
+  }
+}

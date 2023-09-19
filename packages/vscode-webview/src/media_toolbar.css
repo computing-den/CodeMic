@@ -1,0 +1,111 @@
+.media-toolbar {
+  display: flex;
+  align-items: center;
+  position: relative;
+  background: var(--input-background);
+  border: 1px solid var(--vscode-input-border);
+  padding: 2px 11px 2px 7px;
+  border-radius: 30px;
+  border-left: none;
+  margin-left: -3px;
+
+  .primary-action-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+
+    & vscode-button.primary-action {
+      min-width: var(--toggle-button-size);
+      min-height: var(--toggle-button-size);
+      max-width: var(--toggle-button-size);
+      max-height: var(--toggle-button-size);
+      border-radius: 50%;
+      color: var(--button-primary-foreground);
+
+      &:hover {
+        color: var(--button-primary-foreground);
+      }
+      &:disabled {
+        opacity: 1;
+      }
+
+      &.for-player {
+        border: 1px solid var(--button-primary-background);
+        background: var(--button-primary-background);
+
+        &:hover {
+          background: var(--button-primary-hover-background);
+        }
+      }
+
+      &.for-recorder {
+        background: var(--input-background);
+        border: 0;
+        color: var(--button-danger-color);
+        border: 1px solid var(--button-danger-hover-color);
+        /* border: 1px solid var(--vscode-input-border); */
+
+        &:hover {
+          border: 1px solid var(--button-danger-hover-color);
+          color: var(--button-danger-hover-color);
+          background: var(--input-background);
+        }
+        &::part(control):active,
+        &::part(control):focus {
+          background: var(--input-background);
+        }
+      }
+
+      .codicon-play {
+        font-size: 1.2rem;
+        margin-left: 2px;
+      }
+      .codicon-primitive-square {
+        font-size: 1.5rem;
+      }
+      .codicon-circle-large-filled {
+        font-size: 1rem;
+      }
+      &.for-player .codicon-debug-pause {
+        font-size: 1.2rem;
+        margin: 2px 0 0 0px;
+      }
+      &.for-recorder .codicon-debug-pause {
+        font-size: 1.2rem;
+        margin: 2px 0 0 -1px;
+        font-weight: bold;
+      }
+    }
+  }
+
+  .actions {
+    margin-left: 35px;
+    display: flex;
+  }
+
+  .time {
+    margin-left: auto;
+    white-space: nowrap;
+
+    &.large {
+      font-size: 1rem;
+    }
+
+    .recording-indicator {
+      vertical-align: text-top;
+      opacity: 0.5;
+
+      &.active {
+        opacity: 1;
+        color: var(--button-danger-color);
+      }
+    }
+    .text {
+      font-weight: bold;
+      opacity: 0.7;
+    }
+  }
+}

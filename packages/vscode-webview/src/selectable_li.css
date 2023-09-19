@@ -1,0 +1,25 @@
+li.selectable-li {
+  cursor: pointer;
+  position: relative;
+
+  &:hover {
+    background: var(--vscode-list-hoverBackground);
+
+    .actions {
+      visibility: visible;
+    }
+  }
+
+  .actions {
+    background: var(--vscode-list-hoverBackground);
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--vscode-sideBarSectionHeader-border);
+    padding: 0 var(--spacing-small);
+    visibility: hidden;
+  }
+}

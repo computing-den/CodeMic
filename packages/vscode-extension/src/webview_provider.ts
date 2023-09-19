@@ -11,7 +11,11 @@ class WebviewProvider implements vscode.WebviewViewProvider {
   view?: vscode.WebviewView;
   bus?: b.Bus;
 
-  constructor(public readonly extensionUri: vscode.Uri, public messageHandler: b.MessageHandler) {}
+  constructor(
+    public context: vscode.ExtensionContext,
+    public messageHandler: b.MessageHandler,
+    public onViewOpen: () => void,
+  ) {}
 
   resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -26,11 +30,12 @@ class WebviewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
 
       // Allow access to files from these directories
-      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, '..', '..'), vscode.Uri.file(userPaths.data)],
+      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, '..', '..'), vscode.Uri.file(userPaths.data)],
     };
 
     webviewView.webview.html = this.getHtmlForWebview();
     webviewView.webview.onDidReceiveMessage(this.bus.handleParcel.bind(this.bus));
+    this.onViewOpen();
   }
 
   show() {
@@ -56,7 +61,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private getHtmlForWebview() {
-    const getPath = (...args: string[]) => this.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, ...args))!;
+    const getPath = (...args: string[]) => this.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, ...args))!;
 
     const resourcesUri = getPath('..', 'vscode-webview', 'resources');
     const webviewJs = getPath('..', 'vscode-webview', 'out', 'webview.js');
@@ -70,9 +75,6 @@ class WebviewProvider implements vscode.WebviewViewProvider {
 				<meta charset="UTF-8">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
         <base href="${resourcesUri}/">
-        <link href="normalize-8.0.1.css" rel="stylesheet">
-        <link href="vscode.css" rel="stylesheet">
-        <link href="${webviewCss}" rel="stylesheet">
         <link href="${webviewCss}" rel="stylesheet">
         <link href="${codiconCss}" rel="stylesheet">
 				<title>Codecast</title>

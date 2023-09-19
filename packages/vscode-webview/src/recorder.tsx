@@ -1,6 +1,9 @@
 import { h, Fragment, Component } from 'preact';
 import { types as t, path, lib } from '@codecast/lib';
 import FakeMedia from './fake_media.js';
+import PathField from './path_field.jsx';
+import { SessionSummary } from './session_summary.jsx';
+import SessionDescription from './session_description.jsx';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
 import postMessage from './api.js';
@@ -45,46 +48,13 @@ export default class Recorder extends Component<Props> {
     await postMessage({ type: 'updateRecorder', changes });
   };
 
-  rootChanged = async (e: InputEvent) => {
-    const changes = { root: (e.target as HTMLInputElement).value };
-    await postMessage({ type: 'updateRecorder', changes });
-  };
-
-  pickRoot = async () => {
-    const { uris } = await postMessage({
-      type: 'showOpenDialog',
-      options: {
-        defaultUri: this.recorder.root ? path.fileUriFromAbsPath(path.abs(this.recorder.root)) : undefined,
-        canSelectFolders: true,
-        canSelectFiles: false,
-        title: 'Select workspace folder',
-      },
-    });
-    if (uris?.length === 1) {
-      if (!path.isFileUri(uris[0] as t.Uri)) {
-        throw new Error(`pickRoot: only local paths are supported. Instead received ${uris[0]}`);
-      }
-      await postMessage({ type: 'updateRecorder', changes: { root: path.getFileUriPath(uris[0] as t.Uri) } });
-    }
+  rootChanged = async (root: string) => {
+    await postMessage({ type: 'updateRecorder', changes: { root } });
   };
 
   toggleStudio = async () => {
     // TODO
   };
-
-  // saveRecording = async () => {
-  //   await actions.saveRecording();
-  // };
-
-  // discardRecorder = async () => {
-  //   await actions.discardRecorder();
-  // };
-
-  // onExit = async () => {
-  //   const canExit = await actions.askToCloseRecorder();
-  //   if (canExit) await actions.closeRecorder();
-  //   return canExit;
-  // };
 
   enableOrDisableMedia() {
     const isRecording = Boolean(this.recorder.status === t.RecorderStatus.Recording);
@@ -112,7 +82,6 @@ export default class Recorder extends Component<Props> {
   componentDidMount() {
     console.log('Recorder componentDidMount');
     this.enableOrDisableMedia();
-    // this.props.setOnExit(this.onExit);
   }
 
   componentWillUnmount() {
@@ -120,72 +89,75 @@ export default class Recorder extends Component<Props> {
   }
 
   render() {
-    const { status, sessionSummary } = this.recorder;
+    const { status, sessionSummary: ss } = this.recorder;
 
-    const canToggle = Boolean(this.recorder.root);
+    // const canToggle = Boolean(this.recorder.root);
 
-    let toggleFn: () => void, toggleIcon: string, tooltip: string;
-    switch (status) {
-      case t.RecorderStatus.Uninitialized:
-      case t.RecorderStatus.Ready:
-      case t.RecorderStatus.Paused: {
-        toggleFn = this.startRecorder;
-        toggleIcon = 'codicon-circle-large-filled';
-        tooltip = !canToggle
-          ? 'Pick a workspace first'
-          : sessionSummary.duration
-          ? `Continue recording at ${lib.formatTimeSeconds(sessionSummary.duration)}`
-          : 'Start recording';
-        break;
-      }
-      case t.RecorderStatus.Recording:
-        toggleFn = this.pauseRecorder;
-        toggleIcon = 'codicon-debug-pause';
-        tooltip = 'Pause';
-        break;
-      default:
-        throw new Error(`Cannot render recorder status: ${status}`);
-    }
+    // let toggleFn: () => void, toggleIcon: string, tooltip: string;
+    // switch (status) {
+    //   case t.RecorderStatus.Uninitialized:
+    //   case t.RecorderStatus.Ready:
+    //   case t.RecorderStatus.Paused: {
+    //     toggleFn = this.startRecorder;
+    //     toggleIcon = 'codicon-circle-large-filled';
+    //     tooltip = !canToggle
+    //       ? 'Pick a workspace first'
+    //       : ss.duration
+    //       ? `Continue recording at ${lib.formatTimeSeconds(ss.duration)}`
+    //       : 'Start recording';
+    //     break;
+    //   }
+    //   case t.RecorderStatus.Recording:
+    //     toggleFn = this.pauseRecorder;
+    //     toggleIcon = 'codicon-debug-pause';
+    //     tooltip = 'Pause';
+    //     break;
+    //   default:
+    //     throw new Error(`Cannot render recorder status: ${status}`);
+    // }
 
     return (
       <Screen className="recorder">
-        <Section className="main-section">
-          <Section.Header
-            title="RECORDER"
-            buttons={[<Section.Header.ExitButton onClick={this.props.onExit} />]}
-            collapsible
-          />
-          <Section.Body>
-            <div className="control-toolbar">
-              <div className="toggle-button-container">
-                <vscode-button
-                  className="toggle-button for-recorder"
-                  onClick={toggleFn}
-                  appearance="icon"
-                  disabled={!canToggle}
-                  title={tooltip}
-                >
-                  <div className={`codicon ${toggleIcon}`} />
-                </vscode-button>
-              </div>
-              <div className="actions">
-                <vscode-button
-                  appearance="icon"
-                  title="Discard"
-                  disabled={status === t.RecorderStatus.Ready || status === t.RecorderStatus.Uninitialized}
-                >
-                  <span className="codicon codicon-debug-restart" />
-                </vscode-button>
-              </div>
-              <div className="time">
-                <span
-                  className={`recording-indicator codicon codicon-circle-filled m-right_small ${
-                    status === t.RecorderStatus.Recording ? 'active' : ''
-                  }`}
-                />
-                <span className="text large">{lib.formatTimeSeconds(this.recorder.clock, true)}</span>
-              </div>
-            </div>
+        <vscode-panels>
+          <vscode-panel-tab>DETAILS</vscode-panel-tab>
+          <vscode-panel-tab>EDITOR</vscode-panel-tab>
+          <vscode-panel-view className="details">
+            <vscode-text-area
+              className="title subsection"
+              rows={2}
+              resize="vertical"
+              value={ss.title}
+              onInput={this.titleChanged}
+              placeholder="The title of this project"
+            >
+              Title
+            </vscode-text-area>
+            <vscode-text-area
+              className="description subsection"
+              rows={10}
+              resize="vertical"
+              value={ss.description}
+              onInput={this.descriptionChanged}
+              placeholder="What is this project about?"
+            >
+              Description
+            </vscode-text-area>
+            <PathField
+              className="subsection"
+              onChange={this.rootChanged}
+              value={this.recorder.root}
+              label="Workspace"
+              pickTitle="Select workspace folder"
+              disabled={status !== t.RecorderStatus.Uninitialized}
+              autoFocus
+            />
+            <p className="subsection help">
+              Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
+            </p>
+          </vscode-panel-view>
+          <vscode-panel-view className="editor">Editor goes here.</vscode-panel-view>
+        </vscode-panels>
+        {/*
             <div className="subsection buttons">
               <vscode-button appearance="secondary" onClick={this.toggleStudio}>
                 Open studio
@@ -196,44 +168,18 @@ export default class Recorder extends Component<Props> {
               <vscode-button className="bump-left" appearance="primary">
                 Publish
               </vscode-button>
-            </div>
-            <p className="subsection help">Add audio and further adjustments in the studio.</p>
+              </div>
+                */}
+        {/*
             <vscode-text-field
               className="subsection"
-              value={this.recorder.root}
-              onInput={this.rootChanged}
-              data-field="root"
-              disabled={status !== t.RecorderStatus.Uninitialized}
-              autofocus
-            >
-              Workspace
-              <vscode-button slot="end" appearance="icon" title="Pick" onClick={this.pickRoot}>
-                <span className="codicon codicon-search" />
-              </vscode-button>
-            </vscode-text-field>
-            <p className="subsection help">
-              Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
-            </p>
-            <vscode-text-field
-              className="subsection"
-              value={this.recorder.sessionSummary.title}
+              value={ss.title}
               onInput={this.titleChanged}
               data-field="title"
             >
               Title
             </vscode-text-field>
-            <vscode-text-area
-              className="subsection"
-              rows={5}
-              resize="vertical"
-              value={this.recorder.sessionSummary.description}
-              onInput={this.descriptionChanged}
-              data-field="description"
-            >
-              Description
-            </vscode-text-area>
-          </Section.Body>
-        </Section>
+              */}
       </Screen>
     );
 

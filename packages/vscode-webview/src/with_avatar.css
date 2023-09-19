@@ -1,0 +1,27 @@
+.with-avatar {
+  display: flex;
+  > .avatar {
+    display: flex;
+    align-items: flex-start;
+    flex-shrink: 0;
+
+    & img {
+      width: 42px;
+      height: 42px;
+      flex-shrink: 0;
+      object-fit: contain;
+      margin-right: var(--spacing-large);
+      border-radius: 50%;
+      border: 1px solid var(--vscode-input-border);
+
+      @media (max-width: 200px) {
+        display: none;
+      }
+      @media (max-width: 250px) {
+        width: 24px;
+        height: 24px;
+        margin-right: var(--spacing-medium);
+      }
+    }
+  }
+}

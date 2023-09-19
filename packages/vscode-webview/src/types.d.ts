@@ -15,6 +15,8 @@ declare module 'preact' {
       'vscode-link': any;
       'vscode-option': any;
       'vscode-panels': any;
+      'vscode-panel-tab': any;
+      'vscode-panel-view': any;
       'vscode-progress-ring': any;
       'vscode-radio': any;
       'vscode-radio-group': any;

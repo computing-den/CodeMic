@@ -19,8 +19,9 @@ class Codecast {
 
   constructor(public context: vscode.ExtensionContext, public db: Db) {
     context.subscriptions.push(vscode.commands.registerCommand('codecast.openView', this.openView.bind(this)));
+    context.subscriptions.push(vscode.commands.registerCommand('codecast.home', this.goHomeCommand.bind(this)));
 
-    this.webview = new WebviewProvider(context.extensionUri, this.messageHandler.bind(this));
+    this.webview = new WebviewProvider(context, this.messageHandler.bind(this), this.viewOpened.bind(this));
 
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(WebviewProvider.viewType, this.webview, {
@@ -33,12 +34,16 @@ class Codecast {
     return new Codecast(context, await Db.init());
   }
 
+  viewOpened() {
+    this.updateViewTitle();
+  }
+
   async messageHandler(req: t.FrontendRequest): Promise<t.BackendResponse> {
     // console.log('extension received: ', req);
 
     switch (req.type) {
       case 'openWelcome': {
-        await this.closeCurrentScreen();
+        this.goHome();
         return this.respondWithStore();
       }
       case 'openPlayer': {
@@ -51,6 +56,8 @@ class Codecast {
             // set history in getStore() so that it's always up-to-date
           };
           this.screen = t.Screen.Player;
+          this.updateViewTitle();
+          vscode.commands.executeCommand('setContext', 'codecast.canGoHome', true);
         }
         return this.respondWithStore();
       }
@@ -68,6 +75,8 @@ class Codecast {
             // set history in getStore() so that it's always up-to-date
           };
           this.screen = t.Screen.Recorder;
+          this.updateViewTitle();
+          vscode.commands.executeCommand('setContext', 'codecast.canGoHome', true);
         }
 
         return this.respondWithStore();
@@ -238,6 +247,22 @@ class Codecast {
     }
   }
 
+  updateViewTitle() {
+    const title = ' sean_shir / ' + SCREEN_TITLES[this.screen]; // TODO get the logged-in username
+    this.webview.view!.title = title;
+  }
+
+  async goHome() {
+    await this.closeCurrentScreen();
+    this.updateViewTitle();
+    vscode.commands.executeCommand('setContext', 'codecast.canGoHome', false);
+  }
+
+  async goHomeCommand() {
+    await this.goHome();
+    await this.webview.postMessage({ type: 'updateStore', store: this.getStore() });
+  }
+
   async closeCurrentScreen(): Promise<boolean> {
     if (this.screen === t.Screen.Recorder) {
       return await this.closeRecorder();
@@ -406,6 +431,12 @@ class Codecast {
     };
   }
 }
+
+const SCREEN_TITLES = {
+  [t.Screen.Welcome]: 'projects',
+  [t.Screen.Player]: 'player',
+  [t.Screen.Recorder]: 'studio',
+};
 
 // TODO delete this and fetch from internet
 const FEATURED_SESSIONS: t.SessionSummaryMap = _.keyBy(

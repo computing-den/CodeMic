@@ -34,8 +34,32 @@
       {
         "command": "codecast.openView",
         "title": "Codecast"
+      },
+      {
+        "command": "codecast.login",
+        "title": "Login"
+      },
+      {
+        "command": "codecast.home",
+        "title": "Home",
+        "icon": {
+          "light": "../vscode-webview/resources/light/home.svg",
+          "dark": "../vscode-webview/resources/dark/home.svg"
+        }
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "codecast.home",
+          "when": "codecast.canGoHome",
+          "group": "navigation"
+        },
+        {
+          "command": "codecast.login"
+        }
+      ]
+    }
   },
   "devDependencies": {
     "@types/lodash": "^4.14.191",
