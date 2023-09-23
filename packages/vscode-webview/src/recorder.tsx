@@ -9,16 +9,15 @@ import Section from './section.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
 
-type Props = { store: t.Store; onExit: () => void };
+type Props = { recorder: t.RecorderState };
 export default class Recorder extends Component<Props> {
   panelsElem: Element | null = null;
-  media: FakeMedia = new FakeMedia(this.handleMediaProgress.bind(this), this.recorder.sessionSummary.duration * 1000);
+  media: FakeMedia = new FakeMedia(
+    this.handleMediaProgress.bind(this),
+    this.props.recorder.sessionSummary.duration * 1000,
+  );
 
   setRef = (e: Element | null) => (this.panelsElem = e);
-
-  get recorder(): t.RecorderState {
-    return this.props.store.recorder!;
-  }
 
   tabChanged = (e: any) => {
     const tab = e.detail as HTMLElement;
@@ -26,12 +25,12 @@ export default class Recorder extends Component<Props> {
   };
 
   // state = {
-  //   localClock: this.recorder.sessionSummary.duration,
+  //   localClock: this.props.recorder.sessionSummary.duration,
   //   root:
-  //     this.recorder.root ||
-  //     this.recorder.history?.root ||
-  //     this.recorder.defaultRoot,
-  //   sessionSummary: this.recorder.sessionSummary,
+  //     this.props.recorder.root ||
+  //     this.props.recorder.history?.root ||
+  //     this.props.recorder.defaultRoot,
+  //   sessionSummary: this.props.recorder.sessionSummary,
   // };
 
   startRecorder = async () => {
@@ -46,24 +45,10 @@ export default class Recorder extends Component<Props> {
     await postMessage({ type: 'saveRecorder' });
   };
 
-  titleChanged = async (e: InputEvent) => {
-    const changes = { title: (e.target as HTMLInputElement).value };
-    await postMessage({ type: 'updateRecorder', changes });
-  };
-
-  descriptionChanged = async (e: InputEvent) => {
-    const changes = { description: (e.target as HTMLInputElement).value };
-    await postMessage({ type: 'updateRecorder', changes });
-  };
-
-  rootChanged = async (root: string) => {
-    await postMessage({ type: 'updateRecorder', changes: { root } });
-  };
-
   enableOrDisableMedia() {
-    const isRecording = Boolean(this.recorder.status === t.RecorderStatus.Recording);
+    const isRecording = Boolean(this.props.recorder.status === t.RecorderStatus.Recording);
     if (isRecording !== this.media.isActive()) {
-      this.media.timeMs = this.recorder.clock * 1000;
+      this.media.timeMs = this.props.recorder.clock * 1000;
       if (isRecording) {
         this.media.start();
       } else {
@@ -73,7 +58,7 @@ export default class Recorder extends Component<Props> {
   }
 
   async handleMediaProgress(ms: number) {
-    if (this.recorder.status === t.RecorderStatus.Recording) {
+    if (this.props.recorder.status === t.RecorderStatus.Recording) {
       console.log('handleMediaProgress: ', ms);
       await postMessage({ type: 'updateRecorder', changes: { clock: ms / 1000 } });
     }
@@ -88,8 +73,6 @@ export default class Recorder extends Component<Props> {
     this.enableOrDisableMedia();
 
     this.panelsElem!.addEventListener('change', this.tabChanged);
-    // @ts-ignore
-    window.panelsElem = this.panelsElem;
   }
 
   componentWillUnmount() {
@@ -97,9 +80,7 @@ export default class Recorder extends Component<Props> {
   }
 
   render() {
-    const { status, sessionSummary: ss } = this.recorder;
-
-    // const canToggle = Boolean(this.recorder.root);
+    // const canToggle = Boolean(this.props.recorder.root);
 
     // let toggleFn: () => void, toggleIcon: string, tooltip: string;
     // switch (status) {
@@ -129,41 +110,8 @@ export default class Recorder extends Component<Props> {
         <vscode-panels ref={this.setRef}>
           <vscode-panel-tab id="details-tab">DETAILS</vscode-panel-tab>
           <vscode-panel-tab id="editor-tab">EDITOR</vscode-panel-tab>
-          <vscode-panel-view className="details">
-            <vscode-text-area
-              className="title subsection"
-              rows={2}
-              resize="vertical"
-              value={ss.title}
-              onInput={this.titleChanged}
-              placeholder="The title of this project"
-            >
-              Title
-            </vscode-text-area>
-            <vscode-text-area
-              className="description subsection"
-              rows={10}
-              resize="vertical"
-              value={ss.description}
-              onInput={this.descriptionChanged}
-              placeholder="What is this project about?"
-            >
-              Description
-            </vscode-text-area>
-            <PathField
-              className="subsection"
-              onChange={this.rootChanged}
-              value={this.recorder.root}
-              label="Workspace"
-              pickTitle="Select workspace folder"
-              disabled={status !== t.RecorderStatus.Uninitialized}
-              autoFocus
-            />
-            <p className="subsection help">
-              Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
-            </p>
-          </vscode-panel-view>
-          <vscode-panel-view className="editor">Editor goes here.</vscode-panel-view>
+          <DetailsView {...this.props} />
+          <EditorView {...this.props} />
         </vscode-panels>
         {/*
             <div className="subsection buttons">
@@ -216,5 +164,68 @@ export default class Recorder extends Component<Props> {
     //     </div>
     //   </>,
     // );
+  }
+}
+
+class DetailsView extends Component<Props> {
+  titleChanged = async (e: InputEvent) => {
+    const changes = { title: (e.target as HTMLInputElement).value };
+    await postMessage({ type: 'updateRecorder', changes });
+  };
+
+  descriptionChanged = async (e: InputEvent) => {
+    const changes = { description: (e.target as HTMLInputElement).value };
+    await postMessage({ type: 'updateRecorder', changes });
+  };
+
+  rootChanged = async (root: string) => {
+    await postMessage({ type: 'updateRecorder', changes: { root } });
+  };
+
+  render() {
+    const { sessionSummary: ss, status } = this.props.recorder;
+
+    return (
+      <vscode-panel-view className="details">
+        <vscode-text-area
+          className="title subsection"
+          rows={2}
+          resize="vertical"
+          value={ss.title}
+          onInput={this.titleChanged}
+          placeholder="The title of this project"
+        >
+          Title
+        </vscode-text-area>
+        <vscode-text-area
+          className="description subsection"
+          rows={10}
+          resize="vertical"
+          value={ss.description}
+          onInput={this.descriptionChanged}
+          placeholder="What is this project about?"
+        >
+          Description
+        </vscode-text-area>
+        <PathField
+          className="subsection"
+          onChange={this.rootChanged}
+          value={this.props.recorder.root}
+          label="Workspace"
+          pickTitle="Select workspace folder"
+          disabled={status !== t.RecorderStatus.Uninitialized}
+          autoFocus
+        />
+        <p className="subsection help">
+          Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
+        </p>
+      </vscode-panel-view>
+    );
+  }
+}
+
+class EditorView extends Component<Props> {
+  render() {
+    return <vscode-panel-view className="editor">Editor goes here.</vscode-panel-view>;
   }
 }

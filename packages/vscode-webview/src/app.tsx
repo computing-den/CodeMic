@@ -39,21 +39,14 @@ export default class App extends Component<AppProps> {
   //   this.onExit = onExit;
   // };
 
-  screens = {
-    [t.Screen.Welcome]: Welcome,
-    [t.Screen.Recorder]: Recorder,
-    [t.Screen.Player]: Player,
+  renderers = {
+    [t.Screen.Welcome]: () => <Welcome welcome={this.props.store.welcome!} />,
+    [t.Screen.Recorder]: () => <Recorder recorder={this.props.store.recorder!} />,
+    [t.Screen.Player]: () => <Player player={this.props.store.player!} />,
   };
 
   render() {
-    const Screen = this.screens[this.props.store.screen];
-    return (
-      <Screen
-        {...this.props}
-        onExit={this.openWelcome}
-        // setOnExit={this.setOnExit}
-      />
-    );
+    return this.renderers[this.props.store.screen]();
   }
 }
 

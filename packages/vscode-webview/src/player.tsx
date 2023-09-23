@@ -12,18 +12,14 @@ import Section from './section.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
 
-type Props = { store: t.Store; onExit: () => void };
+type Props = { player: t.PlayerState };
 export default class Player extends Component<Props> {
   media = new Media();
   seeking = false;
 
-  get player(): t.PlayerState {
-    return this.props.store.player!;
-  }
-
   startPlayer = async () => {
-    if (this.player.status === t.PlayerStatus.Uninitialized) {
-      if (this.player.root) {
+    if (this.props.player.status === t.PlayerStatus.Uninitialized) {
+      if (this.props.player.root) {
         await postMessage({ type: 'play' });
       } else {
         // TODO show error to user
@@ -44,7 +40,7 @@ export default class Player extends Component<Props> {
   };
 
   seek = async (clock: number) => {
-    if (this.player.status === t.PlayerStatus.Uninitialized) {
+    if (this.props.player.status === t.PlayerStatus.Uninitialized) {
       console.error('Workspace not populated yet');
       return;
     }
@@ -57,13 +53,13 @@ export default class Player extends Component<Props> {
   };
 
   fork = async () => {
-    const res = await postMessage({ type: 'confirmForkFromPlayer', clock: this.player.clock });
+    const res = await postMessage({ type: 'confirmForkFromPlayer', clock: this.props.player.clock });
     if (res.value) {
       await postMessage({
         type: 'openRecorder',
-        sessionId: this.player.sessionSummary.id,
+        sessionId: this.props.player.sessionSummary.id,
         fork: true,
-        forkClock: this.player.clock,
+        forkClock: this.props.player.clock,
       });
     }
   };
@@ -71,13 +67,14 @@ export default class Player extends Component<Props> {
   edit = async () => {
     const res = await postMessage({ type: 'confirmEditFromPlayer' });
     if (res.value) {
-      await postMessage({ type: 'openRecorder', sessionId: this.player.sessionSummary.id });
+      await postMessage({ type: 'openRecorder', sessionId: this.props.player.sessionSummary.id });
     }
   };
 
   isStoppedAlmostAtTheEnd(): boolean {
     return (
-      this.player.status === t.PlayerStatus.Stopped && this.player.clock >= this.player.sessionSummary.duration - 0.5
+      this.props.player.status === t.PlayerStatus.Stopped &&
+      this.props.player.clock >= this.props.player.sessionSummary.duration - 0.5
     );
   }
 
@@ -86,10 +83,11 @@ export default class Player extends Component<Props> {
   }
 
   render() {
-    const ss = this.player.sessionSummary;
+    const { player } = this.props;
+    const { sessionSummary: ss } = player;
 
     let primaryAction: MT.PrimaryAction;
-    if (this.player.status === t.PlayerStatus.Playing) {
+    if (player.status === t.PlayerStatus.Playing) {
       primaryAction = { type: 'pausePlaying', title: 'Pause', onClick: this.pausePlayer };
     } else {
       primaryAction = { type: 'play', title: 'Play', onClick: this.startPlayer };
@@ -98,9 +96,9 @@ export default class Player extends Component<Props> {
     const toolbarActions = [
       {
         title:
-          this.player.status === t.PlayerStatus.Playing
+          player.status === t.PlayerStatus.Playing
             ? `Fork: create a new project starting at this point`
-            : `Fork: create a new project starting at ${lib.formatTimeSeconds(this.player.clock)}`,
+            : `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`,
         icon: 'codicon-repo-forked',
         onClick: this.fork,
       },
@@ -128,8 +126,8 @@ export default class Player extends Component<Props> {
     return (
       <Screen className="player">
         <audio id="audio"></audio>
-        {this.player.status !== t.PlayerStatus.Uninitialized && (
-          <ProgressBar duration={ss.duration} onSeek={this.seek} clock={this.player.clock} />
+        {player.status !== t.PlayerStatus.Uninitialized && (
+          <ProgressBar duration={ss.duration} onSeek={this.seek} clock={player.clock} />
         )}
         <Section className="main-section">
           {/*
@@ -145,15 +143,15 @@ export default class Player extends Component<Props> {
               className="subsection subsection_spaced"
               primaryAction={primaryAction}
               actions={toolbarActions}
-              clock={this.player.clock}
+              clock={player.clock}
               duration={ss.duration}
             />
             <SessionDescription className="subsection subsection_spaced" sessionSummary={ss} />
-            {this.player.status === t.PlayerStatus.Uninitialized && (
+            {player.status === t.PlayerStatus.Uninitialized && (
               <PathField
                 className="subsection"
                 onChange={this.rootChanged}
-                value={this.player.root}
+                value={player.root}
                 label="Workspace"
                 pickTitle="Select workspace folder"
                 autoFocus

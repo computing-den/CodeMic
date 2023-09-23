@@ -7,13 +7,10 @@ import Section from './section.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
 
-type Props = { store: t.Store; onExit: () => void };
+type Props = { welcome: t.WelcomeState };
 export default class Welcome extends Component<Props> {
-  get welcome(): t.Welcome {
-    return this.props.store.welcome!;
-  }
-
   render() {
+    const { welcome } = this.props;
     return (
       <Screen className="welcome">
         {/*<LatencyTest store={this.props.store} />*/}
@@ -27,8 +24,8 @@ export default class Welcome extends Component<Props> {
             </div>
           </Section.Body>
         </Section>
-        <SessionsSection title="WORKSPACE" history={this.welcome.history} sessionSummaries={this.welcome.workspace} />
-        <SessionsSection title="FEATURED" history={this.welcome.history} sessionSummaries={this.welcome.featured} />
+        <SessionsSection title="WORKSPACE" history={welcome.history} sessionSummaries={welcome.workspace} />
+        <SessionsSection title="FEATURED" history={welcome.history} sessionSummaries={welcome.featured} />
       </Screen>
     );
   }

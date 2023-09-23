@@ -86,7 +86,7 @@ export enum Screen {
 // A separate field for each page
 export type Store = {
   screen: Screen;
-  welcome?: Welcome;
+  welcome?: WelcomeState;
   recorder?: RecorderState;
   player?: PlayerState;
   test?: any;
@@ -95,7 +95,7 @@ export type Store = {
   // login?: Login;
 };
 
-export type Welcome = {
+export type WelcomeState = {
   workspace: SessionSummaryMap;
   featured: SessionSummaryMap;
   history: SessionHistory;

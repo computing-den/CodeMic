@@ -413,7 +413,7 @@ class Codecast {
       }
     }
 
-    let welcome: t.Welcome | undefined;
+    let welcome: t.WelcomeState | undefined;
     if (this.screen === t.Screen.Welcome) {
       welcome = {
         workspace: this.db.sessionSummaries,
