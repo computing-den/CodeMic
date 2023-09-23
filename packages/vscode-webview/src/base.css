@@ -83,7 +83,13 @@ vscode-panels {
     padding-top: 0;
   }
 
+  &::part(tabpanel) {
+    display: flex;
+  }
+
   & vscode-panel-view {
+    width: 100%;
+    display: flex;
     flex-direction: column;
     /* padding: var(--container-padding) 0; */
   }

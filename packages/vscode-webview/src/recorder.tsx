@@ -1,5 +1,6 @@
+import MediaToolbar, * as MT from './media_toolbar.jsx';
 import { h, Fragment, Component } from 'preact';
-import { types as t, path, lib } from '@codecast/lib';
+import { types as t, path, lib, assert } from '@codecast/lib';
 import FakeMedia from './fake_media.js';
 import PathField from './path_field.jsx';
 import { SessionSummary } from './session_summary.jsx';
@@ -183,10 +184,11 @@ class DetailsView extends Component<Props> {
   };
 
   render() {
-    const { sessionSummary: ss, status } = this.props.recorder;
+    const { recorder } = this.props;
+    const { sessionSummary: ss } = recorder;
 
     return (
-      <vscode-panel-view className="details">
+      <vscode-panel-view className="details-view">
         <vscode-text-area
           className="title subsection"
           rows={2}
@@ -213,7 +215,7 @@ class DetailsView extends Component<Props> {
           value={this.props.recorder.root}
           label="Workspace"
           pickTitle="Select workspace folder"
-          disabled={status !== t.RecorderStatus.Uninitialized}
+          disabled={recorder.status !== t.RecorderStatus.Uninitialized}
           autoFocus
         />
         <p className="subsection help">
@@ -225,7 +227,96 @@ class DetailsView extends Component<Props> {
 }
 
 class EditorView extends Component<Props> {
-  render() {
-    return <vscode-panel-view className="editor">Editor goes here.</vscode-panel-view>;
+  state = {
+    indicatorClock: 0,
+    stepCount: 15,
+  };
+
+  get timelineStepClock(): number {
+    return calcTimelineStepClock(this.props.recorder.sessionSummary.duration, this.state.stepCount);
   }
+
+  mouseMoved = (e: MouseEvent) => {
+    const timeline = document.getElementById('timeline')!;
+    const timelineRect = timeline.getBoundingClientRect();
+    const indicatorElem = document.getElementById('indicator')!;
+    const clientPos = [e.clientX, e.clientY] as t.Vec2;
+    if (lib.vec2InRect(clientPos, timelineRect, { top: 5 })) {
+      const steps: HTMLElement[] = Array.from(timeline.querySelectorAll('.ruler .step'));
+      const firstStepMidY = lib.rectMid(steps[0].getBoundingClientRect())[1];
+      const lastStepMidY = lib.rectMid(_.last(steps)!.getBoundingClientRect())[1];
+      const firstStepMidYFromTimeline = firstStepMidY - timelineRect.top;
+      const mouseYFromFirstStepMid = Math.max(0, clientPos[1] - firstStepMidY);
+      const height = lastStepMidY - firstStepMidY;
+      const ratio = mouseYFromFirstStepMid / height;
+      const indicatorY = mouseYFromFirstStepMid + firstStepMidYFromTimeline;
+      indicatorElem.style.display = 'block';
+      indicatorElem.style.top = `${indicatorY}px`;
+      this.setState({ indicatorClock: ratio * this.state.stepCount * this.timelineStepClock });
+    } else {
+      indicatorElem.style.display = 'none';
+    }
+  };
+
+  componentDidMount() {
+    document.addEventListener('mousemove', this.mouseMoved);
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener('mousemove', this.mouseMoved);
+  }
+
+  render() {
+    const { recorder } = this.props;
+    const { sessionSummary: ss } = recorder;
+    let primaryAction: MT.PrimaryAction = { type: 'record', title: 'Play', onClick: () => {} };
+
+    const toolbarActions = [
+      {
+        title: 'Play',
+        icon: 'codicon-play',
+        onClick: () => {
+          console.log('TODO');
+        },
+      },
+      {
+        title: 'Add audio',
+        icon: 'codicon-add',
+        onClick: () => {
+          console.log('TODO');
+        },
+      },
+    ];
+
+    return (
+      <vscode-panel-view className="editor-view">
+        <MediaToolbar
+          className="subsection subsection_spaced"
+          primaryAction={primaryAction}
+          actions={toolbarActions}
+          clock={recorder.clock}
+          duration={ss.duration}
+        />
+        <div id="timeline" className="subsection">
+          <div className="ruler">
+            {_.times(this.state.stepCount + 1, i => (
+              <div className="step">{lib.formatTimeSeconds(i * this.timelineStepClock)}</div>
+            ))}
+          </div>
+          <div id="indicator">
+            <div className="time">{lib.formatTimeSeconds(this.state.indicatorClock)}</div>
+          </div>
+        </div>
+      </vscode-panel-view>
+    );
+  }
+}
+
+function roundTo(value: number, to: number) {
+  assert(to > 0);
+  return Math.floor((value + to - 1) / to) * to;
+}
+
+function calcTimelineStepClock(dur: number, steps: number): number {
+  return Math.max(roundTo(dur / steps, 60), 60);
 }

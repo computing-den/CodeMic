@@ -110,3 +110,19 @@ export function dispatchPlaybackEvent(
       return applier.applySaveEvent(e, direction, uriSet);
   }
 }
+
+export function vec2Sub(a: t.Vec2, b: t.Vec2): t.Vec2 {
+  return [a[0] - b[0], a[1] - b[1]];
+}
+
+export function vec2InRect(v: t.Vec2, rect: t.Rect, offset?: Partial<t.Rect>): boolean {
+  const ol = offset?.left ?? 0;
+  const ot = offset?.top ?? 0;
+  const or = offset?.right ?? 0;
+  const ob = offset?.bottom ?? 0;
+  return v[0] >= rect.left - ol && v[0] <= rect.right + or && v[1] >= rect.top - ot && v[1] <= rect.bottom + ob;
+}
+
+export function rectMid(rect: t.Rect): t.Vec2 {
+  return [(rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2];
+}

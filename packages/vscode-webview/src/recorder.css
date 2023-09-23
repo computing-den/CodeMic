@@ -1,33 +1,93 @@
 .recorder {
   /* padding-top: var(--spacing-medium); */
 
-  & vscode-panel-view.details {
-    padding: var(--container-padding-ver) var(--container-padding-hor) 0 var(--container-padding-hor);
-  }
+  & vscode-panels {
+    flex: 1;
 
-  & vscode-panel-view.editor {
-    padding: var(--container-padding-ver) var(--container-padding-hor) 0 var(--container-padding-hor);
-  }
+    .details-view {
+      padding: var(--container-padding-ver) var(--container-padding-hor);
 
-  & vscode-text-area.title {
-    &::part(control) {
-      /* margin-top: var(--spacing-large); */
-      font-weight: bold;
-      font-size: 1.1em;
+      & vscode-text-area.title {
+        &::part(control) {
+          /* margin-top: var(--spacing-large); */
+          font-weight: bold;
+          font-size: 1.1em;
+        }
+      }
+      & vscode-text-area.description {
+        /* margin-top: var(--spacing-large); */
+      }
+
+      /*
+    .subsection.buttons {
+      display: flex;
+
+      & vscode-button + vscode-button {
+        margin-left: var(--spacing-medium);
+      }
+      & vscode-button.bump-left {
+        margin-left: auto;
+      }
     }
-  }
-  & vscode-text-area.description {
-    /* margin-top: var(--spacing-large); */
-  }
-
-  .subsection.buttons {
-    display: flex;
-
-    & vscode-button + vscode-button {
-      margin-left: var(--spacing-medium);
+    */
     }
-    & vscode-button.bump-left {
-      margin-left: auto;
+
+    .editor-view {
+      padding: var(--container-padding-ver) var(--container-padding-hor);
+      /* overflow-y: scroll */
+
+      #timeline {
+        flex: 1;
+        display: flex;
+        position: relative;
+        margin-left: calc(var(--container-padding-hor) * -1);
+        margin-right: calc(var(--container-padding-hor) * -1);
+        cursor: pointer;
+
+        #indicator {
+          position: absolute;
+          left: var(--container-padding);
+          right: calc(var(--container-padding) + 13px);
+          /* height: 1px; */
+          border-bottom: 1px solid #5555ff;
+
+          .time {
+            position: absolute;
+            right: calc(var(--container-padding) + 13px);
+            /* top: -10px; */
+          }
+        }
+
+        .ruler {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          /* left: 0; */
+          right: calc(var(--container-padding) + 13px);
+          /* background-image: linear-gradient(to bottom, var(--vscode-input-border, var(--dropdown-border)) 1px, transparent 1px); */
+          /* background-size: auto 50px; */
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding-left: 8px;
+          border-left: 1px solid var(--vscode-input-border, var(--dropdown-border));
+          overflow: hidden;
+          user-select: none;
+
+          .step {
+            position: relative;
+            font-size: 0.9em;
+            &::after {
+              content: '';
+              position: absolute;
+              right: calc(100% + 3px);
+              width: 11px;
+              border-bottom: 1px solid var(--vscode-input-border, var(--dropdown-border));
+              top: 50%;
+            }
+          }
+        }
+      }
     }
   }
 }

@@ -362,3 +362,6 @@ export type BackendMediaEvent =
   | { type: 'play' }
   | { type: 'pause' }
   | { type: 'seek'; clock: number };
+
+export type Vec2 = [number, number];
+export type Rect = { top: number; right: number; bottom: number; left: number };
