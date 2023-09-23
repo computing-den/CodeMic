@@ -1,3 +1,4 @@
+import { produce, type Draft } from 'immer';
 import MediaToolbar, * as MT from './media_toolbar.jsx';
 import { h, Fragment, Component } from 'preact';
 import { types as t, path, lib, assert } from '@codecast/lib';
@@ -8,6 +9,7 @@ import SessionDescription from './session_description.jsx';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
 import postMessage from './api.js';
+import { cn } from './misc.js';
 import _ from 'lodash';
 
 type Props = { recorder: t.RecorderState };
@@ -226,44 +228,99 @@ class DetailsView extends Component<Props> {
   }
 }
 
+type Marker = {
+  clock: number;
+  type: 'anchor' | 'cursor' | 'selection';
+  active?: boolean;
+  hidden?: boolean;
+};
+
+type EditorViewStateRecipe = (draft: Draft<EditorView['state']>) => EditorView['state'] | void;
+
 class EditorView extends Component<Props> {
   state = {
-    indicatorClock: 0,
+    cursor: { clock: 0, type: 'cursor', hidden: true } as Marker,
+    markers: [] as Marker[],
     stepCount: 15,
   };
 
-  get timelineStepClock(): number {
+  getTimelineStepClock(): number {
     return calcTimelineStepClock(this.props.recorder.sessionSummary.duration, this.state.stepCount);
   }
 
+  getTimelineDuration(): number {
+    return this.getTimelineStepClock() * this.state.stepCount;
+  }
+
   mouseMoved = (e: MouseEvent) => {
-    const timeline = document.getElementById('timeline')!;
-    const timelineRect = timeline.getBoundingClientRect();
-    const indicatorElem = document.getElementById('indicator')!;
-    const clientPos = [e.clientX, e.clientY] as t.Vec2;
-    if (lib.vec2InRect(clientPos, timelineRect, { top: 5 })) {
-      const steps: HTMLElement[] = Array.from(timeline.querySelectorAll('.ruler .step'));
-      const firstStepMidY = lib.rectMid(steps[0].getBoundingClientRect())[1];
-      const lastStepMidY = lib.rectMid(_.last(steps)!.getBoundingClientRect())[1];
-      const firstStepMidYFromTimeline = firstStepMidY - timelineRect.top;
-      const mouseYFromFirstStepMid = Math.max(0, clientPos[1] - firstStepMidY);
-      const height = lastStepMidY - firstStepMidY;
-      const ratio = mouseYFromFirstStepMid / height;
-      const indicatorY = mouseYFromFirstStepMid + firstStepMidYFromTimeline;
-      indicatorElem.style.display = 'block';
-      indicatorElem.style.top = `${indicatorY}px`;
-      this.setState({ indicatorClock: ratio * this.state.stepCount * this.timelineStepClock });
-    } else {
-      indicatorElem.style.display = 'none';
+    const clock = this.getClockUnderMouse(e);
+    if (clock !== undefined) {
+      this.updateState(state => {
+        state.cursor = { clock, type: 'cursor' };
+      });
     }
   };
 
+  mouseLeft = () => {
+    this.updateState(state => {
+      state.cursor = { clock: 0, type: 'cursor', hidden: true };
+    });
+  };
+
+  mouseDown = (e: MouseEvent) => {
+    if (!this.getClockUnderMouse(e) || this.state.cursor.hidden) return;
+
+    this.updateState(state => {
+      for (const marker of state.markers) marker.active = false;
+      state.markers.push({
+        clock: state.cursor.clock,
+        type: 'anchor',
+        active: true,
+      });
+    });
+  };
+
+  mouseUp = () => {
+    // this.updateState(state => {});
+  };
+
+  resized = () => {
+    this.forceUpdate();
+  };
+
+  updateState = (recipe: EditorViewStateRecipe) => this.setState(state => produce(state, recipe));
+
+  getClockUnderMouse(e: MouseEvent): number | undefined {
+    const clientPos = [e.clientX, e.clientY] as t.Vec2;
+    const timeline = document.getElementById('timeline')!;
+    const timelineRect = timeline.getBoundingClientRect();
+    if (lib.vec2InRect(clientPos, timelineRect, { top: 5 })) {
+      const mouseOffsetInTimeline = Math.max(0, clientPos[1] - timelineRect.top);
+      const ratio = mouseOffsetInTimeline / timelineRect.height;
+      return ratio * this.getTimelineDuration();
+    }
+  }
+
+  componentDidUpdate() {}
+
   componentDidMount() {
+    document.addEventListener('resize', this.resized);
     document.addEventListener('mousemove', this.mouseMoved);
+    document.addEventListener('mousedown', this.mouseDown);
+    document.addEventListener('mouseup', this.mouseUp);
+
+    const timeline = document.getElementById('timeline')!;
+    timeline.addEventListener('mouseleave', this.mouseLeft);
   }
 
   componentWillUnmount() {
+    document.removeEventListener('resize', this.resized);
     document.removeEventListener('mousemove', this.mouseMoved);
+    document.removeEventListener('mousedown', this.mouseDown);
+    document.removeEventListener('mouseup', this.mouseUp);
+
+    const timeline = document.getElementById('timeline')!;
+    timeline.removeEventListener('mouseleave', this.mouseLeft);
   }
 
   render() {
@@ -298,16 +355,40 @@ class EditorView extends Component<Props> {
           duration={ss.duration}
         />
         <div id="timeline" className="subsection">
-          <div className="ruler">
-            {_.times(this.state.stepCount + 1, i => (
-              <div className="step">{lib.formatTimeSeconds(i * this.timelineStepClock)}</div>
-            ))}
+          <div className="timeline-body">
+            <div className="markers">
+              <MarkerUI id="cursor" marker={this.state.cursor} timelineDuration={this.getTimelineDuration()} />
+              {_.map(this.state.markers, marker => (
+                <MarkerUI marker={marker} timelineDuration={this.getTimelineDuration()} />
+              ))}
+            </div>
           </div>
-          <div id="indicator">
-            <div className="time">{lib.formatTimeSeconds(this.state.indicatorClock)}</div>
+          <div id="ruler">
+            {_.times(this.state.stepCount + 1, i => (
+              <div className="step">
+                <div className="indicator"></div>
+                <div className="time">{lib.formatTimeSeconds(i * this.getTimelineStepClock())}</div>
+              </div>
+            ))}
           </div>
         </div>
       </vscode-panel-view>
+    );
+  }
+}
+
+type MarkerProps = { id?: string; marker: Marker; timelineDuration: number };
+class MarkerUI extends Component<MarkerProps> {
+  render() {
+    const { id, marker, timelineDuration } = this.props;
+    const style = {
+      visibility: marker.hidden ? 'hidden' : 'visible',
+      top: `${(marker.clock / timelineDuration) * 100}%`,
+    };
+    return (
+      <div id={id} className={cn('marker', `marker_${marker.type}`, marker.active && 'marker_active')} style={style}>
+        <div className="time">{lib.formatTimeSeconds(this.props.marker.clock)}</div>
+      </div>
     );
   }
 }

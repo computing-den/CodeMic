@@ -40,51 +40,102 @@
         flex: 1;
         display: flex;
         position: relative;
-        margin-left: calc(var(--container-padding-hor) * -1);
-        margin-right: calc(var(--container-padding-hor) * -1);
+        /* margin-left: calc(var(--container-padding-hor) * -1); */
+        /* margin-right: calc(var(--container-padding-hor) * -1); */
         cursor: pointer;
+        user-select: none;
 
-        #indicator {
-          position: absolute;
-          left: var(--container-padding);
-          right: calc(var(--container-padding) + 13px);
-          /* height: 1px; */
-          border-bottom: 1px solid #5555ff;
+        .timeline-body {
+          flex: 1;
+          position: relative;
 
-          .time {
+          .markers {
+            .marker {
+              position: absolute;
+              left: 0;
+              right: 0;
+              /* height: 1px; */
+              border-bottom: 1px solid;
+
+              /* &:hover { */
+              /*   z-index: 1; */
+              /* } */
+
+              &.marker_hidden {
+                display: none;
+              }
+              &.marker_active {
+                border-bottom-width: 2px;
+              }
+              &.marker_cursor {
+                border-color: var(--marker-cursor-color);
+                z-index: 1;
+              }
+              &.marker_anchor {
+                border-color: var(--marker-anchor-color);
+              }
+              &.marker_selection {
+                border-color: var(--marker-anchor-color);
+              }
+
+              .time {
+                /*
             position: absolute;
-            right: calc(var(--container-padding) + 13px);
-            /* top: -10px; */
+            left: calc(100% + 3px);
+            background: var(--vscode-sideBar-background);
+            padding: 5px 0px;
+            top: -11px;
+            font-weight: bold;
+            */
+
+                position: absolute;
+                left: 0;
+                background: var(--vscode-sideBar-background);
+                /* padding: 5px 0px; */
+                /* font-weight: bold; */
+                bottom: calc(100% + 2px);
+                font-size: 0.8em;
+                opacity: 0.8;
+              }
+            }
           }
         }
 
-        .ruler {
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          /* left: 0; */
-          right: calc(var(--container-padding) + 13px);
-          /* background-image: linear-gradient(to bottom, var(--vscode-input-border, var(--dropdown-border)) 1px, transparent 1px); */
-          /* background-size: auto 50px; */
+        #ruler {
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          padding-left: 8px;
+          /* padding-left: 8px; */
           border-left: 1px solid var(--vscode-input-border, var(--dropdown-border));
-          overflow: hidden;
-          user-select: none;
+          /* overflow: hidden; */
+          margin-left: auto;
+          margin-right: 0;
 
           .step {
+            display: flex;
+            height: 0;
             position: relative;
-            font-size: 0.9em;
-            &::after {
-              content: '';
-              position: absolute;
-              right: calc(100% + 3px);
-              width: 11px;
-              border-bottom: 1px solid var(--vscode-input-border, var(--dropdown-border));
-              top: 50%;
+            overflow: visible;
+
+            .indicator {
+              width: 7px;
+              border-top: 1px solid var(--vscode-input-border, var(--dropdown-border));
             }
+            .time {
+              margin-left: 5px;
+              margin-top: -7px;
+              font-size: 0.9em;
+              opacity: 0.8;
+            }
+            /* position: relative; */
+            /* &::after { */
+            /*   content: ''; */
+            /*   position: absolute; */
+            /*   right: calc(100% + 3px); */
+            /*   width: 11px; */
+            /*   border-bottom: 1px solid var(--vscode-input-border, var(--dropdown-border)); */
+            /*   top: 50%; */
+            /* } */
           }
         }
       }
