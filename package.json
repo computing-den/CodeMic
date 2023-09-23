@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
+    "start": "npm run build && code --extensionDevelopmentPath=$PWD/packages/vscode-extension",
     "build": "npm run build:tsc && npm run build:webview",
     "build:tsc": "tsc --build",
     "build:webview": "cd packages/vscode-webview && node esbuild.mjs",
+    "watch:tsc": "tsc --build --watch --pretty false",
+    "watch:webview": "cd packages/vscode-webview && node esbuild.mjs --watch",
     "clean": "rm -rf packages/*/out && rm -rf packages/*/tsconfig.tsbuildinfo"
   },
   "workspaces": [

@@ -1,8 +1,9 @@
 .session-description {
   /* margin: var(--spacing-large) var(--container-padding) var(--spacing-medium) var(--container-padding); */
-  border: 1px solid var(--vscode-input-border);
+  border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--dropdown-border));
   padding: var(--spacing-medium);
   background: var(--input-background);
+  border-radius: calc(var(--corner-radius) * 1px);
   overflow: hidden;
   /* border-radius: var(--card-border-radius); */
 

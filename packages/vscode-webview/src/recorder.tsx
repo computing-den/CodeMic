@@ -11,11 +11,19 @@ import _ from 'lodash';
 
 type Props = { store: t.Store; onExit: () => void };
 export default class Recorder extends Component<Props> {
+  panelsElem: Element | null = null;
   media: FakeMedia = new FakeMedia(this.handleMediaProgress.bind(this), this.recorder.sessionSummary.duration * 1000);
+
+  setRef = (e: Element | null) => (this.panelsElem = e);
 
   get recorder(): t.RecorderState {
     return this.props.store.recorder!;
   }
+
+  tabChanged = (e: any) => {
+    const tab = e.detail as HTMLElement;
+    console.log(tab);
+  };
 
   // state = {
   //   localClock: this.recorder.sessionSummary.duration,
@@ -52,10 +60,6 @@ export default class Recorder extends Component<Props> {
     await postMessage({ type: 'updateRecorder', changes: { root } });
   };
 
-  toggleStudio = async () => {
-    // TODO
-  };
-
   enableOrDisableMedia() {
     const isRecording = Boolean(this.recorder.status === t.RecorderStatus.Recording);
     if (isRecording !== this.media.isActive()) {
@@ -82,6 +86,10 @@ export default class Recorder extends Component<Props> {
   componentDidMount() {
     console.log('Recorder componentDidMount');
     this.enableOrDisableMedia();
+
+    this.panelsElem!.addEventListener('change', this.tabChanged);
+    // @ts-ignore
+    window.panelsElem = this.panelsElem;
   }
 
   componentWillUnmount() {
@@ -118,9 +126,9 @@ export default class Recorder extends Component<Props> {
 
     return (
       <Screen className="recorder">
-        <vscode-panels>
-          <vscode-panel-tab>DETAILS</vscode-panel-tab>
-          <vscode-panel-tab>EDITOR</vscode-panel-tab>
+        <vscode-panels ref={this.setRef}>
+          <vscode-panel-tab id="details-tab">DETAILS</vscode-panel-tab>
+          <vscode-panel-tab id="editor-tab">EDITOR</vscode-panel-tab>
           <vscode-panel-view className="details">
             <vscode-text-area
               className="title subsection"

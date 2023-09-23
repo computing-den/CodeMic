@@ -78,7 +78,7 @@ vscode-panels {
 
   &::part(tablist) {
     width: 100%;
-    border-bottom: 1px solid var(--vscode-input-border);
+    border-bottom: 1px solid var(--vscode-input-border, var(--dropdown-border));
     /* padding: 0; */
     padding-top: 0;
   }

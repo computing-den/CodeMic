@@ -12,7 +12,7 @@
       object-fit: contain;
       margin-right: var(--spacing-large);
       border-radius: 50%;
-      border: 1px solid var(--vscode-input-border);
+      border: 1px solid var(--vscode-input-border, var(--dropdown-border));
 
       @media (max-width: 200px) {
         display: none;

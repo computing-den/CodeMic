@@ -1,14 +1,45 @@
-// import config from './config.json' assert { type: 'json' };
-import * as esbuild from 'esbuild';
-// import { execSync } from 'child_process';
+// It's possible to have custom formatting of logs.
+// See https://github.com/evanw/esbuild/issues/2153
+// But print it all, including the suggestions, is a little more involved.
+// Here's an example of an error item that is received by the plugin:
+// {
+//   "id": "css-syntax-error",
+//   "location": {
+//     "column": 4,
+//     "file": "src/player.css",
+//     "length": 3,
+//     "line": 11,
+//     "lineText": "    add {",
+//     "namespace": "",
+//     "suggestion": ":is(add)"
+//   },
+//   "notes": [
+//     {
+//       "location": null,
+//       "text": "To start a nested style rule with an identifier, you need to wrap the identifier in \":is(...)\" to prevent the rule from being parsed as a declaration."
+//     }
+//   ],
+//   "pluginName": "",
+//   "text": "A nested style rule cannot start with \"add\" because it looks like the start of a declaration"
+// }
+// Also, we must set logLevel: 'silent' to disable esbuild to print to console on its own.
+// In which case, we do lose the info and debug logs, but we still get the errors and warnings in the plugin.
 
-// const mustWatch = process.argv[2] === '--watch';
+import * as esbuild from 'esbuild';
+
+// const mustWatch = process.argv.includes('--watch');
+
+// const RED = '\x1b[31m';
+// const GREEN = '\x1b[32m';
+// const YELLOW = '\x1b[33m';
+// const RESET = '\x1b[0m';
 
 const base = {
   target: ['chrome114', 'firefox113', 'safari16.5', 'edge114'],
   sourcemap: 'inline',
   minify: false,
   bundle: true,
+  // logLevel: 'silent',
 };
 
 const jsConfig = {
@@ -16,12 +47,14 @@ const jsConfig = {
   entryPoints: ['src/webview.tsx'],
   outfile: 'out/webview.js',
   // define: { DEBUG: JSON.stringify(config.debug) },
+  // plugins: [messagePlugin('JS')],
 };
 
 const cssConfig = {
   ...base,
   entryPoints: ['src/webview.css'],
   outfile: 'out/webview.css',
+  // plugins: [messagePlugin('CSS')],
 };
 
 await esbuild.build(jsConfig);
@@ -38,47 +71,35 @@ await esbuild.build(cssConfig);
 //   await esbuild.build(cssConfig);
 // }
 
-// const RED = '\x1b[31m';
-// const GREEN = '\x1b[32m';
-// const YELLOW = '\x1b[33m';
-// const RESET = '\x1b[0m';
-
 // function messagePlugin(name) {
 //   return {
 //     name: 'Message',
 //     setup(build) {
 //       build.onEnd(result => {
-//         if (result.errors.length > 0) {
-//           notify(result.errors[0]);
+//         for (const error of result.errors) {
+//           // console.error(JSON.stringify(error, null, 2));
+//           console.error(itemToStr(error));
 //         }
-//         if (result.warnings.length > 0) {
-//           notify(result.warnings[0]);
+//         for (const warning of result.warnings) {
+//           // console.error(JSON.stringify(warning, null, 2));
+//           console.error(itemToStr(warning));
 //         }
 
 //         if (result.errors.length === 0 && result.warnings.length === 0) {
-//           console.log(`${GREEN}${name} built successfully.${RESET}`);
+//           console.log(`${GREEN}esbuild ${name} built successfully.${RESET}`);
 //         }
 //       });
 //     },
 //   };
 // }
 
-// function notify(item) {
-//   try {
-//     const msg = itemToStr(item);
-//     execSync(`notify-send --urgency=critical --expire-time=2000 "esbuild" "${msg}"`);
-//   } catch (error) {
-//     console.error(error);
-//   }
-// }
-
 // function itemToStr(item) {
 //   let msg;
 //   if (item.location) {
-//     msg = `${item.location.file}:${item.location.line}: ${item.text}`;
+//     msg = itemLocationToStr(item.location)
+//     msg = `${item.location.file}:${item.location.line}:${item.location.column} - error esbuild: ${item.text}`;
 //   } else {
-//     msg = `Unknown location: ${item.text}`;
+//     msg = `Unknown:0:0 - error unknown: ${item.text}`;
 //   }
-//   msg = msg.replaceAll('"', '\\"');
 //   return msg;
 // }

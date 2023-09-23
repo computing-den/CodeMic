@@ -12,7 +12,7 @@
   .contents-section .section-body {
     padding: var(--container-padding-ver) var(--container-padding-hor) 0 var(--container-padding-hor);
 
-    container-padded .toc {
+    .toc {
       > .item {
         display: flex;
         align-items: center;
