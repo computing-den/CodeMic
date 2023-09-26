@@ -6,17 +6,17 @@
   "type": "module",
   "dependencies": {
     "@codecast/lib": "^1.0.0",
-    "@types/lodash": "^4.14.195",
-    "@types/uuid": "^9.0.2",
-    "@types/vscode": "^1.79.1",
-    "@types/vscode-webview": "^1.57.1",
-    "@vscode/codicons": "^0.0.33",
+    "@types/lodash": "^4.14.199",
+    "@types/uuid": "^9.0.4",
+    "@types/vscode": "^1.82.0",
+    "@types/vscode-webview": "^1.57.2",
+    "@vscode/codicons": "github:microsoft/vscode-codicons",
     "@vscode/webview-ui-toolkit": "^1.2.2",
-    "esbuild": "^0.18.10",
+    "esbuild": "^0.19.3",
     "immer": "^10.0.2",
     "lodash": "^4.17.21",
     "moment": "^2.29.4",
-    "preact": "^10.15.1",
-    "uuid": "^9.0.0"
+    "preact": "^10.17.1",
+    "uuid": "^9.0.1"
   }
 }

@@ -126,3 +126,7 @@ export function vec2InRect(v: t.Vec2, rect: t.Rect, offset?: Partial<t.Rect>): b
 export function rectMid(rect: t.Rect): t.Vec2 {
   return [(rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2];
 }
+
+export function approxEqual(a: number, b: number, tolerance: number) {
+  return Math.abs(a - b) <= tolerance;
+}

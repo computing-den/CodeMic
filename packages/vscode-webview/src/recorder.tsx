@@ -232,14 +232,14 @@ type Marker = {
   clock: number;
   type: 'anchor' | 'cursor' | 'selection';
   active?: boolean;
-  hidden?: boolean;
 };
 
 type EditorViewStateRecipe = (draft: Draft<EditorView['state']>) => EditorView['state'] | void;
 
 class EditorView extends Component<Props> {
   state = {
-    cursor: { clock: 0, type: 'cursor', hidden: true } as Marker,
+    cursor: undefined as Marker | undefined,
+    anchor: undefined as Marker | undefined,
     markers: [] as Marker[],
     stepCount: 15,
   };
@@ -263,25 +263,32 @@ class EditorView extends Component<Props> {
 
   mouseLeft = () => {
     this.updateState(state => {
-      state.cursor = { clock: 0, type: 'cursor', hidden: true };
+      state.cursor = undefined;
     });
   };
 
   mouseDown = (e: MouseEvent) => {
-    if (!this.getClockUnderMouse(e) || this.state.cursor.hidden) return;
-
-    this.updateState(state => {
-      for (const marker of state.markers) marker.active = false;
-      state.markers.push({
-        clock: state.cursor.clock,
-        type: 'anchor',
-        active: true,
+    const clock = this.getClockUnderMouse(e);
+    if (clock !== undefined) {
+      this.updateState(state => {
+        for (const marker of state.markers) marker.active = false;
+        state.anchor = { clock, type: 'anchor', active: true };
       });
-    });
+    }
   };
 
-  mouseUp = () => {
-    // this.updateState(state => {});
+  mouseUp = (e: MouseEvent) => {
+    // const {anchor} = this.state;
+    // if (anchor) {
+    //   const clock = this.getClockUnderMouse(e);
+    //   const tolerance = this.getTimelineDuration() / 300;
+    //   if (clock !== undefined && lib.approxEqual(clock, anchor.clock, tolerance)) {
+    //     this.updateState(state => {
+    //       state.anchor = undefined;
+    //       state.selection = {fromClock: anchor.clock, toClock: clock, active}
+    //     })
+    //   }
+    // }
   };
 
   resized = () => {
@@ -338,7 +345,7 @@ class EditorView extends Component<Props> {
       },
       {
         title: 'Add audio',
-        icon: 'codicon-add',
+        icon: 'codicon-mic',
         onClick: () => {
           console.log('TODO');
         },
@@ -352,13 +359,11 @@ class EditorView extends Component<Props> {
           primaryAction={primaryAction}
           actions={toolbarActions}
           clock={recorder.clock}
-          duration={ss.duration}
         />
         <div id="timeline" className="subsection">
           <div className="timeline-body">
             <div className="markers">
-              <MarkerUI id="cursor" marker={this.state.cursor} timelineDuration={this.getTimelineDuration()} />
-              {_.map(this.state.markers, marker => (
+              {_.compact([...this.state.markers, this.state.cursor, this.state.anchor]).map(marker => (
                 <MarkerUI marker={marker} timelineDuration={this.getTimelineDuration()} />
               ))}
             </div>
@@ -382,7 +387,6 @@ class MarkerUI extends Component<MarkerProps> {
   render() {
     const { id, marker, timelineDuration } = this.props;
     const style = {
-      visibility: marker.hidden ? 'hidden' : 'visible',
       top: `${(marker.clock / timelineDuration) * 100}%`,
     };
     return (

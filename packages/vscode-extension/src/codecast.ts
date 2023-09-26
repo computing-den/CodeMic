@@ -28,6 +28,13 @@ class Codecast {
         webviewOptions: { retainContextWhenHidden: true },
       }),
     );
+
+    // DEV
+    this.messageHandler({ type: 'openRecorder', sessionId: 'ecc7e7e8-1f38-4a3a-91b1-774f1c91ba21' })
+      .then(() => {
+        this.webview.postMessage({ type: 'updateStore', store: this.getStore() });
+      })
+      .catch(console.error);
   }
 
   static async fromContext(context: vscode.ExtensionContext): Promise<Codecast> {
@@ -248,8 +255,11 @@ class Codecast {
   }
 
   updateViewTitle() {
-    const title = ' sean_shir / ' + SCREEN_TITLES[this.screen]; // TODO get the logged-in username
-    this.webview.view!.title = title;
+    console.log('updateViewTitle: webview.view ' + (this.webview.view ? 'is set' : 'is NOT set'));
+    if (this.webview.view) {
+      const title = ' sean_shir / ' + SCREEN_TITLES[this.screen]; // TODO get the logged-in username
+      this.webview.view.title = title;
+    }
   }
 
   async goHome() {

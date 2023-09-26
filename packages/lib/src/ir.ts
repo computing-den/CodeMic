@@ -11,6 +11,7 @@ export class Session implements t.ApplyPlaybackEvent {
     public root: t.AbsPath,
     public initCheckpoint: t.Checkpoint,
     public events: t.PlaybackEvent[],
+    public audioTracks: t.AudioTrack[],
     public defaultEol: t.EndOfLine,
     public summary: t.SessionSummary,
     public textDocuments: TextDocument[] = [],
@@ -25,17 +26,18 @@ export class Session implements t.ApplyPlaybackEvent {
     root: t.AbsPath,
     checkpoint: t.Checkpoint,
     events: t.PlaybackEvent[],
+    audioTracks: t.AudioTrack[],
     defaultEol: t.EndOfLine,
     summary: t.SessionSummary,
   ): Session {
-    const session = new Session(root, checkpoint, events, defaultEol, summary);
+    const session = new Session(root, checkpoint, events, audioTracks, defaultEol, summary);
     session.restoreCheckpoint(checkpoint);
     return session;
   }
 
   static fromJSON(root: t.AbsPath, json: t.SessionJSON, summary: t.SessionSummary): Session {
-    const { events, initCheckpoint, defaultEol } = json;
-    const session = new Session(root, initCheckpoint, events, defaultEol, summary);
+    const { events, audioTracks, initCheckpoint, defaultEol } = json;
+    const session = new Session(root, initCheckpoint, events, audioTracks, defaultEol, summary);
     session.restoreCheckpoint(initCheckpoint);
     return session;
   }
@@ -44,6 +46,7 @@ export class Session implements t.ApplyPlaybackEvent {
     assert(this.summary);
     return {
       events: this.events,
+      audioTracks: this.audioTracks,
       initCheckpoint: this.initCheckpoint,
       defaultEol: this.defaultEol,
     };

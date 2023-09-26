@@ -61,9 +61,9 @@
               /*   z-index: 1; */
               /* } */
 
-              &.marker_hidden {
-                display: none;
-              }
+              /* &.marker_hidden { */
+              /*   display: none; */
+              /* } */
               &.marker_active {
                 border-bottom-width: 2px;
               }

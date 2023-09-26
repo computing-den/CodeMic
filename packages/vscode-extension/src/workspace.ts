@@ -66,7 +66,7 @@ export default class Workspace {
     const root = path.abs(nodePath.resolve(rootStr));
     const workspace = new Workspace(root);
     const checkpoint = await workspace.createCheckpointFromDirAndVsc();
-    workspace.session = ir.Session.fromCheckpoint(root, checkpoint, [], os.EOL as t.EndOfLine, summary);
+    workspace.session = ir.Session.fromCheckpoint(root, checkpoint, [], [], os.EOL as t.EndOfLine, summary);
     return workspace;
   }
 

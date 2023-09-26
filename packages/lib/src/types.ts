@@ -186,6 +186,7 @@ export type SessionSummaryMap = { [key: string]: SessionSummary };
 
 export type SessionJSON = {
   events: PlaybackEvent[];
+  audioTracks: AudioTrack[];
   initCheckpoint: Checkpoint;
   defaultEol: EndOfLine;
 };
@@ -317,6 +318,13 @@ export type CheckpointTextEditor = {
 };
 
 export type EndOfLine = '\n' | '\r\n';
+
+export type AudioTrack = {
+  id: string;
+  title: string;
+  clock: number;
+  duration: number;
+};
 
 export type Settings = {
   history: SessionHistory;
