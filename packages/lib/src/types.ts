@@ -187,8 +187,14 @@ export type SessionSummaryMap = { [key: string]: SessionSummary };
 export type SessionJSON = {
   events: PlaybackEvent[];
   audioTracks: AudioTrack[];
-  initCheckpoint: Checkpoint;
   defaultEol: EndOfLine;
+  initSnapshot: SessionSnapshot;
+};
+
+export type SessionSnapshot = {
+  worktree: Worktree;
+  textEditors: TextEditor[];
+  activeTextEditorUri?: Uri;
 };
 
 export type OpenDialogOptions = {
@@ -202,7 +208,7 @@ export type OpenDialogOptions = {
 
 export type PlaybackEvent =
   | TextChangeEvent
-  | OpenDocumentEvent
+  | OpenTextDocumentEvent
   | ShowTextEditorEvent
   | SelectEvent
   | ScrollEvent
@@ -216,8 +222,8 @@ export type TextChangeEvent = {
   // revSelections: vscode.Selection[];
 };
 
-export type OpenDocumentEvent = {
-  type: 'openDocument';
+export type OpenTextDocumentEvent = {
+  type: 'openTextDocument';
   clock: number;
   uri: Uri;
   text: string;
@@ -269,7 +275,7 @@ export type UriSet = { [key: Uri]: true };
 
 export interface ApplyPlaybackEvent {
   applyTextChangeEvent(e: TextChangeEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyOpenDocumentEvent(e: OpenDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyOpenTextDocumentEvent(e: OpenTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyShowTextEditorEvent(e: ShowTextEditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applySelectEvent(e: SelectEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyScrollEvent(e: ScrollEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
@@ -298,18 +304,25 @@ export type Selection = {
   active: Position;
 };
 
-export type Checkpoint = {
-  textDocuments: CheckpointTextDocument[];
-  textEditors: CheckpointTextEditor[];
-  activeTextEditorUri?: Uri;
+export type Worktree = { [key: Uri]: File };
+
+export type File = DirFile | LocalFile | GitFile;
+export type DirFile = {
+  type: 'dir';
+  mimetype: 'text/directory';
+};
+export type LocalFile = {
+  type: 'local';
+  mimetype: string;
+  sha1: string;
+};
+export type GitFile = {
+  type: 'git';
+  mimetype: string;
+  sha1: string;
 };
 
-export type CheckpointTextDocument = {
-  uri: Uri;
-  text: string;
-};
-
-export type CheckpointTextEditor = {
+export type TextEditor = {
   uri: Uri;
   selections: Selection[];
   visibleRange: Range;
@@ -319,8 +332,12 @@ export type CheckpointTextEditor = {
 
 export type EndOfLine = '\n' | '\r\n';
 
+/**
+ * Multiple audio tracks may refer to the same file.
+ */
 export type AudioTrack = {
   id: string;
+  file: File;
   title: string;
   clock: number;
   duration: number;

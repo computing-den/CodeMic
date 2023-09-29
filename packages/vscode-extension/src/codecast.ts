@@ -93,7 +93,7 @@ class Codecast {
           assert(this.playerSetup);
 
           // May return undefined if user decides not to overwrite root
-          this.player = await Player.populate(
+          this.player = await Player.populateSession(
             this.context,
             this.db,
             this.playerSetup,

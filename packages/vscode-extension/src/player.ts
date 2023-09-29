@@ -26,7 +26,7 @@ class Player implements t.ApplyPlaybackEvent {
    * root must be already resolved.
    * May return undefined if user decides not to overwrite root or create it.
    */
-  static async populate(
+  static async populateSession(
     context: vscode.ExtensionContext,
     db: Db,
     setup: t.PlayerSetup,
@@ -241,13 +241,13 @@ class Player implements t.ApplyPlaybackEvent {
   }
 
   /**
-   * 'openDocument' event always has the text field since if the document was already in checkpoint, no
-   * 'openDocument' event would be generated at all.
+   * 'openTextDocument' event always has the text field since if the document was already in checkpoint, no
+   * 'openTextDocument' event would be generated at all.
    */
-  async applyOpenDocumentEvent(e: t.OpenDocumentEvent, direction: t.Direction) {
+  async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
       // Apply to session
-      await this.workspace.session!.applyOpenDocumentEvent(e, direction);
+      await this.workspace.session!.applyOpenTextDocumentEvent(e, direction);
 
       // Open vsc document first.
       const vscTextDocument = await vscode.workspace.openTextDocument(this.workspace.uriToVsc(e.uri));

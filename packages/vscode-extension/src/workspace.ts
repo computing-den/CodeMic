@@ -223,7 +223,7 @@ export default class Workspace {
   async syncSessionToVscodeAndDisk(targetUris?: t.Uri[]) {
     // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
 
-    // all tabs that are not in this.textEditors should be closed
+    // all tabs that are not in session's textEditors should be closed
     for (const tabGroup of vscode.window.tabGroups.all) {
       for (const tab of tabGroup.tabs) {
         if (tab.input instanceof vscode.TabInputText && this.shouldRecordVscUri(tab.input.uri)) {
@@ -238,7 +238,7 @@ export default class Workspace {
     }
 
     if (targetUris) {
-      // all files in targetUris that are no longer in this.textDocuments should be deleted
+      // all files in targetUris that are no longer in session's textDocuments should be deleted
       for (const targetUri of targetUris) {
         if (!this.session!.findTextDocumentByUri(targetUri)) {
           if (path.isWorkspaceUri(targetUri)) {
@@ -248,8 +248,8 @@ export default class Workspace {
       }
     } else {
       // targetUris is undefined when we need to restore a checkpoint completely, meaning that
-      // any file that is not in this.textDocuments should be deleted and any text editor not in
-      // this.textEditors should be closed.
+      // any file that is not in session's textDocuments should be deleted and any text editor not in
+      // session's textEditors should be closed.
 
       // save all tabs and close them
       // for (const tabGroup of vscode.window.tabGroups.all) {
@@ -265,7 +265,7 @@ export default class Workspace {
       //   }
       // }
 
-      // all files in workspace that are not in this.textDocuments should be deleted
+      // all files in workspace that are not in session's textDocuments should be deleted
       const workspaceFiles = await this.readDirRecursively({ includeFiles: true });
       for (const file of workspaceFiles) {
         const uri = path.workspaceUriFromRelPath(file);
@@ -274,7 +274,7 @@ export default class Workspace {
         }
       }
 
-      // set targetUris to this.textDocument's uris
+      // set targetUris to session's textDocument's uris
       targetUris = this.session!.textDocuments.map(d => d.uri);
     }
 
@@ -311,7 +311,7 @@ export default class Workspace {
       // await vscTextDocument.save();
     }
 
-    // open all this.textEditors in vscdoe
+    // open all session's textEditors in vscdoe
     {
       const tabUris = this.getRelevantTabUris();
       for (const textEditor of this.session!.textEditors) {

@@ -98,8 +98,8 @@ export function dispatchPlaybackEvent(
   switch (e.type) {
     case 'textChange':
       return applier.applyTextChangeEvent(e, direction, uriSet);
-    case 'openDocument':
-      return applier.applyOpenDocumentEvent(e, direction, uriSet);
+    case 'openTextDocument':
+      return applier.applyOpenTextDocumentEvent(e, direction, uriSet);
     case 'showTextEditor':
       return applier.applyShowTextEditorEvent(e, direction, uriSet);
     case 'select':
