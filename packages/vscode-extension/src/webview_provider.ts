@@ -43,7 +43,8 @@ class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   async postMessage<Req extends t.BackendRequest>(req: Req): Promise<t.FrontendResponseFor<Req>> {
-    const res = (await this.bus!.post(req)) as t.FrontendResponseFor<Req> | t.ErrorResponse;
+    assert(this.bus);
+    const res = (await this.bus.post(req)) as t.FrontendResponseFor<Req> | t.ErrorResponse;
 
     if (res.type === 'error') {
       throw new Error(`Got error for request ${JSON.stringify(req)}`);

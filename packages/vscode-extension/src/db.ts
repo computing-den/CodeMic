@@ -57,6 +57,11 @@ export default class Db {
     return readSession(id);
   }
 
+  async readSessionBlobBySha1(sessionId: string, sha1: string): Promise<Buffer> {
+    const p = path.abs(userPaths.data, 'sessions', sessionId, 'blobs', sha1);
+    return fs.promises.readFile(p);
+  }
+
   mergeSessionHistory(h: t.SessionHistoryItem) {
     this.settings.history[h.id] = { ...this.settings.history[h.id], ...h };
   }
@@ -64,6 +69,13 @@ export default class Db {
   async deleteSession(id: string) {
     delete this.sessionSummaries[id];
     await fs.promises.rm(path.abs(userPaths.data, 'sessions', id), { force: true, recursive: true });
+  }
+
+  async copySession(from: t.SessionSummary, to: t.SessionSummary) {
+    const fromPath = path.abs(userPaths.data, 'sessions', from.id);
+    const toPath = path.abs(userPaths.data, 'sessions', to.id);
+    await fs.promises.cp(fromPath, toPath);
+    await this.writeSessionSummary(to);
   }
 }
 

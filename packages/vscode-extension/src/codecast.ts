@@ -30,11 +30,13 @@ class Codecast {
     );
 
     // DEV
-    this.messageHandler({ type: 'openRecorder', sessionId: 'ecc7e7e8-1f38-4a3a-91b1-774f1c91ba21' })
-      .then(() => {
-        this.webview.postMessage({ type: 'updateStore', store: this.getStore() });
-      })
-      .catch(console.error);
+    if (this.webview.bus) {
+      this.messageHandler({ type: 'openRecorder', sessionId: 'ecc7e7e8-1f38-4a3a-91b1-774f1c91ba21' })
+        .then(() => {
+          this.webview.postMessage({ type: 'updateStore', store: this.getStore() });
+        })
+        .catch(console.error);
+    }
   }
 
   static async fromContext(context: vscode.ExtensionContext): Promise<Codecast> {
@@ -381,10 +383,10 @@ class Codecast {
       if (this.recorder) {
         recorder = {
           status: this.recorder.status,
-          sessionSummary: this.recorder.workspace.session!.summary,
+          sessionSummary: this.recorder.workspace.session.summary,
           clock: this.recorder.getClock(),
           root: this.recorder.getRoot(),
-          history: this.db.settings.history[this.recorder.workspace.session!.summary.id],
+          history: this.db.settings.history[this.recorder.workspace.session.summary.id],
         };
       } else if (this.recorderSetup) {
         recorder = {
@@ -407,10 +409,10 @@ class Codecast {
       if (this.player) {
         player = {
           status: this.player.status,
-          sessionSummary: this.player.workspace.session!.summary,
+          sessionSummary: this.player.workspace.session.summary,
           clock: this.player.getClock(),
           root: this.player.workspace.root,
-          history: this.db.settings.history[this.player.workspace.session!.summary.id],
+          history: this.db.settings.history[this.player.workspace.session.summary.id],
         };
       } else if (this.playerSetup) {
         player = {

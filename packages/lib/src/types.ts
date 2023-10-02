@@ -273,15 +273,6 @@ export enum Direction {
 
 export type UriSet = { [key: Uri]: true };
 
-export interface ApplyPlaybackEvent {
-  applyTextChangeEvent(e: TextChangeEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyOpenTextDocumentEvent(e: OpenTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyShowTextEditorEvent(e: ShowTextEditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applySelectEvent(e: SelectEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyScrollEvent(e: ScrollEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applySaveEvent(e: SaveEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-}
-
 export type ContentChange = {
   range: Range;
   text: string;
@@ -306,19 +297,20 @@ export type Selection = {
 
 export type Worktree = { [key: Uri]: File };
 
-export type File = DirFile | LocalFile | GitFile;
-export type DirFile = {
-  type: 'dir';
-  mimetype: 'text/directory';
+export type File = EmptyFile | LocalFile | GitFile;
+// export type DirFile = {
+//   type: 'dir';
+//   mimetype: 'text/directory';
+// };
+export type EmptyFile = {
+  type: 'empty';
 };
 export type LocalFile = {
   type: 'local';
-  mimetype: string;
   sha1: string;
 };
 export type GitFile = {
   type: 'git';
-  mimetype: string;
   sha1: string;
 };
 

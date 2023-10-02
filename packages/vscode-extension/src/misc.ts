@@ -6,6 +6,7 @@ import * as git from './git';
 import { types as t } from '@codecast/lib';
 import _ from 'lodash';
 import assert from 'assert';
+import crypto from 'crypto';
 
 // export function getRecordingsPath(): t.AbsPath {
 //   return path.join(os.homedir(), 'codecast', 'recordings') as t.AbsPath;
@@ -45,4 +46,10 @@ export async function fileExists(p: t.AbsPath): Promise<boolean> {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
   return false;
+}
+
+export async function computeSHA1(buffer: Buffer): Promise<string> {
+  const hashBuffer = await crypto.subtle.digest('SHA-1', buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
 }

@@ -1,4 +1,4 @@
-import Workspace from './workspace.js';
+import SessionWorkspace from './session_workspace.js';
 import * as misc from './misc.js';
 import Db, { type WriteOptions } from './db.js';
 import { types as t, path, ir, lib } from '@codecast/lib';
@@ -18,13 +18,13 @@ class Recorder {
   private scrollStartRange?: t.Range;
 
   get session(): ir.Session {
-    return this.workspace.session!;
+    return this.workspace.session;
   }
 
   constructor(
     public context: vscode.ExtensionContext,
     public db: Db,
-    public workspace: Workspace,
+    public workspace: SessionWorkspace,
     private clock: number = 0,
     private lastSavedClock: number = clock,
   ) {}
@@ -34,7 +34,7 @@ class Recorder {
    */
   static async fromDirAndVsc(context: vscode.ExtensionContext, db: Db, setup: t.RecorderSetup): Promise<Recorder> {
     assert(setup.root);
-    const workspace = await Workspace.fromDirAndVsc(setup.sessionSummary, setup.root);
+    const workspace = await SessionWorkspace.fromDirAndVsc(db, setup.sessionSummary, setup.root);
     return new Recorder(context, db, workspace);
   }
 
@@ -44,11 +44,19 @@ class Recorder {
   static async populateSession(
     context: vscode.ExtensionContext,
     db: Db,
-    { root, sessionSummary, baseSessionSummary, forkClock }: t.RecorderSetup,
+    setup: t.RecorderSetup,
   ): Promise<Recorder | undefined> {
-    assert(root);
-    const clock = forkClock ?? sessionSummary.duration;
-    const workspace = await Workspace.populateSession(db, root, sessionSummary, baseSessionSummary, clock, clock);
+    assert(setup.root);
+
+    let clock = setup.sessionSummary.duration;
+    if (setup.fork) {
+      assert(setup.baseSessionSummary);
+      assert(setup.forkClock);
+      await db.copySession(setup.baseSessionSummary, setup.sessionSummary);
+      clock = setup.forkClock;
+    }
+
+    const workspace = await SessionWorkspace.populateSession(db, setup.root, setup.sessionSummary, clock, clock);
     return workspace && new Recorder(context, db, workspace, clock);
   }
 
@@ -194,6 +202,11 @@ class Recorder {
 
     const uri = this.workspace.uriFromVsc(vscTextDocument.uri);
     console.log(`adding textChange for ${uri}`);
+
+    if (vscContentChanges.length === 0) {
+      console.log(`textChange: vscContentChanges for ${uri} is empty`);
+      return;
+    }
 
     // Here, we assume that it is possible to get a textChange without a text editor
     // because vscode's event itself does not provide a text editor.
@@ -396,7 +409,7 @@ class Recorder {
       }
     } else {
       irTextDocument = this.workspace.textDocumentFromVsc(vscTextDocument, uri);
-      this.session.textDocuments.push(irTextDocument);
+      this.session.insertTextDocument(irTextDocument);
       this.pushEvent({
         type: 'openTextDocument',
         clock: this.getClock(),
@@ -418,7 +431,7 @@ class Recorder {
     let textEditor = this.session.findTextEditorByUri(textDocument.uri);
     if (!textEditor) {
       textEditor = new ir.TextEditor(textDocument, selections, visibleRange);
-      this.session.textEditors.push(textEditor);
+      this.session.insertTextEditor(textEditor);
     } else {
       textEditor.select(selections, visibleRange);
     }

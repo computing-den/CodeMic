@@ -89,28 +89,6 @@ export function getSessionHistoryItemLastOpenTimestamp(h: t.SessionHistoryItem):
   return _.max([h.lastRecordedTimestamp, h.lastWatchedTimestamp]);
 }
 
-export function dispatchPlaybackEvent(
-  applier: t.ApplyPlaybackEvent,
-  e: t.PlaybackEvent,
-  direction: t.Direction,
-  uriSet?: t.UriSet,
-): Promise<void> {
-  switch (e.type) {
-    case 'textChange':
-      return applier.applyTextChangeEvent(e, direction, uriSet);
-    case 'openTextDocument':
-      return applier.applyOpenTextDocumentEvent(e, direction, uriSet);
-    case 'showTextEditor':
-      return applier.applyShowTextEditorEvent(e, direction, uriSet);
-    case 'select':
-      return applier.applySelectEvent(e, direction, uriSet);
-    case 'scroll':
-      return applier.applyScrollEvent(e, direction, uriSet);
-    case 'save':
-      return applier.applySaveEvent(e, direction, uriSet);
-  }
-}
-
 export function vec2Sub(a: t.Vec2, b: t.Vec2): t.Vec2 {
   return [a[0] - b[0], a[1] - b[1]];
 }

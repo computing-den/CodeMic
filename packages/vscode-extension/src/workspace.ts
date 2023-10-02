@@ -10,65 +10,7 @@ import nodePath from 'path';
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
 
 export default class Workspace {
-  constructor(public root: t.AbsPath, public session?: ir.Session) {}
-
-  static async populateSession(
-    db: Db,
-    rootStr: string,
-    sessionSummary: t.SessionSummary,
-    baseSessionSummary?: t.SessionSummary,
-    seekClock?: number,
-    cutClock?: number,
-  ): Promise<Workspace | undefined> {
-    const root = path.abs(nodePath.resolve(rootStr));
-    // user confirmations and root direction creation
-    try {
-      const files = await fs.promises.readdir(root);
-      if (files.length) {
-        // root exists and is a directory but it's not empty.
-        if (!(await askToOverwriteRoot(root))) return undefined;
-      }
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code === 'ENOENT') {
-        // root doesn't exist. Ask user if they want to create it.
-        if (!(await askToCreateRoot(root))) return undefined;
-        await fs.promises.mkdir(root, { recursive: true });
-      } else if (code === 'ENOTDIR') {
-        // Exists, but it's not a directory
-        vscode.window.showErrorMessage(`"${root}" exists but it's not a folder.`);
-        return undefined;
-      }
-    }
-
-    // read session, or read the base session and cut it to cutClock.
-    const json = await db.readSession(baseSessionSummary?.id || sessionSummary.id);
-    const session = ir.Session.fromJSON(root, json, sessionSummary);
-    if (cutClock !== undefined) session.cut(cutClock);
-    const workspace = new Workspace(root, session);
-
-    // seek if necessary
-    let targetUris: t.Uri[] | undefined;
-    if (seekClock) {
-      const uriSet: t.UriSet = {};
-      const seekData = workspace.session!.getSeekData(0, seekClock);
-      await workspace.session!.seek(seekData, uriSet);
-      targetUris = Object.keys(uriSet);
-    }
-
-    // sync, save and return
-    await workspace.syncSessionToVscodeAndDisk(targetUris);
-    await workspace.saveAllRelevantVscTabs();
-    return workspace;
-  }
-
-  static async fromDirAndVsc(summary: t.SessionSummary, rootStr: string): Promise<Workspace> {
-    const root = path.abs(nodePath.resolve(rootStr));
-    const workspace = new Workspace(root);
-    const checkpoint = await workspace.createCheckpointFromDirAndVsc();
-    workspace.session = ir.Session.fromCheckpoint(root, checkpoint, [], [], os.EOL as t.EndOfLine, summary);
-    return workspace;
-  }
+  constructor(public root: t.AbsPath) {}
 
   static getDefaultRoot(): t.AbsPath | undefined {
     const uri = vscode.workspace.workspaceFolders?.[0].uri;
@@ -192,153 +134,6 @@ export default class Workspace {
     }
   }
 
-  // openTextDocumentFromVsc(vscTextDocument: vscode.TextDocument, uri: t.Uri): ir.TextDocument {
-  //   let textDocument = this.session!.findTextDocumentByUri(uri);
-  //   if (!textDocument) {
-  //     textDocument = this.textDocumentFromVsc(vscTextDocument, uri);
-  //     this.session!.textDocuments.push(textDocument);
-  //   }
-  //   return textDocument;
-  // }
-
-  // openTextEditorFromVsc(
-  //   vscTextDocument: vscode.TextDocument,
-  //   uri: t.Uri,
-  //   selections: t.Selection[],
-  //   visibleRange: t.Range,
-  // ): ir.TextEditor {
-  //   // const selections = selectionsFromVsc(vscTextEditor.selections);
-  //   // const visibleRange = rangeFromVsc(vscTextEditor.visibleRanges[0]);
-  //   const textDocument = this.openTextDocumentFromVsc(vscTextDocument, uri);
-  //   let textEditor = this.session!.findTextEditorByUri(textDocument.uri);
-  //   if (!textEditor) {
-  //     textEditor = new ir.TextEditor(textDocument, selections, visibleRange);
-  //     this.session!.textEditors.push(textEditor);
-  //   } else {
-  //     textEditor.select(selections, visibleRange);
-  //   }
-  //   return textEditor;
-  // }
-
-  async syncSessionToVscodeAndDisk(targetUris?: t.Uri[]) {
-    // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
-
-    // all tabs that are not in session's textEditors should be closed
-    for (const tabGroup of vscode.window.tabGroups.all) {
-      for (const tab of tabGroup.tabs) {
-        if (tab.input instanceof vscode.TabInputText && this.shouldRecordVscUri(tab.input.uri)) {
-          const uri = this.uriFromVsc(tab.input.uri);
-          if (!this.session!.findTextEditorByUri(uri)) {
-            const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
-            await vscTextDocument.save();
-            await vscode.window.tabGroups.close(tab);
-          }
-        }
-      }
-    }
-
-    if (targetUris) {
-      // all files in targetUris that are no longer in session's textDocuments should be deleted
-      for (const targetUri of targetUris) {
-        if (!this.session!.findTextDocumentByUri(targetUri)) {
-          if (path.isWorkspaceUri(targetUri)) {
-            await fs.promises.rm(path.getFileUriPath(this.resolveUri(targetUri)), { force: true });
-          }
-        }
-      }
-    } else {
-      // targetUris is undefined when we need to restore a checkpoint completely, meaning that
-      // any file that is not in session's textDocuments should be deleted and any text editor not in
-      // session's textEditors should be closed.
-
-      // save all tabs and close them
-      // for (const tabGroup of vscode.window.tabGroups.all) {
-      //   for (const tab of tabGroup.tabs) {
-      //     if (tab.input instanceof vscode.TabInputText) {
-      //       const partialUri = this.getPartialUri(tab.input.uri);
-      //       if (partialUri) {
-      //         const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
-      //         await vscTextDocument.save();
-      //         await vscode.window.tabGroups.close(tab);
-      //       }
-      //     }
-      //   }
-      // }
-
-      // all files in workspace that are not in session's textDocuments should be deleted
-      const workspaceFiles = await this.readDirRecursively({ includeFiles: true });
-      for (const file of workspaceFiles) {
-        const uri = path.workspaceUriFromRelPath(file);
-        if (!this.session!.findTextDocumentByUri(uri)) {
-          await fs.promises.rm(path.join(this.root, file), { force: true });
-        }
-      }
-
-      // set targetUris to session's textDocument's uris
-      targetUris = this.session!.textDocuments.map(d => d.uri);
-    }
-
-    // for now, just delete empty directories
-    const dirs = await this.readDirRecursively({ includeDirs: true });
-    for (const dir of dirs) {
-      const dirIsEmpty = !this.session!.textDocuments.some(
-        d => path.isWorkspaceUri(d.uri) && path.isBaseOf(dir, path.getWorkspaceUriPath(d.uri)),
-      );
-      if (dirIsEmpty) await fs.promises.rm(path.join(this.root, dir), { force: true, recursive: true });
-    }
-
-    // for each targetUri
-    //   if there's a textDocument open in vscode, replace its content
-    //   else, mkdir and write to file
-    {
-      const edit = new vscode.WorkspaceEdit();
-      for (const targetUri of targetUris) {
-        assert(path.isWorkspaceUri(targetUri), 'TODO currently, we only support workspace URIs');
-
-        const textDocument = this.session!.findTextDocumentByUri(targetUri);
-        if (!textDocument) continue; // already deleted above
-
-        const vscTextDocument = this.findVscTextDocumentByUri(targetUri);
-        if (vscTextDocument) {
-          edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), textDocument.getText());
-        } else {
-          const absPath = path.getFileUriPath(this.resolveUri(targetUri));
-          await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
-          await fs.promises.writeFile(absPath, textDocument.getText(), 'utf8');
-        }
-      }
-      await vscode.workspace.applyEdit(edit);
-      // await vscTextDocument.save();
-    }
-
-    // open all session's textEditors in vscdoe
-    {
-      const tabUris = this.getRelevantTabUris();
-      for (const textEditor of this.session!.textEditors) {
-        if (!tabUris.includes(textEditor.document.uri)) {
-          const vscUri = this.uriToVsc(textEditor.document.uri);
-          await vscode.window.showTextDocument(vscUri, {
-            preview: false,
-            preserveFocus: true,
-            selection: this.selectionToVsc(textEditor.selections[0]),
-            viewColumn: vscode.ViewColumn.One,
-          });
-        }
-      }
-    }
-
-    // show this.activeTextEditor
-    if (this.session!.activeTextEditor) {
-      const vscUri = this.uriToVsc(this.session!.activeTextEditor.document.uri);
-      await vscode.window.showTextDocument(vscUri, {
-        preview: false,
-        preserveFocus: false,
-        selection: this.selectionToVsc(this.session!.activeTextEditor.selections[0]),
-        viewColumn: vscode.ViewColumn.One,
-      });
-    }
-  }
-
   async saveAllRelevantVscTabs() {
     const uris = this.getRelevantTabVscUris();
     for (const uri of uris) {
@@ -347,50 +142,19 @@ export default class Workspace {
     }
   }
 
-  private async createCheckpointFromDirAndVsc(): Promise<t.Checkpoint> {
-    for (const vscTextDocument of vscode.workspace.textDocuments) {
-      if (vscTextDocument.isDirty) {
-        throw new Error('Checkpoint.fromWorkspace: there are unsaved files in the current workspace.');
-      }
-    }
+  // async createCheckpointTextDocuments(): Promise<t.CheckpointTextDocument[]> {
+  //   const res: t.CheckpointTextDocument[] = [];
+  //   const paths = await this.readDirRecursively({ includeFiles: true });
+  //   for (const p of paths) {
+  //     const text = await fs.promises.readFile(path.join(this.root, p), 'utf8');
+  //     const uri = path.workspaceUriFromRelPath(p);
+  //     res.push(ir.makeCheckpointTextDocument(uri, text));
+  //   }
+  //   return res;
+  // }
 
-    const textDocuments = await this.createCheckpointTextDocuments();
-
-    // Get textEditors from vscode.window.visibleTextEditors first. These have selections and visible range.
-    // Then get the rest from vscode.window.tabGroups. These don't have selections and range.
-    const textEditors = vscode.window.visibleTextEditors
-      .filter(e => this.shouldRecordVscUri(e.document.uri))
-      .map(e => this.createCheckpointTextEditor(e));
-
-    const tabUris = this.getRelevantTabUris();
-    for (const uri of tabUris) {
-      if (!textEditors.some(e => e.uri === uri)) {
-        textEditors.push(ir.makeCheckpointTextEditor(uri));
-      }
-    }
-
-    const activeTextEditorVscUri = vscode.window.activeTextEditor?.document.uri;
-    let activeTextEditorUri;
-    if (activeTextEditorVscUri && this.shouldRecordVscUri(activeTextEditorVscUri)) {
-      activeTextEditorUri = this.uriFromVsc(activeTextEditorVscUri);
-    }
-
-    return ir.makeCheckpoint(textDocuments, textEditors, activeTextEditorUri);
-  }
-
-  private async createCheckpointTextDocuments(): Promise<t.CheckpointTextDocument[]> {
-    const res: t.CheckpointTextDocument[] = [];
-    const paths = await this.readDirRecursively({ includeFiles: true });
-    for (const p of paths) {
-      const text = await fs.promises.readFile(path.join(this.root, p), 'utf8');
-      const uri = path.workspaceUriFromRelPath(p);
-      res.push(ir.makeCheckpointTextDocument(uri, text));
-    }
-    return res;
-  }
-
-  private createCheckpointTextEditor(vscTextEditor: vscode.TextEditor): t.CheckpointTextEditor {
-    return ir.makeCheckpointTextEditor(
+  makeSnapshotTextEditorFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {
+    return ir.makeSnapshotTextEditor(
       this.uriFromVsc(vscTextEditor.document.uri),
       this.selectionsFromVsc(vscTextEditor.selections),
       this.rangeFromVsc(vscTextEditor.visibleRanges[0]),
@@ -401,7 +165,7 @@ export default class Workspace {
    * Returns a sorted list of all files.
    * The returned items do NOT start with "/".
    */
-  private async readDirRecursively(
+  async readDirRecursively(
     options: ReadDirOptions,
     rel: t.RelPath = path.CUR_DIR,
     res: t.RelPath[] = [],
@@ -446,30 +210,4 @@ export default class Workspace {
     }
     return uris;
   }
-}
-
-async function askToOverwriteRoot(root: t.AbsPath): Promise<boolean> {
-  const overwriteTitle = 'Overwrite';
-  const answer = await vscode.window.showWarningMessage(
-    `"${root}" is not empty. Do you want to overwrite it?`,
-    {
-      modal: true,
-      detail:
-        'All files in the folder will be overwritten except for those specified in .gitignore and .codecastignore.',
-    },
-    { title: overwriteTitle },
-    { title: 'Cancel', isCloseAffordance: true },
-  );
-  return answer?.title === overwriteTitle;
-}
-
-async function askToCreateRoot(root: t.AbsPath): Promise<boolean> {
-  const createPathTitle = 'Create path';
-  const answer = await vscode.window.showWarningMessage(
-    `"${root}" does not exist. Do you want to create it?`,
-    { modal: true },
-    { title: createPathTitle },
-    { title: 'Cancel', isCloseAffordance: true },
-  );
-  return answer?.title === createPathTitle;
 }

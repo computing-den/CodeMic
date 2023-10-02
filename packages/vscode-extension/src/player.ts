@@ -1,23 +1,23 @@
 import { types as t, path, lib, ir } from '@codecast/lib';
-import Workspace from './workspace.js';
+import SessionWorkspace from './session_workspace.js';
+import VscStepper from './vsc_stepper.js';
 import Db, { type WriteOptions } from './db.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
 import fs from 'fs';
 
-class Player implements t.ApplyPlaybackEvent {
+class Player {
   status: t.PlayerStatus = t.PlayerStatus.Ready;
 
   private disposables: vscode.Disposable[] = [];
-  private eventIndex: number = -1;
-  private clock: number = 0;
   private enqueueUpdate = lib.taskQueue(this.updateImmediately.bind(this), 1);
+  private vscStepper = new VscStepper(this.workspace);
 
   constructor(
     public context: vscode.ExtensionContext,
     public db: Db,
-    public workspace: Workspace,
+    public workspace: SessionWorkspace,
     private postMessage: t.PostMessageToFrontend,
     private audioSrc: string,
   ) {}
@@ -34,13 +34,12 @@ class Player implements t.ApplyPlaybackEvent {
     audioSrc: string,
   ): Promise<Player | undefined> {
     assert(setup.root);
-    const workspace = await Workspace.populateSession(db, setup.root, setup.sessionSummary);
+    const workspace = await SessionWorkspace.populateSession(db, setup.root, setup.sessionSummary);
     postMessage({ type: 'backendMediaEvent', event: { type: 'load', src: audioSrc.toString() } });
     return workspace && new Player(context, db, workspace, postMessage, audioSrc);
   }
 
   async start() {
-    const oldStatus = this.status;
     assert(
       this.status === t.PlayerStatus.Ready ||
         this.status === t.PlayerStatus.Paused ||
@@ -209,116 +208,8 @@ class Player implements t.ApplyPlaybackEvent {
     }
   }
 
-  async applyPlaybackEvent(e: t.PlaybackEvent, direction: t.Direction) {
-    console.log(`Applying ${t.Direction[direction]}: `, JSON.stringify(e));
-    return lib.dispatchPlaybackEvent(this, e, direction);
-  }
-
-  async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction) {
-    if (e.contentChanges.length > 1) {
-      throw new Error('applyTextChangeEvent: TODO textChange does not yet support contentChanges.length > 1');
-    }
-
-    // Apply to session
-    await this.workspace.session!.applyTextChangeEvent(e, direction);
-
-    // We use WorkspaceEdit here because we don't necessarily want to focus on the text editor yet.
-    // There will be a separate select event after this if the editor had focus during recording.
-
-    const vscUri = this.workspace.uriToVsc(e.uri);
-    const edit = new vscode.WorkspaceEdit();
-    if (direction === t.Direction.Forwards) {
-      for (const cc of e.contentChanges) {
-        edit.replace(vscUri, this.workspace.rangeToVsc(cc.range), cc.text);
-      }
-    } else {
-      for (const cc of e.contentChanges) {
-        // TODO shouldn't we apply these in reverse order?
-        edit.replace(vscUri, this.workspace.rangeToVsc(cc.revRange), cc.revText);
-      }
-    }
-    await vscode.workspace.applyEdit(edit);
-  }
-
-  /**
-   * 'openTextDocument' event always has the text field since if the document was already in checkpoint, no
-   * 'openTextDocument' event would be generated at all.
-   */
-  async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, direction: t.Direction) {
-    if (direction === t.Direction.Forwards) {
-      // Apply to session
-      await this.workspace.session!.applyOpenTextDocumentEvent(e, direction);
-
-      // Open vsc document first.
-      const vscTextDocument = await vscode.workspace.openTextDocument(this.workspace.uriToVsc(e.uri));
-
-      // We use WorkspaceEdit here because we don't necessarily want to open the text editor yet.
-      const edit = new vscode.WorkspaceEdit();
-      edit.replace(vscTextDocument.uri, this.workspace.getVscTextDocumentRange(vscTextDocument), e.text);
-      await vscode.workspace.applyEdit(edit);
-    } else {
-      await this.workspace.closeVscTextEditorByUri(e.uri, true);
-    }
-  }
-
-  async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction) {
-    await this.workspace.session!.applyShowTextEditorEvent(e, direction);
-
-    if (direction === t.Direction.Forwards) {
-      const vscTextEditor = await vscode.window.showTextDocument(this.workspace.uriToVsc(e.uri), {
-        preview: false,
-        preserveFocus: false,
-      });
-      vscTextEditor.selections = this.workspace.selectionsToVsc(e.selections);
-      await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
-    } else if (e.revUri) {
-      const vscTextEditor = await vscode.window.showTextDocument(this.workspace.uriToVsc(e.revUri), {
-        preview: false,
-        preserveFocus: false,
-      });
-      vscTextEditor.selections = this.workspace.selectionsToVsc(e.revSelections!);
-      await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange!.start.line, at: 'top' });
-    }
-  }
-
-  async applySelectEvent(e: t.SelectEvent, direction: t.Direction) {
-    await this.workspace.session!.applySelectEvent(e, direction);
-
-    const vscTextEditor = await vscode.window.showTextDocument(this.workspace.uriToVsc(e.uri), {
-      preview: false,
-      preserveFocus: false,
-    });
-
-    if (direction === t.Direction.Forwards) {
-      vscTextEditor.selections = this.workspace.selectionsToVsc(e.selections);
-      await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
-    } else {
-      vscTextEditor.selections = this.workspace.selectionsToVsc(e.revSelections);
-      await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
-    }
-  }
-
-  async applyScrollEvent(e: t.ScrollEvent, direction: t.Direction) {
-    await this.workspace.session!.applyScrollEvent(e, direction);
-
-    await vscode.window.showTextDocument(this.workspace.uriToVsc(e.uri), { preview: false, preserveFocus: false });
-
-    if (direction === t.Direction.Forwards) {
-      await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
-    } else {
-      await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
-    }
-  }
-
-  async applySaveEvent(e: t.SaveEvent, direction: t.Direction) {
-    const vscTextDocument = await vscode.workspace.openTextDocument(this.workspace.uriToVsc(e.uri));
-    if (!(await vscTextDocument.save())) {
-      throw new Error(`Could not save ${e.uri}`);
-    }
-  }
-
   getClock(): number {
-    return this.clock;
+    return this.workspace.session.clock;
   }
 
   /**
@@ -332,15 +223,15 @@ class Player implements t.ApplyPlaybackEvent {
 
   private async saveHistoryClock(options?: WriteOptions) {
     this.db.mergeSessionHistory({
-      id: this.workspace.session!.summary.id,
-      lastWatchedClock: this.clock,
+      id: this.workspace.session.summary.id,
+      lastWatchedClock: this.getClock(),
     });
     await this.db.write(options);
   }
 
   private async saveHistoryOpenClose() {
     this.db.mergeSessionHistory({
-      id: this.workspace.session!.summary.id,
+      id: this.workspace.session.summary.id,
       lastWatchedTimestamp: new Date().toISOString(),
       root: this.workspace.root,
     });
@@ -348,93 +239,23 @@ class Player implements t.ApplyPlaybackEvent {
   }
 
   private async updateImmediately(clock: number) {
-    // FORWARD
+    const { session } = this.workspace;
+    const seekData = session.getSeekData(clock);
 
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                   ^
-    // eventIndex:           ^
-    // apply:                   ^
-    // new eventIndex:          ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                          ^
-    // eventIndex:              ^
-    // apply:                      ^  ^
-    // new eventIndex:                ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                            ^
-    // eventIndex:                       ^
-    // apply:
-    // new eventIndex:                   ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                             ^
-    // eventIndex:                       ^
-    // apply:
-    // new eventIndex:                   ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                                     ^
-    // eventIndex:                                ^
-    // apply:
-    // new eventIndex:                            ^
-
-    // BACKWARD
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                                   ^
-    // eventIndex:                                ^
-    // apply reverse:                             ^
-    // new eventIndex:                         ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                                  ^
-    // eventIndex:                             ^
-    // apply reverse:
-    // new eventIndex:                         ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                            ^
-    // eventIndex:                             ^
-    // apply reverse:                       ^  ^
-    // new eventIndex:                   ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                   ^
-    // eventIndex:                    ^
-    // apply reverse:              ^  ^
-    // new eventIndex:          ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                   ^
-    // eventIndex:                 ^
-    // apply reverse:              ^
-    // new eventIndex:          ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                   ^
-    // eventIndex:              ^
-    // apply reverse:
-    // new eventIndex:          ^
-
-    let i = this.eventIndex;
-    const seekData = this.workspace.session!.getSeekData(i, clock);
-
-    if (Math.abs(seekData.clock - this.clock) > 10 && seekData.events.length > 10) {
+    if (Math.abs(seekData.clock - session.clock) > 10 && seekData.events.length > 10) {
       // Update by seeking the internal session first, then syncing the session to vscode and disk
       const uriSet: t.UriSet = {};
-      await this.workspace.session!.seek(seekData, uriSet);
+      await session.seek(seekData, uriSet);
       await this.workspace.syncSessionToVscodeAndDisk(Object.keys(uriSet));
     } else {
       // Apply updates one at a time
-      for (const event of seekData.events) {
-        await this.applyPlaybackEvent(event, seekData.direction);
+      for (let i = 0; i < seekData.events.length; i++) {
+        await session.applySeekStep(seekData, i);
+        await this.vscStepper.applySeekStep(seekData, i);
       }
+      await session.finalizeSeek(seekData);
+      await this.vscStepper.finalizeSeek(seekData);
     }
-
-    this.eventIndex = seekData.i;
-    this.clock = seekData.clock;
 
     if (seekData.stop) await this.stop();
 

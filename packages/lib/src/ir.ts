@@ -1,5 +1,6 @@
 import _ from 'lodash';
 import * as t from './types.js';
+import PlaybackEventStepper from './playback_event_stepper.js';
 import * as lib from './lib.js';
 import * as path from './path.js';
 import assert from './assert.js';
@@ -10,11 +11,11 @@ export interface SessionIO {
 
 // Not every TextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
-export class Session implements t.ApplyPlaybackEvent {
+export class Session extends PlaybackEventStepper {
   // These fields remain the same regardless of the clock
   root: t.AbsPath;
-  summary: t.SessionSummary;
   io: SessionIO;
+  summary: t.SessionSummary;
   initSnapshot: t.SessionSnapshot;
   events: t.PlaybackEvent[];
   audioTracks: t.AudioTrack[];
@@ -24,40 +25,39 @@ export class Session implements t.ApplyPlaybackEvent {
   // TODO sync the entire worktree structure including directories.
   // If a TextDocument is in this.textDocuments, it is also in this.worktree.
   // If a TextEditor is in this.textEditors, it is also in this.worktree.
+  clock: number;
+  eventIndex: number;
   worktree: Worktree;
   textDocuments: TextDocument[];
   textEditors: TextEditor[];
   activeTextEditor?: TextEditor;
 
-  private constructor(root: t.AbsPath, summary: t.SessionSummary, io: SessionIO, sessionJSON: t.SessionJSON) {
+  private constructor(root: t.AbsPath, io: SessionIO, summary: t.SessionSummary, sessionJSON: t.SessionJSON) {
+    super();
+
     this.root = root;
-    this.summary = summary;
     this.io = io;
+    this.summary = summary;
     this.initSnapshot = sessionJSON.initSnapshot;
     this.events = sessionJSON.events;
     this.audioTracks = sessionJSON.audioTracks;
     this.defaultEol = sessionJSON.defaultEol;
 
-    this.worktree = _.mapValues(this.initSnapshot.worktree, file => ({ file }));
+    this.clock = 0;
+    this.eventIndex = 0;
+    this.worktree = {};
     this.textDocuments = [];
     this.textEditors = [];
   }
 
-  static async fromSessionJSON(
+  static async fromJSON(
     root: t.AbsPath,
-    summary: t.SessionSummary,
     io: SessionIO,
+    summary: t.SessionSummary,
     sessionJSON: t.SessionJSON,
   ): Promise<Session> {
-    const session = new Session(root, summary, io, sessionJSON);
-
-    for (const textEditor of sessionJSON.initSnapshot.textEditors) {
-      await session.openTextEditorByUri(textEditor.uri, textEditor.selections, textEditor.visibleRange);
-    }
-
-    if (session.initSnapshot.activeTextEditorUri) {
-      session.activeTextEditor = session.findTextEditorByUri(session.initSnapshot.activeTextEditorUri);
-    }
+    const session = new Session(root, io, summary, sessionJSON);
+    await session.restoreInitSnapshot();
     return session;
   }
 
@@ -70,6 +70,50 @@ export class Session implements t.ApplyPlaybackEvent {
     };
   }
 
+  async setInitSnapshotAndRestore(initSnapshot: t.SessionSnapshot) {
+    this.initSnapshot = initSnapshot;
+    await this.restoreInitSnapshot();
+  }
+
+  async restoreInitSnapshot() {
+    this.clock = 0;
+    this.eventIndex = 0;
+    this.worktree = makeWorktree(this.initSnapshot.worktree);
+    this.textDocuments = [];
+    this.textEditors = [];
+
+    for (const textEditor of this.initSnapshot.textEditors) {
+      await this.openTextEditorByUri(textEditor.uri, textEditor.selections, textEditor.visibleRange);
+    }
+
+    if (this.initSnapshot.activeTextEditorUri) {
+      this.activeTextEditor = this.findTextEditorByUri(this.initSnapshot.activeTextEditorUri);
+    }
+  }
+
+  doesUriExist(uri: t.Uri): boolean {
+    return Boolean(this.worktree[uri]);
+  }
+
+  getWorktreeUris(): t.Uri[] {
+    return Object.keys(this.worktree);
+  }
+
+  async getContentByUri(uri: t.Uri): Promise<Buffer> {
+    const item = this.worktree[uri];
+    assert(item);
+
+    if (item.document) {
+      return item.document.toBuffer();
+    }
+
+    if (item.file.type === 'local') {
+      return this.io.readFile(item.file);
+    }
+
+    throw new Error(`getContentByUri ${uri} type "${item.file}" not supported`);
+  }
+
   findTextDocumentByUri(uri: t.Uri): TextDocument | undefined {
     const textDocument = this.worktree[uri]?.document;
     return textDocument instanceof TextDocument ? textDocument : undefined;
@@ -80,17 +124,17 @@ export class Session implements t.ApplyPlaybackEvent {
     return textEditor instanceof TextEditor ? textEditor : undefined;
   }
 
-  // getTextDocumentByUri(uri: t.Uri): TextDocument {
-  //   const textDocument = this.findTextDocumentByUri(uri);
-  //   assert(textDocument);
-  //   return textDocument;
-  // }
+  getTextDocumentByUri(uri: t.Uri): TextDocument {
+    const textDocument = this.findTextDocumentByUri(uri);
+    assert(textDocument);
+    return textDocument;
+  }
 
-  // getTextEditorByUri(uri: t.Uri): TextEditor {
-  //   const textEditor = this.findTextEditorByUri(uri);
-  //   assert(textEditor);
-  //   return textEditor;
-  // }
+  getTextEditorByUri(uri: t.Uri): TextEditor {
+    const textEditor = this.findTextEditorByUri(uri);
+    assert(textEditor);
+    return textEditor;
+  }
 
   async openTextDocumentByUri(uri: t.Uri): Promise<TextDocument> {
     const worktreeItem = this.worktree[uri];
@@ -105,9 +149,14 @@ export class Session implements t.ApplyPlaybackEvent {
 
     const buffer = await this.io.readFile(worktreeItem.file);
     const textDocument = TextDocument.fromText(uri, buffer.toString('utf8'), this.defaultEol);
-    this.textDocuments.push(textDocument);
-    worktreeItem.document = textDocument;
+    this.insertTextDocument(textDocument);
     return textDocument;
+  }
+
+  insertTextDocument(textDocument: TextDocument) {
+    this.worktree[textDocument.uri] ??= { file: { type: 'empty' } };
+    this.worktree[textDocument.uri].document = textDocument;
+    this.textDocuments.push(textDocument);
   }
 
   async openTextEditorByUri(uri: t.Uri, selections?: t.Selection[], visibleRange?: t.Range): Promise<TextEditor> {
@@ -125,9 +174,14 @@ export class Session implements t.ApplyPlaybackEvent {
     }
 
     const textEditor = new TextEditor(await this.openTextDocumentByUri(uri), selections, visibleRange);
-    this.textEditors.push(textEditor);
-    worktreeItem.editor = textEditor;
+    this.insertTextEditor(textEditor);
     return textEditor;
+  }
+
+  insertTextEditor(textEditor: TextEditor) {
+    this.worktree[textEditor.document.uri] ??= { file: { type: 'empty' }, document: textEditor.document };
+    this.worktree[textEditor.document.uri].editor = textEditor;
+    this.textEditors.push(textEditor);
   }
 
   toWorkspaceUri(p: t.AbsPath): t.Uri {
@@ -153,10 +207,81 @@ export class Session implements t.ApplyPlaybackEvent {
     return this.events[i]?.clock ?? 0;
   }
 
-  getSeekData(i: number, toClock: number): t.SeekData {
+  getSeekData(toClock: number): t.SeekData {
+    // FORWARD
+
+    // events/clock:        -1  0  1  2  3  4  5  6
+    // clock:                   ^
+    // i:                    ^
+    // apply:                   ^
+    // new i:                   ^
+
+    // events/clock:        -1  0  1  2  3  4  5  6
+    // clock:                          ^
+    // i:                       ^
+    // apply:                      ^  ^
+    // new i:                         ^
+
+    // events/clock:        -1  0  1  2  3  4  5  6
+    // clock:                            ^
+    // i:                                ^
+    // apply:
+    // new i:                            ^
+
+    // events/clock:        -1  0  1  2  3  4  5  6
+    // clock:                             ^
+    // i:                                ^
+    // apply:
+    // new i:                            ^
+
+    // events/clock:        -1  0  1  2  3  4  5  6
+    // clock:                                     ^
+    // i:                                         ^
+    // apply:
+    // new i:                                     ^
+
+    // BACKWARD
+
+    // events/clock:        -1  0  1  2  3  4  5  6
+    // clock:                                   ^
+    // i:                                         ^
+    // apply reverse:                             ^
+    // new i:                                  ^
+
+    // events/clock:        -1  0  1  2  3  4  5  6
+    // clock:                                  ^
+    // i:                                      ^
+    // apply reverse:
+    // new i:                                  ^
+
+    // events/clock:        -1  0  1  2  3  4  5  6
+    // clock:                            ^
+    // i:                                      ^
+    // apply reverse:                       ^  ^
+    // new i:                            ^
+
+    // events/clock:        -1  0  1  2  3  4  5  6
+    // clock:                   ^
+    // i:                             ^
+    // apply reverse:              ^  ^
+    // new i:                   ^
+
+    // events/clock:        -1  0  1  2  3  4  5  6
+    // clock:                   ^
+    // i:                          ^
+    // apply reverse:              ^
+    // new i:                   ^
+
+    // events/clock:        -1  0  1  2  3  4  5  6
+    // clock:                   ^
+    // i:                       ^
+    // apply reverse:
+    // new i:                   ^
+
     const events = [];
     const n = this.events.length;
     let direction = t.Direction.Forwards;
+    let i = this.eventIndex;
     if (i < 0 || toClock > this.clockAt(i)) {
       // go forwards
       for (let j = i + 1; j < n && toClock >= this.clockAt(j); j++) {
@@ -178,9 +303,22 @@ export class Session implements t.ApplyPlaybackEvent {
   }
 
   async seek(seekData: t.SeekData, uriSet?: t.UriSet) {
-    for (const event of seekData.events) {
-      await lib.dispatchPlaybackEvent(this, event, seekData.direction, uriSet);
+    for (let i = 0; i < seekData.events.length; i++) {
+      await this.applySeekStep(seekData, i, uriSet);
     }
+    await this.finalizeSeek(seekData);
+  }
+
+  async applySeekStep(seekData: t.SeekData, stepIndex: number, uriSet?: t.UriSet) {
+    await this.applyPlaybackEvent(seekData.events[stepIndex], seekData.direction, uriSet);
+    const sign = seekData.direction === t.Direction.Forwards ? 1 : -1;
+    this.eventIndex += sign * (stepIndex + 1);
+    this.clock = seekData.events[stepIndex].clock;
+  }
+
+  async finalizeSeek(seekData: t.SeekData) {
+    this.eventIndex = seekData.i;
+    this.clock = seekData.clock;
   }
 
   /**
@@ -272,7 +410,7 @@ export type Worktree = { [key: t.Uri]: WorktreeItem };
 type WorktreeItem = { file: t.File; document?: Document; editor?: Editor };
 
 export interface Document {
-  // toBuffer(): Buffer;
+  toBuffer(): Buffer;
 }
 
 export class TextDocument implements Document {
@@ -284,9 +422,9 @@ export class TextDocument implements Document {
     return new TextDocument(uri, lines, eol);
   }
 
-  // toBuffer(): Buffer {
-  //   return Buffer.from(this.getText(), 'utf8');
-  // }
+  toBuffer(): Buffer {
+    return Buffer.from(this.getText(), 'utf8');
+  }
 
   getText(range?: t.Range): string {
     if (range) {
@@ -311,7 +449,7 @@ export class TextDocument implements Document {
       range.start.line >= 0 &&
       range.start.character >= 0 &&
       range.end.line < this.lines.length &&
-      range.end.character <= this.lines[this.lines.length - 1].length
+      range.end.character <= this.lines[range.end.line].length
     );
   }
 
@@ -415,4 +553,23 @@ export function makeSelectionN(
   activeCharacter: number,
 ): t.Selection {
   return { anchor: makePosition(anchorLine, anchorCharacter), active: makePosition(activeLine, activeCharacter) };
+}
+
+export function makeEmptySessionSnapshot(): t.SessionSnapshot {
+  return {
+    worktree: {},
+    textEditors: [],
+  };
+}
+
+export function makeSnapshotTextEditor(
+  uri: t.Uri,
+  selections: t.Selection[] = [makeSelectionN(0, 0, 0, 0)],
+  visibleRange: t.Range = makeRangeN(0, 0, 1, 0),
+): t.TextEditor {
+  return { uri, selections, visibleRange };
+}
+
+function makeWorktree(worktree: t.Worktree): Worktree {
+  return _.mapValues(worktree, file => ({ file }));
 }
