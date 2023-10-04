@@ -11,7 +11,7 @@ import nodePath from 'path';
 
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
 
-export default class SessionWorkspace extends Workspace {
+export default class VscEditorWorkspace extends Workspace {
   constructor(public root: t.AbsPath, public session: ir.Session, public io: SessionIO) {
     super(root);
   }
@@ -22,7 +22,7 @@ export default class SessionWorkspace extends Workspace {
     sessionSummary: t.SessionSummary,
     seekClock?: number,
     cutClock?: number,
-  ): Promise<SessionWorkspace | undefined> {
+  ): Promise<VscEditorWorkspace | undefined> {
     const root = path.abs(nodePath.resolve(rootStr));
     // user confirmations and root directory creation
     try {
@@ -49,7 +49,7 @@ export default class SessionWorkspace extends Workspace {
     const sessionJson = await db.readSession(sessionSummary.id);
     const session = await ir.Session.fromJSON(root, sessionIO, sessionSummary, sessionJson);
     if (cutClock !== undefined) session.cut(cutClock);
-    const workspace = new SessionWorkspace(root, session, sessionIO);
+    const workspace = new VscEditorWorkspace(root, session, sessionIO);
 
     // seek if necessary
     let targetUris: t.Uri[] | undefined;
@@ -66,7 +66,7 @@ export default class SessionWorkspace extends Workspace {
     return workspace;
   }
 
-  static async fromDirAndVsc(db: Db, summary: t.SessionSummary, rootStr: string): Promise<SessionWorkspace> {
+  static async fromDirAndVsc(db: Db, summary: t.SessionSummary, rootStr: string): Promise<VscEditorWorkspace> {
     const root = path.abs(nodePath.resolve(rootStr));
     const sessionIO = new SessionIO(db, summary.id);
     const sessionJSON: t.SessionJSON = {
@@ -76,7 +76,7 @@ export default class SessionWorkspace extends Workspace {
       initSnapshot: ir.makeEmptySessionSnapshot(),
     };
     const session = await ir.Session.fromJSON(root, sessionIO, summary, sessionJSON);
-    const workspace = new SessionWorkspace(root, session, sessionIO);
+    const workspace = new VscEditorWorkspace(root, session, sessionIO);
     const initSnapshot = await workspace.createSessionSnapshotFromDirAndVsc();
     await session.setInitSnapshotAndRestore(initSnapshot);
     return workspace;

@@ -1,4 +1,4 @@
-import SessionWorkspace from './session_workspace.js';
+import VscEditorWorkspace from './vsc_editor_workspace.js';
 import * as misc from './misc.js';
 import Db, { type WriteOptions } from './db.js';
 import { types as t, path, ir, lib } from '@codecast/lib';
@@ -24,7 +24,7 @@ class Recorder {
   constructor(
     public context: vscode.ExtensionContext,
     public db: Db,
-    public workspace: SessionWorkspace,
+    public workspace: VscEditorWorkspace,
     private clock: number = 0,
     private lastSavedClock: number = clock,
   ) {}
@@ -34,7 +34,7 @@ class Recorder {
    */
   static async fromDirAndVsc(context: vscode.ExtensionContext, db: Db, setup: t.RecorderSetup): Promise<Recorder> {
     assert(setup.root);
-    const workspace = await SessionWorkspace.fromDirAndVsc(db, setup.sessionSummary, setup.root);
+    const workspace = await VscEditorWorkspace.fromDirAndVsc(db, setup.sessionSummary, setup.root);
     return new Recorder(context, db, workspace);
   }
 
@@ -56,7 +56,7 @@ class Recorder {
       clock = setup.forkClock;
     }
 
-    const workspace = await SessionWorkspace.populateSession(db, setup.root, setup.sessionSummary, clock, clock);
+    const workspace = await VscEditorWorkspace.populateSession(db, setup.root, setup.sessionSummary, clock, clock);
     return workspace && new Recorder(context, db, workspace, clock);
   }
 

@@ -1,5 +1,5 @@
 import { types as t, path, lib, ir } from '@codecast/lib';
-import SessionWorkspace from './session_workspace.js';
+import VscEditorWorkspace from './vsc_editor_workspace.js';
 import VscEditorEventStepper from './vsc_editor_event_stepper.js';
 import Db, { type WriteOptions } from './db.js';
 import * as vscode from 'vscode';
@@ -17,7 +17,7 @@ class Player {
   constructor(
     public context: vscode.ExtensionContext,
     public db: Db,
-    public workspace: SessionWorkspace,
+    public workspace: VscEditorWorkspace,
     private postMessage: t.PostMessageToFrontend,
     private audioSrc: string,
   ) {}
@@ -34,7 +34,7 @@ class Player {
     audioSrc: string,
   ): Promise<Player | undefined> {
     assert(setup.root);
-    const workspace = await SessionWorkspace.populateSession(db, setup.root, setup.sessionSummary);
+    const workspace = await VscEditorWorkspace.populateSession(db, setup.root, setup.sessionSummary);
     postMessage({ type: 'backendMediaEvent', event: { type: 'load', src: audioSrc.toString() } });
     return workspace && new Player(context, db, workspace, postMessage, audioSrc);
   }
