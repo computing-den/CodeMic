@@ -142,17 +142,6 @@ export default class VscWorkspace {
     }
   }
 
-  // async createCheckpointTextDocuments(): Promise<t.CheckpointTextDocument[]> {
-  //   const res: t.CheckpointTextDocument[] = [];
-  //   const paths = await this.readDirRecursively({ includeFiles: true });
-  //   for (const p of paths) {
-  //     const text = await fs.promises.readFile(path.join(this.root, p), 'utf8');
-  //     const uri = path.workspaceUriFromRelPath(p);
-  //     res.push(ir.makeCheckpointTextDocument(uri, text));
-  //   }
-  //   return res;
-  // }
-
   makeTextEditorSnapshotFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {
     return ir.makeTextEditorSnapshot(
       this.uriFromVsc(vscTextEditor.document.uri),

@@ -77,12 +77,12 @@ export default class VscEditorWorkspace extends VscWorkspace {
     };
     const session = await ir.Session.fromJSON(root, sessionIO, summary, sessionJSON);
     const workspace = new VscEditorWorkspace(root, session, sessionIO);
-    const initSnapshot = await workspace.createSnapshotFromDirAndVsc();
+    const initSnapshot = await workspace.makeSnapshotFromDirAndVsc();
     await session.setInitSnapshotAndRestore(initSnapshot);
     return workspace;
   }
 
-  async createSnapshotFromDirAndVsc(): Promise<t.EditorTrackSnapshot> {
+  async makeSnapshotFromDirAndVsc(): Promise<t.EditorTrackSnapshot> {
     for (const vscTextDocument of vscode.workspace.textDocuments) {
       if (vscTextDocument.isDirty) {
         throw new Error('Checkpoint.fromWorkspace: there are unsaved files in the current workspace.');
