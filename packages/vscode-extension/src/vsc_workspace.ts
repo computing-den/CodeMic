@@ -153,8 +153,8 @@ export default class VscWorkspace {
   //   return res;
   // }
 
-  makeSnapshotTextEditorFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {
-    return ir.makeSnapshotTextEditor(
+  makeTextEditorSnapshotFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {
+    return ir.makeTextEditorSnapshot(
       this.uriFromVsc(vscTextEditor.document.uri),
       this.selectionsFromVsc(vscTextEditor.selections),
       this.rangeFromVsc(vscTextEditor.visibleRanges[0]),

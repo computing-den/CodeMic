@@ -12,7 +12,7 @@ export class Session implements t.EditorEventStepper {
   root: t.AbsPath;
   io: t.SessionIO;
   summary: t.SessionSummary;
-  initSnapshot: t.SessionSnapshot;
+  initSnapshot: t.EditorTrackSnapshot;
   events: t.EditorEvent[];
   audioTracks: t.AudioTrack[];
   defaultEol: t.EndOfLine;
@@ -64,7 +64,7 @@ export class Session implements t.EditorEventStepper {
     };
   }
 
-  async setInitSnapshotAndRestore(initSnapshot: t.SessionSnapshot) {
+  async setInitSnapshotAndRestore(initSnapshot: t.EditorTrackSnapshot) {
     this.initSnapshot = initSnapshot;
     await this.restoreInitSnapshot();
   }
@@ -552,14 +552,14 @@ export function makeSelectionN(
   return { anchor: makePosition(anchorLine, anchorCharacter), active: makePosition(activeLine, activeCharacter) };
 }
 
-export function makeEmptySessionSnapshot(): t.SessionSnapshot {
+export function makeEmptySnapshot(): t.EditorTrackSnapshot {
   return {
     worktree: {},
     textEditors: [],
   };
 }
 
-export function makeSnapshotTextEditor(
+export function makeTextEditorSnapshot(
   uri: t.Uri,
   selections: t.Selection[] = [makeSelectionN(0, 0, 0, 0)],
   visibleRange: t.Range = makeRangeN(0, 0, 1, 0),

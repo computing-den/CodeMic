@@ -73,16 +73,16 @@ export default class VscEditorWorkspace extends VscWorkspace {
       events: [],
       audioTracks: [],
       defaultEol: os.EOL as t.EndOfLine,
-      initSnapshot: ir.makeEmptySessionSnapshot(),
+      initSnapshot: ir.makeEmptySnapshot(),
     };
     const session = await ir.Session.fromJSON(root, sessionIO, summary, sessionJSON);
     const workspace = new VscEditorWorkspace(root, session, sessionIO);
-    const initSnapshot = await workspace.createSessionSnapshotFromDirAndVsc();
+    const initSnapshot = await workspace.createSnapshotFromDirAndVsc();
     await session.setInitSnapshotAndRestore(initSnapshot);
     return workspace;
   }
 
-  async createSessionSnapshotFromDirAndVsc(): Promise<t.SessionSnapshot> {
+  async createSnapshotFromDirAndVsc(): Promise<t.EditorTrackSnapshot> {
     for (const vscTextDocument of vscode.workspace.textDocuments) {
       if (vscTextDocument.isDirty) {
         throw new Error('Checkpoint.fromWorkspace: there are unsaved files in the current workspace.');
@@ -104,12 +104,12 @@ export default class VscEditorWorkspace extends VscWorkspace {
     // Then get the rest from vscode.window.tabGroups. These don't have selections and range.
     const textEditors = vscode.window.visibleTextEditors
       .filter(e => this.shouldRecordVscUri(e.document.uri))
-      .map(e => this.makeSnapshotTextEditorFromVsc(e));
+      .map(e => this.makeTextEditorSnapshotFromVsc(e));
 
     const tabUris = this.getRelevantTabUris();
     for (const uri of tabUris) {
       if (!textEditors.some(e => e.uri === uri)) {
-        textEditors.push(ir.makeSnapshotTextEditor(uri));
+        textEditors.push(ir.makeTextEditorSnapshot(uri));
       }
     }
 

@@ -188,10 +188,10 @@ export type SessionJSON = {
   events: EditorEvent[];
   audioTracks: AudioTrack[];
   defaultEol: EndOfLine;
-  initSnapshot: SessionSnapshot;
+  initSnapshot: EditorTrackSnapshot;
 };
 
-export type SessionSnapshot = {
+export type EditorTrackSnapshot = {
   worktree: Worktree;
   textEditors: TextEditor[];
   activeTextEditorUri?: Uri;
