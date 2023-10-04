@@ -35,7 +35,7 @@ export default class Db {
     this.lastWriteTime = Date.now();
   });
 
-  async writeSession(session: t.SessionJSON, sessionSummary: t.SessionSummary) {
+  async writeSession(session: t.Session, sessionSummary: t.SessionSummary) {
     console.log('writeSession: ', session, sessionSummary);
     // If there are multiple files, stringify everything first before calling any async function
     const sessionStr = stringify(session);
@@ -53,7 +53,7 @@ export default class Db {
     this.sessionSummaries[sessionSummary.id] = sessionSummary;
   }
 
-  async readSession(id: string): Promise<t.SessionJSON> {
+  async readSession(id: string): Promise<t.Session> {
     return readSession(id);
   }
 
@@ -134,8 +134,8 @@ function readSettings(): Promise<t.Settings> {
   return readAndParseJSON<t.Settings>(path.abs(userPaths.data, 'settings.json'), makeDefaultSettings);
 }
 
-function readSession(id: string): Promise<t.SessionJSON> {
-  return readAndParseJSON<t.SessionJSON>(path.abs(userPaths.data, 'sessions', id, `session.json`));
+function readSession(id: string): Promise<t.Session> {
+  return readAndParseJSON<t.Session>(path.abs(userPaths.data, 'sessions', id, `session.json`));
 }
 
 function makeDefaultSettings(): t.Settings {

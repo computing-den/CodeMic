@@ -46,8 +46,8 @@ export default class VscEditorWorkspace extends VscWorkspace {
 
     // read the session and cut it to cutClock.
     const sessionIO = new SessionIO(db, sessionSummary.id);
-    const sessionJSON = await db.readSession(sessionSummary.id);
-    const editorTrack = await et.EditorTrack.fromJSON(root, sessionIO, sessionJSON.editorTrack);
+    const session = await db.readSession(sessionSummary.id);
+    const editorTrack = await et.EditorTrack.fromJSON(root, sessionIO, session.editorTrack);
     if (cutClock !== undefined) editorTrack.cut(cutClock);
     const workspace = new VscEditorWorkspace(root, editorTrack, sessionIO);
 
@@ -69,7 +69,7 @@ export default class VscEditorWorkspace extends VscWorkspace {
   static async fromDirAndVsc(db: Db, sessionId: string, rootStr: string): Promise<VscEditorWorkspace> {
     const root = path.abs(nodePath.resolve(rootStr));
     const sessionIO = new SessionIO(db, sessionId);
-    const sessionJSON: t.SessionJSON = {
+    const session: t.Session = {
       editorTrack: {
         events: [],
         defaultEol: os.EOL as t.EndOfLine,
@@ -78,7 +78,7 @@ export default class VscEditorWorkspace extends VscWorkspace {
       },
       audioTracks: [],
     };
-    const editorTrack = await et.EditorTrack.fromJSON(root, sessionIO, sessionJSON.editorTrack);
+    const editorTrack = await et.EditorTrack.fromJSON(root, sessionIO, session.editorTrack);
     const workspace = new VscEditorWorkspace(root, editorTrack, sessionIO);
     const initSnapshot = await workspace.makeSnapshotFromDirAndVsc();
     await editorTrack.setInitSnapshotAndRestore(initSnapshot);

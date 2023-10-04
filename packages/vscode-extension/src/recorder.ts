@@ -179,11 +179,11 @@ class Recorder {
    */
   async save() {
     this.sessionSummary.timestamp = new Date().toISOString();
-    const sessionJSON: t.SessionJSON = {
+    const session: t.Session = {
       editorTrack: this.editorTrack.toJSON(),
       audioTracks: [], // TODO must preserve audioTrack
     };
-    await this.db.writeSession(sessionJSON, this.sessionSummary);
+    await this.db.writeSession(session, this.sessionSummary);
     await this.saveHistoryOpenClose();
     this.lastSavedClock = this.getClock();
   }

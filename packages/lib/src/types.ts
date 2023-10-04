@@ -184,7 +184,7 @@ export type SessionSummary = {
 
 export type SessionSummaryMap = { [key: string]: SessionSummary };
 
-export type SessionJSON = {
+export type Session = {
   editorTrack: EditorTrack;
   audioTracks: AudioTrack[];
 };
