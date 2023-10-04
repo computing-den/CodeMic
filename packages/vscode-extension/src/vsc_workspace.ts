@@ -1,4 +1,4 @@
-import { types as t, path, ir, lib, assert } from '@codecast/lib';
+import { types as t, path, editorTrack as et, lib, assert } from '@codecast/lib';
 import os from 'os';
 import * as fs from 'fs';
 import * as misc from './misc.js';
@@ -31,15 +31,15 @@ export default class VscWorkspace {
   }
 
   selectionFromVsc(selection: vscode.Selection): t.Selection {
-    return ir.makeSelection(this.positionFromVsc(selection.anchor), this.positionFromVsc(selection.active));
+    return et.makeSelection(this.positionFromVsc(selection.anchor), this.positionFromVsc(selection.active));
   }
 
   rangeFromVsc(range: vscode.Range): t.Range {
-    return ir.makeRange(this.positionFromVsc(range.start), this.positionFromVsc(range.end));
+    return et.makeRange(this.positionFromVsc(range.start), this.positionFromVsc(range.end));
   }
 
   positionFromVsc(position: vscode.Position): t.Position {
-    return ir.makePosition(position.line, position.character);
+    return et.makePosition(position.line, position.character);
   }
 
   selectionsToVsc(selections: t.Selection[]): vscode.Selection[] {
@@ -108,8 +108,8 @@ export default class VscWorkspace {
     return textEditors.find(x => x.document.uri.toString() === uriStr);
   }
 
-  textDocumentFromVsc(vscTextDocument: vscode.TextDocument, uri: t.Uri): ir.TextDocument {
-    return new ir.TextDocument(
+  textDocumentFromVsc(vscTextDocument: vscode.TextDocument, uri: t.Uri): et.TextDocument {
+    return new et.TextDocument(
       uri,
       _.times(vscTextDocument.lineCount, i => vscTextDocument.lineAt(i).text),
       this.eolFromVsc(vscTextDocument.eol),
@@ -143,7 +143,7 @@ export default class VscWorkspace {
   }
 
   makeTextEditorSnapshotFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {
-    return ir.makeTextEditorSnapshot(
+    return et.makeTextEditorSnapshot(
       this.uriFromVsc(vscTextEditor.document.uri),
       this.selectionsFromVsc(vscTextEditor.selections),
       this.rangeFromVsc(vscTextEditor.visibleRanges[0]),

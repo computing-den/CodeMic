@@ -7,15 +7,14 @@ import assert from './assert.js';
 
 // Not every TextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
-export class Session implements t.EditorEventStepper {
+export class EditorTrack implements t.EditorEventStepper {
   // These fields remain the same regardless of the clock
   root: t.AbsPath;
   io: t.SessionIO;
-  summary: t.SessionSummary;
   initSnapshot: t.EditorTrackSnapshot;
   events: t.EditorEvent[];
-  audioTracks: t.AudioTrack[];
   defaultEol: t.EndOfLine;
+  duration: number;
 
   // These fields change with the clock
   // TODO sync the entire worktree structure including directories.
@@ -28,14 +27,14 @@ export class Session implements t.EditorEventStepper {
   textEditors: TextEditor[];
   activeTextEditor?: TextEditor;
 
-  private constructor(root: t.AbsPath, io: t.SessionIO, summary: t.SessionSummary, sessionJSON: t.SessionJSON) {
+  private constructor(root: t.AbsPath, io: t.SessionIO, editorTrack: t.EditorTrack) {
     this.root = root;
     this.io = io;
-    this.summary = summary;
-    this.initSnapshot = sessionJSON.initSnapshot;
-    this.events = sessionJSON.events;
-    this.audioTracks = sessionJSON.audioTracks;
-    this.defaultEol = sessionJSON.defaultEol;
+    // this.summary = summary;
+    this.initSnapshot = editorTrack.initSnapshot;
+    this.events = editorTrack.events;
+    this.defaultEol = editorTrack.defaultEol;
+    this.duration = editorTrack.duration;
 
     this.clock = 0;
     this.eventIndex = 0;
@@ -44,23 +43,18 @@ export class Session implements t.EditorEventStepper {
     this.textEditors = [];
   }
 
-  static async fromJSON(
-    root: t.AbsPath,
-    io: t.SessionIO,
-    summary: t.SessionSummary,
-    sessionJSON: t.SessionJSON,
-  ): Promise<Session> {
-    const session = new Session(root, io, summary, sessionJSON);
-    await session.restoreInitSnapshot();
-    return session;
+  static async fromJSON(root: t.AbsPath, io: t.SessionIO, editorTrackJSON: t.EditorTrack): Promise<EditorTrack> {
+    const editorTrack = new EditorTrack(root, io, editorTrackJSON);
+    await editorTrack.restoreInitSnapshot();
+    return editorTrack;
   }
 
-  toJSON(): t.SessionJSON {
+  toJSON(): t.EditorTrack {
     return {
       events: this.events,
-      audioTracks: this.audioTracks,
       defaultEol: this.defaultEol,
       initSnapshot: this.initSnapshot,
+      duration: this.duration,
     };
   }
 
@@ -290,8 +284,8 @@ export class Session implements t.EditorEventStepper {
       }
     }
 
-    const clock = Math.max(0, Math.min(this.summary.duration, toClock));
-    const stop = clock >= this.summary.duration;
+    const clock = Math.max(0, Math.min(this.duration, toClock));
+    const stop = clock >= this.duration;
 
     return { events, direction, i, clock, stop };
   }
@@ -326,7 +320,7 @@ export class Session implements t.EditorEventStepper {
   cut(clock: number) {
     const i = this.events.findIndex(e => e.clock > clock);
     if (i >= 0) this.events.length = i;
-    this.summary.duration = clock;
+    this.duration = clock;
   }
 
   async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {

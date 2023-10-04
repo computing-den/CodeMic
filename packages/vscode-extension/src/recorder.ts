@@ -1,7 +1,7 @@
 import VscEditorWorkspace from './vsc_editor_workspace.js';
 import * as misc from './misc.js';
 import Db, { type WriteOptions } from './db.js';
-import { types as t, path, ir, lib } from '@codecast/lib';
+import { types as t, path, editorTrack as et, lib } from '@codecast/lib';
 import * as vscode from 'vscode';
 import fs from 'fs';
 import _ from 'lodash';
@@ -17,13 +17,14 @@ class Recorder {
   private scrolling: boolean = false;
   private scrollStartRange?: t.Range;
 
-  get session(): ir.Session {
-    return this.workspace.session;
+  get editorTrack(): et.EditorTrack {
+    return this.workspace.editorTrack;
   }
 
   constructor(
     public context: vscode.ExtensionContext,
     public db: Db,
+    public sessionSummary: t.SessionSummary,
     public workspace: VscEditorWorkspace,
     private clock: number = 0,
     private lastSavedClock: number = clock,
@@ -34,8 +35,8 @@ class Recorder {
    */
   static async fromDirAndVsc(context: vscode.ExtensionContext, db: Db, setup: t.RecorderSetup): Promise<Recorder> {
     assert(setup.root);
-    const workspace = await VscEditorWorkspace.fromDirAndVsc(db, setup.sessionSummary, setup.root);
-    return new Recorder(context, db, workspace);
+    const workspace = await VscEditorWorkspace.fromDirAndVsc(db, setup.sessionSummary.id, setup.root);
+    return new Recorder(context, db, setup.sessionSummary, workspace);
   }
 
   /**
@@ -56,8 +57,8 @@ class Recorder {
       clock = setup.forkClock;
     }
 
-    const workspace = await VscEditorWorkspace.populateSession(db, setup.root, setup.sessionSummary, clock, clock);
-    return workspace && new Recorder(context, db, workspace, clock);
+    const workspace = await VscEditorWorkspace.populateEditorTrack(db, setup.root, setup.sessionSummary, clock, clock);
+    return workspace && new Recorder(context, db, setup.sessionSummary, workspace, clock);
   }
 
   /**
@@ -177,21 +178,25 @@ class Recorder {
    * May be called without pause() or stop().
    */
   async save() {
-    this.session.summary.timestamp = new Date().toISOString();
-    await this.db.writeSession(this.session.toJSON(), this.session.summary);
+    this.sessionSummary.timestamp = new Date().toISOString();
+    const sessionJSON: t.SessionJSON = {
+      editorTrack: this.editorTrack.toJSON(),
+      audioTracks: [], // TODO must preserve audioTrack
+    };
+    await this.db.writeSession(sessionJSON, this.sessionSummary);
     await this.saveHistoryOpenClose();
     this.lastSavedClock = this.getClock();
   }
 
   updateState(changes: t.RecorderUpdate) {
-    if (changes.title !== undefined) this.session.summary.title = changes.title;
-    if (changes.description !== undefined) this.session.summary.description = changes.description;
-    if (changes.clock !== undefined) this.session.summary.duration = this.clock = changes.clock;
+    if (changes.title !== undefined) this.sessionSummary.title = changes.title;
+    if (changes.description !== undefined) this.sessionSummary.description = changes.description;
+    if (changes.clock !== undefined) this.sessionSummary.duration = this.clock = changes.clock;
     if (changes.root !== undefined) throw new Error('Recorder.updateState cannot changes root');
   }
 
   isSessionEmpty(): boolean {
-    return this.session.events.length === 0;
+    return this.editorTrack.events.length === 0;
   }
 
   textChange(
@@ -241,14 +246,14 @@ class Recorder {
     const uri = this.workspace.uriFromVsc(vscTextEditor.document.uri);
     console.log(`adding showTextEditor for ${uri}`);
 
-    const revUri = this.session.activeTextEditor?.document.uri;
-    const revSelections = this.session.activeTextEditor?.selections;
-    const revVisibleRange = this.session.activeTextEditor?.visibleRange;
+    const revUri = this.editorTrack.activeTextEditor?.document.uri;
+    const revSelections = this.editorTrack.activeTextEditor?.selections;
+    const revVisibleRange = this.editorTrack.activeTextEditor?.visibleRange;
 
-    // Possibly inserts an openTextDocument or textChange event if the document wasn't found in internal session or
+    // Possibly inserts an openTextDocument or textChange event if the document wasn't found in internal editorTrack or
     // its contents were different.
     const irTextEditor = this.openTextEditorHelper(vscTextEditor, uri, true);
-    this.session.activeTextEditor = irTextEditor;
+    this.editorTrack.activeTextEditor = irTextEditor;
 
     this.pushEvent({
       type: 'showTextEditor',
@@ -271,7 +276,7 @@ class Recorder {
       `visibleRange: ${vscTextEditor.visibleRanges[0].start.line}:${vscTextEditor.visibleRanges[0].end.line}`,
     );
 
-    const irTextEditor = this.session.getTextEditorByUri(uri);
+    const irTextEditor = this.editorTrack.getTextEditorByUri(uri);
     const revSelections = irTextEditor.selections;
     const revVisibleRanges = irTextEditor.visibleRange;
     irTextEditor.select(
@@ -322,7 +327,7 @@ class Recorder {
 
     console.log(`adding scroll for ${uri}`);
 
-    const irTextEditor = this.session.getTextEditorByUri(uri);
+    const irTextEditor = this.editorTrack.getTextEditorByUri(uri);
     const revVisibleRange = irTextEditor.visibleRange;
     irTextEditor.scroll(visibleRange);
 
@@ -357,12 +362,12 @@ class Recorder {
       this.scrolling = false;
       this.scrollStartRange = undefined;
     }
-    this.session.events.push(e);
+    this.editorTrack.events.push(e);
   }
 
   private async saveHistoryOpenClose() {
     this.db.mergeSessionHistory({
-      id: this.session.summary.id,
+      id: this.sessionSummary.id,
       lastRecordedTimestamp: new Date().toISOString(),
       root: this.workspace.root,
     });
@@ -383,8 +388,8 @@ class Recorder {
     vscTextDocument: vscode.TextDocument,
     uri: t.Uri,
     checkContent: boolean,
-  ): ir.TextDocument {
-    let irTextDocument = this.session.findTextDocumentByUri(uri);
+  ): et.TextDocument {
+    let irTextDocument = this.editorTrack.findTextDocumentByUri(uri);
 
     if (irTextDocument) {
       if (checkContent) {
@@ -409,7 +414,7 @@ class Recorder {
       }
     } else {
       irTextDocument = this.workspace.textDocumentFromVsc(vscTextDocument, uri);
-      this.session.insertTextDocument(irTextDocument);
+      this.editorTrack.insertTextDocument(irTextDocument);
       this.pushEvent({
         type: 'openTextDocument',
         clock: this.getClock(),
@@ -424,14 +429,14 @@ class Recorder {
   /**
    * It does not push a showTextEditor event but it might push an 'openTextDocument' or a 'textChange' event.
    */
-  private openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri, checkContent: boolean): ir.TextEditor {
+  private openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri, checkContent: boolean): et.TextEditor {
     const selections = this.workspace.selectionsFromVsc(vscTextEditor.selections);
     const visibleRange = this.workspace.rangeFromVsc(vscTextEditor.visibleRanges[0]);
     const textDocument = this.openTextDocumentWithUri(vscTextEditor.document, uri, checkContent);
-    let textEditor = this.session.findTextEditorByUri(textDocument.uri);
+    let textEditor = this.editorTrack.findTextEditorByUri(textDocument.uri);
     if (!textEditor) {
-      textEditor = new ir.TextEditor(textDocument, selections, visibleRange);
-      this.session.insertTextEditor(textEditor);
+      textEditor = new et.TextEditor(textDocument, selections, visibleRange);
+      this.editorTrack.insertTextEditor(textEditor);
     } else {
       textEditor.select(selections, visibleRange);
     }

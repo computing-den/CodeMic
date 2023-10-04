@@ -383,10 +383,10 @@ class Codecast {
       if (this.recorder) {
         recorder = {
           status: this.recorder.status,
-          sessionSummary: this.recorder.workspace.session.summary,
+          sessionSummary: this.recorder.sessionSummary,
           clock: this.recorder.getClock(),
           root: this.recorder.getRoot(),
-          history: this.db.settings.history[this.recorder.workspace.session.summary.id],
+          history: this.db.settings.history[this.recorder.sessionSummary.id],
         };
       } else if (this.recorderSetup) {
         recorder = {
@@ -409,10 +409,10 @@ class Codecast {
       if (this.player) {
         player = {
           status: this.player.status,
-          sessionSummary: this.player.workspace.session.summary,
+          sessionSummary: this.player.sessionSummary,
           clock: this.player.getClock(),
           root: this.player.workspace.root,
-          history: this.db.settings.history[this.player.workspace.session.summary.id],
+          history: this.db.settings.history[this.player.sessionSummary.id],
         };
       } else if (this.playerSetup) {
         player = {

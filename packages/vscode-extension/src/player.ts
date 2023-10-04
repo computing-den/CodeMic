@@ -1,4 +1,4 @@
-import { types as t, path, lib, ir } from '@codecast/lib';
+import { types as t, path, lib, editorTrack as et } from '@codecast/lib';
 import VscEditorWorkspace from './vsc_editor_workspace.js';
 import VscEditorEventStepper from './vsc_editor_event_stepper.js';
 import Db, { type WriteOptions } from './db.js';
@@ -17,6 +17,7 @@ class Player {
   constructor(
     public context: vscode.ExtensionContext,
     public db: Db,
+    public sessionSummary: t.SessionSummary,
     public workspace: VscEditorWorkspace,
     private postMessage: t.PostMessageToFrontend,
     private audioSrc: string,
@@ -34,9 +35,9 @@ class Player {
     audioSrc: string,
   ): Promise<Player | undefined> {
     assert(setup.root);
-    const workspace = await VscEditorWorkspace.populateSession(db, setup.root, setup.sessionSummary);
+    const workspace = await VscEditorWorkspace.populateEditorTrack(db, setup.root, setup.sessionSummary);
     postMessage({ type: 'backendMediaEvent', event: { type: 'load', src: audioSrc.toString() } });
-    return workspace && new Player(context, db, workspace, postMessage, audioSrc);
+    return workspace && new Player(context, db, setup.sessionSummary, workspace, postMessage, audioSrc);
   }
 
   async start() {
@@ -209,7 +210,7 @@ class Player {
   }
 
   getClock(): number {
-    return this.workspace.session.clock;
+    return this.workspace.editorTrack.clock;
   }
 
   /**
@@ -223,7 +224,7 @@ class Player {
 
   private async saveHistoryClock(options?: WriteOptions) {
     this.db.mergeSessionHistory({
-      id: this.workspace.session.summary.id,
+      id: this.sessionSummary.id,
       lastWatchedClock: this.getClock(),
     });
     await this.db.write(options);
@@ -231,7 +232,7 @@ class Player {
 
   private async saveHistoryOpenClose() {
     this.db.mergeSessionHistory({
-      id: this.workspace.session.summary.id,
+      id: this.sessionSummary.id,
       lastWatchedTimestamp: new Date().toISOString(),
       root: this.workspace.root,
     });
@@ -239,21 +240,21 @@ class Player {
   }
 
   private async updateImmediately(clock: number) {
-    const { session } = this.workspace;
-    const seekData = session.getSeekData(clock);
+    const { editorTrack } = this.workspace;
+    const seekData = editorTrack.getSeekData(clock);
 
-    if (Math.abs(seekData.clock - session.clock) > 10 && seekData.events.length > 10) {
-      // Update by seeking the internal session first, then syncing the session to vscode and disk
+    if (Math.abs(seekData.clock - editorTrack.clock) > 10 && seekData.events.length > 10) {
+      // Update by seeking the internal editorTrack first, then syncing the editorTrack to vscode and disk
       const uriSet: t.UriSet = {};
-      await session.seek(seekData, uriSet);
-      await this.workspace.syncSessionToVscodeAndDisk(Object.keys(uriSet));
+      await editorTrack.seek(seekData, uriSet);
+      await this.workspace.syncEditorTrackToVscodeAndDisk(Object.keys(uriSet));
     } else {
       // Apply updates one at a time
       for (let i = 0; i < seekData.events.length; i++) {
-        await session.applySeekStep(seekData, i);
+        await editorTrack.applySeekStep(seekData, i);
         await this.vscEditorEventStepper.applySeekStep(seekData, i);
       }
-      await session.finalizeSeek(seekData);
+      await editorTrack.finalizeSeek(seekData);
       await this.vscEditorEventStepper.finalizeSeek(seekData);
     }
 

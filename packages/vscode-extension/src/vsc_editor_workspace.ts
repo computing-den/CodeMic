@@ -1,4 +1,4 @@
-import { types as t, path, ir, lib, assert } from '@codecast/lib';
+import { types as t, path, editorTrack as et, lib, assert } from '@codecast/lib';
 import os from 'os';
 import * as fs from 'fs';
 import Db from './db.js';
@@ -12,11 +12,11 @@ import nodePath from 'path';
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
 
 export default class VscEditorWorkspace extends VscWorkspace {
-  constructor(public root: t.AbsPath, public session: ir.Session, public io: SessionIO) {
+  constructor(public root: t.AbsPath, public editorTrack: et.EditorTrack, public io: SessionIO) {
     super(root);
   }
 
-  static async populateSession(
+  static async populateEditorTrack(
     db: Db,
     rootStr: string,
     sessionSummary: t.SessionSummary,
@@ -46,39 +46,42 @@ export default class VscEditorWorkspace extends VscWorkspace {
 
     // read the session and cut it to cutClock.
     const sessionIO = new SessionIO(db, sessionSummary.id);
-    const sessionJson = await db.readSession(sessionSummary.id);
-    const session = await ir.Session.fromJSON(root, sessionIO, sessionSummary, sessionJson);
-    if (cutClock !== undefined) session.cut(cutClock);
-    const workspace = new VscEditorWorkspace(root, session, sessionIO);
+    const sessionJSON = await db.readSession(sessionSummary.id);
+    const editorTrack = await et.EditorTrack.fromJSON(root, sessionIO, sessionJSON.editorTrack);
+    if (cutClock !== undefined) editorTrack.cut(cutClock);
+    const workspace = new VscEditorWorkspace(root, editorTrack, sessionIO);
 
     // seek if necessary
     let targetUris: t.Uri[] | undefined;
     if (seekClock) {
       const uriSet: t.UriSet = {};
-      const seekData = session.getSeekData(seekClock);
-      await session.seek(seekData, uriSet);
+      const seekData = editorTrack.getSeekData(seekClock);
+      await editorTrack.seek(seekData, uriSet);
       targetUris = Object.keys(uriSet);
     }
 
     // sync, save and return
-    await workspace.syncSessionToVscodeAndDisk(targetUris);
+    await workspace.syncEditorTrackToVscodeAndDisk(targetUris);
     await workspace.saveAllRelevantVscTabs();
     return workspace;
   }
 
-  static async fromDirAndVsc(db: Db, summary: t.SessionSummary, rootStr: string): Promise<VscEditorWorkspace> {
+  static async fromDirAndVsc(db: Db, sessionId: string, rootStr: string): Promise<VscEditorWorkspace> {
     const root = path.abs(nodePath.resolve(rootStr));
-    const sessionIO = new SessionIO(db, summary.id);
+    const sessionIO = new SessionIO(db, sessionId);
     const sessionJSON: t.SessionJSON = {
-      events: [],
+      editorTrack: {
+        events: [],
+        defaultEol: os.EOL as t.EndOfLine,
+        initSnapshot: et.makeEmptySnapshot(),
+        duration: 0,
+      },
       audioTracks: [],
-      defaultEol: os.EOL as t.EndOfLine,
-      initSnapshot: ir.makeEmptySnapshot(),
     };
-    const session = await ir.Session.fromJSON(root, sessionIO, summary, sessionJSON);
-    const workspace = new VscEditorWorkspace(root, session, sessionIO);
+    const editorTrack = await et.EditorTrack.fromJSON(root, sessionIO, sessionJSON.editorTrack);
+    const workspace = new VscEditorWorkspace(root, editorTrack, sessionIO);
     const initSnapshot = await workspace.makeSnapshotFromDirAndVsc();
-    await session.setInitSnapshotAndRestore(initSnapshot);
+    await editorTrack.setInitSnapshotAndRestore(initSnapshot);
     return workspace;
   }
 
@@ -109,7 +112,7 @@ export default class VscEditorWorkspace extends VscWorkspace {
     const tabUris = this.getRelevantTabUris();
     for (const uri of tabUris) {
       if (!textEditors.some(e => e.uri === uri)) {
-        textEditors.push(ir.makeTextEditorSnapshot(uri));
+        textEditors.push(et.makeTextEditorSnapshot(uri));
       }
     }
 
@@ -123,25 +126,25 @@ export default class VscEditorWorkspace extends VscWorkspace {
     return { worktree, textEditors, activeTextEditorUri };
   }
 
-  async syncSessionToVscodeAndDisk(targetUris?: t.Uri[]) {
+  async syncEditorTrackToVscodeAndDisk(targetUris?: t.Uri[]) {
     // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
 
-    const { root, session } = this;
+    const { root, editorTrack } = this;
 
-    // TODO having both directories and files in targetUris and session.worktree can make things
+    // TODO having both directories and files in targetUris and editorTrack.worktree can make things
     //      a bit confusing. Especially when it comes to deleting directories when there's
     //      still a file inside but is supposed to be ignored according to .gitignore or .codecastignore
-    //      I think it's best to keep the directory structure in a separate variable than session.worktree
+    //      I think it's best to keep the directory structure in a separate variable than editorTrack.worktree
     //      worktreeFiles: {[key: Uri]: WorktreeFile} vs worktreeDirs: Uri[]
-    // assert(_.values(session.worktree).every(item => item.file.type !== 'dir'));
-    // assert(!targetUris || targetUris.every(uri => session.worktree[uri]?.file.type !== 'dir'));
+    // assert(_.values(editorTrack.worktree).every(item => item.file.type !== 'dir'));
+    // assert(!targetUris || targetUris.every(uri => editorTrack.worktree[uri]?.file.type !== 'dir'));
 
-    // all text editor tabs that are not in session's textEditors should be closed
+    // all text editor tabs that are not in editorTrack's textEditors should be closed
     for (const tabGroup of vscode.window.tabGroups.all) {
       for (const tab of tabGroup.tabs) {
         if (tab.input instanceof vscode.TabInputText && this.shouldRecordVscUri(tab.input.uri)) {
           const uri = this.uriFromVsc(tab.input.uri);
-          if (!session.findTextEditorByUri(uri)) {
+          if (!editorTrack.findTextEditorByUri(uri)) {
             const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
             await vscTextDocument.save();
             await vscode.window.tabGroups.close(tab);
@@ -151,32 +154,32 @@ export default class VscEditorWorkspace extends VscWorkspace {
     }
 
     if (targetUris) {
-      // all files in targetUris that are no longer in session's worktree should be deleted
+      // all files in targetUris that are no longer in editorTrack's worktree should be deleted
       for (const targetUri of targetUris) {
-        if (!session.doesUriExist(targetUri)) {
+        if (!editorTrack.doesUriExist(targetUri)) {
           if (path.isWorkspaceUri(targetUri)) {
             await fs.promises.rm(path.getFileUriPath(this.resolveUri(targetUri)), { force: true });
           }
         }
       }
     } else {
-      // all files in workspace that are not in session's worktree should be deleted
+      // all files in workspace that are not in editorTrack's worktree should be deleted
       const workspaceFiles = await this.readDirRecursively({ includeFiles: true });
       for (const file of workspaceFiles) {
         const uri = path.workspaceUriFromRelPath(file);
-        if (!session.doesUriExist(uri)) {
+        if (!editorTrack.doesUriExist(uri)) {
           await fs.promises.rm(path.join(root, file), { force: true });
         }
       }
 
-      // set targetUris to all known uris in session
-      targetUris = session.getWorktreeUris();
+      // set targetUris to all known uris in editorTrack
+      targetUris = editorTrack.getWorktreeUris();
     }
 
     // for now, just delete empty directories
     {
       const dirs = await this.readDirRecursively({ includeDirs: true });
-      const workspaceUriPaths = session.getWorktreeUris().filter(path.isWorkspaceUri).map(path.getWorkspaceUriPath);
+      const workspaceUriPaths = editorTrack.getWorktreeUris().filter(path.isWorkspaceUri).map(path.getWorkspaceUriPath);
       for (const dir of dirs) {
         const dirIsEmpty = !workspaceUriPaths.some(p => path.isBaseOf(dir, p));
         if (dirIsEmpty) await fs.promises.rm(path.join(root, dir), { force: true, recursive: true });
@@ -184,7 +187,7 @@ export default class VscEditorWorkspace extends VscWorkspace {
     }
 
     // for each targetUri
-    //   if it doesn't exist in session.worktree, it's already been deleted above, so ignore it
+    //   if it doesn't exist in editorTrack.worktree, it's already been deleted above, so ignore it
     //   if there's a textDocument open in vscode, replace its content
     //   else, mkdir and write to file
     {
@@ -193,10 +196,10 @@ export default class VscEditorWorkspace extends VscWorkspace {
       for (const targetUri of targetUris) {
         assert(path.isWorkspaceUri(targetUri), 'TODO currently, we only support workspace URIs');
 
-        if (session.doesUriExist(targetUri)) {
+        if (editorTrack.doesUriExist(targetUri)) {
           const vscTextDocument = this.findVscTextDocumentByUri(targetUri);
           if (vscTextDocument) {
-            const text = new TextDecoder().decode(await session.getContentByUri(targetUri));
+            const text = new TextDecoder().decode(await editorTrack.getContentByUri(targetUri));
             edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), text);
           } else {
             targetUrisOutsideVsc.push(targetUri);
@@ -206,17 +209,17 @@ export default class VscEditorWorkspace extends VscWorkspace {
       await vscode.workspace.applyEdit(edit);
 
       for (const targetUri of targetUrisOutsideVsc) {
-        const data = await session.getContentByUri(targetUri);
+        const data = await editorTrack.getContentByUri(targetUri);
         const absPath = path.getFileUriPath(this.resolveUri(targetUri));
         await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
         await fs.promises.writeFile(absPath, data);
       }
     }
 
-    // open all session's textEditors in vscdoe
+    // open all editorTrack's textEditors in vscdoe
     {
       const tabUris = this.getRelevantTabUris();
-      for (const textEditor of session.textEditors) {
+      for (const textEditor of editorTrack.textEditors) {
         if (!tabUris.includes(textEditor.document.uri)) {
           const vscUri = this.uriToVsc(textEditor.document.uri);
           await vscode.window.showTextDocument(vscUri, {
@@ -230,12 +233,12 @@ export default class VscEditorWorkspace extends VscWorkspace {
     }
 
     // show this.activeTextEditor
-    if (session.activeTextEditor) {
-      const vscUri = this.uriToVsc(session.activeTextEditor.document.uri);
+    if (editorTrack.activeTextEditor) {
+      const vscUri = this.uriToVsc(editorTrack.activeTextEditor.document.uri);
       await vscode.window.showTextDocument(vscUri, {
         preview: false,
         preserveFocus: false,
-        selection: this.selectionToVsc(session.activeTextEditor.selections[0]),
+        selection: this.selectionToVsc(editorTrack.activeTextEditor.selections[0]),
         viewColumn: vscode.ViewColumn.One,
       });
     }

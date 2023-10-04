@@ -185,10 +185,15 @@ export type SessionSummary = {
 export type SessionSummaryMap = { [key: string]: SessionSummary };
 
 export type SessionJSON = {
-  events: EditorEvent[];
+  editorTrack: EditorTrack;
   audioTracks: AudioTrack[];
-  defaultEol: EndOfLine;
+};
+
+export type EditorTrack = {
   initSnapshot: EditorTrackSnapshot;
+  events: EditorEvent[];
+  defaultEol: EndOfLine;
+  duration: number;
 };
 
 export type EditorTrackSnapshot = {
