@@ -1,15 +1,17 @@
-import { types as t, path, ir, lib, assert, PlaybackEventStepper } from '@codecast/lib';
+import { types as t, path, ir, lib, assert, editorEventStepperDispatch } from '@codecast/lib';
 import Workspace from './workspace.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 
-class VscStepper extends PlaybackEventStepper {
-  constructor(public workspace: Workspace) {
-    super();
+class VscStepper implements t.EditorEventStepper {
+  constructor(public workspace: Workspace) {}
+
+  async applyEditorEvent(e: t.EditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
+    await editorEventStepperDispatch(this, e, direction, uriSet);
   }
 
   async applySeekStep(seekData: t.SeekData, stepIndex: number) {
-    await this.applyPlaybackEvent(seekData.events[stepIndex], seekData.direction);
+    await this.applyEditorEvent(seekData.events[stepIndex], seekData.direction);
   }
 
   async finalizeSeek(seekData: t.SeekData) {

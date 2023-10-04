@@ -352,7 +352,7 @@ class Recorder {
     return this.getClock() > this.lastSavedClock;
   }
 
-  private pushEvent(e: t.PlaybackEvent) {
+  private pushEvent(e: t.EditorEvent) {
     if (e.type !== 'scroll') {
       this.scrolling = false;
       this.scrollStartRange = undefined;

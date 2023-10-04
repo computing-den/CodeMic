@@ -185,7 +185,7 @@ export type SessionSummary = {
 export type SessionSummaryMap = { [key: string]: SessionSummary };
 
 export type SessionJSON = {
-  events: PlaybackEvent[];
+  events: EditorEvent[];
   audioTracks: AudioTrack[];
   defaultEol: EndOfLine;
   initSnapshot: SessionSnapshot;
@@ -210,7 +210,17 @@ export interface SessionIO {
   readFile(file: File): Promise<Uint8Array>;
 }
 
-export type PlaybackEvent =
+export interface EditorEventStepper {
+  applyEditorEvent(e: EditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyTextChangeEvent(e: TextChangeEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyOpenTextDocumentEvent(e: OpenTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyShowTextEditorEvent(e: ShowTextEditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applySelectEvent(e: SelectEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyScrollEvent(e: ScrollEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applySaveEvent(e: SaveEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+}
+
+export type EditorEvent =
   | TextChangeEvent
   | OpenTextDocumentEvent
   | ShowTextEditorEvent
@@ -353,7 +363,7 @@ export type SessionHistoryItem = {
   root?: AbsPath;
 };
 
-export type SeekData = { events: PlaybackEvent[]; direction: Direction; i: number; clock: number; stop: boolean };
+export type SeekData = { events: EditorEvent[]; direction: Direction; i: number; clock: number; stop: boolean };
 
 export type FrontendMediaEvent =
   | { type: 'loadstart' }

@@ -1,19 +1,19 @@
 import _ from 'lodash';
 import * as t from './types.js';
-import PlaybackEventStepper from './playback_event_stepper.js';
+import editorEventStepperDispatch from './editor_event_stepper_dispatch.js';
 import * as lib from './lib.js';
 import * as path from './path.js';
 import assert from './assert.js';
 
 // Not every TextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
-export class Session extends PlaybackEventStepper {
+export class Session implements t.EditorEventStepper {
   // These fields remain the same regardless of the clock
   root: t.AbsPath;
   io: t.SessionIO;
   summary: t.SessionSummary;
   initSnapshot: t.SessionSnapshot;
-  events: t.PlaybackEvent[];
+  events: t.EditorEvent[];
   audioTracks: t.AudioTrack[];
   defaultEol: t.EndOfLine;
 
@@ -29,8 +29,6 @@ export class Session extends PlaybackEventStepper {
   activeTextEditor?: TextEditor;
 
   private constructor(root: t.AbsPath, io: t.SessionIO, summary: t.SessionSummary, sessionJSON: t.SessionJSON) {
-    super();
-
     this.root = root;
     this.io = io;
     this.summary = summary;
@@ -305,8 +303,12 @@ export class Session extends PlaybackEventStepper {
     await this.finalizeSeek(seekData);
   }
 
+  async applyEditorEvent(e: t.EditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
+    await editorEventStepperDispatch(this, e, direction, uriSet);
+  }
+
   async applySeekStep(seekData: t.SeekData, stepIndex: number, uriSet?: t.UriSet) {
-    await this.applyPlaybackEvent(seekData.events[stepIndex], seekData.direction, uriSet);
+    await this.applyEditorEvent(seekData.events[stepIndex], seekData.direction, uriSet);
     const sign = seekData.direction === t.Direction.Forwards ? 1 : -1;
     this.eventIndex += sign * (stepIndex + 1);
     this.clock = seekData.events[stepIndex].clock;
