@@ -1,10 +1,10 @@
 import { types as t, path, ir, lib, assert, editorEventStepperDispatch } from '@codecast/lib';
-import Workspace from './workspace.js';
+import VscWorkspace from './vsc_workspace.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 
 class VscEditorEventStepper implements t.EditorEventStepper {
-  constructor(public workspace: Workspace) {}
+  constructor(public workspace: VscWorkspace) {}
 
   async applyEditorEvent(e: t.EditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
     await editorEventStepperDispatch(this, e, direction, uriSet);

@@ -4,14 +4,14 @@ import * as fs from 'fs';
 import Db from './db.js';
 import { SessionIO } from './session.js';
 import * as misc from './misc.js';
-import Workspace from './workspace.js';
+import VscWorkspace from './vsc_workspace.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import nodePath from 'path';
 
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
 
-export default class VscEditorWorkspace extends Workspace {
+export default class VscEditorWorkspace extends VscWorkspace {
   constructor(public root: t.AbsPath, public session: ir.Session, public io: SessionIO) {
     super(root);
   }

@@ -1,6 +1,6 @@
 import Recorder from './recorder.js';
 import Player from './player.js';
-import Workspace from './workspace.js';
+import VscWorkspace from './vsc_workspace.js';
 import WebviewProvider from './webview_provider.js';
 import Db from './db.js';
 import * as vscode from 'vscode';
@@ -80,7 +80,7 @@ class Codecast {
             baseSessionSummary,
             fork: req.fork,
             forkClock: req.forkClock,
-            root: history?.root || Workspace.getDefaultRoot(),
+            root: history?.root || VscWorkspace.getDefaultRoot(),
             // set history in getStore() so that it's always up-to-date
           };
           this.screen = t.Screen.Recorder;

@@ -9,7 +9,7 @@ import nodePath from 'path';
 
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
 
-export default class Workspace {
+export default class VscWorkspace {
   constructor(public root: t.AbsPath) {}
 
   static getDefaultRoot(): t.AbsPath | undefined {
