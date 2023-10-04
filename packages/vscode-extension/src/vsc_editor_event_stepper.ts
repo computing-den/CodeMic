@@ -3,7 +3,7 @@ import Workspace from './workspace.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 
-class VscStepper implements t.EditorEventStepper {
+class VscEditorEventStepper implements t.EditorEventStepper {
   constructor(public workspace: Workspace) {}
 
   async applyEditorEvent(e: t.EditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
@@ -110,4 +110,4 @@ class VscStepper implements t.EditorEventStepper {
   }
 }
 
-export default VscStepper;
+export default VscEditorEventStepper;

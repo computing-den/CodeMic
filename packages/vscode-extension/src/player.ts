@@ -1,6 +1,6 @@
 import { types as t, path, lib, ir } from '@codecast/lib';
 import SessionWorkspace from './session_workspace.js';
-import VscStepper from './vsc_stepper.js';
+import VscEditorEventStepper from './vsc_editor_event_stepper.js';
 import Db, { type WriteOptions } from './db.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
@@ -12,7 +12,7 @@ class Player {
 
   private disposables: vscode.Disposable[] = [];
   private enqueueUpdate = lib.taskQueue(this.updateImmediately.bind(this), 1);
-  private vscStepper = new VscStepper(this.workspace);
+  private vscEditorEventStepper = new VscEditorEventStepper(this.workspace);
 
   constructor(
     public context: vscode.ExtensionContext,
@@ -251,10 +251,10 @@ class Player {
       // Apply updates one at a time
       for (let i = 0; i < seekData.events.length; i++) {
         await session.applySeekStep(seekData, i);
-        await this.vscStepper.applySeekStep(seekData, i);
+        await this.vscEditorEventStepper.applySeekStep(seekData, i);
       }
       await session.finalizeSeek(seekData);
-      await this.vscStepper.finalizeSeek(seekData);
+      await this.vscEditorEventStepper.finalizeSeek(seekData);
     }
 
     if (seekData.stop) await this.stop();
