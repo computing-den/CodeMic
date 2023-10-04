@@ -57,7 +57,7 @@ export default class Db {
     return readSession(id);
   }
 
-  async readSessionBlobBySha1(sessionId: string, sha1: string): Promise<Buffer> {
+  async readSessionBlobBySha1(sessionId: string, sha1: string): Promise<Uint8Array> {
     const p = path.abs(userPaths.data, 'sessions', sessionId, 'blobs', sha1);
     return fs.promises.readFile(p);
   }
@@ -93,19 +93,17 @@ function stringify(json: any): string {
   return JSON.stringify(json, null, 2);
 }
 
-async function writeSessionFile(id: string, relFilePath: string, data: string | Buffer): Promise<void> {
+async function writeSessionFile(id: string, relFilePath: string, data: string | Uint8Array): Promise<void> {
   await writeDataFile(path.rel('sessions', id, relFilePath), data);
 }
 
-async function writeDataFile(relFilePath: string, data: string | Buffer): Promise<void> {
+async function writeDataFile(relFilePath: string, data: string | Uint8Array): Promise<void> {
   const file = path.abs(userPaths.data, relFilePath);
   await fs.promises.mkdir(path.dirname(file), { recursive: true });
-  if (data instanceof Buffer) {
-    await fs.promises.writeFile(file, data);
-  } else if (typeof data === 'string') {
+  if (typeof data === 'string') {
     await fs.promises.writeFile(file, data, 'utf8');
   } else {
-    throw new Error('Unknown data type');
+    await fs.promises.writeFile(file, data);
   }
 }
 

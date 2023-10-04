@@ -48,8 +48,8 @@ export async function fileExists(p: t.AbsPath): Promise<boolean> {
   return false;
 }
 
-export async function computeSHA1(buffer: Buffer): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest('SHA-1', buffer);
+export async function computeSHA1(data: Uint8Array): Promise<string> {
+  const hashBuffer = await crypto.subtle.digest('SHA-1', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
 }

@@ -5,16 +5,12 @@ import * as lib from './lib.js';
 import * as path from './path.js';
 import assert from './assert.js';
 
-export interface SessionIO {
-  readFile(file: t.File): Promise<Buffer>;
-}
-
 // Not every TextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
 export class Session extends PlaybackEventStepper {
   // These fields remain the same regardless of the clock
   root: t.AbsPath;
-  io: SessionIO;
+  io: t.SessionIO;
   summary: t.SessionSummary;
   initSnapshot: t.SessionSnapshot;
   events: t.PlaybackEvent[];
@@ -32,7 +28,7 @@ export class Session extends PlaybackEventStepper {
   textEditors: TextEditor[];
   activeTextEditor?: TextEditor;
 
-  private constructor(root: t.AbsPath, io: SessionIO, summary: t.SessionSummary, sessionJSON: t.SessionJSON) {
+  private constructor(root: t.AbsPath, io: t.SessionIO, summary: t.SessionSummary, sessionJSON: t.SessionJSON) {
     super();
 
     this.root = root;
@@ -52,7 +48,7 @@ export class Session extends PlaybackEventStepper {
 
   static async fromJSON(
     root: t.AbsPath,
-    io: SessionIO,
+    io: t.SessionIO,
     summary: t.SessionSummary,
     sessionJSON: t.SessionJSON,
   ): Promise<Session> {
@@ -99,12 +95,12 @@ export class Session extends PlaybackEventStepper {
     return Object.keys(this.worktree);
   }
 
-  async getContentByUri(uri: t.Uri): Promise<Buffer> {
+  async getContentByUri(uri: t.Uri): Promise<Uint8Array> {
     const item = this.worktree[uri];
     assert(item);
 
     if (item.document) {
-      return item.document.toBuffer();
+      return item.document.getContent();
     }
 
     if (item.file.type === 'local') {
@@ -147,8 +143,8 @@ export class Session extends PlaybackEventStepper {
       return worktreeItem.document;
     }
 
-    const buffer = await this.io.readFile(worktreeItem.file);
-    const textDocument = TextDocument.fromText(uri, buffer.toString('utf8'), this.defaultEol);
+    const text = new TextDecoder().decode(await this.io.readFile(worktreeItem.file));
+    const textDocument = TextDocument.fromText(uri, text, this.defaultEol);
     this.insertTextDocument(textDocument);
     return textDocument;
   }
@@ -410,7 +406,7 @@ export type Worktree = { [key: t.Uri]: WorktreeItem };
 type WorktreeItem = { file: t.File; document?: Document; editor?: Editor };
 
 export interface Document {
-  toBuffer(): Buffer;
+  getContent(): Uint8Array;
 }
 
 export class TextDocument implements Document {
@@ -422,8 +418,8 @@ export class TextDocument implements Document {
     return new TextDocument(uri, lines, eol);
   }
 
-  toBuffer(): Buffer {
-    return Buffer.from(this.getText(), 'utf8');
+  getContent(): Uint8Array {
+    return new TextEncoder().encode(this.getText());
   }
 
   getText(range?: t.Range): string {
@@ -507,7 +503,6 @@ export class TextDocument implements Document {
 
 export interface Editor {
   document: Document;
-  // toBuffer(): Buffer;
 }
 
 /**

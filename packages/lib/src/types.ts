@@ -206,6 +206,10 @@ export type OpenDialogOptions = {
   title?: string;
 };
 
+export interface SessionIO {
+  readFile(file: File): Promise<Uint8Array>;
+}
+
 export type PlaybackEvent =
   | TextChangeEvent
   | OpenTextDocumentEvent

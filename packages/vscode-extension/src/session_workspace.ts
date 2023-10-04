@@ -2,6 +2,7 @@ import { types as t, path, ir, lib, assert } from '@codecast/lib';
 import os from 'os';
 import * as fs from 'fs';
 import Db from './db.js';
+import { SessionIO } from './session.js';
 import * as misc from './misc.js';
 import Workspace from './workspace.js';
 import * as vscode from 'vscode';
@@ -11,7 +12,7 @@ import nodePath from 'path';
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
 
 export default class SessionWorkspace extends Workspace {
-  constructor(public root: t.AbsPath, public session: ir.Session, public io: ir.SessionIO) {
+  constructor(public root: t.AbsPath, public session: ir.Session, public io: SessionIO) {
     super(root);
   }
 
@@ -94,8 +95,8 @@ export default class SessionWorkspace extends Workspace {
     const paths = await this.readDirRecursively({ includeFiles: true });
     for (const p of paths) {
       const uri = path.workspaceUriFromRelPath(p);
-      const buffer = await fs.promises.readFile(path.join(this.root, p));
-      const sha1 = await misc.computeSHA1(buffer);
+      const data = await fs.promises.readFile(path.join(this.root, p));
+      const sha1 = await misc.computeSHA1(data);
       worktree[uri] = { type: 'local', sha1 };
     }
 
@@ -195,8 +196,8 @@ export default class SessionWorkspace extends Workspace {
         if (session.doesUriExist(targetUri)) {
           const vscTextDocument = this.findVscTextDocumentByUri(targetUri);
           if (vscTextDocument) {
-            const buffer: Buffer = await session.getContentByUri(targetUri);
-            edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), buffer.toString('utf8'));
+            const text = new TextDecoder().decode(await session.getContentByUri(targetUri));
+            edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), text);
           } else {
             targetUrisOutsideVsc.push(targetUri);
           }
@@ -205,10 +206,10 @@ export default class SessionWorkspace extends Workspace {
       await vscode.workspace.applyEdit(edit);
 
       for (const targetUri of targetUrisOutsideVsc) {
-        const buffer: Buffer = await session.getContentByUri(targetUri);
+        const data = await session.getContentByUri(targetUri);
         const absPath = path.getFileUriPath(this.resolveUri(targetUri));
         await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
-        await fs.promises.writeFile(absPath, buffer);
+        await fs.promises.writeFile(absPath, data);
       }
     }
 
@@ -237,18 +238,6 @@ export default class SessionWorkspace extends Workspace {
         selection: this.selectionToVsc(session.activeTextEditor.selections[0]),
         viewColumn: vscode.ViewColumn.One,
       });
-    }
-  }
-}
-
-class SessionIO implements ir.SessionIO {
-  constructor(public db: Db, public sessionId: string) {}
-
-  async readFile(file: t.File): Promise<Buffer> {
-    if (file.type === 'local') {
-      return this.db.readSessionBlobBySha1(this.sessionId, file.sha1);
-    } else {
-      throw new Error(`TODO readFile ${file.type}`);
     }
   }
 }
