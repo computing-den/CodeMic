@@ -103,10 +103,11 @@ export type WelcomeState = {
 
 export enum RecorderStatus {
   Uninitialized,
-  Ready,
-  Recording,
+  Initialized,
+  Error,
   Paused,
   Stopped,
+  Recording,
 }
 
 export type RecorderState = {
@@ -137,11 +138,12 @@ export type RecorderSetup = {
 
 export enum PlayerStatus {
   Uninitialized,
-  Ready,
-  Buffering,
-  Playing,
+  Initialized,
+  Error,
+  Loading,
   Paused,
   Stopped,
+  Playing,
 }
 
 export type PlayerState = {
@@ -195,6 +197,39 @@ export type EditorTrack = {
   defaultEol: EndOfLine;
   duration: number;
 };
+
+/**
+ * Multiple audio tracks may refer to the same file.
+ */
+export type AudioTrack = {
+  id: string;
+  file: File;
+  title: string;
+  clock: number;
+  duration: number;
+};
+
+export enum TrackPlayerStatus {
+  Init,
+  Error,
+  Loading,
+  Paused,
+  Stopped,
+  Playing,
+}
+
+export interface TrackPlayer {
+  onProgress?: (clock: number) => any;
+  onStatusChange?: (status: TrackPlayerStatus) => any;
+  clock: number;
+  status: TrackPlayerStatus;
+
+  start(): Promise<void>;
+  pause(): Promise<void>;
+  stop(): Promise<void>;
+  seek(clock: number): Promise<void>;
+  dispose(): any;
+}
 
 export type EditorTrackSnapshot = {
   worktree: Worktree;
@@ -342,17 +377,6 @@ export type TextEditor = {
 };
 
 export type EndOfLine = '\n' | '\r\n';
-
-/**
- * Multiple audio tracks may refer to the same file.
- */
-export type AudioTrack = {
-  id: string;
-  file: File;
-  title: string;
-  clock: number;
-  duration: number;
-};
 
 export type Settings = {
   history: SessionHistory;

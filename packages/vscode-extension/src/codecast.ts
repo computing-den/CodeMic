@@ -32,9 +32,7 @@ class Codecast {
     // DEV
     if (this.webview.bus) {
       this.messageHandler({ type: 'openRecorder', sessionId: 'ecc7e7e8-1f38-4a3a-91b1-774f1c91ba21' })
-        .then(() => {
-          this.webview.postMessage({ type: 'updateStore', store: this.getStore() });
-        })
+        .then(this.postUpdateStore)
         .catch(console.error);
     }
   }
@@ -100,7 +98,8 @@ class Codecast {
             this.db,
             this.playerSetup,
             this.webview.postMessage.bind(this.webview),
-            this.webview.asWebviewUri(vscode.Uri.file('/home/sean/.local/share/codecast/sample.mp3'))?.toString()!,
+            this.playerChanged.bind(this),
+            // this.webview.asWebviewUri(vscode.Uri.file('/home/sean/.local/share/codecast/sample.mp3'))?.toString()!,
           );
         }
 
@@ -272,7 +271,7 @@ class Codecast {
 
   async goHomeCommand() {
     await this.goHome();
-    await this.webview.postMessage({ type: 'updateStore', store: this.getStore() });
+    await this.postUpdateStore();
   }
 
   async closeCurrentScreen(): Promise<boolean> {
@@ -293,7 +292,7 @@ class Codecast {
       // Pause the frontend while we figure out if we should save the session.
       if (wasRecording) {
         await this.recorder.pause();
-        await this.webview.postMessage({ type: 'updateStore', store: this.getStore() });
+        await this.postUpdateStore();
       }
 
       let shouldSave = this.recorder.isDirty();
@@ -319,7 +318,7 @@ class Codecast {
         await this.recorder.stop();
       } else if (wasRecording) {
         this.recorder.start();
-        await this.webview.postMessage({ type: 'updateStore', store: this.getStore() });
+        await this.postUpdateStore();
       }
 
       // Save
@@ -350,6 +349,10 @@ class Codecast {
     return true;
   }
 
+  async playerChanged() {
+    await this.postUpdateStore();
+  }
+
   // async showOpenSessionDialog(): Promise<t.Uri | undefined> {
   //   const uris = await vscode.window.showOpenDialog({
   //     canSelectFiles: true,
@@ -369,6 +372,10 @@ class Codecast {
 
   respondWithStore(): t.BackendResponse {
     return { type: 'store', store: this.getStore() };
+  }
+
+  async postUpdateStore() {
+    await this.webview.postMessage({ type: 'updateStore', store: this.getStore() });
   }
 
   getFirstHistoryItemById(...ids: (string | undefined)[]): t.SessionHistoryItem | undefined {
@@ -411,7 +418,7 @@ class Codecast {
           status: this.player.status,
           sessionSummary: this.player.sessionSummary,
           clock: this.player.getClock(),
-          root: this.player.workspace.root,
+          root: this.player.root,
           history: this.db.settings.history[this.player.sessionSummary.id],
         };
       } else if (this.playerSetup) {

@@ -1,27 +1,31 @@
 import { types as t, path, lib, editorTrack as et } from '@codecast/lib';
 import VscEditorWorkspace from './vsc_editor_workspace.js';
-import VscEditorEventStepper from './vsc_editor_event_stepper.js';
+import VscEditorTrackPlayer from './vsc_editor_track_player.js';
 import Db, { type WriteOptions } from './db.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
-import fs from 'fs';
 
 class Player {
-  status: t.PlayerStatus = t.PlayerStatus.Ready;
+  status: t.PlayerStatus = t.PlayerStatus.Initialized;
 
-  private disposables: vscode.Disposable[] = [];
-  private enqueueUpdate = lib.taskQueue(this.updateImmediately.bind(this), 1);
-  private vscEditorEventStepper = new VscEditorEventStepper(this.workspace);
+  get root(): t.AbsPath {
+    return this.vscEditorTrackPlayer.workspace.root;
+  }
+
+  // private vscEditorEventStepper = new VscEditorEventStepper(this.workspace);
 
   constructor(
     public context: vscode.ExtensionContext,
     public db: Db,
     public sessionSummary: t.SessionSummary,
-    public workspace: VscEditorWorkspace,
     private postMessage: t.PostMessageToFrontend,
-    private audioSrc: string,
-  ) {}
+    private vscEditorTrackPlayer: VscEditorTrackPlayer,
+    private onChange: () => any,
+  ) {
+    vscEditorTrackPlayer.onProgress = this.vscEditorTrackProgressHandler.bind(this);
+    vscEditorTrackPlayer.onStatusChange = this.vscEditorTrackStatusChangeHandler.bind(this);
+  }
 
   /**
    * root must be already resolved.
@@ -32,61 +36,73 @@ class Player {
     db: Db,
     setup: t.PlayerSetup,
     postMessage: t.PostMessageToFrontend,
-    audioSrc: string,
+    onChange: () => any,
+    // audioSrc: string,
   ): Promise<Player | undefined> {
     assert(setup.root);
     const workspace = await VscEditorWorkspace.populateEditorTrack(db, setup.root, setup.sessionSummary);
-    postMessage({ type: 'backendMediaEvent', event: { type: 'load', src: audioSrc.toString() } });
-    return workspace && new Player(context, db, setup.sessionSummary, workspace, postMessage, audioSrc);
+    if (workspace) {
+      // postMessage({ type: 'backendMediaEvent', event: { type: 'load', src: audioSrc.toString() } });
+      const vscEditorTrackPlayer = new VscEditorTrackPlayer(context, workspace);
+      return new Player(context, db, setup.sessionSummary, postMessage, vscEditorTrackPlayer, onChange);
+    }
+  }
+
+  async vscEditorTrackProgressHandler(clock: number) {
+    // console.log(`vscEditorTrackProgressHandler: ${clock}`);
+
+    // update frontend
+    this.onChange();
+
+    // save history
+    await this.saveHistoryClock({ ifDirtyForLong: true });
+  }
+
+  async vscEditorTrackStatusChangeHandler(status: t.TrackPlayerStatus) {
+    switch (status) {
+      case t.TrackPlayerStatus.Init:
+        this.status = t.PlayerStatus.Initialized;
+        break;
+      case t.TrackPlayerStatus.Error:
+        this.status = t.PlayerStatus.Error;
+        break;
+      case t.TrackPlayerStatus.Loading:
+        this.status = t.PlayerStatus.Loading;
+        break;
+      case t.TrackPlayerStatus.Paused:
+        this.status = t.PlayerStatus.Paused;
+        break;
+      case t.TrackPlayerStatus.Stopped:
+        this.status = t.PlayerStatus.Stopped;
+        break;
+      case t.TrackPlayerStatus.Playing:
+        this.status = t.PlayerStatus.Playing;
+        break;
+      default:
+        lib.unreachable(status);
+    }
   }
 
   async start() {
-    assert(
-      this.status === t.PlayerStatus.Ready ||
-        this.status === t.PlayerStatus.Paused ||
-        this.status === t.PlayerStatus.Stopped,
-    );
-    this.status = t.PlayerStatus.Playing;
-
-    // ignore user input
-    {
-      const disposable = vscode.commands.registerCommand('type', (e: { text: string }) => {
-        const uri = vscode.window.activeTextEditor?.document.uri;
-        if (!uri || !this.workspace.shouldRecordVscUri(uri)) {
-          // approve the default type command
-          vscode.commands.executeCommand('default:type', e);
-        }
-      });
-      this.disposables.push(disposable);
-    }
-
-    // register disposables
-    this.context.subscriptions.push(...this.disposables);
-
-    await this.postMessage({ type: 'backendMediaEvent', event: { type: 'play' } });
-
+    await this.vscEditorTrackPlayer.start();
     await this.saveHistoryOpenClose();
   }
 
   dispose() {
-    this.enqueueUpdate.clear();
-    for (const d of this.disposables) d.dispose();
-    this.disposables = [];
+    this.vscEditorTrackPlayer.dispose();
   }
 
   async pause() {
-    await this.postMessage({ type: 'backendMediaEvent', event: { type: 'pause' } });
-    await this.afterPauseOrStop(t.PlayerStatus.Paused);
+    await this.vscEditorTrackPlayer.pause();
+    await this.afterPauseOrStop();
   }
 
   async stop() {
-    await this.postMessage({ type: 'backendMediaEvent', event: { type: 'pause' } });
-    await this.afterPauseOrStop(t.PlayerStatus.Stopped);
+    await this.vscEditorTrackPlayer.pause();
+    await this.afterPauseOrStop();
   }
 
-  async afterPauseOrStop(status: t.PlayerStatus) {
-    this.status = status;
-    this.dispose();
+  async afterPauseOrStop() {
     await this.saveHistoryClock();
   }
 
@@ -102,125 +118,115 @@ class Player {
   }
 
   async seek(clock: number) {
-    console.log('player.ts: seek: ', clock);
-    await this.postMessage({ type: 'backendMediaEvent', event: { type: 'seek', clock } });
+    await this.vscEditorTrackPlayer.seek(clock);
   }
 
   async handleFrontendMediaEvent(e: t.FrontendMediaEvent) {
-    try {
-      switch (e.type) {
-        case 'loadstart': {
-          console.log('loadstart');
-          return;
-        }
-        case 'durationchange': {
-          console.log('durationchange');
-          return;
-        }
-        case 'loadedmetadata': {
-          console.log('loadedmetadata');
-          return;
-        }
-        case 'loadeddata': {
-          console.log('loadeddata');
-          return;
-        }
-        case 'progress': {
-          console.log('progress');
-          return;
-        }
-        case 'canplay': {
-          console.log('canplay');
-          return;
-        }
-        case 'canplaythrough': {
-          console.log('canplaythrough');
-          return;
-        }
-        case 'suspend': {
-          console.log('suspend');
-          return;
-        }
-        case 'abort': {
-          console.log('abort');
-          await this.afterPauseOrStop(t.PlayerStatus.Stopped);
-          return;
-        }
-        case 'emptied': {
-          console.log('emptied');
-          return;
-        }
-        case 'stalled': {
-          console.log('stalled');
-          return;
-        }
-        case 'playing': {
-          console.log('playing');
-          return;
-        }
-        case 'waiting': {
-          console.log('waiting');
-          return;
-        }
-        case 'play': {
-          console.log('play');
-          return;
-        }
-        case 'pause': {
-          console.log('pause');
-          return;
-        }
-        case 'ended': {
-          console.log('ended');
-          await this.afterPauseOrStop(t.PlayerStatus.Paused);
-          return;
-        }
-        case 'seeking': {
-          console.log('seeking');
-          return;
-        }
-        case 'seeked': {
-          console.log('seeked');
-          return;
-        }
-        case 'timeupdate': {
-          console.log('timeupdate', e.clock);
-          await this.enqueueUpdate(e.clock);
-          return;
-        }
-        case 'volumechange': {
-          console.log('volumechange', e.volume);
-          return;
-        }
-        case 'error': {
-          console.log('error');
-          // await this.afterPauseOrStop(t.PlayerStatus.Stopped);
-          // error will be caught and will call this.pause()
-          throw new Error(e.error);
-        }
-        default: {
-          lib.unreachable(e);
-        }
-      }
-    } catch (error) {
-      console.error(error);
-      vscode.window.showErrorMessage('ERROR', { detail: (error as Error).message });
-      await this.stop();
-    }
+    // try {
+    //   switch (e.type) {
+    //     case 'loadstart': {
+    //       console.log('loadstart');
+    //       return;
+    //     }
+    //     case 'durationchange': {
+    //       console.log('durationchange');
+    //       return;
+    //     }
+    //     case 'loadedmetadata': {
+    //       console.log('loadedmetadata');
+    //       return;
+    //     }
+    //     case 'loadeddata': {
+    //       console.log('loadeddata');
+    //       return;
+    //     }
+    //     case 'progress': {
+    //       console.log('progress');
+    //       return;
+    //     }
+    //     case 'canplay': {
+    //       console.log('canplay');
+    //       return;
+    //     }
+    //     case 'canplaythrough': {
+    //       console.log('canplaythrough');
+    //       return;
+    //     }
+    //     case 'suspend': {
+    //       console.log('suspend');
+    //       return;
+    //     }
+    //     case 'abort': {
+    //       console.log('abort');
+    //       await this.afterPauseOrStop(t.PlayerStatus.Stopped);
+    //       return;
+    //     }
+    //     case 'emptied': {
+    //       console.log('emptied');
+    //       return;
+    //     }
+    //     case 'stalled': {
+    //       console.log('stalled');
+    //       return;
+    //     }
+    //     case 'playing': {
+    //       console.log('playing');
+    //       return;
+    //     }
+    //     case 'waiting': {
+    //       console.log('waiting');
+    //       return;
+    //     }
+    //     case 'play': {
+    //       console.log('play');
+    //       return;
+    //     }
+    //     case 'pause': {
+    //       console.log('pause');
+    //       return;
+    //     }
+    //     case 'ended': {
+    //       console.log('ended');
+    //       await this.afterPauseOrStop(t.PlayerStatus.Paused);
+    //       return;
+    //     }
+    //     case 'seeking': {
+    //       console.log('seeking');
+    //       return;
+    //     }
+    //     case 'seeked': {
+    //       console.log('seeked');
+    //       return;
+    //     }
+    //     case 'timeupdate': {
+    //       console.log('timeupdate', e.clock);
+    //       await this.enqueueUpdate(e.clock);
+    //       return;
+    //     }
+    //     case 'volumechange': {
+    //       console.log('volumechange', e.volume);
+    //       return;
+    //     }
+    //     case 'error': {
+    //       console.log('error');
+    //       // await this.afterPauseOrStop(t.PlayerStatus.Stopped);
+    //       // error will be caught and will call this.pause()
+    //       throw new Error(e.error);
+    //     }
+    //     default: {
+    //       lib.unreachable(e);
+    //     }
+    //   }
+    // } catch (error) {
+    //   console.error(error);
+    //   vscode.window.showErrorMessage('ERROR', { detail: (error as Error).message });
+    //   await this.stop();
+    // }
   }
 
   getClock(): number {
-    return this.workspace.editorTrack.clock;
+    return this.vscEditorTrackPlayer.clock;
   }
-
-  /**
-   * Note that the lifecycle of the returned document from vscode.workspace.openTextDocument() is owned
-   * by the editor and not by the extension. That means an onDidClose event can occur at any time after opening it.
-   * We probably should not cache the vscTextDocument itself.
-   */
-  // private async openVscTextDocumentByUri(uri: t.Uri): Promise<vscode.TextDocument> {
-  //   return await vscode.workspace.openTextDocument(this.workspace.uriToVsc(uri));
-  // }
 
   private async saveHistoryClock(options?: WriteOptions) {
     this.db.mergeSessionHistory({
@@ -234,34 +240,9 @@ class Player {
     this.db.mergeSessionHistory({
       id: this.sessionSummary.id,
       lastWatchedTimestamp: new Date().toISOString(),
-      root: this.workspace.root,
+      root: this.root,
     });
     await this.db.write();
-  }
-
-  private async updateImmediately(clock: number) {
-    const { editorTrack } = this.workspace;
-    const seekData = editorTrack.getSeekData(clock);
-
-    if (Math.abs(seekData.clock - editorTrack.clock) > 10 && seekData.events.length > 10) {
-      // Update by seeking the internal editorTrack first, then syncing the editorTrack to vscode and disk
-      const uriSet: t.UriSet = {};
-      await editorTrack.seek(seekData, uriSet);
-      await this.workspace.syncEditorTrackToVscodeAndDisk(Object.keys(uriSet));
-    } else {
-      // Apply updates one at a time
-      for (let i = 0; i < seekData.events.length; i++) {
-        await editorTrack.applySeekStep(seekData, i);
-        await this.vscEditorEventStepper.applySeekStep(seekData, i);
-      }
-      await editorTrack.finalizeSeek(seekData);
-      await this.vscEditorEventStepper.finalizeSeek(seekData);
-    }
-
-    if (seekData.stop) await this.stop();
-
-    // save history
-    await this.saveHistoryClock({ ifDirtyForLong: true });
   }
 }
 

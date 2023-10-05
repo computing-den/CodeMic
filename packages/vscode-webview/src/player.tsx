@@ -14,7 +14,7 @@ import _ from 'lodash';
 
 type Props = { player: t.PlayerState };
 export default class Player extends Component<Props> {
-  media = new Media();
+  // media = new Media();
   seeking = false;
 
   startPlayer = async () => {
@@ -79,7 +79,7 @@ export default class Player extends Component<Props> {
   }
 
   componentWillUnmount() {
-    this.media!.stop();
+    // this.media!.stop();
   }
 
   render() {

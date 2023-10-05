@@ -11,7 +11,7 @@ import { v4 as uuid } from 'uuid';
 const SCROLL_LINES_TRIGGER = 2;
 
 class Recorder {
-  status: t.RecorderStatus = t.RecorderStatus.Ready;
+  status: t.RecorderStatus = t.RecorderStatus.Initialized;
 
   private disposables: vscode.Disposable[] = [];
   private scrolling: boolean = false;
@@ -98,7 +98,7 @@ class Recorder {
   }
 
   async start() {
-    assert(this.status === t.RecorderStatus.Ready || this.status === t.RecorderStatus.Paused);
+    assert(this.status === t.RecorderStatus.Initialized || this.status === t.RecorderStatus.Paused);
 
     this.status = t.RecorderStatus.Recording;
 

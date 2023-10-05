@@ -2,7 +2,7 @@ import { produce, type Draft } from 'immer';
 import MediaToolbar, * as MT from './media_toolbar.jsx';
 import { h, Fragment, Component } from 'preact';
 import { types as t, path, lib, assert } from '@codecast/lib';
-import FakeMedia from './fake_media.js';
+// import FakeMedia from './fake_media.js';
 import PathField from './path_field.jsx';
 import { SessionSummary } from './session_summary.jsx';
 import SessionDescription from './session_description.jsx';
@@ -15,10 +15,10 @@ import _ from 'lodash';
 type Props = { recorder: t.RecorderState };
 export default class Recorder extends Component<Props> {
   panelsElem: Element | null = null;
-  media: FakeMedia = new FakeMedia(
-    this.handleMediaProgress.bind(this),
-    this.props.recorder.sessionSummary.duration * 1000,
-  );
+  // media: FakeMedia = new FakeMedia(
+  //   this.handleMediaProgress.bind(this),
+  //   this.props.recorder.sessionSummary.duration * 1000,
+  // );
 
   setRef = (e: Element | null) => (this.panelsElem = e);
 
@@ -49,15 +49,15 @@ export default class Recorder extends Component<Props> {
   };
 
   enableOrDisableMedia() {
-    const isRecording = Boolean(this.props.recorder.status === t.RecorderStatus.Recording);
-    if (isRecording !== this.media.isActive()) {
-      this.media.timeMs = this.props.recorder.clock * 1000;
-      if (isRecording) {
-        this.media.start();
-      } else {
-        this.media.pause();
-      }
-    }
+    // const isRecording = Boolean(this.props.recorder.status === t.RecorderStatus.Recording);
+    // if (isRecording !== this.media.isActive()) {
+    //   this.media.timeMs = this.props.recorder.clock * 1000;
+    //   if (isRecording) {
+    //     this.media.start();
+    //   } else {
+    //     this.media.pause();
+    //   }
+    // }
   }
 
   async handleMediaProgress(ms: number) {
@@ -79,7 +79,7 @@ export default class Recorder extends Component<Props> {
   }
 
   componentWillUnmount() {
-    this.media.pause();
+    // this.media.pause();
   }
 
   render() {
@@ -88,7 +88,7 @@ export default class Recorder extends Component<Props> {
     // let toggleFn: () => void, toggleIcon: string, tooltip: string;
     // switch (status) {
     //   case t.RecorderStatus.Uninitialized:
-    //   case t.RecorderStatus.Ready:
+    //   case t.RecorderStatus.Initialized:
     //   case t.RecorderStatus.Paused: {
     //     toggleFn = this.startRecorder;
     //     toggleIcon = 'codicon-circle-large-filled';

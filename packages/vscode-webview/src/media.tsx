@@ -5,7 +5,7 @@ import _ from 'lodash';
 // export enum MediaStatus {
 //   Init,
 //   Waiting,
-//   Ready,
+//   Initialized,
 //   Playing,
 //   Error,
 // }
