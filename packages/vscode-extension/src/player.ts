@@ -1,4 +1,5 @@
-import { types as t, path, lib, editorTrack as et } from '@codecast/lib';
+import { SessionIO } from './session.js';
+import { types as t, path, lib, editorTrack as et, AudioTrackPlayer } from '@codecast/lib';
 import VscEditorWorkspace from './vsc_editor_workspace.js';
 import VscEditorTrackPlayer from './vsc_editor_track_player.js';
 import Db, { type WriteOptions } from './db.js';
@@ -19,8 +20,8 @@ class Player {
     public context: vscode.ExtensionContext,
     public db: Db,
     public sessionSummary: t.SessionSummary,
-    private postMessage: t.PostMessageToFrontend,
     private vscEditorTrackPlayer: VscEditorTrackPlayer,
+    private audioTrackPlayer: AudioTrackPlayer,
     private onChange: () => any,
   ) {
     vscEditorTrackPlayer.onProgress = this.vscEditorTrackProgressHandler.bind(this);
@@ -35,16 +36,25 @@ class Player {
     context: vscode.ExtensionContext,
     db: Db,
     setup: t.PlayerSetup,
-    postMessage: t.PostMessageToFrontend,
+    postAudioMessage: t.PostAudioMessageToFrontend,
+    getSessionBlobUri: (sha1: string) => t.Uri,
     onChange: () => any,
     // audioSrc: string,
   ): Promise<Player | undefined> {
     assert(setup.root);
-    const workspace = await VscEditorWorkspace.populateEditorTrack(db, setup.root, setup.sessionSummary);
+    const sessionIO = new SessionIO(db, setup.sessionSummary.id);
+    const session = await db.readSession(setup.sessionSummary.id);
+    const workspace = await VscEditorWorkspace.populateEditorTrack(setup.root, session, sessionIO);
     if (workspace) {
       // postMessage({ type: 'backendMediaEvent', event: { type: 'load', src: audioSrc.toString() } });
       const vscEditorTrackPlayer = new VscEditorTrackPlayer(context, workspace);
-      return new Player(context, db, setup.sessionSummary, postMessage, vscEditorTrackPlayer, onChange);
+      const audioTrackPlayer = new AudioTrackPlayer(
+        session.audioTracks[0],
+        postAudioMessage,
+        getSessionBlobUri,
+        sessionIO,
+      );
+      return new Player(context, db, setup.sessionSummary, vscEditorTrackPlayer, audioTrackPlayer, onChange);
     }
   }
 
@@ -85,6 +95,7 @@ class Player {
 
   async start() {
     await this.vscEditorTrackPlayer.start();
+    await this.audioTrackPlayer.start();
     await this.saveHistoryOpenClose();
   }
 
@@ -94,11 +105,13 @@ class Player {
 
   async pause() {
     await this.vscEditorTrackPlayer.pause();
+    await this.audioTrackPlayer.pause();
     await this.afterPauseOrStop();
   }
 
   async stop() {
     await this.vscEditorTrackPlayer.pause();
+    await this.audioTrackPlayer.stop();
     await this.afterPauseOrStop();
   }
 
@@ -119,109 +132,17 @@ class Player {
 
   async seek(clock: number) {
     await this.vscEditorTrackPlayer.seek(clock);
+    await this.audioTrackPlayer.seek(clock);
   }
 
-  async handleFrontendMediaEvent(e: t.FrontendMediaEvent) {
-    // try {
-    //   switch (e.type) {
-    //     case 'loadstart': {
-    //       console.log('loadstart');
-    //       return;
-    //     }
-    //     case 'durationchange': {
-    //       console.log('durationchange');
-    //       return;
-    //     }
-    //     case 'loadedmetadata': {
-    //       console.log('loadedmetadata');
-    //       return;
-    //     }
-    //     case 'loadeddata': {
-    //       console.log('loadeddata');
-    //       return;
-    //     }
-    //     case 'progress': {
-    //       console.log('progress');
-    //       return;
-    //     }
-    //     case 'canplay': {
-    //       console.log('canplay');
-    //       return;
-    //     }
-    //     case 'canplaythrough': {
-    //       console.log('canplaythrough');
-    //       return;
-    //     }
-    //     case 'suspend': {
-    //       console.log('suspend');
-    //       return;
-    //     }
-    //     case 'abort': {
-    //       console.log('abort');
-    //       await this.afterPauseOrStop(t.PlayerStatus.Stopped);
-    //       return;
-    //     }
-    //     case 'emptied': {
-    //       console.log('emptied');
-    //       return;
-    //     }
-    //     case 'stalled': {
-    //       console.log('stalled');
-    //       return;
-    //     }
-    //     case 'playing': {
-    //       console.log('playing');
-    //       return;
-    //     }
-    //     case 'waiting': {
-    //       console.log('waiting');
-    //       return;
-    //     }
-    //     case 'play': {
-    //       console.log('play');
-    //       return;
-    //     }
-    //     case 'pause': {
-    //       console.log('pause');
-    //       return;
-    //     }
-    //     case 'ended': {
-    //       console.log('ended');
-    //       await this.afterPauseOrStop(t.PlayerStatus.Paused);
-    //       return;
-    //     }
-    //     case 'seeking': {
-    //       console.log('seeking');
-    //       return;
-    //     }
-    //     case 'seeked': {
-    //       console.log('seeked');
-    //       return;
-    //     }
-    //     case 'timeupdate': {
-    //       console.log('timeupdate', e.clock);
-    //       await this.enqueueUpdate(e.clock);
-    //       return;
-    //     }
-    //     case 'volumechange': {
-    //       console.log('volumechange', e.volume);
-    //       return;
-    //     }
-    //     case 'error': {
-    //       console.log('error');
-    //       // await this.afterPauseOrStop(t.PlayerStatus.Stopped);
-    //       // error will be caught and will call this.pause()
-    //       throw new Error(e.error);
-    //     }
-    //     default: {
-    //       lib.unreachable(e);
-    //     }
-    //   }
-    // } catch (error) {
-    //   console.error(error);
-    //   vscode.window.showErrorMessage('ERROR', { detail: (error as Error).message });
-    //   await this.stop();
-    // }
+  async handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
+    try {
+      await this.audioTrackPlayer.handleAudioEvent(e);
+    } catch (error) {
+      console.error(error);
+      vscode.window.showErrorMessage('ERROR', { detail: (error as Error).message });
+      await this.stop();
+    }
   }
 
   getClock(): number {

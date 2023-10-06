@@ -1,8 +1,6 @@
 import { types as t, path, editorTrack as et, lib, assert } from '@codecast/lib';
 import os from 'os';
 import * as fs from 'fs';
-import Db from './db.js';
-import { SessionIO } from './session.js';
 import * as misc from './misc.js';
 import VscWorkspace from './vsc_workspace.js';
 import * as vscode from 'vscode';
@@ -12,14 +10,14 @@ import nodePath from 'path';
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
 
 export default class VscEditorWorkspace extends VscWorkspace {
-  constructor(public root: t.AbsPath, public editorTrack: et.EditorTrack, public io: SessionIO) {
+  constructor(public root: t.AbsPath, public editorTrack: et.EditorTrack, public io: t.SessionIO) {
     super(root);
   }
 
   static async populateEditorTrack(
-    db: Db,
     rootStr: string,
-    sessionSummary: t.SessionSummary,
+    session: t.Session,
+    sessionIO: t.SessionIO,
     seekClock?: number,
     cutClock?: number,
   ): Promise<VscEditorWorkspace | undefined> {
@@ -45,8 +43,6 @@ export default class VscEditorWorkspace extends VscWorkspace {
     }
 
     // read the session and cut it to cutClock.
-    const sessionIO = new SessionIO(db, sessionSummary.id);
-    const session = await db.readSession(sessionSummary.id);
     const editorTrack = await et.EditorTrack.fromJSON(root, sessionIO, session.editorTrack);
     if (cutClock !== undefined) editorTrack.cut(cutClock);
     const workspace = new VscEditorWorkspace(root, editorTrack, sessionIO);
@@ -66,9 +62,8 @@ export default class VscEditorWorkspace extends VscWorkspace {
     return workspace;
   }
 
-  static async fromDirAndVsc(db: Db, sessionId: string, rootStr: string): Promise<VscEditorWorkspace> {
+  static async fromDirAndVsc(sessionIO: t.SessionIO, rootStr: string): Promise<VscEditorWorkspace> {
     const root = path.abs(nodePath.resolve(rootStr));
-    const sessionIO = new SessionIO(db, sessionId);
     const session: t.Session = {
       editorTrack: {
         events: [],

@@ -1,7 +1,6 @@
 import { h, Fragment, Component } from 'preact';
 import { types as t, path, lib } from '@codecast/lib';
 // import FakeMedia from './fake_media.jsx';
-import Media from './media.jsx';
 import ProgressBar from './progress_bar.jsx';
 import PathField from './path_field.jsx';
 import MediaToolbar, * as MT from './media_toolbar.jsx';
@@ -14,7 +13,6 @@ import _ from 'lodash';
 
 type Props = { player: t.PlayerState };
 export default class Player extends Component<Props> {
-  // media = new Media();
   seeking = false;
 
   startPlayer = async () => {
@@ -125,7 +123,6 @@ export default class Player extends Component<Props> {
 
     return (
       <Screen className="player">
-        <audio id="audio"></audio>
         {player.status !== t.PlayerStatus.Uninitialized && (
           <ProgressBar duration={ss.duration} onSeek={this.seek} clock={player.clock} />
         )}

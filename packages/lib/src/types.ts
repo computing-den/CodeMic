@@ -22,7 +22,7 @@ export type BooleanResponse = { type: 'boolean'; value: boolean };
 export type OKResponse = { type: 'ok' };
 export type ErrorResponse = { type: 'error' };
 
-export type FrontendToBackend =
+export type FrontendToBackendReqRes =
   | { request: { type: 'openWelcome' }; response: StoreResponse }
   | { request: { type: 'openPlayer'; sessionId: string }; response: StoreResponse }
   | {
@@ -43,27 +43,57 @@ export type FrontendToBackend =
   | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }
   | { request: { type: 'confirmForkFromPlayer'; clock: number }; response: BooleanResponse }
   | { request: { type: 'confirmEditFromPlayer' }; response: BooleanResponse }
-  | { request: { type: 'frontendMediaEvent'; event: FrontendMediaEvent }; response: StoreResponse }
-  | { request: { type: 'test'; value: any }; response: StoreResponse };
+  | { request: { type: 'test'; value: any }; response: StoreResponse }
+  | { request: { type: 'audio'; event: FrontendAudioEvent }; response: OKResponse };
 
-export type BackendToFrontend =
+export type FrontendAudioEvent =
+  | { type: 'loadstart' }
+  | { type: 'durationchange' }
+  | { type: 'loadedmetadata' }
+  | { type: 'loadeddata' }
+  | { type: 'progress' }
+  | { type: 'canplay' }
+  | { type: 'canplaythrough' }
+  | { type: 'suspend' }
+  | { type: 'abort' }
+  | { type: 'error'; error: string }
+  | { type: 'emptied' }
+  | { type: 'stalled' }
+  | { type: 'timeupdate'; clock: number }
+  | { type: 'playing' }
+  | { type: 'waiting' }
+  | { type: 'play' }
+  | { type: 'pause' }
+  | { type: 'ended' }
+  | { type: 'volumechange'; volume: number }
+  | { type: 'seeking' }
+  | { type: 'seeked' };
+
+export type BackendToFrontendReqRes =
   | { request: { type: 'updateStore'; store: Store }; response: OKResponse }
-  | { request: { type: 'backendMediaEvent'; event: BackendMediaEvent }; response: OKResponse }
-  | { request: { type: 'todo' }; response: OKResponse };
+  | { request: { type: 'todo' }; response: OKResponse }
+  | BackendAudioToFrontendReqRes;
 
-export type FrontendRequest = FrontendToBackend['request'];
-export type BackendResponse = FrontendToBackend['response'] | ErrorResponse;
+export type BackendAudioToFrontendReqRes =
+  | { request: { type: 'audio/load'; src: string; id: string }; response: OKResponse }
+  | { request: { type: 'audio/play'; id: string }; response: OKResponse }
+  | { request: { type: 'audio/pause'; id: string }; response: OKResponse }
+  | { request: { type: 'audio/stop'; id: string }; response: OKResponse }
+  | { request: { type: 'audio/seek'; id: string; clock: number }; response: OKResponse };
 
-export type BackendRequest = BackendToFrontend['request'];
-export type FrontendResponse = BackendToFrontend['response'] | ErrorResponse;
+export type FrontendRequest = FrontendToBackendReqRes['request'];
+export type BackendResponse = FrontendToBackendReqRes['response'] | ErrorResponse;
+
+export type BackendRequest = BackendToFrontendReqRes['request'];
+export type FrontendResponse = BackendToFrontendReqRes['response'] | ErrorResponse;
 
 export type BackendResponseFor<Req extends FrontendRequest> = Extract<
-  FrontendToBackend,
+  FrontendToBackendReqRes,
   { request: { type: Req['type'] } }
 >['response'];
 
 export type FrontendResponseFor<Req extends BackendRequest> = Extract<
-  BackendToFrontend,
+  BackendToFrontendReqRes,
   { request: { type: Req['type'] } }
 >['response'];
 
@@ -76,6 +106,13 @@ export type PostMessageToBackend = <Req extends FrontendRequest>(
   req: Req,
   options?: PostMessageOptions,
 ) => Promise<BackendResponseFor<Req>>;
+
+export type BackendAudioRequest = BackendAudioToFrontendReqRes['request'];
+export type PostAudioMessageToFrontend = <Req extends BackendAudioRequest>(
+  req: Req,
+) => Promise<FrontendResponseFor<Req>>;
+
+// export type PostAudioEventToBackend = (event: FrontendAudioEvent) => Promise<void>;
 
 export enum Screen {
   Welcome,
@@ -205,8 +242,13 @@ export type AudioTrack = {
   id: string;
   file: File;
   title: string;
-  clock: number;
+  clockRange: ClockRange;
   duration: number;
+};
+
+export type ClockRange = {
+  start: number;
+  end: number;
 };
 
 export enum TrackPlayerStatus {
@@ -393,35 +435,6 @@ export type SessionHistoryItem = {
 };
 
 export type SeekData = { events: EditorEvent[]; direction: Direction; i: number; clock: number; stop: boolean };
-
-export type FrontendMediaEvent =
-  | { type: 'loadstart' }
-  | { type: 'durationchange' }
-  | { type: 'loadedmetadata' }
-  | { type: 'loadeddata' }
-  | { type: 'progress' }
-  | { type: 'canplay' }
-  | { type: 'canplaythrough' }
-  | { type: 'suspend' }
-  | { type: 'abort' }
-  | { type: 'error'; error: string }
-  | { type: 'emptied' }
-  | { type: 'stalled' }
-  | { type: 'timeupdate'; clock: number }
-  | { type: 'playing' }
-  | { type: 'waiting' }
-  | { type: 'play' }
-  | { type: 'pause' }
-  | { type: 'ended' }
-  | { type: 'volumechange'; volume: number }
-  | { type: 'seeking' }
-  | { type: 'seeked' };
-
-export type BackendMediaEvent =
-  | { type: 'load'; src: string }
-  | { type: 'play' }
-  | { type: 'pause' }
-  | { type: 'seek'; clock: number };
 
 export type Vec2 = [number, number];
 export type Rect = { top: number; right: number; bottom: number; left: number };

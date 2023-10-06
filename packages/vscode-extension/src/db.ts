@@ -62,6 +62,10 @@ export default class Db {
     return fs.promises.readFile(p);
   }
 
+  getSessionBlobPathBySha1(sessionId: string, sha1: string): t.AbsPath {
+    return path.abs(userPaths.data, 'sessions', sessionId, 'blobs', sha1);
+  }
+
   mergeSessionHistory(h: t.SessionHistoryItem) {
     this.settings.history[h.id] = { ...this.settings.history[h.id], ...h };
   }

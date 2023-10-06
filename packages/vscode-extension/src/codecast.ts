@@ -97,9 +97,9 @@ class Codecast {
             this.context,
             this.db,
             this.playerSetup,
-            this.webview.postMessage.bind(this.webview),
+            this.postAudioMessage.bind(this),
+            this.getSessionBlobUri.bind(this, this.playerSetup.sessionSummary.id),
             this.playerChanged.bind(this),
-            // this.webview.asWebviewUri(vscode.Uri.file('/home/sean/.local/share/codecast/sample.mp3'))?.toString()!,
           );
         }
 
@@ -239,10 +239,10 @@ class Codecast {
         }
         return this.respondWithStore();
       }
-      case 'frontendMediaEvent': {
+      case 'audio': {
         assert(this.player);
 
-        await this.player.handleFrontendMediaEvent(req.event);
+        await this.player.handleFrontendAudioEvent(req.event);
         return this.respondWithStore();
       }
       case 'test': {
@@ -382,6 +382,17 @@ class Codecast {
     return _.compact(ids)
       .map(id => this.db.settings.history[id])
       .find(Boolean);
+  }
+
+  async postAudioMessage<Req extends t.BackendAudioRequest>(req: Req): Promise<t.FrontendResponseFor<Req>> {
+    return this.webview.postMessage(req);
+  }
+
+  getSessionBlobUri(sessionId: string, sha1: string): t.Uri {
+    const fileUri = vscode.Uri.file(this.db.getSessionBlobPathBySha1(sessionId, sha1));
+    const webviewUri = this.webview.asWebviewUri(fileUri);
+    assert(webviewUri);
+    return webviewUri.toString();
   }
 
   getStore(): t.Store {
