@@ -1,5 +1,7 @@
-export type ParcelMsg = { id: number; msg: any };
-export type ParcelError = { id: number; error: string };
+import { v4 as uuid } from 'uuid';
+
+export type ParcelMsg = { id: string; msg: any };
+export type ParcelError = { id: string; error: string };
 export type Parcel = ParcelMsg | ParcelError;
 
 export type PendingParcel = {
@@ -13,8 +15,7 @@ export type PostParcel = (parcel: Parcel) => Promise<boolean>;
 export type MessageHandler = (msg: any) => Promise<any>;
 
 export class Bus {
-  private pendingParcels: Map<number, PendingParcel> = new Map();
-  private idCounter: number = 1;
+  private pendingParcels: Map<string, PendingParcel> = new Map();
 
   constructor(private postParcel: PostParcel, private onMessage: MessageHandler) {}
 
@@ -34,6 +35,7 @@ export class Bus {
       // parcel is new, call its handler and send back the response
       try {
         if (!('msg' in parcel)) throw new Error('parcel is missing msg');
+
         const msg = await this.onMessage(parcel.msg);
         await this.postParcel({ id: parcel.id, msg });
       } catch (error: any) {
@@ -45,7 +47,7 @@ export class Bus {
 
   post(msg: any): Promise<any> {
     return new Promise(async (resolve, reject) => {
-      const parcel = { id: this.idCounter++, msg };
+      const parcel = { id: uuid(), msg };
       if (await this.postParcel(parcel)) {
         const pendingParcel = { parcel, resolve, reject };
         this.pendingParcels.set(parcel.id, pendingParcel);
