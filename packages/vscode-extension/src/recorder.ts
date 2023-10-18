@@ -12,7 +12,13 @@ import { v4 as uuid } from 'uuid';
 const SCROLL_LINES_TRIGGER = 2;
 
 class Recorder {
-  status: t.RecorderStatus = t.RecorderStatus.Initialized;
+  state: t.TrackPlayerState = {
+    status: t.TrackPlayerStatus.Init,
+    loading: false,
+    loaded: false,
+    buffering: false,
+    seeking: false,
+  };
 
   private disposables: vscode.Disposable[] = [];
   private scrolling: boolean = false;
@@ -102,9 +108,9 @@ class Recorder {
   }
 
   async start() {
-    assert(this.status === t.RecorderStatus.Initialized || this.status === t.RecorderStatus.Paused);
+    assert(this.state.loaded && this.state.status < t.TrackPlayerStatus.Stopped);
 
-    this.status = t.RecorderStatus.Recording;
+    this.state.status = t.TrackPlayerStatus.Running;
 
     // listen for open document events
     {
@@ -163,7 +169,7 @@ class Recorder {
   }
 
   async pause() {
-    this.status = t.RecorderStatus.Paused;
+    this.state.status = t.TrackPlayerStatus.Paused;
     this.dispose();
   }
 
@@ -174,7 +180,7 @@ class Recorder {
 
   async stop() {
     this.pause();
-    this.status = t.RecorderStatus.Stopped;
+    this.state.status = t.TrackPlayerStatus.Stopped;
     await this.saveHistoryOpenClose();
   }
 
@@ -350,7 +356,7 @@ class Recorder {
 
   getClock(): number {
     return this.clock;
-    // if (this.status === t.RecorderStatus.Recording) {
+    // if (this.status === t.TrackPlayerStatus.Running) {
     //   return (Date.now() - this.lastStartTimeMs) / 1000 + this.clock;
     // } else {
     //   return this.clock;

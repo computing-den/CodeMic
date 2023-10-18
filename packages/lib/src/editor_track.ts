@@ -11,16 +11,17 @@ export class EditorTrack implements t.EditorEventStepper {
   // These fields remain the same regardless of the clock
   root: t.AbsPath;
   io: t.SessionIO;
+  id: string;
+  clockRange: t.ClockRange;
   initSnapshot: t.EditorTrackSnapshot;
   events: t.EditorEvent[];
   defaultEol: t.EndOfLine;
-  duration: number;
 
-  // These fields change with the clock
+  // These fields change with the clock/eventIndex
   // TODO sync the entire worktree structure including directories.
   // If a TextDocument is in this.textDocuments, it is also in this.worktree.
   // If a TextEditor is in this.textEditors, it is also in this.worktree.
-  clock: number;
+  // clock: number;
   eventIndex: number;
   worktree: Worktree;
   textDocuments: TextDocument[];
@@ -31,13 +32,13 @@ export class EditorTrack implements t.EditorEventStepper {
     this.root = root;
     this.io = io;
     // this.summary = summary;
+    this.id = editorTrack.id;
+    this.clockRange = editorTrack.clockRange;
     this.initSnapshot = editorTrack.initSnapshot;
     this.events = editorTrack.events;
     this.defaultEol = editorTrack.defaultEol;
-    this.duration = editorTrack.duration;
 
-    this.clock = 0;
-    this.eventIndex = 0;
+    this.eventIndex = -1;
     this.worktree = {};
     this.textDocuments = [];
     this.textEditors = [];
@@ -51,10 +52,11 @@ export class EditorTrack implements t.EditorEventStepper {
 
   toJSON(): t.EditorTrack {
     return {
+      id: this.id,
+      clockRange: this.clockRange,
       events: this.events,
       defaultEol: this.defaultEol,
       initSnapshot: this.initSnapshot,
-      duration: this.duration,
     };
   }
 
@@ -64,8 +66,7 @@ export class EditorTrack implements t.EditorEventStepper {
   }
 
   async restoreInitSnapshot() {
-    this.clock = 0;
-    this.eventIndex = 0;
+    this.eventIndex = -1;
     this.worktree = makeWorktree(this.initSnapshot.worktree);
     this.textDocuments = [];
     this.textEditors = [];
@@ -284,8 +285,8 @@ export class EditorTrack implements t.EditorEventStepper {
       }
     }
 
-    const clock = Math.max(0, Math.min(this.duration, toClock));
-    const stop = clock >= this.duration;
+    const clock = Math.max(0, Math.min(this.clockRange.end, toClock));
+    const stop = clock === this.clockRange.end;
 
     return { events, direction, i, clock, stop };
   }
@@ -305,12 +306,10 @@ export class EditorTrack implements t.EditorEventStepper {
     await this.applyEditorEvent(seekData.events[stepIndex], seekData.direction, uriSet);
     const sign = seekData.direction === t.Direction.Forwards ? 1 : -1;
     this.eventIndex += sign * (stepIndex + 1);
-    this.clock = seekData.events[stepIndex].clock;
   }
 
   async finalizeSeek(seekData: t.SeekData) {
     this.eventIndex = seekData.i;
-    this.clock = seekData.clock;
   }
 
   /**
@@ -320,7 +319,7 @@ export class EditorTrack implements t.EditorEventStepper {
   cut(clock: number) {
     const i = this.events.findIndex(e => e.clock > clock);
     if (i >= 0) this.events.length = i;
-    this.duration = clock;
+    this.clockRange.end = clock;
   }
 
   async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {

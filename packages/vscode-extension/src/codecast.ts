@@ -30,11 +30,11 @@ class Codecast {
     );
 
     // DEV
-    if (this.webview.bus) {
-      this.messageHandler({ type: 'openRecorder', sessionId: 'ecc7e7e8-1f38-4a3a-91b1-774f1c91ba21' })
-        .then(this.postUpdateStore)
-        .catch(console.error);
-    }
+    // if (this.webview.bus) {
+    //   this.messageHandler({ type: 'openRecorder', sessionId: 'ecc7e7e8-1f38-4a3a-91b1-774f1c91ba21' })
+    //     .then(this.postUpdateStore)
+    //     .catch(console.error);
+    // }
   }
 
   static async fromContext(context: vscode.ExtensionContext): Promise<Codecast> {
@@ -104,7 +104,7 @@ class Codecast {
         }
 
         if (this.player) {
-          await this.player.start();
+          this.player.start();
         }
         return this.respondWithStore();
       }
@@ -133,17 +133,17 @@ class Codecast {
       }
       case 'pausePlayer': {
         assert(this.player);
-        await this.player.pause();
+        this.player.pause();
         return this.respondWithStore();
       }
       case 'pauseRecorder': {
         assert(this.recorder);
-        await this.recorder.pause();
+        this.recorder.pause();
         return this.respondWithStore();
       }
       case 'seekPlayer': {
         assert(this.player);
-        await this.player.seek(req.clock);
+        this.player.seek(req.clock);
         return this.respondWithStore();
       }
       case 'saveRecorder': {
@@ -184,7 +184,7 @@ class Codecast {
       }
       case 'updatePlayer': {
         if (this.player) {
-          await this.player.updateState(req.changes);
+          this.player.updateState(req.changes);
         } else {
           if (req.changes.root !== undefined) this.playerSetup!.root = req.changes.root;
           // if (req.changes.clock !== undefined) throw new Error('TODO seek before player instantiation');
@@ -192,9 +192,9 @@ class Codecast {
         return this.respondWithStore();
       }
       case 'confirmForkFromPlayer': {
-        const status = this.player?.status;
-        if (status !== t.PlayerStatus.Playing) return { type: 'boolean', value: true };
-        await this.player!.pause();
+        const status = this.player?.state.status;
+        if (status !== t.TrackPlayerStatus.Running) return { type: 'boolean', value: true };
+        this.player!.pause();
 
         const confirmTitle = 'Fork';
         const answer = await vscode.window.showWarningMessage(
@@ -203,15 +203,15 @@ class Codecast {
           { title: 'Cancel', isCloseAffordance: true },
           { title: confirmTitle },
         );
-        if (answer?.title != confirmTitle && status === t.PlayerStatus.Playing) {
-          await this.player!.start();
+        if (answer?.title != confirmTitle && status === t.TrackPlayerStatus.Running) {
+          this.player!.start();
         }
         return { type: 'boolean', value: answer?.title === confirmTitle };
       }
       case 'confirmEditFromPlayer': {
-        const status = this.player?.status;
-        if (status !== t.PlayerStatus.Playing) return { type: 'boolean', value: true };
-        await this.player!.pause();
+        const status = this.player?.state.status;
+        if (status !== t.TrackPlayerStatus.Running) return { type: 'boolean', value: true };
+        this.player!.pause();
 
         const confirmTitle = 'Edit';
         const answer = await vscode.window.showWarningMessage(
@@ -220,8 +220,8 @@ class Codecast {
           { title: 'Cancel', isCloseAffordance: true },
           { title: confirmTitle },
         );
-        if (answer?.title != confirmTitle && status === t.PlayerStatus.Playing) {
-          await this.player!.start();
+        if (answer?.title != confirmTitle && status === t.TrackPlayerStatus.Running) {
+          this.player!.start();
         }
         return { type: 'boolean', value: answer?.title === confirmTitle };
       }
@@ -242,7 +242,7 @@ class Codecast {
       case 'audio': {
         assert(this.player);
 
-        await this.player.handleFrontendAudioEvent(req.event);
+        this.player.handleFrontendAudioEvent(req.event);
         return this.respondWithStore();
       }
       case 'test': {
@@ -287,7 +287,7 @@ class Codecast {
     let shouldExit = true;
 
     if (this.recorder) {
-      const wasRecording = this.recorder.status === t.RecorderStatus.Recording;
+      const wasRecording = this.recorder.state.status === t.TrackPlayerStatus.Running;
 
       // Pause the frontend while we figure out if we should save the session.
       if (wasRecording) {
@@ -340,7 +340,7 @@ class Codecast {
 
   async closePlayer(): Promise<boolean> {
     if (this.player) {
-      await this.player.stop();
+      this.player.stop();
     }
 
     this.playerSetup = undefined;
@@ -400,7 +400,7 @@ class Codecast {
     if (this.screen === t.Screen.Recorder) {
       if (this.recorder) {
         recorder = {
-          status: this.recorder.status,
+          state: this.recorder.state,
           sessionSummary: this.recorder.sessionSummary,
           clock: this.recorder.getClock(),
           root: this.recorder.getRoot(),
@@ -408,7 +408,13 @@ class Codecast {
         };
       } else if (this.recorderSetup) {
         recorder = {
-          status: t.RecorderStatus.Uninitialized,
+          state: {
+            status: t.TrackPlayerStatus.Init,
+            buffering: false,
+            loaded: false,
+            loading: false,
+            seeking: false,
+          },
           sessionSummary: this.recorderSetup.sessionSummary,
           clock: this.recorderSetup.forkClock ?? this.recorderSetup.baseSessionSummary?.duration ?? 0,
           root: this.recorderSetup.root,
@@ -426,7 +432,7 @@ class Codecast {
     if (this.screen === t.Screen.Player) {
       if (this.player) {
         player = {
-          status: this.player.status,
+          state: this.player.state,
           sessionSummary: this.player.sessionSummary,
           clock: this.player.getClock(),
           root: this.player.root,
@@ -434,7 +440,13 @@ class Codecast {
         };
       } else if (this.playerSetup) {
         player = {
-          status: t.PlayerStatus.Uninitialized,
+          state: {
+            status: t.TrackPlayerStatus.Init,
+            buffering: false,
+            loaded: false,
+            loading: false,
+            seeking: false,
+          },
           sessionSummary: this.playerSetup.sessionSummary,
           clock: 0,
           root: this.playerSetup.root,

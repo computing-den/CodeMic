@@ -79,7 +79,9 @@ export type BackendAudioToFrontendReqRes =
   | { request: { type: 'audio/play'; id: string }; response: OKResponse }
   | { request: { type: 'audio/pause'; id: string }; response: OKResponse }
   | { request: { type: 'audio/stop'; id: string }; response: OKResponse }
-  | { request: { type: 'audio/seek'; id: string; clock: number }; response: OKResponse };
+  | { request: { type: 'audio/dispose'; id: string }; response: OKResponse }
+  | { request: { type: 'audio/seek'; id: string; clock: number }; response: OKResponse }
+  | { request: { type: 'audio/setPlaybackRate'; id: string; rate: number }; response: OKResponse };
 
 export type FrontendRequest = FrontendToBackendReqRes['request'];
 export type BackendResponse = FrontendToBackendReqRes['response'] | ErrorResponse;
@@ -138,17 +140,8 @@ export type WelcomeState = {
   history: SessionHistory;
 };
 
-export enum RecorderStatus {
-  Uninitialized,
-  Initialized,
-  Error,
-  Paused,
-  Stopped,
-  Recording,
-}
-
 export type RecorderState = {
-  status: RecorderStatus;
+  state: TrackPlayerState;
   sessionSummary: SessionSummary;
   clock: number;
   root?: string;
@@ -173,18 +166,8 @@ export type RecorderSetup = {
   root?: string;
 };
 
-export enum PlayerStatus {
-  Uninitialized,
-  Initialized,
-  Error,
-  Loading,
-  Paused,
-  Stopped,
-  Playing,
-}
-
 export type PlayerState = {
-  status: PlayerStatus;
+  state: TrackPlayerState;
   sessionSummary: SessionSummary;
   clock: number;
   root?: string;
@@ -228,22 +211,9 @@ export type Session = {
   audioTracks: AudioTrack[];
 };
 
-export type EditorTrack = {
-  initSnapshot: EditorTrackSnapshot;
-  events: EditorEvent[];
-  defaultEol: EndOfLine;
-  duration: number;
-};
-
-/**
- * Multiple audio tracks may refer to the same file.
- */
-export type AudioTrack = {
+export type Track = {
   id: string;
-  file: File;
-  title: string;
   clockRange: ClockRange;
-  duration: number;
 };
 
 export type ClockRange = {
@@ -251,25 +221,52 @@ export type ClockRange = {
   end: number;
 };
 
+export type EditorTrack = Track & {
+  initSnapshot: EditorTrackSnapshot;
+  events: EditorEvent[];
+  defaultEol: EndOfLine;
+};
+
+/**
+ * Multiple audio tracks may refer to the same file.
+ */
+export type AudioTrack = Track & {
+  title: string;
+  file: File;
+};
+
 export enum TrackPlayerStatus {
   Init,
   Error,
-  Loading,
+  // Loaded,
+  Running,
   Paused,
   Stopped,
-  Playing,
 }
 
-export interface TrackPlayer {
-  onProgress?: (clock: number) => any;
-  onStatusChange?: (status: TrackPlayerStatus) => any;
-  clock: number;
+export type TrackPlayerState = {
   status: TrackPlayerStatus;
+  loading: boolean;
+  loaded: boolean;
+  buffering: boolean;
+  seeking: boolean;
+};
 
-  start(): Promise<void>;
-  pause(): Promise<void>;
-  stop(): Promise<void>;
-  seek(clock: number): Promise<void>;
+export interface TrackPlayer {
+  name: string;
+  track: Track;
+  clock: number;
+  state: TrackPlayerState;
+  playbackRate: number;
+  onProgress?: (clock: number) => any;
+  onStateChange?: (state: TrackPlayerState) => any;
+
+  load(): void;
+  start(): void;
+  pause(): void;
+  stop(): void;
+  seek(clock: number): void;
+  setPlaybackRate(rate: number): void;
   dispose(): any;
 }
 

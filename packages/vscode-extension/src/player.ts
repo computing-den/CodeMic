@@ -1,5 +1,5 @@
 import { SessionIO } from './session.js';
-import { types as t, path, lib, editorTrack as et, AudioTrackPlayer } from '@codecast/lib';
+import { types as t, path, lib, editorTrack as et, AudioTrackPlayer, SessionTrackPlayer } from '@codecast/lib';
 import VscEditorWorkspace from './vsc_editor_workspace.js';
 import VscEditorTrackPlayer from './vsc_editor_track_player.js';
 import Db, { type WriteOptions } from './db.js';
@@ -8,7 +8,9 @@ import _ from 'lodash';
 import assert from 'assert';
 
 class Player {
-  status: t.PlayerStatus = t.PlayerStatus.Initialized;
+  get state(): t.TrackPlayerState {
+    return this.sessionTrackPlayer.state;
+  }
 
   get root(): t.AbsPath {
     return this.vscEditorTrackPlayer.workspace.root;
@@ -20,12 +22,12 @@ class Player {
     public context: vscode.ExtensionContext,
     public db: Db,
     public sessionSummary: t.SessionSummary,
+    private sessionTrackPlayer: SessionTrackPlayer,
     private vscEditorTrackPlayer: VscEditorTrackPlayer,
     private audioTrackPlayer: AudioTrackPlayer,
     private onChange: () => any,
   ) {
-    vscEditorTrackPlayer.onProgress = this.vscEditorTrackProgressHandler.bind(this);
-    vscEditorTrackPlayer.onStatusChange = this.vscEditorTrackStatusChangeHandler.bind(this);
+    sessionTrackPlayer.onChange = this.changeHandler.bind(this);
   }
 
   /**
@@ -54,13 +56,23 @@ class Player {
         getSessionBlobUri,
         sessionIO,
       );
-      return new Player(context, db, setup.sessionSummary, vscEditorTrackPlayer, audioTrackPlayer, onChange);
+      const sessionTrackPlayer = new SessionTrackPlayer();
+      sessionTrackPlayer.addTrack(vscEditorTrackPlayer);
+      sessionTrackPlayer.addTrack(audioTrackPlayer);
+      sessionTrackPlayer.load();
+      return new Player(
+        context,
+        db,
+        setup.sessionSummary,
+        sessionTrackPlayer,
+        vscEditorTrackPlayer,
+        audioTrackPlayer,
+        onChange,
+      );
     }
   }
 
-  async vscEditorTrackProgressHandler(clock: number) {
-    // console.log(`vscEditorTrackProgressHandler: ${clock}`);
-
+  async changeHandler() {
     // update frontend
     this.onChange();
 
@@ -68,85 +80,44 @@ class Player {
     await this.saveHistoryClock({ ifDirtyForLong: true });
   }
 
-  async vscEditorTrackStatusChangeHandler(status: t.TrackPlayerStatus) {
-    switch (status) {
-      case t.TrackPlayerStatus.Init:
-        this.status = t.PlayerStatus.Initialized;
-        break;
-      case t.TrackPlayerStatus.Error:
-        this.status = t.PlayerStatus.Error;
-        break;
-      case t.TrackPlayerStatus.Loading:
-        this.status = t.PlayerStatus.Loading;
-        break;
-      case t.TrackPlayerStatus.Paused:
-        this.status = t.PlayerStatus.Paused;
-        break;
-      case t.TrackPlayerStatus.Stopped:
-        this.status = t.PlayerStatus.Stopped;
-        break;
-      case t.TrackPlayerStatus.Playing:
-        this.status = t.PlayerStatus.Playing;
-        break;
-      default:
-        lib.unreachable(status);
-    }
-  }
-
-  async start() {
-    await this.vscEditorTrackPlayer.start();
-    await this.audioTrackPlayer.start();
-    await this.saveHistoryOpenClose();
+  start() {
+    this.sessionTrackPlayer.start();
+    this.saveHistoryOpenClose().catch(console.error);
   }
 
   dispose() {
-    this.vscEditorTrackPlayer.dispose();
+    this.sessionTrackPlayer.dispose();
   }
 
-  async pause() {
-    await this.vscEditorTrackPlayer.pause();
-    await this.audioTrackPlayer.pause();
-    await this.afterPauseOrStop();
+  pause() {
+    this.sessionTrackPlayer.pause();
+    this.afterPauseOrStop();
   }
 
-  async stop() {
-    await this.vscEditorTrackPlayer.pause();
-    await this.audioTrackPlayer.stop();
-    await this.afterPauseOrStop();
+  stop() {
+    this.sessionTrackPlayer.stop();
+    this.afterPauseOrStop();
   }
 
-  async afterPauseOrStop() {
-    await this.saveHistoryClock();
+  seek(clock: number) {
+    this.sessionTrackPlayer.seek(clock);
   }
 
-  async updateState(changes: t.PlayerUpdate) {
-    try {
-      if (changes.root !== undefined) throw new Error('Player: cannot modify root while playing');
-      // if (changes.clock !== undefined) await this.enqueueUpdate(changes.clock);
-    } catch (error) {
-      console.error(error);
-      vscode.window.showErrorMessage('ERROR', { detail: (error as Error).message });
-      await this.pause();
-    }
+  afterPauseOrStop() {
+    this.saveHistoryClock().catch(console.error);
   }
 
-  async seek(clock: number) {
-    await this.vscEditorTrackPlayer.seek(clock);
-    await this.audioTrackPlayer.seek(clock);
+  updateState(changes: t.PlayerUpdate) {
+    if (changes.root !== undefined) throw new Error('Player: cannot modify root while playing');
+    // if (changes.clock !== undefined) await this.enqueueUpdate(changes.clock);
   }
 
-  async handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
-    try {
-      await this.audioTrackPlayer.handleAudioEvent(e);
-    } catch (error) {
-      console.error(error);
-      vscode.window.showErrorMessage('ERROR', { detail: (error as Error).message });
-      await this.stop();
-    }
+  handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
+    this.audioTrackPlayer.handleAudioEvent(e);
   }
 
   getClock(): number {
-    return this.vscEditorTrackPlayer.clock;
+    return this.sessionTrackPlayer.clock;
   }
 
   private async saveHistoryClock(options?: WriteOptions) {

@@ -8,27 +8,47 @@ import assert from 'assert';
 import fs from 'fs';
 
 class VscEditorTrackPlayer implements t.TrackPlayer {
-  status: t.TrackPlayerStatus = t.TrackPlayerStatus.Init;
-  onProgress?: (clock: number) => any;
-  onStatusChange?: (status: t.TrackPlayerStatus) => any;
+  name = 'vsc';
 
-  get clock(): number {
-    return this.clockTrackPlayer.clock;
+  clock = 0;
+  state: t.TrackPlayerState = {
+    status: t.TrackPlayerStatus.Init,
+    loading: false,
+    loaded: false,
+    buffering: false,
+    seeking: false,
+  };
+
+  onProgress?: (clock: number) => any;
+  onStateChange?: (state: t.TrackPlayerState) => any;
+
+  get playbackRate(): number {
+    return this.clockTrackPlayer.playbackRate;
+  }
+
+  get track(): t.Track {
+    return this.workspace.editorTrack;
   }
 
   private vscEditorEventStepper = new VscEditorEventStepper(this.workspace);
-  private clockTrackPlayer = new ClockTrackPlayer(100);
+  private clockTrackPlayer = new ClockTrackPlayer(100, Infinity);
   private disposables: vscode.Disposable[] = [];
-  private enqueueUpdate = lib.taskQueue(this.updateImmediately.bind(this), 1);
+  private updateQueue = lib.taskQueue(this.updateImmediately.bind(this), 1);
+  private lastUpdateClock = 0;
 
   constructor(public context: vscode.ExtensionContext, public workspace: VscEditorWorkspace) {}
 
-  async start() {
-    // assert(
-    //   this.status === t.PlayerStatus.Initialized ||
-    //     this.status === t.PlayerStatus.Paused ||
-    //     this.status === t.PlayerStatus.Stopped,
-    // );
+  load() {
+    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
+    if (this.state.loaded || this.state.loading) return;
+
+    this.clockTrackPlayer.load();
+    this.updateState({ loading: false, loaded: true });
+  }
+
+  start() {
+    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
+    if (this.state.status === t.TrackPlayerStatus.Running) return;
 
     // ignore user input
     {
@@ -45,86 +65,87 @@ class VscEditorTrackPlayer implements t.TrackPlayer {
     // register disposables
     this.context.subscriptions.push(...this.disposables);
 
-    this.setStatusAndNotify(t.TrackPlayerStatus.Playing);
     this.clockTrackPlayer.start();
     this.clockTrackPlayer.onProgress = this.clockTrackProgressHandler.bind(this);
+    this.updateState({ status: t.TrackPlayerStatus.Running });
   }
 
-  async pause() {
+  pause() {
+    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
+    if (this.state.status === t.TrackPlayerStatus.Paused) return;
+
     this.dispose();
     this.clockTrackPlayer.pause();
-    this.setStatusAndNotify(t.TrackPlayerStatus.Paused);
+    this.updateState({ status: t.TrackPlayerStatus.Paused });
   }
 
-  async stop() {
+  stop() {
+    if (this.state.status === t.TrackPlayerStatus.Stopped || this.state.status === t.TrackPlayerStatus.Error) return;
+
     this.dispose();
     this.clockTrackPlayer.stop();
-    this.setStatusAndNotify(t.TrackPlayerStatus.Stopped);
+    this.updateState({ status: t.TrackPlayerStatus.Stopped });
   }
 
   /**
    * Throws an error if seek had an error but not if it was cancelled.
    */
-  async seek(clock: number) {
-    const originalStatus = this.status;
-    try {
-      // Pause clock while loading.
-      this.setStatusAndNotify(t.TrackPlayerStatus.Loading);
-      this.clockTrackPlayer.pause();
-      this.clockTrackPlayer.seek(clock);
-      await this.enqueueUpdate(clock);
+  seek(clock: number) {
+    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
+    assert(this.state.loaded, 'Track is not loaded');
 
-      // Restore the original status.
-      this.setStatusAndNotify(originalStatus);
-      if (originalStatus === t.TrackPlayerStatus.Playing) {
-        this.clockTrackPlayer.start();
-      }
-    } catch (error) {
-      if (!(error instanceof lib.CancelledError)) {
-        this.gotError(error);
-        throw error;
-      }
-    }
+    this.seekHelper(clock);
+  }
+
+  setPlaybackRate(rate: number) {
+    this.clockTrackPlayer.setPlaybackRate(rate);
   }
 
   dispose() {
-    this.enqueueUpdate.rejectAllInQueue();
+    this.updateQueue.rejectAllInQueue();
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
   }
 
-  private async clockTrackProgressHandler(clock: number) {
+  private async seekHelper(clock: number) {
     try {
+      // Pause clock while seeking.
+      this.updateState({ seeking: true });
+      this.clockTrackPlayer.pause();
+      this.clockTrackPlayer.seek(clock);
       await this.enqueueUpdate(clock);
     } catch (error) {
       if (!(error instanceof lib.CancelledError)) {
         this.gotError(error);
-        throw error;
       }
     }
   }
 
-  private gotError(error: any) {
-    console.error(error);
-    this.dispose();
-    this.setStatusAndNotify(t.TrackPlayerStatus.Error);
+  private clockTrackProgressHandler(clock: number) {
+    this.enqueueUpdate(clock).catch(error => {
+      if (!(error instanceof lib.CancelledError)) {
+        this.gotError(error);
+      }
+    });
   }
 
-  private setStatusAndNotify(status: t.TrackPlayerStatus) {
-    this.status = status;
-    this.onStatusChange?.(status);
+  private async enqueueUpdate(clock: number) {
+    this.updateQueue.rejectAllInQueue();
+    await this.updateQueue(clock);
   }
 
   private async updateImmediately(clock: number) {
     const { editorTrack } = this.workspace;
     const seekData = editorTrack.getSeekData(clock);
 
-    if (Math.abs(seekData.clock - editorTrack.clock) > 10 && seekData.events.length > 10) {
+    if (Math.abs(seekData.clock - this.lastUpdateClock) > 10 && seekData.events.length > 10) {
+      console.log('updateImmediately: applying wholesale', seekData);
       // Update by seeking the internal editorTrack first, then syncing the editorTrack to vscode and disk
       const uriSet: t.UriSet = {};
       await editorTrack.seek(seekData, uriSet);
       await this.workspace.syncEditorTrackToVscodeAndDisk(Object.keys(uriSet));
     } else {
+      console.log('updateImmediately: applying one at a time', seekData);
       // Apply updates one at a time
       for (let i = 0; i < seekData.events.length; i++) {
         await editorTrack.applySeekStep(seekData, i);
@@ -134,8 +155,33 @@ class VscEditorTrackPlayer implements t.TrackPlayer {
       await this.vscEditorEventStepper.finalizeSeek(seekData);
     }
 
+    this.lastUpdateClock = seekData.clock;
+    this.clock = seekData.clock;
+
+    // End seeking
+    if (this.state.seeking) {
+      this.updateState({ seeking: false });
+    }
+
     this.onProgress?.(seekData.clock);
-    if (seekData.stop) await this.stop();
+
+    // Start clock again if running.
+    if (this.state.status === t.TrackPlayerStatus.Running) {
+      this.clockTrackPlayer.start();
+    }
+
+    if (seekData.stop) this.stop();
+  }
+
+  private gotError(error: any) {
+    console.error(error);
+    this.dispose();
+    this.updateState({ status: t.TrackPlayerStatus.Error });
+  }
+
+  private updateState(partial: Partial<t.TrackPlayerState>) {
+    this.state = { ...this.state, ...partial };
+    this.onStateChange?.(this.state);
   }
 }
 

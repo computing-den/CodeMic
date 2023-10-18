@@ -66,21 +66,28 @@ export class AudioManager {
   }
 
   async stop() {
-    console.log(`AudioManager seek ${stop}`);
-
-    this.audio.removeEventListener('volumechange', this.handleVolumechange);
-    this.audio.removeEventListener('timeupdate', this.handleTimeupdate);
-    this.audio.removeEventListener('error', this.handleError);
-    for (const e of genericEventTypes) {
-      this.audio.removeEventListener(e, this.handleGenericEvent);
-    }
-
+    console.log(`AudioManager stop`);
     this.audio.pause();
   }
 
   async seek(clock: number) {
     console.log(`AudioManager seek ${clock}`);
     this.audio.currentTime = clock;
+  }
+
+  async setPlaybackRate(rate: number) {
+    console.log(`AudioManager setPlaybackRate ${rate}`);
+    this.audio.playbackRate = rate;
+  }
+
+  dispose() {
+    this.audio.pause();
+    this.audio.removeEventListener('volumechange', this.handleVolumechange);
+    this.audio.removeEventListener('timeupdate', this.handleTimeupdate);
+    this.audio.removeEventListener('error', this.handleError);
+    for (const e of genericEventTypes) {
+      this.audio.removeEventListener(e, this.handleGenericEvent);
+    }
   }
 
   handleGenericEvent = async (e: Event) => {

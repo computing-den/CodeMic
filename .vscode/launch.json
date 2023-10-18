@@ -10,11 +10,16 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-extension",
-       //"--load-extension=/home/sean/.config/google-chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.28.0_0"
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-extension"
+        //"--load-extension=/home/sean/.config/google-chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.28.0_0"
       ],
-      "outFiles": ["${workspaceFolder}/packages/vscode-extension/out/**/*.js"],
       "preLaunchTask": "${defaultBuildTask}",
+      "sourceMaps": true,
+      "outFiles": ["${workspaceRoot}/packages/**/out/*", "!**/node_modules/**/*"]
+      // "resolveSourceMapLocations": [
+      //   "${workspaceRoot}/packages/**/out/*",
+      //   "!**/node_modules/**"
+      // ]
     },
     {
       "name": "Extension Tests",
@@ -24,8 +29,8 @@
         "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-extension",
         "--extensionTestsPath=${workspaceFolder}/packages/vscode-extension/out/test/suite/index"
       ],
-      "outFiles": ["${workspaceFolder}/packages/vscode-extension/out/test/**/*.js"],
-      "preLaunchTask": "${defaultBuildTask}"
+      "preLaunchTask": "${defaultBuildTask}",
+      "sourceMaps": true
     }
   ]
 }

@@ -84,8 +84,16 @@ async function messageHandler(req: t.BackendRequest): Promise<t.FrontendResponse
       await mediaApi.getAudioManager(req.id).stop();
       return { type: 'ok' };
     }
+    case 'audio/dispose': {
+      mediaApi.getAudioManager(req.id).dispose();
+      return { type: 'ok' };
+    }
     case 'audio/seek': {
       await mediaApi.getAudioManager(req.id).seek(req.clock);
+      return { type: 'ok' };
+    }
+    case 'audio/setPlaybackRate': {
+      await mediaApi.getAudioManager(req.id).setPlaybackRate(req.rate);
       return { type: 'ok' };
     }
     default: {

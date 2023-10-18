@@ -49,7 +49,7 @@ export default class Recorder extends Component<Props> {
   };
 
   enableOrDisableMedia() {
-    // const isRecording = Boolean(this.props.recorder.status === t.RecorderStatus.Recording);
+    // const isRecording = Boolean(this.props.recorder.status === t.TrackPlayerStatus.Running);
     // if (isRecording !== this.media.isActive()) {
     //   this.media.timeMs = this.props.recorder.clock * 1000;
     //   if (isRecording) {
@@ -61,7 +61,7 @@ export default class Recorder extends Component<Props> {
   }
 
   async handleMediaProgress(ms: number) {
-    if (this.props.recorder.status === t.RecorderStatus.Recording) {
+    if (this.props.recorder.state.status === t.TrackPlayerStatus.Running) {
       console.log('handleMediaProgress: ', ms);
       await postMessage({ type: 'updateRecorder', changes: { clock: ms / 1000 } });
     }
@@ -87,9 +87,9 @@ export default class Recorder extends Component<Props> {
 
     // let toggleFn: () => void, toggleIcon: string, tooltip: string;
     // switch (status) {
-    //   case t.RecorderStatus.Uninitialized:
-    //   case t.RecorderStatus.Initialized:
-    //   case t.RecorderStatus.Paused: {
+    //   case t.TrackPlayerStatus.Uninitialized:
+    //   case t.TrackPlayerStatus.Initialized:
+    //   case t.TrackPlayerStatus.Paused: {
     //     toggleFn = this.startRecorder;
     //     toggleIcon = 'codicon-circle-large-filled';
     //     tooltip = !canToggle
@@ -99,7 +99,7 @@ export default class Recorder extends Component<Props> {
     //       : 'Start recording';
     //     break;
     //   }
-    //   case t.RecorderStatus.Recording:
+    //   case t.TrackPlayerStatus.Running:
     //     toggleFn = this.pauseRecorder;
     //     toggleIcon = 'codicon-debug-pause';
     //     tooltip = 'Pause';
@@ -217,7 +217,7 @@ class DetailsView extends Component<Props> {
           value={this.props.recorder.root}
           label="Workspace"
           pickTitle="Select workspace folder"
-          disabled={recorder.status !== t.RecorderStatus.Uninitialized}
+          disabled={recorder.state.loaded}
           autoFocus
         />
         <p className="subsection help">

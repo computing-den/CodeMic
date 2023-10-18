@@ -2,11 +2,11 @@ import _ from 'lodash';
 import * as t from './types.js';
 
 export function unreachable(arg: never, message: string = 'Unreachable'): never {
-  throw new Error(message);
+  throw new Error(`${message}: ${JSON.stringify(arg)}`);
 }
 
-export function timeout(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+export function timeout<Req>(ms: number, value?: Req): Promise<Req> {
+  return new Promise(resolve => setTimeout(resolve, ms, value));
 }
 
 /**

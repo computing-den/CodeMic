@@ -25,6 +25,8 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     this.bus = new b.Bus(this.postParcel.bind(this), this.messageHandler);
     this.view = webviewView;
 
+    console.log('resolveWebviewView localResourceRoots', vscode.Uri.joinPath(this.context.extensionUri, '..', '..'));
+
     webviewView.webview.options = {
       // Allow scripts in the webview
       enableScripts: true,

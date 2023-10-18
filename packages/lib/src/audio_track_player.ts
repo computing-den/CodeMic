@@ -3,155 +3,193 @@ import assert from './assert.js';
 import * as t from './types.js';
 
 export default class AudioTrackPlayer implements t.TrackPlayer {
-  clock: number = 0;
-  status: t.TrackPlayerStatus = t.TrackPlayerStatus.Init;
+  name = 'audio';
+  clock = 0;
+  state: t.TrackPlayerState = {
+    status: t.TrackPlayerStatus.Init,
+    loading: false,
+    loaded: false,
+    buffering: false,
+    seeking: false,
+  };
+  playbackRate = 1;
+
   onProgress?: (clock: number) => any;
-  onStatusChange?: (status: t.TrackPlayerStatus) => any;
+  onStateChange?: (state: t.TrackPlayerState) => any;
 
   constructor(
-    public audioTrack: t.AudioTrack,
+    public track: t.AudioTrack,
     public postAudioMessage: t.PostAudioMessageToFrontend,
     public getSessionBlobUri: (sha1: string) => t.Uri,
     public sessionIO: t.SessionIO,
   ) {}
 
-  async start() {
-    if (this.status === t.TrackPlayerStatus.Init) {
-      assert(this.audioTrack.file.type === 'local', 'AudioTrackPlayer: only supports local files');
-      await this.postAudioMessage({
-        type: 'audio/load',
-        id: this.audioTrack.id,
-        src: this.getSessionBlobUri(this.audioTrack.file.sha1),
-      });
-    }
-    await this.postAudioMessage({ type: 'audio/play', id: this.audioTrack.id });
+  load() {
+    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
+    if (this.state.loaded || this.state.loading) return;
+
+    assert(this.track.file.type === 'local', 'AudioTrackPlayer: only supports local files');
+    this.updateState({ loading: true, loaded: false });
+    this.postAudioMessage({
+      type: 'audio/load',
+      id: this.track.id,
+      src: this.getSessionBlobUri(this.track.file.sha1),
+    }).catch(this.gotError);
   }
 
-  async pause() {
-    await this.postAudioMessage({ type: 'audio/pause', id: this.audioTrack.id });
+  start() {
+    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
+    if (this.state.status === t.TrackPlayerStatus.Running) return;
+
+    this.updateState({ status: t.TrackPlayerStatus.Running });
+    this.postAudioMessage({ type: 'audio/play', id: this.track.id }).catch(this.gotError);
   }
 
-  async stop() {
-    await this.postAudioMessage({ type: 'audio/stop', id: this.audioTrack.id });
+  pause() {
+    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
+    if (this.state.status === t.TrackPlayerStatus.Paused) return;
+
+    this.updateState({ status: t.TrackPlayerStatus.Paused });
+    this.postAudioMessage({ type: 'audio/pause', id: this.track.id }).catch(this.gotError);
   }
 
-  async seek(clock: number) {
-    await this.postAudioMessage({ type: 'audio/seek', clock, id: this.audioTrack.id });
+  stop() {
+    if (this.state.status === t.TrackPlayerStatus.Stopped || this.state.status === t.TrackPlayerStatus.Error) return;
+
+    this.updateState({ status: t.TrackPlayerStatus.Stopped });
+    this.postAudioMessage({ type: 'audio/stop', id: this.track.id }).catch(this.gotError);
+  }
+
+  seek(clock: number) {
+    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
+    assert(this.state.loaded, 'Track is not loaded');
+
+    this.clock = clock;
+    this.updateState({ seeking: true });
+    this.postAudioMessage({ type: 'audio/seek', id: this.track.id, clock }).catch(this.gotError);
+  }
+
+  setPlaybackRate(rate: number) {
+    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
+
+    this.playbackRate = rate;
+    this.postAudioMessage({ type: 'audio/setPlaybackRate', rate, id: this.track.id }).catch(this.gotError);
   }
 
   dispose() {
-    this.stop();
+    this.postAudioMessage({ type: 'audio/dispose', id: this.track.id }).catch(this.gotError);
   }
 
-  async handleAudioEvent(e: t.FrontendAudioEvent) {
+  handleAudioEvent(e: t.FrontendAudioEvent) {
     switch (e.type) {
       case 'loadstart': {
         console.log('loadstart');
-        this.setStatusAndNotify(t.TrackPlayerStatus.Loading);
-        return;
+        this.updateState({ loading: true });
+        break;
       }
       case 'durationchange': {
         console.log('durationchange');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Loading);
-        return;
+        // this.updateState({status: t.TrackPlayerStatus.Loading});
+        break;
       }
       case 'loadedmetadata': {
         console.log('loadedmetadata');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Loading);
-        return;
+        // this.updateState({status: t.TrackPlayerStatus.Loading});
+        break;
       }
       case 'loadeddata': {
         console.log('loadeddata');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Loading);
-        return;
+        // this.updateState({status: t.TrackPlayerStatus.Loading});
+        break;
       }
       case 'progress': {
         console.log('progress');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Loading);
-        return;
+        // this.updateState({status: t.TrackPlayerStatus.Loading});
+        break;
       }
       case 'canplay': {
         console.log('canplay');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Paused);
-        return;
+        break;
       }
       case 'canplaythrough': {
         console.log('canplaythrough');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Paused);
-        return;
+        this.updateState({ loading: false, loaded: true });
+        break;
       }
       case 'suspend': {
         console.log('suspend');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Stopped);
-        return;
+        // this.updateState({status: t.TrackPlayerStatus.Stopped});
+        break;
       }
       case 'abort': {
         console.log('abort');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Stopped);
-        return;
+        // this.updateState({status: t.TrackPlayerStatus.Stopped});
+        break;
       }
       case 'emptied': {
         console.log('emptied');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Stopped);
-        return;
+        // this.updateState({status: t.TrackPlayerStatus.Stopped});
+        break;
       }
       case 'stalled': {
         console.log('stalled');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Stopped);
-        return;
+        // this.updateState({status: t.TrackPlayerStatus.Stopped});
+        break;
       }
       case 'playing': {
         console.log('playing');
-        this.setStatusAndNotify(t.TrackPlayerStatus.Playing);
-        return;
+        this.updateState({ status: t.TrackPlayerStatus.Running, buffering: false, seeking: false });
+        break;
       }
       case 'waiting': {
         console.log('waiting');
-        this.setStatusAndNotify(t.TrackPlayerStatus.Loading);
-        return;
+        this.updateState({ buffering: true });
+        break;
       }
       case 'play': {
         console.log('play');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Playing);
-        return;
+        // this.updateState({status: t.TrackPlayerStatus.Playing});
+        break;
       }
       case 'pause': {
         console.log('pause');
-        this.setStatusAndNotify(t.TrackPlayerStatus.Paused);
-        return;
+        this.updateState({ status: t.TrackPlayerStatus.Paused });
+        break;
       }
       case 'ended': {
         console.log('ended');
-        this.setStatusAndNotify(t.TrackPlayerStatus.Stopped);
+        this.updateState({ status: t.TrackPlayerStatus.Stopped });
         // await this.afterPauseOrStop(t.PlayerStatus.Paused);
-        return;
+        break;
       }
       case 'seeking': {
         console.log('seeking');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Loading)
-        return;
+        this.updateState({ seeking: true });
+        break;
       }
       case 'seeked': {
         console.log('seeked');
-        // this.setStatusAndNotify(t.TrackPlayerStatus.Paused)
-        return;
+        this.updateState({ seeking: false });
+        break;
       }
       case 'timeupdate': {
         console.log('timeupdate', e.clock);
-        this.clock = e.clock;
-        this.onProgress?.(e.clock);
-        return;
+        // We might receive progress update before seeking to another position is complete.
+        // In which case, just ignore the progress update.
+        if (!this.state.seeking) {
+          this.clock = e.clock;
+          this.onProgress?.(this.clock);
+        }
+        break;
       }
       case 'volumechange': {
         console.log('volumechange', e.volume);
-        return;
+        break;
       }
       case 'error': {
-        console.log('error');
-        this.setStatusAndNotify(t.TrackPlayerStatus.Error);
-        // await this.afterPauseOrStop(t.PlayerStatus.Stopped);
-        // error will be caught and will call this.pause()
-        throw new Error(e.error);
+        console.error('error', e.error);
+        this.gotError(e.error);
+        break;
       }
       default: {
         lib.unreachable(e);
@@ -159,8 +197,12 @@ export default class AudioTrackPlayer implements t.TrackPlayer {
     }
   }
 
-  private setStatusAndNotify(status: t.TrackPlayerStatus) {
-    this.status = status;
-    this.onStatusChange?.(status);
+  private gotError = (error?: any) => {
+    this.updateState({ status: t.TrackPlayerStatus.Error });
+  };
+
+  private updateState(partial: Partial<t.TrackPlayerState>) {
+    this.state = { ...this.state, ...partial };
+    this.onStateChange?.(this.state);
   }
 }

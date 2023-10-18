@@ -7,3 +7,4 @@ export { default as assert } from './assert.js';
 export { default as editorEventStepperDispatch } from './editor_event_stepper_dispatch.js';
 export { default as ClockTrackPlayer } from './clock_track_player.js';
 export { default as AudioTrackPlayer } from './audio_track_player.js';
+export { default as SessionTrackPlayer } from './session_track_player.js';

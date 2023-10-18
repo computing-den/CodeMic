@@ -16,7 +16,7 @@ export default class Player extends Component<Props> {
   seeking = false;
 
   startPlayer = async () => {
-    if (this.props.player.status === t.PlayerStatus.Uninitialized) {
+    if (this.props.player.state.status === t.TrackPlayerStatus.Init) {
       if (this.props.player.root) {
         await postMessage({ type: 'play' });
       } else {
@@ -24,7 +24,7 @@ export default class Player extends Component<Props> {
         console.error('Select a workspace folder');
       }
     } else {
-      if (this.isStoppedAlmostAtTheEnd()) await this.seek(0);
+      // if (this.isStoppedAlmostAtTheEnd()) await this.seek(0);
       await postMessage({ type: 'play' });
     }
   };
@@ -38,8 +38,8 @@ export default class Player extends Component<Props> {
   };
 
   seek = async (clock: number) => {
-    if (this.props.player.status === t.PlayerStatus.Uninitialized) {
-      console.error('Workspace not populated yet');
+    if (!this.props.player.state.loaded) {
+      console.error(`Cannot seek track that is not loaded`);
       return;
     }
     await postMessage({ type: 'seekPlayer', clock });
@@ -69,12 +69,12 @@ export default class Player extends Component<Props> {
     }
   };
 
-  isStoppedAlmostAtTheEnd(): boolean {
-    return (
-      this.props.player.status === t.PlayerStatus.Stopped &&
-      this.props.player.clock >= this.props.player.sessionSummary.duration - 0.5
-    );
-  }
+  // isStoppedAlmostAtTheEnd(): boolean {
+  //   return (
+  //     this.props.player.state.status === t.TrackPlayerStatus.Stopped &&
+  //     this.props.player.clock >= this.props.player.sessionSummary.duration - 0.5
+  //   );
+  // }
 
   componentWillUnmount() {
     // this.media!.stop();
@@ -85,7 +85,7 @@ export default class Player extends Component<Props> {
     const { sessionSummary: ss } = player;
 
     let primaryAction: MT.PrimaryAction;
-    if (player.status === t.PlayerStatus.Playing) {
+    if (player.state.status === t.TrackPlayerStatus.Running) {
       primaryAction = { type: 'pausePlaying', title: 'Pause', onClick: this.pausePlayer };
     } else {
       primaryAction = { type: 'play', title: 'Play', onClick: this.startPlayer };
@@ -94,7 +94,7 @@ export default class Player extends Component<Props> {
     const toolbarActions = [
       {
         title:
-          player.status === t.PlayerStatus.Playing
+          player.state.status === t.TrackPlayerStatus.Running
             ? `Fork: create a new project starting at this point`
             : `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`,
         icon: 'codicon-repo-forked',
@@ -123,9 +123,7 @@ export default class Player extends Component<Props> {
 
     return (
       <Screen className="player">
-        {player.status !== t.PlayerStatus.Uninitialized && (
-          <ProgressBar duration={ss.duration} onSeek={this.seek} clock={player.clock} />
-        )}
+        {player.state.loaded && <ProgressBar duration={ss.duration} onSeek={this.seek} clock={player.clock} />}
         <Section className="main-section">
           {/*
           <Section.Header
@@ -144,7 +142,7 @@ export default class Player extends Component<Props> {
               duration={ss.duration}
             />
             <SessionDescription className="subsection subsection_spaced" sessionSummary={ss} />
-            {player.status === t.PlayerStatus.Uninitialized && (
+            {!player.state.loaded && (
               <PathField
                 className="subsection"
                 onChange={this.rootChanged}
