@@ -437,6 +437,7 @@ class Codecast {
           clock: this.player.getClock(),
           root: this.player.root,
           history: this.db.settings.history[this.player.sessionSummary.id],
+          DEV_trackPlayersStates: [],
         };
       } else if (this.playerSetup) {
         player = {
@@ -451,6 +452,7 @@ class Codecast {
           clock: 0,
           root: this.playerSetup.root,
           history: this.db.settings.history[this.playerSetup.sessionSummary.id],
+          DEV_trackPlayersStates: [],
         };
       }
     }

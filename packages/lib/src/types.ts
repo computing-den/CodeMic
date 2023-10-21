@@ -172,6 +172,7 @@ export type PlayerState = {
   clock: number;
   root?: string;
   history?: SessionHistoryItem;
+  DEV_trackPlayersStates: TrackPlayerSummary[];
 };
 
 export type PlayerUpdate = {
@@ -268,6 +269,14 @@ export interface TrackPlayer {
   seek(clock: number): void;
   setPlaybackRate(rate: number): void;
   dispose(): any;
+}
+
+export interface TrackPlayerSummary {
+  name: string;
+  track: Track;
+  clock: number;
+  state: TrackPlayerState;
+  playbackRate: number;
 }
 
 export type EditorTrackSnapshot = {

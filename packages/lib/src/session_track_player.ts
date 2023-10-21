@@ -23,13 +23,13 @@ export default class SessionTrackPlayer implements t.TrackPlayer {
     seeking: false,
   };
   playbackRate = 1;
+  trackPlayers: t.TrackPlayer[] = [];
 
   onProgress?: (clock: number) => any;
   onStateChange?: (state: t.TrackPlayerState) => any;
   onChange?: () => any;
 
   private id = uuid();
-  private trackPlayers: t.TrackPlayer[] = [];
   private timeout?: any;
   private updateQueue: UpdateQueueItem[] = [];
   private isUpdating = false;
@@ -50,7 +50,7 @@ export default class SessionTrackPlayer implements t.TrackPlayer {
     assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
     if (this.state.status === t.TrackPlayerStatus.Running) return;
 
-    if (this.state.status === t.TrackPlayerStatus.Stopped) {
+    if (this.state.status === t.TrackPlayerStatus.Stopped && this.clock >= this.track.clockRange.end - 1) {
       this.update({ status: t.TrackPlayerStatus.Running, seeking: this.clock !== 0 }, 0);
     } else {
       this.update({ status: t.TrackPlayerStatus.Running });
@@ -73,7 +73,13 @@ export default class SessionTrackPlayer implements t.TrackPlayer {
   seek(clock: number) {
     assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
 
-    this.update({ seeking: true }, clock);
+    // If session track is stopped, set it to paused so that the seeking logic in updateHelper will work immediately.
+    let status = this.state.status;
+    if (status === t.TrackPlayerStatus.Stopped) {
+      status = t.TrackPlayerStatus.Paused;
+    }
+
+    this.update({ status, seeking: true }, clock);
   }
 
   setPlaybackRate(rate: number) {
