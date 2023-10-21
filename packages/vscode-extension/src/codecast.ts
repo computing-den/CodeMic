@@ -98,7 +98,7 @@ class Codecast {
             this.db,
             this.playerSetup,
             this.postAudioMessage.bind(this),
-            this.getSessionBlobUri.bind(this, this.playerSetup.sessionSummary.id),
+            this.getSessionBlobWebviewUri.bind(this, this.playerSetup.sessionSummary.id),
             this.playerChanged.bind(this),
           );
         }
@@ -388,7 +388,7 @@ class Codecast {
     return this.webview.postMessage(req);
   }
 
-  getSessionBlobUri(sessionId: string, sha1: string): t.Uri {
+  getSessionBlobWebviewUri(sessionId: string, sha1: string): t.Uri {
     const fileUri = vscode.Uri.file(this.db.getSessionBlobPathBySha1(sessionId, sha1));
     const webviewUri = this.webview.asWebviewUri(fileUri);
     assert(webviewUri);

@@ -43,7 +43,7 @@ class Player {
     db: Db,
     setup: t.PlayerSetup,
     postAudioMessage: t.PostAudioMessageToFrontend,
-    getSessionBlobUri: (sha1: string) => t.Uri,
+    getSessionBlobWebviewUri: (sha1: string) => t.Uri,
     onChange: () => any,
     // audioSrc: string,
   ): Promise<Player | undefined> {
@@ -57,7 +57,7 @@ class Player {
       const audioTrackPlayer = new AudioTrackPlayer(
         session.audioTracks[0],
         postAudioMessage,
-        getSessionBlobUri,
+        getSessionBlobWebviewUri,
         sessionIO,
       );
       const sessionTrackPlayer = new SessionTrackPlayer();

@@ -20,7 +20,7 @@ export default class AudioTrackPlayer implements t.TrackPlayer {
   constructor(
     public track: t.AudioTrack,
     public postAudioMessage: t.PostAudioMessageToFrontend,
-    public getSessionBlobUri: (sha1: string) => t.Uri,
+    public getSessionBlobWebviewUri: (sha1: string) => t.Uri,
     public sessionIO: t.SessionIO,
   ) {}
 
@@ -33,7 +33,7 @@ export default class AudioTrackPlayer implements t.TrackPlayer {
     this.postAudioMessage({
       type: 'audio/load',
       id: this.track.id,
-      src: this.getSessionBlobUri(this.track.file.sha1),
+      src: this.getSessionBlobWebviewUri(this.track.file.sha1),
     }).catch(this.gotError);
   }
 
