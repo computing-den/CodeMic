@@ -192,7 +192,7 @@ class Codecast {
         return this.respondWithStore();
       }
       case 'confirmForkFromPlayer': {
-        const status = this.player?.state.status;
+        const status = this.player?.trackPlayerSummary.state.status;
         if (status !== t.TrackPlayerStatus.Running) return { type: 'boolean', value: true };
         this.player!.pause();
 
@@ -209,7 +209,7 @@ class Codecast {
         return { type: 'boolean', value: answer?.title === confirmTitle };
       }
       case 'confirmEditFromPlayer': {
-        const status = this.player?.state.status;
+        const status = this.player?.trackPlayerSummary.state.status;
         if (status !== t.TrackPlayerStatus.Running) return { type: 'boolean', value: true };
         this.player!.pause();
 
@@ -432,27 +432,36 @@ class Codecast {
     if (this.screen === t.Screen.Player) {
       if (this.player) {
         player = {
-          state: this.player.state,
+          trackPlayerSummary: this.player.trackPlayerSummary,
           sessionSummary: this.player.sessionSummary,
           clock: this.player.getClock(),
           root: this.player.root,
           history: this.db.settings.history[this.player.sessionSummary.id],
-          DEV_trackPlayersStates: [],
+          DEV_trackPlayerSummaries: this.player.DEV_trackPlayerSummaries,
         };
       } else if (this.playerSetup) {
         player = {
-          state: {
-            status: t.TrackPlayerStatus.Init,
-            buffering: false,
-            loaded: false,
-            loading: false,
-            seeking: false,
+          trackPlayerSummary: {
+            name: 'empty',
+            track: {
+              id: this.playerSetup.sessionSummary.id,
+              clockRange: { start: 0, end: this.playerSetup.sessionSummary.duration },
+            },
+            state: {
+              status: t.TrackPlayerStatus.Init,
+              buffering: false,
+              loaded: false,
+              loading: false,
+              seeking: false,
+            },
+            clock: 0,
+            playbackRate: 1,
           },
           sessionSummary: this.playerSetup.sessionSummary,
           clock: 0,
           root: this.playerSetup.root,
           history: this.db.settings.history[this.playerSetup.sessionSummary.id],
-          DEV_trackPlayersStates: [],
+          DEV_trackPlayerSummaries: [],
         };
       }
     }

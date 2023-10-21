@@ -167,12 +167,12 @@ export type RecorderSetup = {
 };
 
 export type PlayerState = {
-  state: TrackPlayerState;
+  trackPlayerSummary: TrackPlayerSummary;
   sessionSummary: SessionSummary;
   clock: number;
   root?: string;
   history?: SessionHistoryItem;
-  DEV_trackPlayersStates: TrackPlayerSummary[];
+  DEV_trackPlayerSummaries: TrackPlayerSummary[];
 };
 
 export type PlayerUpdate = {
@@ -271,13 +271,13 @@ export interface TrackPlayer {
   dispose(): any;
 }
 
-export interface TrackPlayerSummary {
+export type TrackPlayerSummary = {
   name: string;
   track: Track;
-  clock: number;
   state: TrackPlayerState;
+  clock: number;
   playbackRate: number;
-}
+};
 
 export type EditorTrackSnapshot = {
   worktree: Worktree;

@@ -13,6 +13,10 @@ export default class SessionTrackPlayer implements t.TrackPlayer {
     return { id: this.id, clockRange: maxTrackPlayer.track.clockRange };
   }
 
+  get DEV_trackPlayerSummaries(): t.TrackPlayerSummary[] {
+    return this.trackPlayers.map(lib.getTrackPlayerSummary);
+  }
+
   name = 'Session';
   clock = 0;
   state: t.TrackPlayerState = {

@@ -8,8 +8,12 @@ import _ from 'lodash';
 import assert from 'assert';
 
 class Player {
-  get state(): t.TrackPlayerState {
-    return this.sessionTrackPlayer.state;
+  get trackPlayerSummary(): t.TrackPlayerSummary {
+    return lib.getTrackPlayerSummary(this.sessionTrackPlayer);
+  }
+
+  get DEV_trackPlayerSummaries(): t.TrackPlayerSummary[] {
+    return this.sessionTrackPlayer.DEV_trackPlayerSummaries;
   }
 
   get root(): t.AbsPath {

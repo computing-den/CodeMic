@@ -16,7 +16,7 @@ export default class Player extends Component<Props> {
   seeking = false;
 
   startPlayer = async () => {
-    if (this.props.player.state.status === t.TrackPlayerStatus.Init) {
+    if (this.props.player.trackPlayerSummary.state.status === t.TrackPlayerStatus.Init) {
       if (this.props.player.root) {
         await postMessage({ type: 'play' });
       } else {
@@ -38,7 +38,7 @@ export default class Player extends Component<Props> {
   };
 
   seek = async (clock: number) => {
-    if (!this.props.player.state.loaded) {
+    if (!this.props.player.trackPlayerSummary.state.loaded) {
       console.error(`Cannot seek track that is not loaded`);
       return;
     }
@@ -85,7 +85,7 @@ export default class Player extends Component<Props> {
     const { sessionSummary: ss } = player;
 
     let primaryAction: MT.PrimaryAction;
-    if (player.state.status === t.TrackPlayerStatus.Running) {
+    if (player.trackPlayerSummary.state.status === t.TrackPlayerStatus.Running) {
       primaryAction = { type: 'pausePlaying', title: 'Pause', onClick: this.pausePlayer };
     } else {
       primaryAction = { type: 'play', title: 'Play', onClick: this.startPlayer };
@@ -94,7 +94,7 @@ export default class Player extends Component<Props> {
     const toolbarActions = [
       {
         title:
-          player.state.status === t.TrackPlayerStatus.Running
+          player.trackPlayerSummary.state.status === t.TrackPlayerStatus.Running
             ? `Fork: create a new project starting at this point`
             : `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`,
         icon: 'codicon-repo-forked',
@@ -123,7 +123,9 @@ export default class Player extends Component<Props> {
 
     return (
       <Screen className="player">
-        {player.state.loaded && <ProgressBar duration={ss.duration} onSeek={this.seek} clock={player.clock} />}
+        {player.trackPlayerSummary.state.loaded && (
+          <ProgressBar duration={ss.duration} onSeek={this.seek} clock={player.clock} />
+        )}
         <Section className="main-section">
           {/*
           <Section.Header
@@ -142,7 +144,7 @@ export default class Player extends Component<Props> {
               duration={ss.duration}
             />
             <SessionDescription className="subsection subsection_spaced" sessionSummary={ss} />
-            {!player.state.loaded && (
+            {!player.trackPlayerSummary.state.loaded && (
               <PathField
                 className="subsection"
                 onChange={this.rootChanged}
@@ -175,7 +177,43 @@ export default class Player extends Component<Props> {
             )}
           </Section.Body>
         </Section>
+        <Section className="dev-section">
+          <Section.Header title="DEV" collapsible />
+          <Section.Body>
+            <DevTrackPlayer p={player.trackPlayerSummary} />
+            {player.DEV_trackPlayerSummaries.map(p => (
+              <DevTrackPlayer p={p} />
+            ))}
+          </Section.Body>
+        </Section>
       </Screen>
+    );
+  }
+}
+
+class DevTrackPlayer extends Component<{ p: t.TrackPlayerSummary }> {
+  render() {
+    const { p } = this.props;
+
+    return (
+      <ul className="track-player">
+        <li>
+          <b>{p.name}</b>
+        </li>
+        <li>{p.playbackRate.toFixed(3)}x</li>
+        <li>{p.clock.toFixed(3)}</li>
+        <li>{t.TrackPlayerStatus[p.state.status]}</li>
+        <li>
+          {[
+            p.state.loaded && 'loaded',
+            p.state.loading && 'loading',
+            p.state.seeking && 'seeking',
+            p.state.buffering && 'buffering',
+          ]
+            .filter(Boolean)
+            .join(', ')}
+        </li>
+      </ul>
     );
   }
 }
