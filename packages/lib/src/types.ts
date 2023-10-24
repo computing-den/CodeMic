@@ -115,8 +115,6 @@ export type PostAudioMessageToFrontend = <Req extends BackendAudioRequest>(
   req: Req,
 ) => Promise<FrontendResponseFor<Req>>;
 
-// export type PostAudioEventToBackend = (event: FrontendAudioEvent) => Promise<void>;
-
 export enum Screen {
   Welcome,
   Recorder,
@@ -130,9 +128,6 @@ export type Store = {
   recorder?: RecorderState;
   player?: PlayerState;
   test?: any;
-
-  // welcome?: Welcome;
-  // login?: Login;
 };
 
 export type WelcomeState = {
@@ -142,16 +137,13 @@ export type WelcomeState = {
 };
 
 export type RecorderState = {
-  trackPlayerSummary: TrackPlayerSummary;
-  isInRecorderMode: boolean;
-  sessionSummary: SessionSummary;
+  mode: SessionCtrlMode;
   clock: number;
+  sessionSummary: SessionSummary;
   root?: string;
   fork?: boolean;
   forkClock?: number;
   history?: SessionHistoryItem;
-  DEV_trackPlayerSummaries: TrackPlayerSummary[];
-  // studio: boolean;
 };
 
 export type RecorderUpdate = {
@@ -169,12 +161,11 @@ export type RecorderSetup = {
 };
 
 export type PlayerState = {
-  trackPlayerSummary: TrackPlayerSummary;
+  mode: SessionCtrlMode;
   sessionSummary: SessionSummary;
   clock: number;
   root?: string;
   history?: SessionHistoryItem;
-  DEV_trackPlayerSummaries: TrackPlayerSummary[];
 };
 
 export type PlayerUpdate = {
@@ -214,17 +205,12 @@ export type Session = {
   audioTracks: AudioTrack[];
 };
 
-export type Track = {
-  id: string;
-  clockRange: ClockRange;
-};
-
 export type ClockRange = {
   start: number;
   end: number;
 };
 
-export type EditorTrack = Track & {
+export type EditorTrack = {
   initSnapshot: EditorTrackSnapshot;
   events: EditorEvent[];
   defaultEol: EndOfLine;
@@ -233,56 +219,81 @@ export type EditorTrack = Track & {
 /**
  * Multiple audio tracks may refer to the same file.
  */
-export type AudioTrack = Track & {
+export type AudioTrack = {
+  id: string;
+  clockRange: ClockRange;
   title: string;
   file: File;
 };
 
-export enum TrackPlayerStatus {
+export enum TrackCtrlStatus {
   Init,
   Error,
-  // Loaded,
   Running,
   Paused,
-  Stopped,
 }
 
-export type TrackPlayerState = {
-  status: TrackPlayerStatus;
-  loading: boolean;
-  loaded: boolean;
-  buffering: boolean;
-  seeking: boolean;
+export type SessionCtrlMode = {
+  status: TrackCtrlStatus;
+  recordingEditor: boolean;
 };
 
-export interface TrackPlayer {
-  name: string;
-  track: Track;
-  clock: number;
-  state: TrackPlayerState;
-  playbackRate: number;
-  isRecorder: boolean;
-  onProgress?: (clock: number) => any;
-  onStateChange?: (state: TrackPlayerState) => any;
+export interface EditorPlayer {
+  readonly track: EditorTrack;
+
+  play(): void;
+  pause(): void;
+  seek(clock: number): void;
+}
+
+export interface EditorRecorder {
+  readonly track: EditorTrack;
+  onChange?: () => any;
+
+  record(): void;
+  pause(): void;
+  setClock(clock: number): void;
+}
+
+export interface AudioCtrl {
+  readonly isRunning: boolean;
+  readonly track: AudioTrack;
 
   load(): void;
-  start(): void;
+  play(): void;
   pause(): void;
-  stop(): void;
   seek(clock: number): void;
-  setClock(clock: number): void;
-  extend(clock: number): void;
-  setPlaybackRate(rate: number): void;
-  dispose(): any;
+  handleAudioEvent(e: FrontendAudioEvent): void;
 }
 
-export type TrackPlayerSummary = {
-  name: string;
-  track: Track;
-  state: TrackPlayerState;
-  clock: number;
-  playbackRate: number;
-};
+// export interface TrackPlayer {
+//   name: string;
+//   track: Track;
+//   clock: number;
+//   state: TrackPlayerState;
+//   playbackRate: number;
+//   isRecorder: boolean;
+//   onProgress?: (clock: number) => any;
+//   onStateChange?: (state: TrackPlayerState) => any;
+
+//   load(): void;
+//   start(): void;
+//   pause(): void;
+//   stop(): void;
+//   seek(clock: number): void;
+//   setClock(clock: number): void;
+//   extend(clock: number): void;
+//   setPlaybackRate(rate: number): void;
+//   dispose(): any;
+// }
+
+// export type TrackPlayerSummary = {
+//   name: string;
+//   track: Track;
+//   state: TrackPlayerState;
+//   clock: number;
+//   playbackRate: number;
+// };
 
 export type EditorTrackSnapshot = {
   worktree: Worktree;
@@ -447,7 +458,7 @@ export type SessionHistoryItem = {
   root?: AbsPath;
 };
 
-export type SeekData = { events: EditorEvent[]; direction: Direction; i: number; clock: number; stop: boolean };
+export type SeekData = { events: EditorEvent[]; direction: Direction; i: number; clock: number };
 
 export type Vec2 = [number, number];
 export type Rect = { top: number; right: number; bottom: number; left: number };

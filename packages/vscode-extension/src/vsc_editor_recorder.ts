@@ -1,60 +1,28 @@
-import { types as t, path, lib, editorTrack as et, ClockTrackPlayer } from '@codecast/lib';
+import { types as t, path, lib, editorTrack as et } from '@codecast/lib';
 import VscEditorWorkspace from './vsc_editor_workspace.js';
-import { SessionIO } from './session.js';
-import * as misc from './misc.js';
-import Db, { type WriteOptions } from './db.js';
 import * as vscode from 'vscode';
-import fs from 'fs';
 import _ from 'lodash';
-import assert from 'assert';
-import { v4 as uuid } from 'uuid';
 
 const SCROLL_LINES_TRIGGER = 2;
 
-class VscEditorTrackRecorder implements t.TrackPlayer {
-  name = 'vsc recorder';
-  state: t.TrackPlayerState = {
-    status: t.TrackPlayerStatus.Init,
-    loading: false,
-    loaded: false,
-    buffering: false,
-    seeking: false,
-  };
-  isRecorder = true;
-
-  onProgress?: (clock: number) => any;
-  onStateChange?: (state: t.TrackPlayerState) => any;
-
-  get clock(): number {
-    return this.clockTrackPlayer.clock;
-  }
-
-  get playbackRate(): number {
-    return this.clockTrackPlayer.playbackRate;
-  }
+class VscEditorRecorder implements t.EditorRecorder {
+  onChange?: () => any;
+  isRecording = false;
+  clock = 0;
 
   get track(): et.EditorTrack {
     return this.workspace.editorTrack;
   }
 
-  private clockTrackPlayer = new ClockTrackPlayer(100);
   private disposables: vscode.Disposable[] = [];
   private scrolling: boolean = false;
   private scrollStartRange?: t.Range;
 
   constructor(public context: vscode.ExtensionContext, public workspace: VscEditorWorkspace) {}
 
-  load() {
-    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
-    if (this.state.loaded || this.state.loading) return;
-
-    this.clockTrackPlayer.load();
-    this.updateState({ loading: false, loaded: true });
-  }
-
-  start() {
-    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
-    if (this.state.status === t.TrackPlayerStatus.Running) return;
+  record() {
+    if (this.isRecording) return;
+    this.isRecording = true;
 
     // listen for open document events
     {
@@ -108,57 +76,22 @@ class VscEditorTrackRecorder implements t.TrackPlayer {
 
     // register disposables
     this.context.subscriptions.push(...this.disposables);
-
-    this.clockTrackPlayer.start();
-    this.clockTrackPlayer.onProgress = this.clockTrackProgressHandler.bind(this);
-    this.updateState({ status: t.TrackPlayerStatus.Running });
   }
 
   pause() {
-    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
-    if (this.state.status === t.TrackPlayerStatus.Paused) return;
+    if (!this.isRecording) return;
+    this.isRecording = false;
 
     this.dispose();
-    this.clockTrackPlayer.pause();
-    this.updateState({ status: t.TrackPlayerStatus.Paused });
-  }
-
-  stop() {
-    if (this.state.status === t.TrackPlayerStatus.Stopped || this.state.status === t.TrackPlayerStatus.Error) return;
-
-    this.dispose();
-    this.clockTrackPlayer.stop();
-    this.updateState({ status: t.TrackPlayerStatus.Stopped });
-  }
-
-  seek(clock: number) {
-    assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
-
-    this.clockTrackPlayer.seek(clock);
-    this.onProgress?.(clock);
   }
 
   setClock(clock: number) {
-    this.clockTrackPlayer.setClock(clock);
-  }
-
-  extend(clock: number) {
-    this.track.clockRange.end = Math.max(clock, this.track.clockRange.end);
-    // this.clockTrackPlayer.extend(clock);
-  }
-
-  setPlaybackRate(rate: number) {
-    this.clockTrackPlayer.setPlaybackRate(rate);
+    this.clock = clock;
   }
 
   dispose() {
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
-  }
-
-  private clockTrackProgressHandler(clock: number) {
-    this.extend(clock);
-    this.onProgress?.(clock);
   }
 
   private textChange(
@@ -308,6 +241,7 @@ class VscEditorTrackRecorder implements t.TrackPlayer {
       this.scrollStartRange = undefined;
     }
     this.track.events.push(e);
+    this.onChange?.();
   }
 
   /**
@@ -378,11 +312,6 @@ class VscEditorTrackRecorder implements t.TrackPlayer {
     }
     return textEditor;
   }
-
-  private updateState(partial: Partial<t.TrackPlayerState>) {
-    this.state = { ...this.state, ...partial };
-    this.onStateChange?.(this.state);
-  }
 }
 
-export default VscEditorTrackRecorder;
+export default VscEditorRecorder;

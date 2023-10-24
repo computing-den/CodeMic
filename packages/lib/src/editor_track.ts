@@ -11,8 +11,6 @@ export class EditorTrack implements t.EditorEventStepper {
   // These fields remain the same regardless of the clock
   root: t.AbsPath;
   io: t.SessionIO;
-  id: string;
-  clockRange: t.ClockRange;
   initSnapshot: t.EditorTrackSnapshot;
   events: t.EditorEvent[];
   defaultEol: t.EndOfLine;
@@ -32,8 +30,6 @@ export class EditorTrack implements t.EditorEventStepper {
     this.root = root;
     this.io = io;
     // this.summary = summary;
-    this.id = editorTrack.id;
-    this.clockRange = editorTrack.clockRange;
     this.initSnapshot = editorTrack.initSnapshot;
     this.events = editorTrack.events;
     this.defaultEol = editorTrack.defaultEol;
@@ -52,8 +48,6 @@ export class EditorTrack implements t.EditorEventStepper {
 
   toJSON(): t.EditorTrack {
     return {
-      id: this.id,
-      clockRange: this.clockRange,
       events: this.events,
       defaultEol: this.defaultEol,
       initSnapshot: this.initSnapshot,
@@ -285,10 +279,13 @@ export class EditorTrack implements t.EditorEventStepper {
       }
     }
 
-    const clock = Math.max(0, Math.min(this.clockRange.end, toClock));
-    const stop = clock === this.clockRange.end;
+    const clock = Math.max(0, toClock);
+    return { events, direction, i, clock };
 
-    return { events, direction, i, clock, stop };
+    // const clock = Math.max(0, Math.min(this.clockRange.end, toClock));
+    // const stop = clock === this.clockRange.end;
+
+    // return { events, direction, i, clock, stop };
   }
 
   async seek(seekData: t.SeekData, uriSet?: t.UriSet) {
@@ -319,7 +316,7 @@ export class EditorTrack implements t.EditorEventStepper {
   cut(clock: number) {
     const i = this.events.findIndex(e => e.clock > clock);
     if (i >= 0) this.events.length = i;
-    this.clockRange.end = clock;
+    // this.clockRange.end = clock;
   }
 
   async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {

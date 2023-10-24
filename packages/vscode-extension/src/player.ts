@@ -1,27 +1,28 @@
 import { SessionIO } from './session.js';
-import { types as t, path, lib, AudioTrackPlayer, SessionTrackPlayer } from '@codecast/lib';
+import { types as t, path, lib, SessionCtrl, AudioCtrl } from '@codecast/lib';
 import VscEditorWorkspace from './vsc_editor_workspace.js';
-import VscEditorTrackPlayer from './vsc_editor_track_player.js';
+import VscEditorPlayer from './vsc_editor_player.js';
+import VscEditorRecorder from './vsc_editor_recorder.js';
 import Db, { type WriteOptions } from './db.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
 
 class Player {
-  get trackPlayerSummary(): t.TrackPlayerSummary {
-    return lib.getTrackPlayerSummary(this.sessionTrackPlayer);
-  }
+  // get trackPlayerSummary(): t.TrackPlayerSummary {
+  //   return lib.getTrackPlayerSummary(this.sessionCtrl);
+  // }
 
-  get DEV_trackPlayerSummaries(): t.TrackPlayerSummary[] {
-    return this.sessionTrackPlayer.DEV_trackPlayerSummaries;
-  }
+  // get DEV_trackPlayerSummaries(): t.TrackPlayerSummary[] {
+  //   return this.sessionCtrl.DEV_trackPlayerSummaries;
+  // }
 
   get root(): t.AbsPath {
-    return this.vscEditorTrackPlayer.workspace.root;
+    return this.workspace.root;
   }
 
   get clock(): number {
-    return this.sessionTrackPlayer.clock;
+    return this.sessionCtrl.clock;
   }
 
   // private vscEditorEventStepper = new VscEditorEventStepper(this.workspace);
@@ -30,12 +31,12 @@ class Player {
     public context: vscode.ExtensionContext,
     public db: Db,
     public sessionSummary: t.SessionSummary,
-    private sessionTrackPlayer: SessionTrackPlayer,
-    private vscEditorTrackPlayer: VscEditorTrackPlayer,
-    private audioTrackPlayers: { [key: string]: AudioTrackPlayer },
-    private onChange: () => any,
+    public workspace: VscEditorWorkspace,
+    private sessionCtrl: SessionCtrl,
+    private audioCtrls: AudioCtrl[],
+    private onUpdateFrontend: () => any,
   ) {
-    sessionTrackPlayer.onChange = this.changeHandler.bind(this);
+    sessionCtrl.onUpdateFrontend = this.sessionCtrlUpdateFrontendHandler.bind(this);
   }
 
   /**
@@ -48,7 +49,7 @@ class Player {
     setup: t.PlayerSetup,
     postAudioMessage: t.PostAudioMessageToFrontend,
     getSessionBlobWebviewUri: (sha1: string) => t.Uri,
-    onChange: () => any,
+    onUpdateFrontend: () => any,
     // audioSrc: string,
   ): Promise<Player | undefined> {
     assert(setup.root);
@@ -56,66 +57,48 @@ class Player {
     const session = await db.readSession(setup.sessionSummary.id);
     const workspace = await VscEditorWorkspace.populateEditorTrack(setup.root, session, sessionIO);
     if (workspace) {
-      // postMessage({ type: 'backendMediaEvent', event: { type: 'load', src: audioSrc.toString() } });
-      const sessionTrackPlayer = new SessionTrackPlayer();
-      const vscEditorTrackPlayer = new VscEditorTrackPlayer(context, workspace);
-      const audioTrackPlayers: { [key: string]: AudioTrackPlayer } = {};
-      for (const audioTrack of session.audioTracks) {
-        const p = new AudioTrackPlayer(audioTrack, postAudioMessage, getSessionBlobWebviewUri, sessionIO);
-        audioTrackPlayers[audioTrack.id] = p;
-        sessionTrackPlayer.addTrack(p);
-      }
-      sessionTrackPlayer.addTrack(vscEditorTrackPlayer);
-      sessionTrackPlayer.load();
-      return new Player(
-        context,
-        db,
-        setup.sessionSummary,
-        sessionTrackPlayer,
-        vscEditorTrackPlayer,
-        audioTrackPlayers,
-        onChange,
+      const vscEditorPlayer = new VscEditorPlayer(context, workspace);
+      const vscEditorRecorder = new VscEditorRecorder(context, workspace);
+      const audioCtrls = session.audioTracks.map(
+        audioTrack => new AudioCtrl(audioTrack, postAudioMessage, getSessionBlobWebviewUri, sessionIO),
       );
+
+      const sessionCtrl = new SessionCtrl(setup.sessionSummary, audioCtrls, vscEditorPlayer, vscEditorRecorder);
+      sessionCtrl.load();
+      // sessionCtrl.seek(clock);
+
+      return new Player(context, db, setup.sessionSummary, workspace, sessionCtrl, audioCtrls, onUpdateFrontend);
     }
   }
 
-  async changeHandler() {
+  async sessionCtrlUpdateFrontendHandler() {
     // update frontend
-    this.onChange();
+    this.onUpdateFrontend();
 
     // save history
     await this.saveHistoryClock({ ifDirtyForLong: true });
   }
 
   start() {
-    this.sessionTrackPlayer.start();
+    this.sessionCtrl.play();
     this.saveHistoryOpenClose().catch(console.error);
   }
 
   pause() {
-    this.sessionTrackPlayer.pause();
-    this.afterPauseOrStop();
-  }
-
-  stop() {
-    this.sessionTrackPlayer.stop();
-    this.afterPauseOrStop();
-  }
-
-  seek(clock: number) {
-    this.sessionTrackPlayer.seek(clock);
-  }
-
-  dispose() {
-    this.sessionTrackPlayer.dispose();
-  }
-
-  afterPauseOrStop() {
+    this.sessionCtrl.pause();
     this.saveHistoryClock().catch(console.error);
   }
 
+  seek(clock: number) {
+    this.sessionCtrl.seek(clock);
+  }
+
+  dispose() {
+    // this.sessionCtrl.dispose();
+  }
+
   handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
-    const p = this.audioTrackPlayers[e.id];
+    const p = this.audioCtrls.find(a => a.track.id === e.id);
     if (p) {
       p.handleAudioEvent(e);
     } else {

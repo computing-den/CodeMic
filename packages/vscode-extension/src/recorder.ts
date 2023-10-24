@@ -1,58 +1,23 @@
-import {
-  types as t,
-  path,
-  lib,
-  editorTrack as et,
-  AudioTrackPlayer,
-  SessionTrackPlayer,
-  SwitchTrackPlayer,
-} from '@codecast/lib';
+import { types as t, path, lib, editorTrack as et, SessionCtrl, AudioCtrl } from '@codecast/lib';
 import VscEditorWorkspace from './vsc_editor_workspace.js';
-import VscEditorTrackPlayer from './vsc_editor_track_player.js';
-import VscEditorTrackRecorder from './vsc_editor_track_recorder.js';
+import VscEditorPlayer from './vsc_editor_player.js';
+import VscEditorRecorder from './vsc_editor_recorder.js';
 import { SessionIO } from './session.js';
 import * as misc from './misc.js';
-import Db, { type WriteOptions } from './db.js';
+import Db from './db.js';
 import * as vscode from 'vscode';
-import fs from 'fs';
 import _ from 'lodash';
 import assert from 'assert';
 import { v4 as uuid } from 'uuid';
-
-const PLAYER_TRACK_INDEX = 0;
-const RECORDER_TRACK_INDEX = 1;
+import VscWorkspace from './vsc_workspace.js';
 
 class Recorder {
-  get trackPlayerSummary(): t.TrackPlayerSummary {
-    return lib.getTrackPlayerSummary(this.sessionTrackPlayer);
-  }
-
-  get DEV_trackPlayerSummaries(): t.TrackPlayerSummary[] {
-    return this.sessionTrackPlayer.DEV_trackPlayerSummaries;
-  }
-
-  get recorderTrackPlayer(): VscEditorTrackRecorder {
-    return this.switchTrackPlayer.trackPlayers[RECORDER_TRACK_INDEX] as VscEditorTrackRecorder;
-  }
-
-  get playerTrackPlayer(): VscEditorTrackPlayer {
-    return this.switchTrackPlayer.trackPlayers[PLAYER_TRACK_INDEX] as VscEditorTrackPlayer;
-  }
-
   get root(): t.AbsPath {
-    return this.recorderTrackPlayer.workspace.root;
-  }
-
-  get track(): et.EditorTrack {
-    return this.recorderTrackPlayer.track;
+    return this.workspace.root;
   }
 
   get clock(): number {
-    return this.sessionTrackPlayer.clock;
-  }
-
-  get isInRecorderMode(): boolean {
-    return this.switchTrackPlayer.curIndex === RECORDER_TRACK_INDEX;
+    return this.sessionCtrl.clock;
   }
 
   isDirty: boolean = false;
@@ -63,15 +28,15 @@ class Recorder {
     public context: vscode.ExtensionContext,
     public db: Db,
     public sessionSummary: t.SessionSummary,
-    private sessionTrackPlayer: SessionTrackPlayer,
-    private switchTrackPlayer: SwitchTrackPlayer,
-    private audioTrackPlayers: { [key: string]: AudioTrackPlayer },
+    public workspace: VscEditorWorkspace,
+    private sessionCtrl: SessionCtrl,
     private postAudioMessage: t.PostAudioMessageToFrontend,
     private getSessionBlobWebviewUri: (sha1: string) => t.Uri,
-    private onChange: () => any,
+    private onUpdateFrontend: () => any,
   ) {
-    sessionTrackPlayer.onChange = this.changeHandler.bind(this);
-    // this.lastSavedClock = sessionTrackPlayer.clock;
+    sessionCtrl.onUpdateFrontend = this.sessionCtrlUpdateFrontendHandler.bind(this);
+    sessionCtrl.onChange = this.sessionCtrlChangeHandler.bind(this);
+    // this.lastSavedClock = sessionCtrl.clock;
   }
 
   /**
@@ -83,29 +48,27 @@ class Recorder {
     setup: t.RecorderSetup,
     postAudioMessage: t.PostAudioMessageToFrontend,
     getSessionBlobWebviewUri: (sha1: string) => t.Uri,
-    onChange: () => any,
+    onUpdateFrontend: () => any,
   ): Promise<Recorder> {
     assert(setup.root);
     const sessionIO = new SessionIO(db, setup.sessionSummary.id);
     const workspace = await VscEditorWorkspace.fromDirAndVsc(sessionIO, setup.root);
-    const vscEditorTrackPlayer = new VscEditorTrackPlayer(context, workspace);
-    const vscEditorTrackRecorder = new VscEditorTrackRecorder(context, workspace);
-    const switchTrackPlayer = new SwitchTrackPlayer([vscEditorTrackPlayer, vscEditorTrackRecorder], PLAYER_TRACK_INDEX);
-    const sessionTrackPlayer = new SessionTrackPlayer();
+    const vscEditorPlayer = new VscEditorPlayer(context, workspace);
+    const vscEditorRecorder = new VscEditorRecorder(context, workspace);
+    const audioCtrls: AudioCtrl[] = [];
 
-    sessionTrackPlayer.addTrack(switchTrackPlayer);
-    sessionTrackPlayer.load();
+    const sessionCtrl = new SessionCtrl(setup.sessionSummary, audioCtrls, vscEditorPlayer, vscEditorRecorder);
+    sessionCtrl.load();
 
     const recorder = new Recorder(
       context,
       db,
       setup.sessionSummary,
-      sessionTrackPlayer,
-      switchTrackPlayer,
-      {},
+      workspace,
+      sessionCtrl,
       postAudioMessage,
       getSessionBlobWebviewUri,
-      onChange,
+      onUpdateFrontend,
     );
 
     await recorder.save();
@@ -121,7 +84,7 @@ class Recorder {
     setup: t.RecorderSetup,
     postAudioMessage: t.PostAudioMessageToFrontend,
     getSessionBlobWebviewUri: (sha1: string) => t.Uri,
-    onChange: () => any,
+    onUpdateFrontend: () => any,
   ): Promise<Recorder | undefined> {
     assert(setup.root);
 
@@ -139,34 +102,27 @@ class Recorder {
     if (workspace) {
       // TODO cut all tracks or remove them completely if out of range.
 
-      const sessionTrackPlayer = new SessionTrackPlayer();
-      const vscEditorTrackPlayer = new VscEditorTrackPlayer(context, workspace);
-      const vscEditorTrackRecorder = new VscEditorTrackRecorder(context, workspace);
-      const switchTrackPlayer = new SwitchTrackPlayer(
-        [vscEditorTrackPlayer, vscEditorTrackRecorder],
-        PLAYER_TRACK_INDEX,
+      const vscEditorPlayer = new VscEditorPlayer(context, workspace);
+      const vscEditorRecorder = new VscEditorRecorder(context, workspace);
+      const audioCtrls = session.audioTracks.map(
+        audioTrack => new AudioCtrl(audioTrack, postAudioMessage, getSessionBlobWebviewUri, sessionIO),
       );
-      const audioTrackPlayers: { [key: string]: AudioTrackPlayer } = {};
-      for (const audioTrack of session.audioTracks) {
-        const p = new AudioTrackPlayer(audioTrack, postAudioMessage, getSessionBlobWebviewUri, sessionIO);
-        audioTrackPlayers[audioTrack.id] = p;
-        sessionTrackPlayer.addTrack(p);
-      }
-      sessionTrackPlayer.addTrack(switchTrackPlayer);
-      sessionTrackPlayer.load();
-      sessionTrackPlayer.seek(clock);
+
+      const sessionCtrl = new SessionCtrl(setup.sessionSummary, audioCtrls, vscEditorPlayer, vscEditorRecorder);
+      sessionCtrl.load();
+      sessionCtrl.seek(clock);
 
       const recorder = new Recorder(
         context,
         db,
         setup.sessionSummary,
-        sessionTrackPlayer,
-        switchTrackPlayer,
-        audioTrackPlayers,
+        workspace,
+        sessionCtrl,
         postAudioMessage,
         getSessionBlobWebviewUri,
-        onChange,
+        onUpdateFrontend,
       );
+
       await recorder.save();
       return recorder;
     }
@@ -208,49 +164,42 @@ class Recorder {
     }
   }
 
-  async changeHandler() {
-    if (this.isInRecorderMode) {
-      this.isDirty = true;
-      this.sessionSummary.duration = this.sessionTrackPlayer.track.clockRange.end;
-    }
-    // update frontend
-    this.onChange();
+  sessionCtrlUpdateFrontendHandler() {
+    this.onUpdateFrontend();
+  }
+
+  async sessionCtrlChangeHandler() {
+    this.isDirty = true;
   }
 
   record() {
-    this.switchTrackPlayer.switch(RECORDER_TRACK_INDEX);
-    this.sessionTrackPlayer.start();
+    this.sessionCtrl.record();
     this.saveHistoryOpenClose().catch(console.error);
   }
 
   play() {
-    this.switchTrackPlayer.switch(PLAYER_TRACK_INDEX);
-    this.sessionTrackPlayer.start();
+    this.sessionCtrl.play();
     this.saveHistoryOpenClose().catch(console.error);
   }
 
   pause() {
-    this.sessionTrackPlayer.pause();
-  }
-
-  stop() {
-    this.sessionTrackPlayer.stop();
+    this.sessionCtrl.pause();
   }
 
   seek(clock: number) {
-    this.sessionTrackPlayer.seek(clock);
+    this.sessionCtrl.seek(clock);
   }
 
   dispose() {
-    this.sessionTrackPlayer.dispose();
+    // this.sessionCtrl.dispose();
   }
 
   isSessionEmpty(): boolean {
-    return this.track.events.length === 0 && Object.values(this.audioTrackPlayers).length === 0;
+    return this.workspace.editorTrack.events.length === 0 && this.sessionCtrl.audioCtrls.length === 0;
   }
 
   handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
-    const p = this.audioTrackPlayers[e.id];
+    const p = this.sessionCtrl.audioCtrls.find(a => a.track.id === e.id);
     if (p) {
       p.handleAudioEvent(e);
     } else {
@@ -261,20 +210,20 @@ class Recorder {
   updateState(changes: t.RecorderUpdate) {
     if (changes.title !== undefined) this.sessionSummary.title = changes.title;
     if (changes.description !== undefined) this.sessionSummary.description = changes.description;
-    // if (changes.clock !== undefined) this.sessionSummary.duration = this.sessionTrackPlayer.clock = changes.clock;
+    // if (changes.clock !== undefined) this.sessionSummary.duration = this.sessionCtrl.clock = changes.clock;
     if (changes.root !== undefined) throw new Error('Recorder.updateState cannot change root after initialization');
 
     this.isDirty = true;
   }
 
   /**
-   * May be called without pause() or stop().
+   * May be called without pause().
    */
   async save() {
     this.sessionSummary.timestamp = new Date().toISOString();
     const session: t.Session = {
-      editorTrack: this.track.toJSON(),
-      audioTracks: Object.values(this.audioTrackPlayers).map(p => p.track),
+      editorTrack: this.workspace.editorTrack.toJSON(),
+      audioTracks: this.sessionCtrl.audioCtrls.map(p => p.track),
     };
     await this.db.writeSession(session, this.sessionSummary);
     await this.saveHistoryOpenClose();

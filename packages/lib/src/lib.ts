@@ -134,3 +134,15 @@ export function getTrackPlayerSummary(p: t.TrackPlayer): t.TrackPlayerSummary {
     playbackRate: p.playbackRate,
   };
 }
+
+export function isClockInRange(clock: number, range: t.ClockRange): boolean {
+  return clock >= range.start && clock < range.end;
+}
+
+export function clockToLocal(clock: number, range: t.ClockRange): number {
+  return clock - range.start;
+}
+
+export function clockToGlobal(clock: number, range: t.ClockRange): number {
+  return clock + range.start;
+}
