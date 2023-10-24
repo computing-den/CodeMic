@@ -1,5 +1,5 @@
 import { SessionIO } from './session.js';
-import { types as t, path, lib, editorTrack as et, AudioTrackPlayer, SessionTrackPlayer } from '@codecast/lib';
+import { types as t, path, lib, AudioTrackPlayer, SessionTrackPlayer } from '@codecast/lib';
 import VscEditorWorkspace from './vsc_editor_workspace.js';
 import VscEditorTrackPlayer from './vsc_editor_track_player.js';
 import Db, { type WriteOptions } from './db.js';
@@ -20,6 +20,10 @@ class Player {
     return this.vscEditorTrackPlayer.workspace.root;
   }
 
+  get clock(): number {
+    return this.sessionTrackPlayer.clock;
+  }
+
   // private vscEditorEventStepper = new VscEditorEventStepper(this.workspace);
 
   constructor(
@@ -28,7 +32,7 @@ class Player {
     public sessionSummary: t.SessionSummary,
     private sessionTrackPlayer: SessionTrackPlayer,
     private vscEditorTrackPlayer: VscEditorTrackPlayer,
-    private audioTrackPlayer: AudioTrackPlayer,
+    private audioTrackPlayers: { [key: string]: AudioTrackPlayer },
     private onChange: () => any,
   ) {
     sessionTrackPlayer.onChange = this.changeHandler.bind(this);
@@ -53,16 +57,15 @@ class Player {
     const workspace = await VscEditorWorkspace.populateEditorTrack(setup.root, session, sessionIO);
     if (workspace) {
       // postMessage({ type: 'backendMediaEvent', event: { type: 'load', src: audioSrc.toString() } });
-      const vscEditorTrackPlayer = new VscEditorTrackPlayer(context, workspace);
-      const audioTrackPlayer = new AudioTrackPlayer(
-        session.audioTracks[0],
-        postAudioMessage,
-        getSessionBlobWebviewUri,
-        sessionIO,
-      );
       const sessionTrackPlayer = new SessionTrackPlayer();
+      const vscEditorTrackPlayer = new VscEditorTrackPlayer(context, workspace);
+      const audioTrackPlayers: { [key: string]: AudioTrackPlayer } = {};
+      for (const audioTrack of session.audioTracks) {
+        const p = new AudioTrackPlayer(audioTrack, postAudioMessage, getSessionBlobWebviewUri, sessionIO);
+        audioTrackPlayers[audioTrack.id] = p;
+        sessionTrackPlayer.addTrack(p);
+      }
       sessionTrackPlayer.addTrack(vscEditorTrackPlayer);
-      sessionTrackPlayer.addTrack(audioTrackPlayer);
       sessionTrackPlayer.load();
       return new Player(
         context,
@@ -70,7 +73,7 @@ class Player {
         setup.sessionSummary,
         sessionTrackPlayer,
         vscEditorTrackPlayer,
-        audioTrackPlayer,
+        audioTrackPlayers,
         onChange,
       );
     }
@@ -89,10 +92,6 @@ class Player {
     this.saveHistoryOpenClose().catch(console.error);
   }
 
-  dispose() {
-    this.sessionTrackPlayer.dispose();
-  }
-
   pause() {
     this.sessionTrackPlayer.pause();
     this.afterPauseOrStop();
@@ -107,8 +106,21 @@ class Player {
     this.sessionTrackPlayer.seek(clock);
   }
 
+  dispose() {
+    this.sessionTrackPlayer.dispose();
+  }
+
   afterPauseOrStop() {
     this.saveHistoryClock().catch(console.error);
+  }
+
+  handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
+    const p = this.audioTrackPlayers[e.id];
+    if (p) {
+      p.handleAudioEvent(e);
+    } else {
+      console.error(`handleFrontendAudioEvent audio track player with id ${e.id} not found`);
+    }
   }
 
   updateState(changes: t.PlayerUpdate) {
@@ -116,18 +128,10 @@ class Player {
     // if (changes.clock !== undefined) await this.enqueueUpdate(changes.clock);
   }
 
-  handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
-    this.audioTrackPlayer.handleAudioEvent(e);
-  }
-
-  getClock(): number {
-    return this.sessionTrackPlayer.clock;
-  }
-
   private async saveHistoryClock(options?: WriteOptions) {
     this.db.mergeSessionHistory({
       id: this.sessionSummary.id,
-      lastWatchedClock: this.getClock(),
+      lastWatchedClock: this.clock,
     });
     await this.db.write(options);
   }

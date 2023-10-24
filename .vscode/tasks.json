@@ -9,7 +9,7 @@
       "tsconfig": "tsconfig.json",
       "problemMatcher": {
         "base": "$tsc-watch",
-        "fileLocation": ["relative", "${workspaceFolder}/packages"],
+        "fileLocation": ["relative", "${workspaceFolder}"],
       },
       "isBackground": false,
       "presentation": {

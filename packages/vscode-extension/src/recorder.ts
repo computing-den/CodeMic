@@ -1,50 +1,115 @@
-import { SessionIO } from './session.js';
+import {
+  types as t,
+  path,
+  lib,
+  editorTrack as et,
+  AudioTrackPlayer,
+  SessionTrackPlayer,
+  SwitchTrackPlayer,
+} from '@codecast/lib';
 import VscEditorWorkspace from './vsc_editor_workspace.js';
+import VscEditorTrackPlayer from './vsc_editor_track_player.js';
+import VscEditorTrackRecorder from './vsc_editor_track_recorder.js';
+import { SessionIO } from './session.js';
 import * as misc from './misc.js';
 import Db, { type WriteOptions } from './db.js';
-import { types as t, path, editorTrack as et, lib } from '@codecast/lib';
 import * as vscode from 'vscode';
 import fs from 'fs';
 import _ from 'lodash';
 import assert from 'assert';
 import { v4 as uuid } from 'uuid';
 
-const SCROLL_LINES_TRIGGER = 2;
+const PLAYER_TRACK_INDEX = 0;
+const RECORDER_TRACK_INDEX = 1;
 
 class Recorder {
-  state: t.TrackPlayerState = {
-    status: t.TrackPlayerStatus.Init,
-    loading: false,
-    loaded: false,
-    buffering: false,
-    seeking: false,
-  };
-
-  private disposables: vscode.Disposable[] = [];
-  private scrolling: boolean = false;
-  private scrollStartRange?: t.Range;
-
-  get editorTrack(): et.EditorTrack {
-    return this.workspace.editorTrack;
+  get trackPlayerSummary(): t.TrackPlayerSummary {
+    return lib.getTrackPlayerSummary(this.sessionTrackPlayer);
   }
+
+  get DEV_trackPlayerSummaries(): t.TrackPlayerSummary[] {
+    return this.sessionTrackPlayer.DEV_trackPlayerSummaries;
+  }
+
+  get recorderTrackPlayer(): VscEditorTrackRecorder {
+    return this.switchTrackPlayer.trackPlayers[RECORDER_TRACK_INDEX] as VscEditorTrackRecorder;
+  }
+
+  get playerTrackPlayer(): VscEditorTrackPlayer {
+    return this.switchTrackPlayer.trackPlayers[PLAYER_TRACK_INDEX] as VscEditorTrackPlayer;
+  }
+
+  get root(): t.AbsPath {
+    return this.recorderTrackPlayer.workspace.root;
+  }
+
+  get track(): et.EditorTrack {
+    return this.recorderTrackPlayer.track;
+  }
+
+  get clock(): number {
+    return this.sessionTrackPlayer.clock;
+  }
+
+  get isInRecorderMode(): boolean {
+    return this.switchTrackPlayer.curIndex === RECORDER_TRACK_INDEX;
+  }
+
+  isDirty: boolean = false;
+
+  // private lastSavedClock: number;
 
   constructor(
     public context: vscode.ExtensionContext,
     public db: Db,
     public sessionSummary: t.SessionSummary,
-    public workspace: VscEditorWorkspace,
-    private clock: number = 0,
-    private lastSavedClock: number = clock,
-  ) {}
+    private sessionTrackPlayer: SessionTrackPlayer,
+    private switchTrackPlayer: SwitchTrackPlayer,
+    private audioTrackPlayers: { [key: string]: AudioTrackPlayer },
+    private postAudioMessage: t.PostAudioMessageToFrontend,
+    private getSessionBlobWebviewUri: (sha1: string) => t.Uri,
+    private onChange: () => any,
+  ) {
+    sessionTrackPlayer.onChange = this.changeHandler.bind(this);
+    // this.lastSavedClock = sessionTrackPlayer.clock;
+  }
 
   /**
    * root must be already resolved.
    */
-  static async fromDirAndVsc(context: vscode.ExtensionContext, db: Db, setup: t.RecorderSetup): Promise<Recorder> {
+  static async fromDirAndVsc(
+    context: vscode.ExtensionContext,
+    db: Db,
+    setup: t.RecorderSetup,
+    postAudioMessage: t.PostAudioMessageToFrontend,
+    getSessionBlobWebviewUri: (sha1: string) => t.Uri,
+    onChange: () => any,
+  ): Promise<Recorder> {
     assert(setup.root);
     const sessionIO = new SessionIO(db, setup.sessionSummary.id);
     const workspace = await VscEditorWorkspace.fromDirAndVsc(sessionIO, setup.root);
-    return new Recorder(context, db, setup.sessionSummary, workspace);
+    const vscEditorTrackPlayer = new VscEditorTrackPlayer(context, workspace);
+    const vscEditorTrackRecorder = new VscEditorTrackRecorder(context, workspace);
+    const switchTrackPlayer = new SwitchTrackPlayer([vscEditorTrackPlayer, vscEditorTrackRecorder], PLAYER_TRACK_INDEX);
+    const sessionTrackPlayer = new SessionTrackPlayer();
+
+    sessionTrackPlayer.addTrack(switchTrackPlayer);
+    sessionTrackPlayer.load();
+
+    const recorder = new Recorder(
+      context,
+      db,
+      setup.sessionSummary,
+      sessionTrackPlayer,
+      switchTrackPlayer,
+      {},
+      postAudioMessage,
+      getSessionBlobWebviewUri,
+      onChange,
+    );
+
+    await recorder.save();
+    return recorder;
   }
 
   /**
@@ -54,6 +119,9 @@ class Recorder {
     context: vscode.ExtensionContext,
     db: Db,
     setup: t.RecorderSetup,
+    postAudioMessage: t.PostAudioMessageToFrontend,
+    getSessionBlobWebviewUri: (sha1: string) => t.Uri,
+    onChange: () => any,
   ): Promise<Recorder | undefined> {
     assert(setup.root);
 
@@ -61,14 +129,47 @@ class Recorder {
     if (setup.fork) {
       assert(setup.baseSessionSummary);
       assert(setup.forkClock);
-      await db.copySession(setup.baseSessionSummary, setup.sessionSummary);
+      await db.copySessionDir(setup.baseSessionSummary, setup.sessionSummary);
       clock = setup.forkClock;
     }
 
     const sessionIO = new SessionIO(db, setup.sessionSummary.id);
     const session = await db.readSession(setup.sessionSummary.id);
     const workspace = await VscEditorWorkspace.populateEditorTrack(setup.root, session, sessionIO, clock, clock);
-    return workspace && new Recorder(context, db, setup.sessionSummary, workspace, clock);
+    if (workspace) {
+      // TODO cut all tracks or remove them completely if out of range.
+
+      const sessionTrackPlayer = new SessionTrackPlayer();
+      const vscEditorTrackPlayer = new VscEditorTrackPlayer(context, workspace);
+      const vscEditorTrackRecorder = new VscEditorTrackRecorder(context, workspace);
+      const switchTrackPlayer = new SwitchTrackPlayer(
+        [vscEditorTrackPlayer, vscEditorTrackRecorder],
+        PLAYER_TRACK_INDEX,
+      );
+      const audioTrackPlayers: { [key: string]: AudioTrackPlayer } = {};
+      for (const audioTrack of session.audioTracks) {
+        const p = new AudioTrackPlayer(audioTrack, postAudioMessage, getSessionBlobWebviewUri, sessionIO);
+        audioTrackPlayers[audioTrack.id] = p;
+        sessionTrackPlayer.addTrack(p);
+      }
+      sessionTrackPlayer.addTrack(switchTrackPlayer);
+      sessionTrackPlayer.load();
+      sessionTrackPlayer.seek(clock);
+
+      const recorder = new Recorder(
+        context,
+        db,
+        setup.sessionSummary,
+        sessionTrackPlayer,
+        switchTrackPlayer,
+        audioTrackPlayers,
+        postAudioMessage,
+        getSessionBlobWebviewUri,
+        onChange,
+      );
+      await recorder.save();
+      return recorder;
+    }
   }
 
   /**
@@ -107,81 +208,63 @@ class Recorder {
     }
   }
 
-  async start() {
-    assert(this.state.loaded && this.state.status < t.TrackPlayerStatus.Stopped);
-
-    this.state.status = t.TrackPlayerStatus.Running;
-
-    // listen for open document events
-    {
-      const disposable = vscode.workspace.onDidOpenTextDocument(vscTextDocument => {
-        this.openTextDocument(vscTextDocument);
-      });
-      this.disposables.push(disposable);
+  async changeHandler() {
+    if (this.isInRecorderMode) {
+      this.isDirty = true;
+      this.sessionSummary.duration = this.sessionTrackPlayer.track.clockRange.end;
     }
-
-    // listen for show document events
-    {
-      const disposable = vscode.window.onDidChangeActiveTextEditor(vscTextEditor => {
-        if (vscTextEditor) this.showTextEditor(vscTextEditor);
-      });
-      this.disposables.push(disposable);
-    }
-
-    // listen for text change events
-    {
-      const disposable = vscode.workspace.onDidChangeTextDocument(e => {
-        this.textChange(e.document, e.contentChanges);
-      });
-      this.disposables.push(disposable);
-    }
-
-    // listen for selection change events
-    {
-      const disposable = vscode.window.onDidChangeTextEditorSelection(e => {
-        // checking for e.kind !== TextEditorSelectionChangeKind.Keyboard isn't helpful
-        // because shift+arrow keys would trigger this event kind
-        this.select(e.textEditor, e.selections);
-      });
-      this.disposables.push(disposable);
-    }
-
-    // listen for save events
-    {
-      const disposable = vscode.workspace.onDidSaveTextDocument(vscTextDocument => {
-        this.saveTextDocument(vscTextDocument);
-      });
-      this.disposables.push(disposable);
-    }
-
-    // listen for scroll events
-    {
-      const disposable = vscode.window.onDidChangeTextEditorVisibleRanges(e => {
-        this.scroll(e.textEditor, e.visibleRanges);
-      });
-      this.disposables.push(disposable);
-    }
-
-    // register disposables
-    this.context.subscriptions.push(...this.disposables);
-
-    await this.saveHistoryOpenClose();
+    // update frontend
+    this.onChange();
   }
 
-  async pause() {
-    this.state.status = t.TrackPlayerStatus.Paused;
-    this.dispose();
+  record() {
+    this.switchTrackPlayer.switch(RECORDER_TRACK_INDEX);
+    this.sessionTrackPlayer.start();
+    this.saveHistoryOpenClose().catch(console.error);
+  }
+
+  play() {
+    this.switchTrackPlayer.switch(PLAYER_TRACK_INDEX);
+    this.sessionTrackPlayer.start();
+    this.saveHistoryOpenClose().catch(console.error);
+  }
+
+  pause() {
+    this.sessionTrackPlayer.pause();
+  }
+
+  stop() {
+    this.sessionTrackPlayer.stop();
+  }
+
+  seek(clock: number) {
+    this.sessionTrackPlayer.seek(clock);
   }
 
   dispose() {
-    for (const d of this.disposables) d.dispose();
-    this.disposables = [];
+    this.sessionTrackPlayer.dispose();
   }
 
-  async stop() {
-    this.pause();
-    this.state.status = t.TrackPlayerStatus.Stopped;
-    await this.saveHistoryOpenClose();
+  isSessionEmpty(): boolean {
+    return this.track.events.length === 0 && Object.values(this.audioTrackPlayers).length === 0;
+  }
+
+  handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
+    const p = this.audioTrackPlayers[e.id];
+    if (p) {
+      p.handleAudioEvent(e);
+    } else {
+      console.error(`handleFrontendAudioEvent audio track player with id ${e.id} not found`);
+    }
+  }
+
+  updateState(changes: t.RecorderUpdate) {
+    if (changes.title !== undefined) this.sessionSummary.title = changes.title;
+    if (changes.description !== undefined) this.sessionSummary.description = changes.description;
+    // if (changes.clock !== undefined) this.sessionSummary.duration = this.sessionTrackPlayer.clock = changes.clock;
+    if (changes.root !== undefined) throw new Error('Recorder.updateState cannot change root after initialization');
+
+    this.isDirty = true;
   }
 
   /**
@@ -190,267 +273,22 @@ class Recorder {
   async save() {
     this.sessionSummary.timestamp = new Date().toISOString();
     const session: t.Session = {
-      editorTrack: this.editorTrack.toJSON(),
-      audioTracks: [], // TODO must preserve audioTrack
+      editorTrack: this.track.toJSON(),
+      audioTracks: Object.values(this.audioTrackPlayers).map(p => p.track),
     };
     await this.db.writeSession(session, this.sessionSummary);
     await this.saveHistoryOpenClose();
-    this.lastSavedClock = this.getClock();
-  }
-
-  updateState(changes: t.RecorderUpdate) {
-    if (changes.title !== undefined) this.sessionSummary.title = changes.title;
-    if (changes.description !== undefined) this.sessionSummary.description = changes.description;
-    if (changes.clock !== undefined) this.sessionSummary.duration = this.clock = changes.clock;
-    if (changes.root !== undefined) throw new Error('Recorder.updateState cannot changes root');
-  }
-
-  isSessionEmpty(): boolean {
-    return this.editorTrack.events.length === 0;
-  }
-
-  textChange(
-    vscTextDocument: vscode.TextDocument,
-    vscContentChanges: readonly vscode.TextDocumentContentChangeEvent[],
-  ) {
-    if (!this.workspace.shouldRecordVscUri(vscTextDocument.uri)) return;
-
-    const uri = this.workspace.uriFromVsc(vscTextDocument.uri);
-    console.log(`adding textChange for ${uri}`);
-
-    if (vscContentChanges.length === 0) {
-      console.log(`textChange: vscContentChanges for ${uri} is empty`);
-      return;
-    }
-
-    // Here, we assume that it is possible to get a textChange without a text editor
-    // because vscode's event itself does not provide a text editor.
-
-    const irTextDocument = this.openTextDocumentWithUri(vscTextDocument, uri, false);
-    const irContentChanges = vscContentChanges.map(({ range: vscRange, text }) => {
-      const range = this.workspace.rangeFromVsc(vscRange);
-      const [revRange, revText] = irTextDocument.applyContentChange(range, text, true);
-      return { range, text, revRange, revText };
-    });
-
-    this.pushEvent({
-      type: 'textChange',
-      clock: this.getClock(),
-      uri: irTextDocument.uri,
-      contentChanges: irContentChanges,
-    });
-  }
-
-  openTextDocument(vscTextDocument: vscode.TextDocument) {
-    if (!this.workspace.shouldRecordVscUri(vscTextDocument.uri)) return;
-
-    const uri = this.workspace.uriFromVsc(vscTextDocument.uri);
-    console.log(`adding openTextDocument for ${uri}`);
-
-    this.openTextDocumentWithUri(vscTextDocument, uri, true);
-  }
-
-  showTextEditor(vscTextEditor: vscode.TextEditor) {
-    if (!this.workspace.shouldRecordVscUri(vscTextEditor.document.uri)) return;
-
-    const uri = this.workspace.uriFromVsc(vscTextEditor.document.uri);
-    console.log(`adding showTextEditor for ${uri}`);
-
-    const revUri = this.editorTrack.activeTextEditor?.document.uri;
-    const revSelections = this.editorTrack.activeTextEditor?.selections;
-    const revVisibleRange = this.editorTrack.activeTextEditor?.visibleRange;
-
-    // Possibly inserts an openTextDocument or textChange event if the document wasn't found in internal editorTrack or
-    // its contents were different.
-    const irTextEditor = this.openTextEditorHelper(vscTextEditor, uri, true);
-    this.editorTrack.activeTextEditor = irTextEditor;
-
-    this.pushEvent({
-      type: 'showTextEditor',
-      clock: this.getClock(),
-      uri,
-      selections: irTextEditor.selections,
-      visibleRange: irTextEditor.visibleRange,
-      revUri,
-      revSelections,
-      revVisibleRange,
-    });
-  }
-
-  select(vscTextEditor: vscode.TextEditor, selections: readonly vscode.Selection[]) {
-    if (!this.workspace.shouldRecordVscUri(vscTextEditor.document.uri)) return;
-
-    const uri = this.workspace.uriFromVsc(vscTextEditor.document.uri);
-    console.log(`adding select for ${uri}`);
-    console.log(
-      `visibleRange: ${vscTextEditor.visibleRanges[0].start.line}:${vscTextEditor.visibleRanges[0].end.line}`,
-    );
-
-    const irTextEditor = this.editorTrack.getTextEditorByUri(uri);
-    const revSelections = irTextEditor.selections;
-    const revVisibleRanges = irTextEditor.visibleRange;
-    irTextEditor.select(
-      this.workspace.selectionsFromVsc(selections),
-      this.workspace.rangeFromVsc(vscTextEditor.visibleRanges[0]),
-    );
-
-    this.pushEvent({
-      type: 'select',
-      clock: this.getClock(),
-      uri,
-      selections: irTextEditor.selections,
-      visibleRange: irTextEditor.visibleRange,
-      revSelections,
-      revVisibleRange: revVisibleRanges,
-    });
-  }
-
-  saveTextDocument(vscTextDocument: vscode.TextDocument) {
-    if (!this.workspace.shouldRecordVscUri(vscTextDocument.uri)) return;
-
-    const uri = this.workspace.uriFromVsc(vscTextDocument.uri);
-    console.log(`adding save for ${uri}`);
-
-    this.pushEvent({
-      type: 'save',
-      clock: this.getClock(),
-      uri,
-    });
-  }
-
-  scroll(vscTextEditor: vscode.TextEditor, visibleRanges: readonly vscode.Range[]) {
-    if (!this.workspace.shouldRecordVscUri(vscTextEditor.document.uri)) return;
-
-    const uri = this.workspace.uriFromVsc(vscTextEditor.document.uri);
-    const visibleRange = this.workspace.rangeFromVsc(visibleRanges[0]);
-    console.log(`visible range: ${visibleRange.start.line}:${visibleRange.end.line}`);
-
-    if (!this.scrolling) {
-      this.scrollStartRange ??= visibleRange;
-      const delta = Math.abs(visibleRange.start.line - this.scrollStartRange.start.line);
-      if (delta > SCROLL_LINES_TRIGGER) {
-        this.scrolling = true;
-      }
-    }
-
-    if (!this.scrolling) return;
-
-    console.log(`adding scroll for ${uri}`);
-
-    const irTextEditor = this.editorTrack.getTextEditorByUri(uri);
-    const revVisibleRange = irTextEditor.visibleRange;
-    irTextEditor.scroll(visibleRange);
-
-    this.pushEvent({
-      type: 'scroll',
-      clock: this.getClock(),
-      uri,
-      visibleRange,
-      revVisibleRange,
-    });
-  }
-
-  getRoot(): t.AbsPath | undefined {
-    return this.workspace.root;
-  }
-
-  getClock(): number {
-    return this.clock;
-    // if (this.status === t.TrackPlayerStatus.Running) {
-    //   return (Date.now() - this.lastStartTimeMs) / 1000 + this.clock;
-    // } else {
-    //   return this.clock;
-    // }
-  }
-
-  isDirty(): boolean {
-    return this.getClock() > this.lastSavedClock;
-  }
-
-  private pushEvent(e: t.EditorEvent) {
-    if (e.type !== 'scroll') {
-      this.scrolling = false;
-      this.scrollStartRange = undefined;
-    }
-    this.editorTrack.events.push(e);
+    // this.lastSavedClock = this.clock;
+    this.isDirty = false;
   }
 
   private async saveHistoryOpenClose() {
     this.db.mergeSessionHistory({
       id: this.sessionSummary.id,
       lastRecordedTimestamp: new Date().toISOString(),
-      root: this.workspace.root,
+      root: this.root,
     });
     await this.db.write();
-  }
-
-  /**
-   * Inserts an 'openTextDocument' event only if session does not have the document open.
-   * When checkContent is true, it will compare the content of the vsc text document with that of the internal document
-   * and if they are different, it will update internal document and insert a textChange event.
-   * Even if openTextDocument was not emitted before, it might still exist in the internal session if it was scanned
-   * from the disk.
-   * So, 'openTextDocument' event always has the text field since if the document was already in checkpoint, no
-   * 'openTextDocument' event would be generated at all.
-   * Assumes a valid uri which has already been approved by this.workspace.shouldRecordVscUri().
-   */
-  private openTextDocumentWithUri(
-    vscTextDocument: vscode.TextDocument,
-    uri: t.Uri,
-    checkContent: boolean,
-  ): et.TextDocument {
-    let irTextDocument = this.editorTrack.findTextDocumentByUri(uri);
-
-    if (irTextDocument) {
-      if (checkContent) {
-        const linesMatch =
-          irTextDocument.lines.length === vscTextDocument.lineCount &&
-          irTextDocument.lines.every((line, i) => line === vscTextDocument.lineAt(i).text);
-        if (!linesMatch) {
-          // TOOD I think this might happen if the file is changed externally, but maybe vscode automatically
-          //      detects that and emits a textChange event, or maybe it'll emit a second openTextDocument.
-          //      What if it changed on disk before it was opened in vscode? vscode wouldn't be able to detect changes anyways.
-
-          const range = irTextDocument.getRange();
-          const text = vscTextDocument.getText();
-          const [revRange, revText] = irTextDocument.applyContentChange(range, text, true);
-          this.pushEvent({
-            type: 'textChange',
-            clock: this.getClock(),
-            uri,
-            contentChanges: [{ range, text, revRange, revText }],
-          });
-        }
-      }
-    } else {
-      irTextDocument = this.workspace.textDocumentFromVsc(vscTextDocument, uri);
-      this.editorTrack.insertTextDocument(irTextDocument);
-      this.pushEvent({
-        type: 'openTextDocument',
-        clock: this.getClock(),
-        text: vscTextDocument.getText(),
-        uri,
-        eol: irTextDocument.eol,
-      });
-    }
-    return irTextDocument;
-  }
-
-  /**
-   * It does not push a showTextEditor event but it might push an 'openTextDocument' or a 'textChange' event.
-   */
-  private openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri, checkContent: boolean): et.TextEditor {
-    const selections = this.workspace.selectionsFromVsc(vscTextEditor.selections);
-    const visibleRange = this.workspace.rangeFromVsc(vscTextEditor.visibleRanges[0]);
-    const textDocument = this.openTextDocumentWithUri(vscTextEditor.document, uri, checkContent);
-    let textEditor = this.editorTrack.findTextEditorByUri(textDocument.uri);
-    if (!textEditor) {
-      textEditor = new et.TextEditor(textDocument, selections, visibleRange);
-      this.editorTrack.insertTextEditor(textEditor);
-    } else {
-      textEditor.select(selections, visibleRange);
-    }
-    return textEditor;
   }
 }
 

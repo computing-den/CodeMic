@@ -77,19 +77,22 @@ export default class VscEditorWorkspace extends VscWorkspace {
     };
     const editorTrack = await et.EditorTrack.fromJSON(root, sessionIO, session.editorTrack);
     const workspace = new VscEditorWorkspace(root, editorTrack, sessionIO);
-    const initSnapshot = await workspace.makeSnapshotFromDirAndVsc();
+    const initSnapshot = await workspace.makeSnapshotFromDirAndVsc(sessionIO);
     await editorTrack.setInitSnapshotAndRestore(initSnapshot);
     return workspace;
   }
 
-  async makeSnapshotFromDirAndVsc(): Promise<t.EditorTrackSnapshot> {
+  async makeSnapshotFromDirAndVsc(sessionIO: t.SessionIO): Promise<t.EditorTrackSnapshot> {
     for (const vscTextDocument of vscode.workspace.textDocuments) {
       if (vscTextDocument.isDirty) {
         throw new Error('Checkpoint.fromWorkspace: there are unsaved files in the current workspace.');
       }
     }
 
-    // Create the worktree.
+    // Initialize the session directory.
+    await sessionIO.init();
+
+    // Create the worktree and copy files to session directory.
     // TODO: ignore files in .gitignore and .codecastignore
     const worktree: t.Worktree = {};
     const paths = await this.readDirRecursively({ includeFiles: true });
@@ -98,6 +101,7 @@ export default class VscEditorWorkspace extends VscWorkspace {
       const data = await fs.promises.readFile(path.join(this.root, p));
       const sha1 = await misc.computeSHA1(data);
       worktree[uri] = { type: 'local', sha1 };
+      await sessionIO.copyLocalFile(path.join(this.root, p), sha1);
     }
 
     // Get textEditors from vscode.window.visibleTextEditors first. These have selections and visible range.

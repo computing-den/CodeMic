@@ -14,6 +14,7 @@ export default class ClockTrackPlayer implements t.TrackPlayer {
     seeking: false,
   };
   playbackRate = 1;
+  isRecorder = false;
   onProgress?: (clock: number) => any;
   onStateChange?: (state: t.TrackPlayerState) => any;
 
@@ -21,12 +22,8 @@ export default class ClockTrackPlayer implements t.TrackPlayer {
   private clockOrigin: number = 0;
   private request: any;
 
-  constructor(public intervalMs: number, endClock: number) {
-    this.track = { id: uuid(), clockRange: { start: 0, end: endClock } };
-  }
-
-  setEndClock(endClock: number) {
-    this.track.clockRange.end = endClock;
+  constructor(public intervalMs: number) {
+    this.track = { id: uuid(), clockRange: { start: 0, end: Infinity } };
   }
 
   load() {
@@ -66,6 +63,14 @@ export default class ClockTrackPlayer implements t.TrackPlayer {
     if (this.state.status === t.TrackPlayerStatus.Running) {
       this.restart();
     }
+  }
+
+  setClock(clock: number) {
+    this.clock = clock;
+  }
+
+  extend(clock: number) {
+    // this.track.clockRange.end = clock;
   }
 
   setPlaybackRate(rate: number) {

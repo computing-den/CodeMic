@@ -62,6 +62,11 @@ export default class Db {
     return fs.promises.readFile(p);
   }
 
+  async copyAsSessionBlob(sessionId: string, src: t.AbsPath, sha1: string) {
+    const blobPath = path.abs(userPaths.data, 'sessions', sessionId, 'blobs', sha1);
+    await fs.promises.cp(src, blobPath, { recursive: true });
+  }
+
   getSessionBlobPathBySha1(sessionId: string, sha1: string): t.AbsPath {
     return path.abs(userPaths.data, 'sessions', sessionId, 'blobs', sha1);
   }
@@ -75,11 +80,11 @@ export default class Db {
     await fs.promises.rm(path.abs(userPaths.data, 'sessions', id), { force: true, recursive: true });
   }
 
-  async copySession(from: t.SessionSummary, to: t.SessionSummary) {
+  async copySessionDir(from: t.SessionSummary, to: t.SessionSummary) {
     const fromPath = path.abs(userPaths.data, 'sessions', from.id);
     const toPath = path.abs(userPaths.data, 'sessions', to.id);
     await fs.promises.cp(fromPath, toPath);
-    await this.writeSessionSummary(to);
+    // await this.writeSessionSummary(to);
   }
 }
 

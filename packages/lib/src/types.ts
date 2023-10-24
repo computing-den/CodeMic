@@ -29,14 +29,15 @@ export type FrontendToBackendReqRes =
       request: { type: 'openRecorder'; sessionId?: string; fork?: boolean; forkClock?: number };
       response: StoreResponse;
     }
-  | { request: { type: 'play' }; response: StoreResponse }
-  | { request: { type: 'record' }; response: StoreResponse }
-  | { request: { type: 'pausePlayer' }; response: StoreResponse }
-  | { request: { type: 'seekPlayer'; clock: number }; response: StoreResponse }
-  | { request: { type: 'pauseRecorder' }; response: StoreResponse }
-  | { request: { type: 'saveRecorder' }; response: StoreResponse }
-  | { request: { type: 'updateRecorder'; changes: RecorderUpdate }; response: StoreResponse }
-  | { request: { type: 'updatePlayer'; changes: PlayerUpdate }; response: StoreResponse }
+  | { request: { type: 'player/play' }; response: StoreResponse }
+  | { request: { type: 'player/pause' }; response: StoreResponse }
+  | { request: { type: 'player/seek'; clock: number }; response: StoreResponse }
+  | { request: { type: 'player/update'; changes: PlayerUpdate }; response: StoreResponse }
+  | { request: { type: 'recorder/play' }; response: StoreResponse }
+  | { request: { type: 'recorder/record' }; response: StoreResponse }
+  | { request: { type: 'recorder/pause' }; response: StoreResponse }
+  | { request: { type: 'recorder/save' }; response: StoreResponse }
+  | { request: { type: 'recorder/update'; changes: RecorderUpdate }; response: StoreResponse }
   // | { request: { type: 'toggleRecorderStudio' }; response: StoreResponse }
   | { request: { type: 'deleteSession'; sessionId: string }; response: StoreResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
@@ -47,27 +48,27 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'audio'; event: FrontendAudioEvent }; response: OKResponse };
 
 export type FrontendAudioEvent =
-  | { type: 'loadstart' }
-  | { type: 'durationchange' }
-  | { type: 'loadedmetadata' }
-  | { type: 'loadeddata' }
-  | { type: 'progress' }
-  | { type: 'canplay' }
-  | { type: 'canplaythrough' }
-  | { type: 'suspend' }
-  | { type: 'abort' }
-  | { type: 'error'; error: string }
-  | { type: 'emptied' }
-  | { type: 'stalled' }
-  | { type: 'timeupdate'; clock: number }
-  | { type: 'playing' }
-  | { type: 'waiting' }
-  | { type: 'play' }
-  | { type: 'pause' }
-  | { type: 'ended' }
-  | { type: 'volumechange'; volume: number }
-  | { type: 'seeking' }
-  | { type: 'seeked' };
+  | { type: 'loadstart'; id: string }
+  | { type: 'durationchange'; id: string }
+  | { type: 'loadedmetadata'; id: string }
+  | { type: 'loadeddata'; id: string }
+  | { type: 'progress'; id: string }
+  | { type: 'canplay'; id: string }
+  | { type: 'canplaythrough'; id: string }
+  | { type: 'suspend'; id: string }
+  | { type: 'abort'; id: string }
+  | { type: 'error'; id: string; error: string }
+  | { type: 'emptied'; id: string }
+  | { type: 'stalled'; id: string }
+  | { type: 'timeupdate'; id: string; clock: number }
+  | { type: 'playing'; id: string }
+  | { type: 'waiting'; id: string }
+  | { type: 'play'; id: string }
+  | { type: 'pause'; id: string }
+  | { type: 'ended'; id: string }
+  | { type: 'volumechange'; id: string; volume: number }
+  | { type: 'seeking'; id: string }
+  | { type: 'seeked'; id: string };
 
 export type BackendToFrontendReqRes =
   | { request: { type: 'updateStore'; store: Store }; response: OKResponse }
@@ -141,13 +142,15 @@ export type WelcomeState = {
 };
 
 export type RecorderState = {
-  state: TrackPlayerState;
+  trackPlayerSummary: TrackPlayerSummary;
+  isInRecorderMode: boolean;
   sessionSummary: SessionSummary;
   clock: number;
   root?: string;
   fork?: boolean;
   forkClock?: number;
   history?: SessionHistoryItem;
+  DEV_trackPlayerSummaries: TrackPlayerSummary[];
   // studio: boolean;
 };
 
@@ -155,7 +158,6 @@ export type RecorderUpdate = {
   title?: string;
   description?: string;
   root?: string;
-  clock?: number;
 };
 
 export type RecorderSetup = {
@@ -259,6 +261,7 @@ export interface TrackPlayer {
   clock: number;
   state: TrackPlayerState;
   playbackRate: number;
+  isRecorder: boolean;
   onProgress?: (clock: number) => any;
   onStateChange?: (state: TrackPlayerState) => any;
 
@@ -267,6 +270,8 @@ export interface TrackPlayer {
   pause(): void;
   stop(): void;
   seek(clock: number): void;
+  setClock(clock: number): void;
+  extend(clock: number): void;
   setPlaybackRate(rate: number): void;
   dispose(): any;
 }
@@ -295,7 +300,9 @@ export type OpenDialogOptions = {
 };
 
 export interface SessionIO {
+  init(): Promise<void>;
   readFile(file: File): Promise<Uint8Array>;
+  copyLocalFile(src: AbsPath, sha1: string): Promise<void>;
 }
 
 export interface EditorEventStepper {

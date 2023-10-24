@@ -18,23 +18,23 @@ export default class Player extends Component<Props> {
   startPlayer = async () => {
     if (this.props.player.trackPlayerSummary.state.status === t.TrackPlayerStatus.Init) {
       if (this.props.player.root) {
-        await postMessage({ type: 'play' });
+        await postMessage({ type: 'player/play' });
       } else {
         // TODO show error to user
         console.error('Select a workspace folder');
       }
     } else {
       // if (this.isStoppedAlmostAtTheEnd()) await this.seek(0);
-      await postMessage({ type: 'play' });
+      await postMessage({ type: 'player/play' });
     }
   };
 
   pausePlayer = async () => {
-    await postMessage({ type: 'pausePlayer' });
+    await postMessage({ type: 'player/pause' });
   };
 
   rootChanged = async (root: string) => {
-    await postMessage({ type: 'updatePlayer', changes: { root } });
+    await postMessage({ type: 'player/update', changes: { root } });
   };
 
   seek = async (clock: number) => {
@@ -42,7 +42,7 @@ export default class Player extends Component<Props> {
       console.error(`Cannot seek track that is not loaded`);
       return;
     }
-    await postMessage({ type: 'seekPlayer', clock });
+    await postMessage({ type: 'player/seek', clock });
   };
 
   tocItemClicked = async (e: Event, item: t.TocItem) => {
@@ -86,9 +86,9 @@ export default class Player extends Component<Props> {
 
     let primaryAction: MT.PrimaryAction;
     if (player.trackPlayerSummary.state.status === t.TrackPlayerStatus.Running) {
-      primaryAction = { type: 'pausePlaying', title: 'Pause', onClick: this.pausePlayer };
+      primaryAction = { type: 'player/pause', title: 'Pause', onClick: this.pausePlayer };
     } else {
-      primaryAction = { type: 'play', title: 'Play', onClick: this.startPlayer };
+      primaryAction = { type: 'player/play', title: 'Play', onClick: this.startPlayer };
     }
 
     const toolbarActions = [

@@ -91,26 +91,26 @@ export class AudioManager {
   }
 
   handleGenericEvent = async (e: Event) => {
-    await this.postAudioEvent({ type: e.type as (typeof genericEventTypes)[number] });
+    await this.postAudioEvent({ type: e.type as (typeof genericEventTypes)[number], id: this.id });
   };
 
   handleVolumechange = async () => {
     console.log('handleVolumechange');
     // The volumechange event signifies that the volume has changed; that includes being muted.
-    await this.postAudioEvent({ type: 'volumechange', volume: this.audio.volume });
+    await this.postAudioEvent({ type: 'volumechange', volume: this.audio.volume, id: this.id });
   };
 
   handleTimeupdate = async () => {
     console.log('handleTimeupdate');
     // The timeupdate event is triggered every time the currentTime property changes. In practice, this occurs every 250 milliseconds. This event can be used to trigger the displaying of playback progress.
-    await this.postAudioEvent({ type: 'timeupdate', clock: this.audio.currentTime });
+    await this.postAudioEvent({ type: 'timeupdate', clock: this.audio.currentTime, id: this.id });
   };
 
   handleError = async (e: ErrorEvent) => {
     // An error is encountered while media data is being downloaded.
     console.error(e.error);
     console.error(e.message);
-    await this.postAudioEvent({ type: 'error', error: e.message });
+    await this.postAudioEvent({ type: 'error', error: e.message, id: this.id });
   };
 }
 

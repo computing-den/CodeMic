@@ -8,3 +8,4 @@ export { default as editorEventStepperDispatch } from './editor_event_stepper_di
 export { default as ClockTrackPlayer } from './clock_track_player.js';
 export { default as AudioTrackPlayer } from './audio_track_player.js';
 export { default as SessionTrackPlayer } from './session_track_player.js';
+export { default as SwitchTrackPlayer } from './switch_track_player.js';

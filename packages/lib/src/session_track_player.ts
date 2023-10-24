@@ -1,4 +1,3 @@
-import ClockTrackPlayer from './clock_track_player.js';
 import * as lib from './lib.js';
 import assert from './assert.js';
 import * as t from './types.js';
@@ -11,6 +10,10 @@ export default class SessionTrackPlayer implements t.TrackPlayer {
   get track(): t.Track {
     const maxTrackPlayer = _.maxBy(this.trackPlayers, p => p.track.clockRange.end)!;
     return { id: this.id, clockRange: maxTrackPlayer.track.clockRange };
+  }
+
+  get isRecorder(): boolean {
+    return this.trackPlayers.some(p => p.isRecorder);
   }
 
   get DEV_trackPlayerSummaries(): t.TrackPlayerSummary[] {
@@ -84,6 +87,18 @@ export default class SessionTrackPlayer implements t.TrackPlayer {
     }
 
     this.update({ status, seeking: true }, clock);
+  }
+
+  setClock(clock: number) {
+    assert(!this.isUpdating, 'SessionTrackPlayer setClock: an update is in progress.');
+    assert(this.updateQueue.length === 0, 'SessionTrackPlayer setClock: update queue must be empty.');
+    this.clock = clock;
+  }
+
+  extend(clock: number) {
+    for (const p of this.trackPlayers) {
+      if (p.isRecorder) p.extend(clock);
+    }
   }
 
   setPlaybackRate(rate: number) {
@@ -176,8 +191,10 @@ export default class SessionTrackPlayer implements t.TrackPlayer {
       }
     }
 
-    const inRange = this.getInRangeTrackPlayers();
-    const outOfRange = this.getOutOfRangeTrackPlayers();
+    // Try extending isRecorder children.
+    this.extend(this.clock);
+
+    const [inRange, outOfRange] = this.partitionTrackPlayers();
     const inRangeOrIncoming = this.getInRangeOrIncomingTrackPlayers();
 
     // Stop children that are out of range and still running.
@@ -288,10 +305,10 @@ export default class SessionTrackPlayer implements t.TrackPlayer {
   }
 
   /**
-   * Returns track players whose clock range matches the master clock [start, end)
+   * Returns in-range and out-of-range track players based on this.clock.
    */
-  private getInRangeTrackPlayers(): t.TrackPlayer[] {
-    return this.trackPlayers.filter(p => isClockInRange(this.clock, p.track.clockRange));
+  private partitionTrackPlayers(): [t.TrackPlayer[], t.TrackPlayer[]] {
+    return _.partition(this.trackPlayers, p => isClockInRange(this.clock, p.track.clockRange) || p.isRecorder);
   }
 
   /**
@@ -299,16 +316,11 @@ export default class SessionTrackPlayer implements t.TrackPlayer {
    * it will in a few seconds
    */
   private getInRangeOrIncomingTrackPlayers(): t.TrackPlayer[] {
-    return this.trackPlayers.filter(p =>
-      isClockInRange(this.clock, { start: p.track.clockRange.start - 10, end: p.track.clockRange.end }),
+    return this.trackPlayers.filter(
+      p =>
+        isClockInRange(this.clock, { start: p.track.clockRange.start - 10, end: p.track.clockRange.end }) ||
+        p.isRecorder,
     );
-  }
-
-  /**
-   * Returns track players whose clock range does not match the master clock [start, end)
-   */
-  private getOutOfRangeTrackPlayers(): t.TrackPlayer[] {
-    return this.trackPlayers.filter(p => !isClockInRange(this.clock, p.track.clockRange));
   }
 
   /**
@@ -363,7 +375,7 @@ function isReady(p: t.TrackPlayer) {
 }
 
 /**
- * Clock must be in range [start, end).
+ * Clock must be in range [start, end)
  */
 function isClockInRange(clock: number, range: t.ClockRange): boolean {
   return clock >= range.start && clock < range.end;

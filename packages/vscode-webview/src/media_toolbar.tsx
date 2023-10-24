@@ -5,10 +5,11 @@ import { h, Fragment, Component } from 'preact';
 export type CommonAction = {
   title: string;
   onClick: () => void;
+  disabled?: boolean;
 };
 
 export type PrimaryAction = CommonAction & {
-  type: 'record' | 'pauseRecording' | 'play' | 'pausePlaying';
+  type: 'recorder/record' | 'recorder/pause' | 'player/play' | 'player/pause';
 };
 export type Action = CommonAction & {
   icon: string;
@@ -27,22 +28,22 @@ export default class MediaToolbar extends Component<Props> {
   render() {
     let primaryActionIcon: string, primaryActionFor: string;
     switch (this.props.primaryAction.type) {
-      case 'record': {
+      case 'recorder/record': {
         primaryActionIcon = 'codicon-circle-large-filled';
         primaryActionFor = 'for-recorder';
         break;
       }
-      case 'pauseRecording': {
+      case 'recorder/pause': {
         primaryActionIcon = 'codicon-debug-pause';
         primaryActionFor = 'for-recorder';
         break;
       }
-      case 'play': {
+      case 'player/play': {
         primaryActionIcon = 'codicon-play';
         primaryActionFor = 'for-player';
         break;
       }
-      case 'pausePlaying': {
+      case 'player/pause': {
         primaryActionIcon = 'codicon-debug-pause';
         primaryActionFor = 'for-player';
         break;
@@ -59,13 +60,14 @@ export default class MediaToolbar extends Component<Props> {
             onClick={this.props.primaryAction.onClick}
             title={this.props.primaryAction.title}
             appearance="icon"
+            disabled={Boolean(this.props.primaryAction.disabled)}
           >
             <div className={`codicon ${primaryActionIcon}`} />
           </vscode-button>
         </div>
         <div className="actions">
           {this.props.actions.map(a => (
-            <vscode-button appearance="icon" title={a.title} onClick={a.onClick}>
+            <vscode-button appearance="icon" title={a.title} onClick={a.onClick} disabled={a.disabled}>
               <span className={cn('codicon', a.icon)} />
             </vscode-button>
           ))}

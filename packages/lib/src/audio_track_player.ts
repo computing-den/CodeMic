@@ -13,6 +13,7 @@ export default class AudioTrackPlayer implements t.TrackPlayer {
     seeking: false,
   };
   playbackRate = 1;
+  isRecorder = false;
 
   onProgress?: (clock: number) => any;
   onStateChange?: (state: t.TrackPlayerState) => any;
@@ -67,6 +68,14 @@ export default class AudioTrackPlayer implements t.TrackPlayer {
     this.clock = clock;
     this.updateState({ seeking: true });
     this.postAudioMessage({ type: 'audio/seek', id: this.track.id, clock }).catch(this.gotError);
+  }
+
+  setClock(clock: number) {
+    this.clock = clock;
+  }
+
+  extend(clock: number) {
+    throw new Error('AudioTrackPlayer not isRecorder');
   }
 
   setPlaybackRate(rate: number) {

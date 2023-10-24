@@ -8,9 +8,8 @@ import assert from 'assert';
 import fs from 'fs';
 
 class VscEditorTrackPlayer implements t.TrackPlayer {
-  name = 'vsc';
+  name = 'vsc player';
 
-  clock = 0;
   state: t.TrackPlayerState = {
     status: t.TrackPlayerStatus.Init,
     loading: false,
@@ -18,20 +17,25 @@ class VscEditorTrackPlayer implements t.TrackPlayer {
     buffering: false,
     seeking: false,
   };
+  isRecorder = false;
 
   onProgress?: (clock: number) => any;
   onStateChange?: (state: t.TrackPlayerState) => any;
+
+  get clock(): number {
+    return this.clockTrackPlayer.clock;
+  }
 
   get playbackRate(): number {
     return this.clockTrackPlayer.playbackRate;
   }
 
-  get track(): t.Track {
+  get track(): et.EditorTrack {
     return this.workspace.editorTrack;
   }
 
   private vscEditorEventStepper = new VscEditorEventStepper(this.workspace);
-  private clockTrackPlayer = new ClockTrackPlayer(100, Infinity);
+  private clockTrackPlayer = new ClockTrackPlayer(100);
   private disposables: vscode.Disposable[] = [];
   private updateQueue = lib.taskQueue(this.updateImmediately.bind(this), 1);
   private lastUpdateClock = 0;
@@ -97,6 +101,16 @@ class VscEditorTrackPlayer implements t.TrackPlayer {
     this.seekHelper(clock);
   }
 
+  setClock(clock: number) {
+    this.updateQueue.rejectAllInQueue();
+    this.clockTrackPlayer.setClock(clock);
+    this.lastUpdateClock = clock;
+  }
+
+  extend(clock: number) {
+    throw new Error('VscEditorTrackPlayer not extendable');
+  }
+
   setPlaybackRate(rate: number) {
     this.clockTrackPlayer.setPlaybackRate(rate);
   }
@@ -156,7 +170,6 @@ class VscEditorTrackPlayer implements t.TrackPlayer {
     }
 
     this.lastUpdateClock = seekData.clock;
-    this.clock = seekData.clock;
 
     // End seeking
     if (this.state.seeking) {

@@ -36,44 +36,44 @@ export default class Recorder extends Component<Props> {
   //   sessionSummary: this.props.recorder.sessionSummary,
   // };
 
-  startRecorder = async () => {
-    await postMessage({ type: 'record' });
-  };
+  // record = async () => {
+  //   await postMessage({ type: 'recorder/record' });
+  // };
 
-  pauseRecorder = async () => {
-    await postMessage({ type: 'pauseRecorder' });
-  };
+  // pause = async () => {
+  //   await postMessage({ type: 'recorder/pause' });
+  // };
 
-  save = async () => {
-    await postMessage({ type: 'saveRecorder' });
-  };
+  // save = async () => {
+  //   await postMessage({ type: 'recorder/save' });
+  // };
 
-  enableOrDisableMedia() {
-    // const isRecording = Boolean(this.props.recorder.status === t.TrackPlayerStatus.Running);
-    // if (isRecording !== this.media.isActive()) {
-    //   this.media.timeMs = this.props.recorder.clock * 1000;
-    //   if (isRecording) {
-    //     this.media.start();
-    //   } else {
-    //     this.media.pause();
-    //   }
-    // }
-  }
+  // enableOrDisableMedia() {
+  //   const isRecording = Boolean(this.props.recorder.status === t.TrackPlayerStatus.Running);
+  //   if (isRecording !== this.media.isActive()) {
+  //     this.media.timeMs = this.props.recorder.clock * 1000;
+  //     if (isRecording) {
+  //       this.media.start();
+  //     } else {
+  //       this.media.pause();
+  //     }
+  //   }
+  // }
 
-  async handleMediaProgress(ms: number) {
-    if (this.props.recorder.state.status === t.TrackPlayerStatus.Running) {
-      console.log('handleMediaProgress: ', ms);
-      await postMessage({ type: 'updateRecorder', changes: { clock: ms / 1000 } });
-    }
-  }
+  // async handleMediaProgress(ms: number) {
+  //   if (this.props.recorder.state.status === t.TrackPlayerStatus.Running) {
+  //     console.log('handleMediaProgress: ', ms);
+  //     await postMessage({ type: 'updateRecorder', changes: { clock: ms / 1000 } });
+  //   }
+  // }
 
   componentDidUpdate() {
-    this.enableOrDisableMedia();
+    // this.enableOrDisableMedia();
   }
 
   componentDidMount() {
     console.log('Recorder componentDidMount');
-    this.enableOrDisableMedia();
+    // this.enableOrDisableMedia();
 
     this.panelsElem!.addEventListener('change', this.tabChanged);
   }
@@ -173,16 +173,16 @@ export default class Recorder extends Component<Props> {
 class DetailsView extends Component<Props> {
   titleChanged = async (e: InputEvent) => {
     const changes = { title: (e.target as HTMLInputElement).value };
-    await postMessage({ type: 'updateRecorder', changes });
+    await postMessage({ type: 'recorder/update', changes });
   };
 
   descriptionChanged = async (e: InputEvent) => {
     const changes = { description: (e.target as HTMLInputElement).value };
-    await postMessage({ type: 'updateRecorder', changes });
+    await postMessage({ type: 'recorder/update', changes });
   };
 
   rootChanged = async (root: string) => {
-    await postMessage({ type: 'updateRecorder', changes: { root } });
+    await postMessage({ type: 'recorder/update', changes: { root } });
   };
 
   render() {
@@ -217,7 +217,7 @@ class DetailsView extends Component<Props> {
           value={this.props.recorder.root}
           label="Workspace"
           pickTitle="Select workspace folder"
-          disabled={recorder.state.loaded}
+          disabled={recorder.trackPlayerSummary.state.loaded}
           autoFocus
         />
         <p className="subsection help">
@@ -333,16 +333,46 @@ class EditorView extends Component<Props> {
   render() {
     const { recorder } = this.props;
     const { sessionSummary: ss } = recorder;
-    let primaryAction: MT.PrimaryAction = { type: 'record', title: 'Play', onClick: () => {} };
+    let primaryAction: MT.PrimaryAction;
+
+    const state = recorder.trackPlayerSummary.state;
+    const isRunning = state.status === t.TrackPlayerStatus.Running;
+    if (isRunning && recorder.isInRecorderMode) {
+      primaryAction = {
+        type: 'recorder/pause',
+        title: 'Record',
+        onClick: async () => {
+          await postMessage({ type: 'recorder/pause' });
+        },
+      };
+    } else {
+      primaryAction = {
+        type: 'recorder/record',
+        title: 'Record',
+        disabled: isRunning,
+        onClick: async () => {
+          await postMessage({ type: 'recorder/record' });
+        },
+      };
+    }
 
     const toolbarActions = [
-      {
-        title: 'Play',
-        icon: 'codicon-play',
-        onClick: () => {
-          console.log('TODO');
-        },
-      },
+      isRunning && !recorder.isInRecorderMode
+        ? {
+            title: 'Pause',
+            icon: 'codicon-debug-pause',
+            onClick: async () => {
+              await postMessage({ type: 'recorder/pause' });
+            },
+          }
+        : {
+            title: 'Play',
+            icon: 'codicon-play',
+            disabled: isRunning,
+            onClick: async () => {
+              await postMessage({ type: 'recorder/play' });
+            },
+          },
       {
         title: 'Add audio',
         icon: 'codicon-mic',
