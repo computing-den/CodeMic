@@ -164,6 +164,19 @@ export function dirname<T extends t.Path>(p: T): T {
   return p.slice(0, i) as T;
 }
 
+export function basename(p: t.Path, options?: { omitExt: boolean }): string {
+  const pathComps = p.split('/');
+  let base = pathComps[pathComps.length - 1];
+
+  if (options?.omitExt) {
+    const parts = base.split('.');
+    if (parts.length > 1) parts.pop();
+    base = parts.join('.');
+  }
+
+  return base;
+}
+
 export function isTopLevel(p: t.Path): boolean {
   return p === '/' || p === CUR_DIR;
 }

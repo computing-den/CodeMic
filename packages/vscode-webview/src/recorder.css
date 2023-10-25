@@ -1,10 +1,10 @@
 .recorder {
   /* padding-top: var(--spacing-medium); */
 
-  & vscode-panels {
+  & .tabs {
     flex: 1;
 
-    .details-view {
+    #details-view {
       padding: var(--container-padding-ver) var(--container-padding-hor);
 
       & vscode-text-area.title {
@@ -32,7 +32,7 @@
     */
     }
 
-    .editor-view {
+    #editor-view {
       padding: var(--container-padding-ver) var(--container-padding-hor);
       /* overflow-y: scroll */
 

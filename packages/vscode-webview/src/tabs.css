@@ -1,0 +1,77 @@
+.tabs {
+  box-sizing: border-box;
+  font-family: var(--font-family);
+  font-size: var(--type-ramp-base-font-size);
+  line-height: var(--type-ramp-base-line-height);
+  color: var(--foreground);
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto 1fr;
+  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+
+  .tabs-header {
+    /* display: flex; */
+    display: grid;
+    grid-template-rows: auto auto;
+    grid-template-columns: auto;
+    column-gap: calc(var(--design-unit) * 8px);
+    position: relative;
+    /* width: max-content; */
+    align-self: end;
+    /* padding: calc(var(--design-unit) * 1px) calc(var(--design-unit) * 1px) 0; */
+    padding: 0 calc(var(--design-unit) * 1px);
+    box-sizing: border-box;
+    width: 100%;
+    border-bottom: 1px solid var(--vscode-input-border, var(--dropdown-border));
+
+    .tabs-header-item {
+      /* flex: 1 0 0; */
+      box-sizing: border-box;
+      font-family: var(--font-family);
+      font-size: var(--type-ramp-base-font-size);
+      line-height: var(--type-ramp-base-line-height);
+      height: calc(var(--design-unit) * 7px);
+      padding: calc(var(--design-unit) * 1px) 0;
+      color: var(--panel-tab-foreground);
+      fill: currentcolor;
+      border-radius: calc(var(--corner-radius) * 1px);
+      border: solid calc(var(--border-width) * 1px) transparent;
+      align-items: center;
+      justify-content: center;
+      grid-row: 1 / auto;
+      cursor: pointer;
+      text-align: center;
+
+      &.active {
+        background: transparent;
+        color: var(--panel-tab-active-foreground);
+        fill: currentcolor;
+      }
+    }
+
+    .active-indicator {
+      width: 100%;
+      height: calc((var(--design-unit) / 4) * 1px);
+      justify-self: center;
+      background: var(--panel-tab-active-foreground);
+      margin: 0px;
+      border-radius: calc(var(--corner-radius) * 1px);
+    }
+  }
+
+  .tabs-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+
+    & > * {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    & > .hidden {
+      display: none;
+    }
+  }
+}

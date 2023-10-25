@@ -53,6 +53,9 @@ export class AudioManager {
 
     this.audio.src = src;
     console.log(`AudioManager: loading audio: ${src}`);
+    console.log(`AudioManager: loading audio, stack: ${new Error().stack}`);
+    // this.audio.play();
+    // this.audio.pause();
   }
 
   async play() {

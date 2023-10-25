@@ -135,6 +135,13 @@ class Codecast {
         }
         return this.respondWithStore();
       }
+      case 'recorder/load': {
+        if (!this.recorder) {
+          this.recorder = await this.populateRecorder();
+        }
+
+        return this.respondWithStore();
+      }
       case 'recorder/play': {
         if (!this.recorder) {
           this.recorder = await this.populateRecorder();
@@ -148,6 +155,11 @@ class Codecast {
       case 'recorder/pause': {
         assert(this.recorder);
         this.recorder.pause();
+        return this.respondWithStore();
+      }
+      case 'recorder/seek': {
+        assert(this.recorder);
+        this.recorder.seek(req.clock);
         return this.respondWithStore();
       }
       case 'recorder/save': {
@@ -184,6 +196,11 @@ class Codecast {
             this.recorderSetup!.sessionSummary.description = req.changes.description;
           if (req.changes.root !== undefined) this.recorderSetup!.root = req.changes.root;
         }
+        return this.respondWithStore();
+      }
+      case 'recorder/insertAudio': {
+        assert(this.recorder);
+        await this.recorder.insertAudio(req.uri, req.clock);
         return this.respondWithStore();
       }
       case 'confirmForkFromPlayer': {
@@ -235,9 +252,13 @@ class Codecast {
         return this.respondWithStore();
       }
       case 'audio': {
-        assert(this.player);
-
-        this.player.handleFrontendAudioEvent(req.event);
+        if (this.player) {
+          this.player.handleFrontendAudioEvent(req.event);
+        } else if (this.recorder) {
+          this.recorder.handleFrontendAudioEvent(req.event);
+        } else {
+          throw new Error('Got audio event from frontend but player and recorder are not initialized.');
+        }
         return this.respondWithStore();
       }
       case 'test': {

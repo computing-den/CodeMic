@@ -4,7 +4,7 @@ import MediaApi from './media_api.js';
 
 const vscode = acquireVsCodeApi();
 const bus = new b.Bus(postParcel, messageHandler);
-const mediaApi = new MediaApi(postAudioEvent);
+export const mediaApi = new MediaApi(postAudioEvent);
 window.addEventListener('message', event => bus.handleParcel(event.data));
 
 // type Listener = (req: t.BackendRequest) => Promise<t.FrontendResponse>;

@@ -2,12 +2,14 @@ import { types as t, path, lib, editorTrack as et, SessionCtrl, AudioCtrl } from
 import VscEditorWorkspace from './vsc_editor_workspace.js';
 import VscEditorPlayer from './vsc_editor_player.js';
 import VscEditorRecorder from './vsc_editor_recorder.js';
+import getMp3Duration from './get_mp3_duration.js';
 import { SessionIO } from './session.js';
 import * as misc from './misc.js';
 import Db from './db.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
+import fs from 'fs';
 import { v4 as uuid } from 'uuid';
 import VscWorkspace from './vsc_workspace.js';
 
@@ -238,6 +240,23 @@ class Recorder {
     await this.saveHistoryOpenClose();
     // this.lastSavedClock = this.clock;
     this.isDirty = false;
+  }
+
+  async insertAudio(uri: t.Uri, clock: number) {
+    const absPath = path.getFileUriPath(uri);
+    const data = await fs.promises.readFile(absPath);
+    const duration = getMp3Duration(data);
+    const sha1 = await misc.computeSHA1(data);
+    await this.workspace.io.copyLocalFile(absPath, sha1);
+    const audioTrack: t.AudioTrack = {
+      id: uuid(),
+      clockRange: { start: clock, end: clock + duration },
+      file: { type: 'local', sha1: sha1 },
+      title: path.basename(absPath, { omitExt: true }),
+    };
+    this.sessionCtrl.insertAudioAndLoad(
+      new AudioCtrl(audioTrack, this.postAudioMessage, this.getSessionBlobWebviewUri, this.workspace.io),
+    );
   }
 
   private async saveHistoryOpenClose() {

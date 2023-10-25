@@ -33,11 +33,14 @@ export type FrontendToBackendReqRes =
       request: { type: 'recorder/open'; sessionId?: string; fork?: boolean; forkClock?: number };
       response: StoreResponse;
     }
+  | { request: { type: 'recorder/load' }; response: StoreResponse }
   | { request: { type: 'recorder/play' }; response: StoreResponse }
   | { request: { type: 'recorder/record' }; response: StoreResponse }
   | { request: { type: 'recorder/pause' }; response: StoreResponse }
+  | { request: { type: 'recorder/seek'; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/save' }; response: StoreResponse }
   | { request: { type: 'recorder/update'; changes: RecorderUpdate }; response: StoreResponse }
+  | { request: { type: 'recorder/insertAudio'; uri: Uri; clock: number }; response: StoreResponse }
   // | { request: { type: 'toggleRecorderStudio' }; response: StoreResponse }
   | { request: { type: 'deleteSession'; sessionId: string }; response: StoreResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }

@@ -4,28 +4,45 @@ import { h, Fragment, Component } from 'preact';
 import { types as t, path, lib, assert } from '@codecast/lib';
 // import FakeMedia from './fake_media.js';
 import PathField from './path_field.jsx';
+import Tabs, { type TabViewProps } from './tabs.jsx';
 import { SessionSummary } from './session_summary.jsx';
 import SessionDescription from './session_description.jsx';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
-import postMessage from './api.js';
+import postMessage, { mediaApi } from './api.js';
 import { cn } from './misc.js';
 import _ from 'lodash';
 
 type Props = { recorder: t.RecorderState };
 export default class Recorder extends Component<Props> {
-  panelsElem: Element | null = null;
+  // panelsElem: Element | null = null;
   // media: FakeMedia = new FakeMedia(
   //   this.handleMediaProgress.bind(this),
   //   this.props.recorder.sessionSummary.duration * 1000,
   // );
 
-  setRef = (e: Element | null) => (this.panelsElem = e);
-
-  tabChanged = (e: any) => {
-    const tab = e.detail as HTMLElement;
-    console.log(tab);
+  state = {
+    tabId: 'details-view',
   };
+
+  tabs = [
+    { id: 'details-view', label: 'DETAILS' },
+    { id: 'editor-view', label: 'EDITOR' },
+  ];
+
+  tabChanged = async (tabId: string) => {
+    if (tabId === 'editor-view' && !this.props.recorder.isLoaded) {
+      await postMessage({ type: 'recorder/load' });
+    }
+    this.setState({ tabId });
+  };
+
+  // setRef = (e: Element | null) => (this.panelsElem = e);
+
+  // tabChanged = (e: any) => {
+  //   const tab = e.detail as HTMLElement;
+  //   // if (tab.id === 'editor-view')
+  // };
 
   // state = {
   //   localClock: this.props.recorder.sessionSummary.duration,
@@ -75,7 +92,7 @@ export default class Recorder extends Component<Props> {
     console.log('Recorder componentDidMount');
     // this.enableOrDisableMedia();
 
-    this.panelsElem!.addEventListener('change', this.tabChanged);
+    // this.panelsElem!.addEventListener('change', this.tabChanged);
   }
 
   componentWillUnmount() {
@@ -110,13 +127,15 @@ export default class Recorder extends Component<Props> {
 
     return (
       <Screen className="recorder">
-        <vscode-panels ref={this.setRef}>
-          <vscode-panel-tab id="details-tab">DETAILS</vscode-panel-tab>
-          <vscode-panel-tab id="editor-tab">EDITOR</vscode-panel-tab>
-          <DetailsView {...this.props} />
-          <EditorView {...this.props} />
-        </vscode-panels>
+        <Tabs tabs={this.tabs} activeTabId={this.state.tabId} onTabChange={this.tabChanged}>
+          <DetailsView id="details-view" className="" {...this.props} />
+          <EditorView id="editor-view" className="" {...this.props} />
+        </Tabs>
         {/*
+        <vscode-panels ref={this.setRef}>
+          <vscode-panel-tab id="details-view">DETAILS</vscode-panel-tab>
+          <vscode-panel-tab id="editor-view">EDITOR</vscode-panel-tab>
+        </vscode-panels>
             <div className="subsection buttons">
               <vscode-button appearance="secondary" onClick={this.toggleStudio}>
                 Open studio
@@ -170,7 +189,7 @@ export default class Recorder extends Component<Props> {
   }
 }
 
-class DetailsView extends Component<Props> {
+class DetailsView extends Component<Props & TabViewProps> {
   titleChanged = async (e: InputEvent) => {
     const changes = { title: (e.target as HTMLInputElement).value };
     await postMessage({ type: 'recorder/update', changes });
@@ -186,11 +205,11 @@ class DetailsView extends Component<Props> {
   };
 
   render() {
-    const { recorder } = this.props;
+    const { recorder, id, className } = this.props;
     const { sessionSummary: ss } = recorder;
 
     return (
-      <vscode-panel-view className="details-view">
+      <div id={id} className={className}>
         <vscode-text-area
           className="title subsection"
           rows={2}
@@ -223,7 +242,7 @@ class DetailsView extends Component<Props> {
         <p className="subsection help">
           Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
         </p>
-      </vscode-panel-view>
+      </div>
     );
   }
 }
@@ -236,12 +255,12 @@ type Marker = {
 
 type EditorViewStateRecipe = (draft: Draft<EditorView['state']>) => EditorView['state'] | void;
 
-class EditorView extends Component<Props> {
+class EditorView extends Component<Props & TabViewProps> {
   state = {
     cursor: undefined as Marker | undefined,
     anchor: undefined as Marker | undefined,
     markers: [] as Marker[],
-    stepCount: 15,
+    stepCount: 16,
   };
 
   getTimelineStepClock(): number {
@@ -254,17 +273,21 @@ class EditorView extends Component<Props> {
 
   mouseMoved = (e: MouseEvent) => {
     const clock = this.getClockUnderMouse(e);
-    if (clock !== undefined) {
-      this.updateState(state => {
-        state.cursor = { clock, type: 'cursor' };
-      });
-    }
+    // console.log(`mouseMoved to clock ${clock}`, e.target);
+    this.updateState(state => {
+      state.cursor = clock === undefined ? undefined : { clock, type: 'cursor' };
+    });
   };
 
-  mouseLeft = () => {
+  mouseLeft = (e: MouseEvent) => {
+    // console.log('mouseLeft', e.target);
     this.updateState(state => {
       state.cursor = undefined;
     });
+  };
+
+  mouseOut = (e: MouseEvent) => {
+    // console.log('mouseOut', e.target);
   };
 
   mouseDown = (e: MouseEvent) => {
@@ -297,6 +320,25 @@ class EditorView extends Component<Props> {
 
   updateState = (recipe: EditorViewStateRecipe) => this.setState(state => produce(state, recipe));
 
+  insertAudio = async () => {
+    const { uris } = await postMessage({
+      type: 'showOpenDialog',
+      options: {
+        title: 'Select audio file',
+        filters: { 'MP3 Audio': ['mp3'] },
+      },
+    });
+    if (uris?.length === 1) {
+      const clock = this.state.anchor?.clock ?? 0;
+      await postMessage({ type: 'recorder/insertAudio', uri: uris[0], clock });
+      // await lib.timeout(1000);
+      // for (const m of Object.values(mediaApi.audioManagers)) {
+      //   await m.play();
+      //   await m.pause();
+      // }
+    }
+  };
+
   getClockUnderMouse(e: MouseEvent): number | undefined {
     const clientPos = [e.clientX, e.clientY] as t.Vec2;
     const timeline = document.getElementById('timeline')!;
@@ -318,6 +360,7 @@ class EditorView extends Component<Props> {
 
     const timeline = document.getElementById('timeline')!;
     timeline.addEventListener('mouseleave', this.mouseLeft);
+    timeline.addEventListener('mouseout', this.mouseOut);
   }
 
   componentWillUnmount() {
@@ -328,10 +371,11 @@ class EditorView extends Component<Props> {
 
     const timeline = document.getElementById('timeline')!;
     timeline.removeEventListener('mouseleave', this.mouseLeft);
+    timeline.removeEventListener('mouseout', this.mouseOut);
   }
 
   render() {
-    const { recorder } = this.props;
+    const { id, recorder, className } = this.props;
     const { sessionSummary: ss } = recorder;
     let primaryAction: MT.PrimaryAction;
 
@@ -349,6 +393,9 @@ class EditorView extends Component<Props> {
         title: 'Record',
         disabled: recorder.isPlaying,
         onClick: async () => {
+          if (this.state.anchor) {
+            await postMessage({ type: 'recorder/seek', clock: this.state.anchor.clock });
+          }
           await postMessage({ type: 'recorder/record' });
         },
       };
@@ -368,15 +415,16 @@ class EditorView extends Component<Props> {
             icon: 'codicon-play',
             disabled: recorder.isRecording,
             onClick: async () => {
+              if (this.state.anchor) {
+                await postMessage({ type: 'recorder/seek', clock: this.state.anchor.clock });
+              }
               await postMessage({ type: 'recorder/play' });
             },
           },
       {
         title: 'Add audio',
         icon: 'codicon-mic',
-        onClick: () => {
-          console.log('TODO');
-        },
+        onClick: this.insertAudio,
       },
     ];
 
@@ -384,12 +432,13 @@ class EditorView extends Component<Props> {
     const allMarkers = _.compact([...this.state.markers, this.state.cursor, this.state.anchor, clockMarker]);
 
     return (
-      <vscode-panel-view className="editor-view">
+      <div id={id} className={className}>
         <MediaToolbar
           className="subsection subsection_spaced"
           primaryAction={primaryAction}
           actions={toolbarActions}
           clock={recorder.clock}
+          duration={ss.duration}
         />
         <div id="timeline" className="subsection">
           <div className="timeline-body">
@@ -408,7 +457,7 @@ class EditorView extends Component<Props> {
             ))}
           </div>
         </div>
-      </vscode-panel-view>
+      </div>
     );
   }
 }
@@ -434,5 +483,5 @@ function roundTo(value: number, to: number) {
 }
 
 function calcTimelineStepClock(dur: number, steps: number): number {
-  return Math.max(roundTo(dur / steps, 60), 60);
+  return Math.max(roundTo(dur / steps, 30), 30);
 }

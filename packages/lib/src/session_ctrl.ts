@@ -27,9 +27,7 @@ export default class SessionCtrl {
     public editorPlayer: t.EditorPlayer,
     public editorRecorder: t.EditorRecorder,
   ) {
-    for (const c of audioCtrls) {
-      c.onError = this.gotError.bind(this);
-    }
+    for (const c of audioCtrls) this.initAudioCtrl(c);
     editorPlayer.onError = this.gotError.bind(this);
     editorRecorder.onChange = this.editorRecorderChangeHandler.bind(this);
     editorRecorder.onError = this.gotError.bind(this);
@@ -43,7 +41,6 @@ export default class SessionCtrl {
   play() {
     assert(!this.isRunning);
 
-    // Change the mode first so that this.seek() will call seek on the player instead of just setting the clock.
     this.mode.recordingEditor = false;
     this.mode.status = t.TrackCtrlStatus.Running;
 
@@ -58,6 +55,8 @@ export default class SessionCtrl {
 
   record() {
     assert(!this.isRunning);
+
+    assert(this.clock === this.sessionSummary.duration);
 
     this.mode.recordingEditor = true;
     this.mode.status = t.TrackCtrlStatus.Running;
@@ -74,14 +73,29 @@ export default class SessionCtrl {
     this.pauseEditor();
   }
 
+  /**
+   * If in recorder mode, it will pause and switch to player mode.
+   */
   seek(clock: number, options?: { noUpdate: boolean }) {
     const noUpdate = options?.noUpdate ?? false;
-    this.clock = clock;
 
+    if (this.mode.recordingEditor) {
+      this.pause();
+      this.mode.recordingEditor = false;
+    }
+
+    this.clock = clock;
     this.seekInRangeAudios();
     this.seekEditor();
 
     if (!noUpdate) this.update(); // Will clear previous timeouts.
+  }
+
+  insertAudioAndLoad(c: t.AudioCtrl) {
+    this.sessionSummary.duration = Math.max(this.sessionSummary.duration, c.track.clockRange.end);
+    this.audioCtrls.push(c);
+    this.initAudioCtrl(c);
+    c.load();
   }
 
   handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
@@ -91,6 +105,10 @@ export default class SessionCtrl {
     } else {
       console.error(`handleFrontendAudioEvent audio track player with id ${e.id} not found`);
     }
+  }
+
+  private initAudioCtrl(c: t.AudioCtrl) {
+    c.onError = this.gotError.bind(this);
   }
 
   private seekEditor() {
