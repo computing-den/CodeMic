@@ -230,7 +230,7 @@ class DetailsView extends Component<Props> {
 
 type Marker = {
   clock: number;
-  type: 'anchor' | 'cursor' | 'selection';
+  type: 'clock' | 'anchor' | 'cursor' | 'selection';
   active?: boolean;
 };
 
@@ -380,6 +380,9 @@ class EditorView extends Component<Props> {
       },
     ];
 
+    const clockMarker: Marker | undefined = recorder.clock > 0 ? { clock: recorder.clock, type: 'clock' } : undefined;
+    const allMarkers = _.compact([...this.state.markers, this.state.cursor, this.state.anchor, clockMarker]);
+
     return (
       <vscode-panel-view className="editor-view">
         <MediaToolbar
@@ -391,7 +394,7 @@ class EditorView extends Component<Props> {
         <div id="timeline" className="subsection">
           <div className="timeline-body">
             <div className="markers">
-              {_.compact([...this.state.markers, this.state.cursor, this.state.anchor]).map(marker => (
+              {allMarkers.map(marker => (
                 <MarkerUI marker={marker} timelineDuration={this.getTimelineDuration()} />
               ))}
             </div>

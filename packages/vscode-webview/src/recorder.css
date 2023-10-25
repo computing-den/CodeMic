@@ -71,6 +71,9 @@
                 border-color: var(--marker-cursor-color);
                 z-index: 1;
               }
+              &.marker_clock {
+                border-color: var(--marker-clock-color);
+              }
               &.marker_anchor {
                 border-color: var(--marker-anchor-color);
               }
@@ -93,7 +96,7 @@
                 background: var(--vscode-sideBar-background);
                 /* padding: 5px 0px; */
                 /* font-weight: bold; */
-                bottom: calc(100% + 2px);
+                top: calc(100% + 2px);
                 font-size: 0.8em;
                 opacity: 0.8;
               }
