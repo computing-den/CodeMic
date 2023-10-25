@@ -14,7 +14,7 @@ class VscEditorEventStepper implements t.EditorEventStepper {
     await this.applyEditorEvent(seekData.events[stepIndex], seekData.direction);
   }
 
-  async finalizeSeek(seekData: t.SeekData) {
+  finalizeSeek(seekData: t.SeekData) {
     // nothing
   }
 

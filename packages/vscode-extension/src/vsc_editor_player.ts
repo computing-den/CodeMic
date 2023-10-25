@@ -9,6 +9,7 @@ import fs from 'fs';
 
 class VscEditorPlayer implements t.EditorPlayer {
   isPlaying = false;
+  onError?: (error: Error) => any;
 
   get track(): et.EditorTrack {
     return this.workspace.editorTrack;
@@ -50,6 +51,15 @@ class VscEditorPlayer implements t.EditorPlayer {
     this.seekHelper(clock);
   }
 
+  /**
+   * Assumes that the editor track is modified externally.
+   */
+  setClock(clock: number) {
+    assert(this.updateQueue.length === 0, 'VscEditorPlayer setClock requires updateQueue to be empty');
+    const seekData = this.workspace.editorTrack.getSeekData(clock);
+    this.workspace.editorTrack.finalizeSeek(seekData);
+  }
+
   private dispose() {
     this.updateQueue.rejectAllInQueue();
     for (const d of this.disposables) d.dispose();
@@ -61,7 +71,7 @@ class VscEditorPlayer implements t.EditorPlayer {
       await this.enqueueUpdate(clock);
     } catch (error) {
       if (!(error instanceof lib.CancelledError)) {
-        this.gotError(error);
+        this.gotError(error as Error);
       }
     }
   }
@@ -88,17 +98,14 @@ class VscEditorPlayer implements t.EditorPlayer {
         await editorTrack.applySeekStep(seekData, i);
         await this.vscEditorEventStepper.applySeekStep(seekData, i);
       }
-      await editorTrack.finalizeSeek(seekData);
-      await this.vscEditorEventStepper.finalizeSeek(seekData);
+      editorTrack.finalizeSeek(seekData);
+      this.vscEditorEventStepper.finalizeSeek(seekData);
     }
   }
 
-  private gotError(error: any) {
-    assert(0); // TODO
-    // console.error(error);
-    // this.dispose();
-    // this.updateState({ status: t.TrackPlayerStatus.Error });
-  }
+  private gotError = (error: Error) => {
+    this.onError?.(error);
+  };
 }
 
 export default VscEditorPlayer;

@@ -292,7 +292,7 @@ export class EditorTrack implements t.EditorEventStepper {
     for (let i = 0; i < seekData.events.length; i++) {
       await this.applySeekStep(seekData, i, uriSet);
     }
-    await this.finalizeSeek(seekData);
+    this.finalizeSeek(seekData);
   }
 
   async applyEditorEvent(e: t.EditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
@@ -305,7 +305,7 @@ export class EditorTrack implements t.EditorEventStepper {
     this.eventIndex += sign * (stepIndex + 1);
   }
 
-  async finalizeSeek(seekData: t.SeekData) {
+  finalizeSeek(seekData: t.SeekData) {
     this.eventIndex = seekData.i;
   }
 

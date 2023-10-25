@@ -217,7 +217,7 @@ class DetailsView extends Component<Props> {
           value={this.props.recorder.root}
           label="Workspace"
           pickTitle="Select workspace folder"
-          disabled={recorder.trackPlayerSummary.state.loaded}
+          disabled={recorder.isLoaded}
           autoFocus
         />
         <p className="subsection help">
@@ -335,9 +335,7 @@ class EditorView extends Component<Props> {
     const { sessionSummary: ss } = recorder;
     let primaryAction: MT.PrimaryAction;
 
-    const state = recorder.trackPlayerSummary.state;
-    const isRunning = state.status === t.TrackPlayerStatus.Running;
-    if (isRunning && recorder.isInRecorderMode) {
+    if (recorder.isRecording) {
       primaryAction = {
         type: 'recorder/pause',
         title: 'Record',
@@ -349,7 +347,7 @@ class EditorView extends Component<Props> {
       primaryAction = {
         type: 'recorder/record',
         title: 'Record',
-        disabled: isRunning,
+        disabled: recorder.isPlaying,
         onClick: async () => {
           await postMessage({ type: 'recorder/record' });
         },
@@ -357,7 +355,7 @@ class EditorView extends Component<Props> {
     }
 
     const toolbarActions = [
-      isRunning && !recorder.isInRecorderMode
+      recorder.isPlaying
         ? {
             title: 'Pause',
             icon: 'codicon-debug-pause',
@@ -368,7 +366,7 @@ class EditorView extends Component<Props> {
         : {
             title: 'Play',
             icon: 'codicon-play',
-            disabled: isRunning,
+            disabled: recorder.isRecording,
             onClick: async () => {
               await postMessage({ type: 'recorder/play' });
             },

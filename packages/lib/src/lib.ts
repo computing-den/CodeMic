@@ -122,19 +122,6 @@ export function approxEqual(a: number, b: number, tolerance: number) {
   return Math.abs(a - b) <= tolerance;
 }
 
-export function getTrackPlayerSummary(p: t.TrackPlayer): t.TrackPlayerSummary {
-  return {
-    name: p.name,
-    track: {
-      id: p.track.id,
-      clockRange: p.track.clockRange,
-    },
-    state: p.state,
-    clock: p.clock,
-    playbackRate: p.playbackRate,
-  };
-}
-
 export function isClockInRange(clock: number, range: t.ClockRange): boolean {
   return clock >= range.start && clock < range.end;
 }

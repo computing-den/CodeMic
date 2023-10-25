@@ -16,7 +16,7 @@ export default class App extends Component<AppProps> {
   onExit?: () => Promise<boolean>;
 
   openWelcome = async () => {
-    await postMessage({ type: 'openWelcome' });
+    await postMessage({ type: 'welcome/open' });
   };
 
   // openRecorder = async () => {

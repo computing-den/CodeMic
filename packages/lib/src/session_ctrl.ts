@@ -4,7 +4,6 @@ import * as t from './types.js';
 import _ from 'lodash';
 
 export default class SessionCtrl {
-  name = 'Session';
   clock = 0;
   mode: t.SessionCtrlMode = {
     status: t.TrackCtrlStatus.Init,
@@ -13,6 +12,7 @@ export default class SessionCtrl {
 
   onUpdateFrontend?: () => any;
   onChange?: () => any;
+  onError?: (error: Error) => any;
 
   get isRunning(): boolean {
     return this.mode.status === t.TrackCtrlStatus.Running;
@@ -27,7 +27,12 @@ export default class SessionCtrl {
     public editorPlayer: t.EditorPlayer,
     public editorRecorder: t.EditorRecorder,
   ) {
+    for (const c of audioCtrls) {
+      c.onError = this.gotError.bind(this);
+    }
+    editorPlayer.onError = this.gotError.bind(this);
     editorRecorder.onChange = this.editorRecorderChangeHandler.bind(this);
+    editorRecorder.onError = this.gotError.bind(this);
   }
 
   load() {
@@ -38,49 +43,62 @@ export default class SessionCtrl {
   play() {
     assert(!this.isRunning);
 
-    this.playInRangeAudios();
-    this.editorPlayer.play();
-
+    // Change the mode first so that this.seek() will call seek on the player instead of just setting the clock.
     this.mode.recordingEditor = false;
     this.mode.status = t.TrackCtrlStatus.Running;
 
-    this.startUpdating();
+    if (this.isAlmostAtTheEnd()) {
+      this.seek(0, { noUpdate: true });
+    }
+
+    // this.playInRangeAudios();
+    this.editorPlayer.play();
+    this.update();
   }
 
   record() {
     assert(!this.isRunning);
 
-    this.playInRangeAudios();
-    this.editorRecorder.record();
-
     this.mode.recordingEditor = true;
     this.mode.status = t.TrackCtrlStatus.Running;
+
+    // this.playInRangeAudios();
+    this.editorRecorder.record();
+
+    this.update();
   }
 
   pause() {
+    this.mode.status = t.TrackCtrlStatus.Paused;
     this.pauseAudios();
     this.pauseEditor();
-
-    this.mode.status = t.TrackCtrlStatus.Paused;
   }
 
-  seek(clock: number) {
+  seek(clock: number, options?: { noUpdate: boolean }) {
+    const noUpdate = options?.noUpdate ?? false;
     this.clock = clock;
 
     this.seekInRangeAudios();
-    this.pauseOutOfRangeAudios();
     this.seekEditor();
 
-    if (this.isRunning) {
-      this.playInRangeAudios();
-      this.startUpdating(); // Will clear previous timeouts.
+    if (!noUpdate) this.update(); // Will clear previous timeouts.
+  }
+
+  handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
+    const p = this.audioCtrls.find(a => a.track.id === e.id);
+    if (p) {
+      p.handleAudioEvent(e);
+    } else {
+      console.error(`handleFrontendAudioEvent audio track player with id ${e.id} not found`);
     }
   }
 
   private seekEditor() {
     this.editorRecorder.setClock(this.clock);
 
-    if (!this.mode.recordingEditor) {
+    if (this.mode.recordingEditor) {
+      this.editorPlayer.setClock(this.clock);
+    } else {
       this.editorPlayer.seek(this.clock);
     }
   }
@@ -99,12 +117,9 @@ export default class SessionCtrl {
     }
   }
 
-  private seekAndPlayNewInRangeAudios() {
+  private seekInRangeAudiosThatAreNotRunning() {
     for (const c of this.audioCtrls) {
-      if (!c.isRunning && this.isAudioInRange(c)) {
-        this.seekAudio(c);
-        c.play();
-      }
+      if (!c.isRunning && this.isAudioInRange(c)) this.seekAudio(c);
     }
   }
 
@@ -135,6 +150,10 @@ export default class SessionCtrl {
     this.timeout = 0;
   }
 
+  private isAlmostAtTheEnd() {
+    return this.clock > this.sessionSummary.duration - 1;
+  }
+
   private isAudioInRange(c: t.AudioCtrl): boolean {
     return lib.isClockInRange(this.clock, c.track.clockRange);
   }
@@ -148,17 +167,20 @@ export default class SessionCtrl {
     this.onUpdateFrontend?.();
   }
 
-  private startUpdating() {
+  private update() {
     this.clearTimeout();
     this.timeoutTimestamp = performance.now();
-    this.update();
+    this.updateStep();
   }
 
-  private update = () => {
+  private updateStep = () => {
     const timeAtUpdate = performance.now();
-    this.clock += timeAtUpdate - this.timeoutTimestamp;
+    this.clock += (timeAtUpdate - this.timeoutTimestamp) / 1000;
 
     if (this.mode.recordingEditor) {
+      console.log(
+        `SessionCtrl duration ${this.sessionSummary.duration} -> ${Math.max(this.sessionSummary.duration, this.clock)}`,
+      );
       this.sessionSummary.duration = Math.max(this.sessionSummary.duration, this.clock);
     } else {
       this.clock = Math.min(this.sessionSummary.duration, this.clock);
@@ -166,7 +188,8 @@ export default class SessionCtrl {
 
     // TODO should we await this?
     this.seekEditor();
-    this.seekAndPlayNewInRangeAudios();
+    this.seekInRangeAudiosThatAreNotRunning();
+    if (this.isRunning) this.playInRangeAudios();
     this.pauseOutOfRangeAudios();
 
     if (!this.mode.recordingEditor && this.clock === this.sessionSummary.duration) {
@@ -177,7 +200,13 @@ export default class SessionCtrl {
 
     if (this.isRunning) {
       this.timeoutTimestamp = timeAtUpdate;
-      this.timeout = setTimeout(this.update, 100);
+      this.timeout = setTimeout(this.updateStep, 100);
     }
   };
+
+  private gotError(error: Error) {
+    this.pause();
+    this.mode.status = t.TrackCtrlStatus.Error;
+    this.onError?.(error);
+  }
 }

@@ -67,11 +67,9 @@ export default class VscEditorWorkspace extends VscWorkspace {
     const root = path.abs(nodePath.resolve(rootStr));
     const session: t.Session = {
       editorTrack: {
-        id: uuid(),
         events: [],
         defaultEol: os.EOL as t.EndOfLine,
         initSnapshot: et.makeEmptySnapshot(),
-        clockRange: { start: 0, end: 0 },
       },
       audioTracks: [],
     };

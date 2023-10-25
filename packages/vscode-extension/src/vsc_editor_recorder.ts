@@ -6,14 +6,15 @@ import _ from 'lodash';
 const SCROLL_LINES_TRIGGER = 2;
 
 class VscEditorRecorder implements t.EditorRecorder {
-  onChange?: () => any;
   isRecording = false;
-  clock = 0;
+  onChange?: () => any;
+  onError?: (error: Error) => any;
 
   get track(): et.EditorTrack {
     return this.workspace.editorTrack;
   }
 
+  private clock = 0;
   private disposables: vscode.Disposable[] = [];
   private scrolling: boolean = false;
   private scrollStartRange?: t.Range;

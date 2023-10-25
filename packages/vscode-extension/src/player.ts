@@ -25,6 +25,10 @@ class Player {
     return this.sessionCtrl.clock;
   }
 
+  get isPlaying(): boolean {
+    return this.sessionCtrl.isRunning;
+  }
+
   // private vscEditorEventStepper = new VscEditorEventStepper(this.workspace);
 
   constructor(
@@ -37,6 +41,7 @@ class Player {
     private onUpdateFrontend: () => any,
   ) {
     sessionCtrl.onUpdateFrontend = this.sessionCtrlUpdateFrontendHandler.bind(this);
+    sessionCtrl.onError = this.sessionCtrlErrorHandler.bind(this);
   }
 
   /**
@@ -79,7 +84,12 @@ class Player {
     await this.saveHistoryClock({ ifDirtyForLong: true });
   }
 
-  start() {
+  sessionCtrlErrorHandler(error: Error) {
+    // TODO show error to user
+    console.error(error);
+  }
+
+  play() {
     this.sessionCtrl.play();
     this.saveHistoryOpenClose().catch(console.error);
   }
@@ -98,12 +108,7 @@ class Player {
   }
 
   handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
-    const p = this.audioCtrls.find(a => a.track.id === e.id);
-    if (p) {
-      p.handleAudioEvent(e);
-    } else {
-      console.error(`handleFrontendAudioEvent audio track player with id ${e.id} not found`);
-    }
+    this.sessionCtrl.handleFrontendAudioEvent(e);
   }
 
   updateState(changes: t.PlayerUpdate) {

@@ -79,22 +79,22 @@ export class SessionSummaryForList extends Component<ForListProps> {
 }
 
 export class SessionSummaryListItem extends Component<ListItemProps> {
-  clicked = () => postMessage({ type: 'openPlayer', sessionId: this.props.sessionSummary.id });
+  clicked = () => postMessage({ type: 'player/open', sessionId: this.props.sessionSummary.id });
   actions: SL.Action[] = [
     {
       icon: 'codicon-play',
       title: 'Play',
-      onClick: () => postMessage({ type: 'openPlayer', sessionId: this.props.sessionSummary.id }),
+      onClick: () => postMessage({ type: 'player/open', sessionId: this.props.sessionSummary.id }),
     },
     {
       icon: 'codicon-repo-forked',
       title: 'Fork: create a new project based on this one',
-      onClick: () => postMessage({ type: 'openRecorder', sessionId: this.props.sessionSummary.id, fork: true }),
+      onClick: () => postMessage({ type: 'recorder/open', sessionId: this.props.sessionSummary.id, fork: true }),
     },
     {
       icon: 'codicon-edit',
       title: 'Edit: open this project in the Studio',
-      onClick: () => postMessage({ type: 'openRecorder', sessionId: this.props.sessionSummary.id }),
+      onClick: () => postMessage({ type: 'recorder/open', sessionId: this.props.sessionSummary.id }),
     },
     {
       icon: 'codicon-heart',

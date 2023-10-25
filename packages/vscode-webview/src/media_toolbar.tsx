@@ -67,7 +67,7 @@ export default class MediaToolbar extends Component<Props> {
         </div>
         <div className="actions">
           {this.props.actions.map(a => (
-            <vscode-button appearance="icon" title={a.title} onClick={a.onClick} disabled={a.disabled}>
+            <vscode-button appearance="icon" title={a.title} onClick={a.onClick} disabled={Boolean(a.disabled)}>
               <span className={cn('codicon', a.icon)} />
             </vscode-button>
           ))}

@@ -3,17 +3,19 @@ import assert from './assert.js';
 import * as t from './types.js';
 
 export default class AudioCtrl implements t.AudioCtrl {
-  clock = 0;
   isRunning = false;
-  loaded = false;
-  loading = false;
-  seekAfterLoad = false;
+  onError?: (error: Error) => any;
+
+  private clock = 0;
+  private loaded = false;
+  private loading = false;
+  private seekAfterLoad = false;
 
   constructor(
     public track: t.AudioTrack,
-    public postAudioMessage: t.PostAudioMessageToFrontend,
-    public getSessionBlobWebviewUri: (sha1: string) => t.Uri,
-    public sessionIO: t.SessionIO,
+    private postAudioMessage: t.PostAudioMessageToFrontend,
+    private getSessionBlobWebviewUri: (sha1: string) => t.Uri,
+    private sessionIO: t.SessionIO,
   ) {}
 
   load() {
@@ -91,16 +93,19 @@ export default class AudioCtrl implements t.AudioCtrl {
       }
       case 'canplaythrough': {
         console.log('canplaythrough');
+        const isFirstLoad = !this.loaded;
         this.loading = false;
         this.loaded = true;
 
-        if (this.seekAfterLoad) {
-          this.seekAfterLoad = false;
-          this.seek(this.clock);
-        }
+        if (isFirstLoad) {
+          if (this.seekAfterLoad) {
+            this.seekAfterLoad = false;
+            this.seek(this.clock);
+          }
 
-        if (this.isRunning) {
-          this.play();
+          if (this.isRunning) {
+            this.play();
+          }
         }
 
         break;
@@ -165,7 +170,7 @@ export default class AudioCtrl implements t.AudioCtrl {
       }
       case 'error': {
         console.error('error', e.error);
-        this.gotError(e.error);
+        this.gotError(new Error(e.error));
         break;
       }
       default: {
@@ -174,9 +179,7 @@ export default class AudioCtrl implements t.AudioCtrl {
     }
   }
 
-  private gotError = (error?: any) => {
-    // TODO
-    assert(0);
-    // this.updateState({ status: t.TrackPlayerStatus.Error });
+  private gotError = (error: Error) => {
+    this.onError?.(error);
   };
 }

@@ -18,7 +18,7 @@ export default class Welcome extends Component<Props> {
           <Section.Body>
             <div className="search-subsection subsection">
               <vscode-text-field placeholder="Search" autofocus></vscode-text-field>
-              <vscode-button onClick={() => postMessage({ type: 'openRecorder' })} title="Record a new session">
+              <vscode-button onClick={() => postMessage({ type: 'recorder/open' })} title="Record a new session">
                 <span className="codicon codicon-device-camera-video" />
               </vscode-button>
             </div>

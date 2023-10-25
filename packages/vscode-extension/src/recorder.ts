@@ -20,6 +20,14 @@ class Recorder {
     return this.sessionCtrl.clock;
   }
 
+  get isRecording(): boolean {
+    return this.sessionCtrl.isRunning && this.sessionCtrl.mode.recordingEditor;
+  }
+
+  get isPlaying(): boolean {
+    return this.sessionCtrl.isRunning && !this.sessionCtrl.mode.recordingEditor;
+  }
+
   isDirty: boolean = false;
 
   // private lastSavedClock: number;
@@ -36,6 +44,7 @@ class Recorder {
   ) {
     sessionCtrl.onUpdateFrontend = this.sessionCtrlUpdateFrontendHandler.bind(this);
     sessionCtrl.onChange = this.sessionCtrlChangeHandler.bind(this);
+    sessionCtrl.onError = this.sessionCtrlErrorHandler.bind(this);
     // this.lastSavedClock = sessionCtrl.clock;
   }
 
@@ -91,7 +100,7 @@ class Recorder {
     let clock = setup.sessionSummary.duration;
     if (setup.fork) {
       assert(setup.baseSessionSummary);
-      assert(setup.forkClock);
+      assert(setup.forkClock !== undefined);
       await db.copySessionDir(setup.baseSessionSummary, setup.sessionSummary);
       clock = setup.forkClock;
     }
@@ -168,8 +177,13 @@ class Recorder {
     this.onUpdateFrontend();
   }
 
-  async sessionCtrlChangeHandler() {
+  sessionCtrlChangeHandler() {
     this.isDirty = true;
+  }
+
+  sessionCtrlErrorHandler(error: Error) {
+    // TODO show error to user
+    console.error(error);
   }
 
   record() {
@@ -199,12 +213,7 @@ class Recorder {
   }
 
   handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
-    const p = this.sessionCtrl.audioCtrls.find(a => a.track.id === e.id);
-    if (p) {
-      p.handleAudioEvent(e);
-    } else {
-      console.error(`handleFrontendAudioEvent audio track player with id ${e.id} not found`);
-    }
+    this.sessionCtrl.handleFrontendAudioEvent(e);
   }
 
   updateState(changes: t.RecorderUpdate) {

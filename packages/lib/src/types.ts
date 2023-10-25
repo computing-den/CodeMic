@@ -23,16 +23,16 @@ export type OKResponse = { type: 'ok' };
 export type ErrorResponse = { type: 'error' };
 
 export type FrontendToBackendReqRes =
-  | { request: { type: 'openWelcome' }; response: StoreResponse }
-  | { request: { type: 'openPlayer'; sessionId: string }; response: StoreResponse }
-  | {
-      request: { type: 'openRecorder'; sessionId?: string; fork?: boolean; forkClock?: number };
-      response: StoreResponse;
-    }
+  | { request: { type: 'welcome/open' }; response: StoreResponse }
+  | { request: { type: 'player/open'; sessionId: string }; response: StoreResponse }
   | { request: { type: 'player/play' }; response: StoreResponse }
   | { request: { type: 'player/pause' }; response: StoreResponse }
   | { request: { type: 'player/seek'; clock: number }; response: StoreResponse }
   | { request: { type: 'player/update'; changes: PlayerUpdate }; response: StoreResponse }
+  | {
+      request: { type: 'recorder/open'; sessionId?: string; fork?: boolean; forkClock?: number };
+      response: StoreResponse;
+    }
   | { request: { type: 'recorder/play' }; response: StoreResponse }
   | { request: { type: 'recorder/record' }; response: StoreResponse }
   | { request: { type: 'recorder/pause' }; response: StoreResponse }
@@ -79,7 +79,6 @@ export type BackendAudioToFrontendReqRes =
   | { request: { type: 'audio/load'; src: string; id: string }; response: OKResponse }
   | { request: { type: 'audio/play'; id: string }; response: OKResponse }
   | { request: { type: 'audio/pause'; id: string }; response: OKResponse }
-  | { request: { type: 'audio/stop'; id: string }; response: OKResponse }
   | { request: { type: 'audio/dispose'; id: string }; response: OKResponse }
   | { request: { type: 'audio/seek'; id: string; clock: number }; response: OKResponse }
   | { request: { type: 'audio/setPlaybackRate'; id: string; rate: number }; response: OKResponse };
@@ -137,7 +136,9 @@ export type WelcomeState = {
 };
 
 export type RecorderState = {
-  mode: SessionCtrlMode;
+  isLoaded: boolean;
+  isRecording: boolean;
+  isPlaying: boolean;
   clock: number;
   sessionSummary: SessionSummary;
   root?: string;
@@ -161,7 +162,8 @@ export type RecorderSetup = {
 };
 
 export type PlayerState = {
-  mode: SessionCtrlMode;
+  isLoaded: boolean;
+  isPlaying: boolean;
   sessionSummary: SessionSummary;
   clock: number;
   root?: string;
@@ -240,15 +242,20 @@ export type SessionCtrlMode = {
 
 export interface EditorPlayer {
   readonly track: EditorTrack;
+  readonly isPlaying: boolean;
+  onError?: (error: Error) => any;
 
   play(): void;
   pause(): void;
   seek(clock: number): void;
+  setClock(clock: number): void;
 }
 
 export interface EditorRecorder {
   readonly track: EditorTrack;
+  readonly isRecording: boolean;
   onChange?: () => any;
+  onError?: (error: Error) => any;
 
   record(): void;
   pause(): void;
@@ -258,6 +265,7 @@ export interface EditorRecorder {
 export interface AudioCtrl {
   readonly isRunning: boolean;
   readonly track: AudioTrack;
+  onError?: (error: Error) => any;
 
   load(): void;
   play(): void;

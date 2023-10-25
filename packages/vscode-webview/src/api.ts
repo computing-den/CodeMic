@@ -80,10 +80,10 @@ async function messageHandler(req: t.BackendRequest): Promise<t.FrontendResponse
       await mediaApi.getAudioManager(req.id).pause();
       return { type: 'ok' };
     }
-    case 'audio/stop': {
-      await mediaApi.getAudioManager(req.id).stop();
-      return { type: 'ok' };
-    }
+    // case 'audio/stop': {
+    //   await mediaApi.getAudioManager(req.id).stop();
+    //   return { type: 'ok' };
+    // }
     case 'audio/dispose': {
       mediaApi.getAudioManager(req.id).dispose();
       return { type: 'ok' };

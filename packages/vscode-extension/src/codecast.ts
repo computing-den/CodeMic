@@ -31,7 +31,7 @@ class Codecast {
 
     // DEV
     // if (this.webview.bus) {
-    //   this.messageHandler({ type: 'openRecorder', sessionId: 'ecc7e7e8-1f38-4a3a-91b1-774f1c91ba21' })
+    //   this.messageHandler({ type: 'recorder/open', sessionId: 'ecc7e7e8-1f38-4a3a-91b1-774f1c91ba21' })
     //     .then(this.postUpdateStore)
     //     .catch(console.error);
     // }
@@ -49,11 +49,11 @@ class Codecast {
     // console.log('extension received: ', req);
 
     switch (req.type) {
-      case 'openWelcome': {
+      case 'welcome/open': {
         this.goHome();
         return this.respondWithStore();
       }
-      case 'openPlayer': {
+      case 'player/open': {
         if (await this.closeCurrentScreen()) {
           const sessionSummary = this.db.sessionSummaries[req.sessionId];
           assert(sessionSummary);
@@ -68,43 +68,13 @@ class Codecast {
         }
         return this.respondWithStore();
       }
-      case 'openRecorder': {
-        if (await this.closeCurrentScreen()) {
-          const baseSessionSummary = req.sessionId ? this.db.sessionSummaries[req.sessionId] : undefined;
-          const sessionSummary = Recorder.makeSessionSummary(baseSessionSummary, req.fork, req.forkClock);
-          const history = this.getFirstHistoryItemById(sessionSummary.id, baseSessionSummary?.id);
-          this.recorderSetup = {
-            sessionSummary,
-            baseSessionSummary,
-            fork: req.fork,
-            forkClock: req.forkClock,
-            root: history?.root || VscWorkspace.getDefaultRoot(),
-            // set history in getStore() so that it's always up-to-date
-          };
-          this.screen = t.Screen.Recorder;
-          this.updateViewTitle();
-          vscode.commands.executeCommand('setContext', 'codecast.canGoHome', true);
-        }
-
-        return this.respondWithStore();
-      }
       case 'player/play': {
         if (!this.player) {
-          assert(this.playerSetup);
-
-          // May return undefined if user decides not to overwrite root
-          this.player = await Player.populateSession(
-            this.context,
-            this.db,
-            this.playerSetup,
-            this.postAudioMessage.bind(this),
-            this.getSessionBlobWebviewUri.bind(this, this.playerSetup.sessionSummary.id),
-            this.playerChanged.bind(this),
-          );
+          this.player = await this.populatePlayer();
         }
 
         if (this.player) {
-          this.player.start();
+          this.player.play();
         }
         return this.respondWithStore();
       }
@@ -127,6 +97,26 @@ class Codecast {
         }
         return this.respondWithStore();
       }
+      case 'recorder/open': {
+        if (await this.closeCurrentScreen()) {
+          const baseSessionSummary = req.sessionId ? this.db.sessionSummaries[req.sessionId] : undefined;
+          const sessionSummary = Recorder.makeSessionSummary(baseSessionSummary, req.fork, req.forkClock);
+          const history = this.getFirstHistoryItemById(sessionSummary.id, baseSessionSummary?.id);
+          this.recorderSetup = {
+            sessionSummary,
+            baseSessionSummary,
+            fork: req.fork,
+            forkClock: req.forkClock,
+            root: history?.root || VscWorkspace.getDefaultRoot(),
+            // set history in getStore() so that it's always up-to-date
+          };
+          this.screen = t.Screen.Recorder;
+          this.updateViewTitle();
+          vscode.commands.executeCommand('setContext', 'codecast.canGoHome', true);
+        }
+
+        return this.respondWithStore();
+      }
       case 'recorder/record': {
         if (!this.recorder) {
           for (const vscTextDocument of vscode.workspace.textDocuments) {
@@ -137,26 +127,7 @@ class Codecast {
               return { type: 'error' };
             }
           }
-          assert(this.recorderSetup);
-          if (this.recorderSetup.baseSessionSummary) {
-            this.recorder = await Recorder.populateSession(
-              this.context,
-              this.db,
-              this.recorderSetup,
-              this.postAudioMessage.bind(this),
-              this.getSessionBlobWebviewUri.bind(this, this.recorderSetup.sessionSummary.id),
-              this.recorderChanged.bind(this),
-            );
-          } else {
-            this.recorder = await Recorder.fromDirAndVsc(
-              this.context,
-              this.db,
-              this.recorderSetup,
-              this.postAudioMessage.bind(this),
-              this.getSessionBlobWebviewUri.bind(this, this.recorderSetup.sessionSummary.id),
-              this.recorderChanged.bind(this),
-            );
-          }
+          this.recorder = await this.populateRecorder();
         }
 
         if (this.recorder) {
@@ -165,8 +136,13 @@ class Codecast {
         return this.respondWithStore();
       }
       case 'recorder/play': {
-        assert(this.recorder);
-        this.recorder.play();
+        if (!this.recorder) {
+          this.recorder = await this.populateRecorder();
+        }
+
+        if (this.recorder) {
+          this.recorder.play();
+        }
         return this.respondWithStore();
       }
       case 'recorder/pause': {
@@ -211,8 +187,8 @@ class Codecast {
         return this.respondWithStore();
       }
       case 'confirmForkFromPlayer': {
-        const status = this.player?.trackPlayerSummary.state.status;
-        if (status !== t.TrackPlayerStatus.Running) return { type: 'boolean', value: true };
+        const wasRunning = this.player?.isPlaying;
+        if (!wasRunning) return { type: 'boolean', value: true };
         this.player!.pause();
 
         const confirmTitle = 'Fork';
@@ -222,14 +198,14 @@ class Codecast {
           { title: 'Cancel', isCloseAffordance: true },
           { title: confirmTitle },
         );
-        if (answer?.title != confirmTitle && status === t.TrackPlayerStatus.Running) {
-          this.player!.start();
+        if (answer?.title != confirmTitle && wasRunning) {
+          this.player!.play();
         }
         return { type: 'boolean', value: answer?.title === confirmTitle };
       }
       case 'confirmEditFromPlayer': {
-        const status = this.player?.trackPlayerSummary.state.status;
-        if (status !== t.TrackPlayerStatus.Running) return { type: 'boolean', value: true };
+        const wasRunning = this.player?.isPlaying;
+        if (!wasRunning) return { type: 'boolean', value: true };
         this.player!.pause();
 
         const confirmTitle = 'Edit';
@@ -239,8 +215,8 @@ class Codecast {
           { title: 'Cancel', isCloseAffordance: true },
           { title: confirmTitle },
         );
-        if (answer?.title != confirmTitle && status === t.TrackPlayerStatus.Running) {
-          this.player!.start();
+        if (answer?.title != confirmTitle && wasRunning) {
+          this.player!.play();
         }
         return { type: 'boolean', value: answer?.title === confirmTitle };
       }
@@ -293,6 +269,41 @@ class Codecast {
     await this.postUpdateStore();
   }
 
+  async populateRecorder(): Promise<Recorder | undefined> {
+    assert(this.recorderSetup);
+    if (this.recorderSetup.baseSessionSummary) {
+      return Recorder.populateSession(
+        this.context,
+        this.db,
+        this.recorderSetup,
+        this.postAudioMessage.bind(this),
+        this.getSessionBlobWebviewUri.bind(this, this.recorderSetup.sessionSummary.id),
+        this.recorderChanged.bind(this),
+      );
+    } else {
+      return Recorder.fromDirAndVsc(
+        this.context,
+        this.db,
+        this.recorderSetup,
+        this.postAudioMessage.bind(this),
+        this.getSessionBlobWebviewUri.bind(this, this.recorderSetup.sessionSummary.id),
+        this.recorderChanged.bind(this),
+      );
+    }
+  }
+
+  async populatePlayer(): Promise<Player | undefined> {
+    assert(this.playerSetup);
+    return Player.populateSession(
+      this.context,
+      this.db,
+      this.playerSetup,
+      this.postAudioMessage.bind(this),
+      this.getSessionBlobWebviewUri.bind(this, this.playerSetup.sessionSummary.id),
+      this.playerChanged.bind(this),
+    );
+  }
+
   async closeCurrentScreen(): Promise<boolean> {
     if (this.screen === t.Screen.Recorder) {
       return await this.closeRecorder();
@@ -306,10 +317,11 @@ class Codecast {
     let shouldExit = true;
 
     if (this.recorder) {
-      const wasRunning = this.recorder.trackPlayerSummary.state.status === t.TrackPlayerStatus.Running;
+      const wasPlaying = this.recorder.isPlaying;
+      const wasRecording = this.recorder.isRecording;
 
       // Pause the frontend while we figure out if we should save the session.
-      if (wasRunning) {
+      if (wasPlaying || wasRecording) {
         this.recorder.pause();
         this.postUpdateStore();
       }
@@ -334,13 +346,12 @@ class Codecast {
       // If we want to exit recorder, stop recording and intercepting editor events.
       // Otherwise, resume recording if we were initially recording.
       if (shouldExit) {
-        this.recorder.stop();
-      } else if (wasRunning && this.recorder.isInRecorderMode) {
-        if (this.recorder.isInRecorderMode) {
-          this.recorder.record();
-        } else {
-          this.recorder.play();
-        }
+        this.recorder.pause();
+      } else if (wasRecording) {
+        this.recorder.record();
+        await this.postUpdateStore();
+      } else if (wasPlaying) {
+        this.recorder.play();
         await this.postUpdateStore();
       }
 
@@ -363,7 +374,7 @@ class Codecast {
 
   async closePlayer(): Promise<boolean> {
     if (this.player) {
-      this.player.stop();
+      this.player.pause();
     }
 
     this.playerSetup = undefined;
@@ -427,33 +438,19 @@ class Codecast {
     if (this.screen === t.Screen.Recorder) {
       if (this.recorder) {
         recorder = {
-          trackPlayerSummary: this.recorder.trackPlayerSummary,
-          isInRecorderMode: this.recorder.isInRecorderMode,
+          isLoaded: true,
+          isRecording: this.recorder.isRecording,
+          isPlaying: this.recorder.isPlaying,
           sessionSummary: this.recorder.sessionSummary,
           clock: this.recorder.clock,
           root: this.recorder.root,
           history: this.db.settings.history[this.recorder.sessionSummary.id],
-          DEV_trackPlayerSummaries: this.recorder.DEV_trackPlayerSummaries,
         };
       } else if (this.recorderSetup) {
         recorder = {
-          trackPlayerSummary: {
-            name: 'empty',
-            track: {
-              id: this.recorderSetup.sessionSummary.id,
-              clockRange: { start: 0, end: this.recorderSetup.sessionSummary.duration },
-            },
-            state: {
-              status: t.TrackPlayerStatus.Init,
-              buffering: false,
-              loaded: false,
-              loading: false,
-              seeking: false,
-            },
-            clock: 0,
-            playbackRate: 1,
-          },
-          isInRecorderMode: true,
+          isLoaded: false,
+          isRecording: false,
+          isPlaying: false,
           sessionSummary: this.recorderSetup.sessionSummary,
           clock: this.recorderSetup.forkClock ?? this.recorderSetup.baseSessionSummary?.duration ?? 0,
           root: this.recorderSetup.root,
@@ -463,7 +460,6 @@ class Codecast {
             this.recorderSetup.sessionSummary.id,
             this.recorderSetup.baseSessionSummary?.id,
           ),
-          DEV_trackPlayerSummaries: [],
         };
       }
     }
@@ -472,36 +468,21 @@ class Codecast {
     if (this.screen === t.Screen.Player) {
       if (this.player) {
         player = {
-          trackPlayerSummary: this.player.trackPlayerSummary,
+          isLoaded: true,
+          isPlaying: this.player.isPlaying,
           sessionSummary: this.player.sessionSummary,
           clock: this.player.clock,
           root: this.player.root,
           history: this.db.settings.history[this.player.sessionSummary.id],
-          DEV_trackPlayerSummaries: this.player.DEV_trackPlayerSummaries,
         };
       } else if (this.playerSetup) {
         player = {
-          trackPlayerSummary: {
-            name: 'empty',
-            track: {
-              id: this.playerSetup.sessionSummary.id,
-              clockRange: { start: 0, end: this.playerSetup.sessionSummary.duration },
-            },
-            state: {
-              status: t.TrackPlayerStatus.Init,
-              buffering: false,
-              loaded: false,
-              loading: false,
-              seeking: false,
-            },
-            clock: 0,
-            playbackRate: 1,
-          },
+          isLoaded: false,
+          isPlaying: false,
           sessionSummary: this.playerSetup.sessionSummary,
           clock: 0,
           root: this.playerSetup.root,
           history: this.db.settings.history[this.playerSetup.sessionSummary.id],
-          DEV_trackPlayerSummaries: [],
         };
       }
     }
