@@ -293,62 +293,6 @@ class EditorView extends Component<EditorViewProps> {
     cursor: undefined as Marker | undefined,
     anchor: undefined as Marker | undefined,
     markers: [] as Marker[],
-    stepCount: 16,
-  };
-
-  getTimelineStepClock(): number {
-    return calcTimelineStepClock(this.props.recorder.sessionSummary.duration, this.state.stepCount);
-  }
-
-  getTimelineDuration(): number {
-    return this.getTimelineStepClock() * this.state.stepCount;
-  }
-
-  mouseMoved = (e: MouseEvent) => {
-    const clock = this.getClockUnderMouse(e);
-    // console.log(`mouseMoved to clock ${clock}`, e.target);
-    this.updateState(state => {
-      state.cursor = clock === undefined ? undefined : { clock, type: 'cursor' };
-    });
-  };
-
-  mouseLeft = (e: MouseEvent) => {
-    // console.log('mouseLeft', e.target);
-    this.updateState(state => {
-      state.cursor = undefined;
-    });
-  };
-
-  mouseOut = (e: MouseEvent) => {
-    // console.log('mouseOut', e.target);
-  };
-
-  mouseDown = (e: MouseEvent) => {
-    const clock = this.getClockUnderMouse(e);
-    if (clock !== undefined) {
-      this.updateState(state => {
-        for (const marker of state.markers) marker.active = false;
-        state.anchor = { clock, type: 'anchor', active: true };
-      });
-    }
-  };
-
-  mouseUp = (e: MouseEvent) => {
-    // const {anchor} = this.state;
-    // if (anchor) {
-    //   const clock = this.getClockUnderMouse(e);
-    //   const tolerance = this.getTimelineDuration() / 300;
-    //   if (clock !== undefined && lib.approxEqual(clock, anchor.clock, tolerance)) {
-    //     this.updateState(state => {
-    //       state.anchor = undefined;
-    //       state.selection = {fromClock: anchor.clock, toClock: clock, active}
-    //     })
-    //   }
-    // }
-  };
-
-  resized = () => {
-    this.forceUpdate();
   };
 
   updateState = (recipe: EditorViewStateRecipe) => this.setState(state => produce(state, recipe));
@@ -371,41 +315,6 @@ class EditorView extends Component<EditorViewProps> {
       // }
     }
   };
-
-  getClockUnderMouse(e: MouseEvent): number | undefined {
-    const clientPos = [e.clientX, e.clientY] as t.Vec2;
-    const timeline = document.getElementById('timeline')!;
-    const timelineRect = timeline.getBoundingClientRect();
-    if (lib.vec2InRect(clientPos, timelineRect, { top: 5 })) {
-      const mouseOffsetInTimeline = Math.max(0, clientPos[1] - timelineRect.top);
-      const ratio = mouseOffsetInTimeline / timelineRect.height;
-      return ratio * this.getTimelineDuration();
-    }
-  }
-
-  componentDidUpdate() {}
-
-  componentDidMount() {
-    document.addEventListener('resize', this.resized);
-    document.addEventListener('mousemove', this.mouseMoved);
-    document.addEventListener('mousedown', this.mouseDown);
-    document.addEventListener('mouseup', this.mouseUp);
-
-    const timeline = document.getElementById('timeline')!;
-    timeline.addEventListener('mouseleave', this.mouseLeft);
-    timeline.addEventListener('mouseout', this.mouseOut);
-  }
-
-  componentWillUnmount() {
-    document.removeEventListener('resize', this.resized);
-    document.removeEventListener('mousemove', this.mouseMoved);
-    document.removeEventListener('mousedown', this.mouseDown);
-    document.removeEventListener('mouseup', this.mouseUp);
-
-    const timeline = document.getElementById('timeline')!;
-    timeline.removeEventListener('mouseleave', this.mouseLeft);
-    timeline.removeEventListener('mouseout', this.mouseOut);
-  }
 
   render() {
     const { id, recorder, className, onRecord, onPlay } = this.props;
@@ -452,9 +361,6 @@ class EditorView extends Component<EditorViewProps> {
       },
     ];
 
-    const clockMarker: Marker | undefined = recorder.clock > 0 ? { clock: recorder.clock, type: 'clock' } : undefined;
-    const allMarkers = _.compact([...this.state.markers, this.state.cursor, this.state.anchor, clockMarker]);
-
     return (
       <div id={id} className={className}>
         <MediaToolbar
@@ -464,22 +370,143 @@ class EditorView extends Component<EditorViewProps> {
           clock={recorder.clock}
           duration={ss.duration}
         />
-        <div id="timeline" className="subsection">
-          <div className="timeline-body">
-            <div className="markers">
-              {allMarkers.map(marker => (
-                <MarkerUI marker={marker} timelineDuration={this.getTimelineDuration()} />
-              ))}
-            </div>
-          </div>
-          <div id="ruler">
-            {_.times(this.state.stepCount + 1, i => (
-              <div className="step">
-                <div className="indicator"></div>
-                <div className="time">{lib.formatTimeSeconds(i * this.getTimelineStepClock())}</div>
-              </div>
+        <Timeline
+          recorder={recorder}
+          markers={this.state.markers}
+          cursor={this.state.cursor}
+          anchor={this.state.anchor}
+          clock={recorder.clock}
+          onChange={this.updateState}
+        />
+      </div>
+    );
+  }
+}
+
+type TimelineProps = {
+  recorder: t.RecorderState;
+  markers: Marker[];
+  cursor?: Marker;
+  anchor?: Marker;
+  clock: number;
+  onChange: (draft: EditorViewStateRecipe) => any;
+};
+class Timeline extends Component<TimelineProps> {
+  state = {
+    stepCount: 16,
+  };
+
+  getTimelineStepClock(): number {
+    return calcTimelineStepClock(this.props.recorder.sessionSummary.duration, this.state.stepCount);
+  }
+
+  getTimelineDuration(): number {
+    return this.getTimelineStepClock() * this.state.stepCount;
+  }
+
+  mouseMoved = (e: MouseEvent) => {
+    const clock = this.getClockUnderMouse(e);
+    // console.log(`mouseMoved to clock ${clock}`, e.target);
+    this.props.onChange(state => {
+      state.cursor = clock === undefined ? undefined : { clock, type: 'cursor' };
+    });
+  };
+
+  mouseLeft = (e: MouseEvent) => {
+    // console.log('mouseLeft', e.target);
+    this.props.onChange(state => {
+      state.cursor = undefined;
+    });
+  };
+
+  mouseOut = (e: MouseEvent) => {
+    // console.log('mouseOut', e.target);
+  };
+
+  mouseDown = (e: MouseEvent) => {
+    const clock = this.getClockUnderMouse(e);
+    if (clock !== undefined) {
+      this.props.onChange(state => {
+        for (const marker of state.markers) marker.active = false;
+        state.anchor = { clock, type: 'anchor', active: true };
+      });
+    }
+  };
+
+  mouseUp = (e: MouseEvent) => {
+    // const {anchor} = this.state;
+    // if (anchor) {
+    //   const clock = this.getClockUnderMouse(e);
+    //   const tolerance = this.getTimelineDuration() / 300;
+    //   if (clock !== undefined && lib.approxEqual(clock, anchor.clock, tolerance)) {
+    //     this.updateState(state => {
+    //       state.anchor = undefined;
+    //       state.selection = {fromClock: anchor.clock, toClock: clock, active}
+    //     })
+    //   }
+    // }
+  };
+
+  resized = () => {
+    this.forceUpdate();
+  };
+
+  getClockUnderMouse(e: MouseEvent): number | undefined {
+    const clientPos = [e.clientX, e.clientY] as t.Vec2;
+    const timeline = document.getElementById('timeline')!;
+    const timelineRect = timeline.getBoundingClientRect();
+    if (lib.vec2InRect(clientPos, timelineRect, { top: 5 })) {
+      const mouseOffsetInTimeline = Math.max(0, clientPos[1] - timelineRect.top);
+      const ratio = mouseOffsetInTimeline / timelineRect.height;
+      return ratio * this.getTimelineDuration();
+    }
+  }
+
+  componentDidUpdate() {}
+
+  componentDidMount() {
+    document.addEventListener('resize', this.resized);
+    document.addEventListener('mousemove', this.mouseMoved);
+    document.addEventListener('mousedown', this.mouseDown);
+    document.addEventListener('mouseup', this.mouseUp);
+
+    const timeline = document.getElementById('timeline')!;
+    timeline.addEventListener('mouseleave', this.mouseLeft);
+    timeline.addEventListener('mouseout', this.mouseOut);
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener('resize', this.resized);
+    document.removeEventListener('mousemove', this.mouseMoved);
+    document.removeEventListener('mousedown', this.mouseDown);
+    document.removeEventListener('mouseup', this.mouseUp);
+
+    const timeline = document.getElementById('timeline')!;
+    timeline.removeEventListener('mouseleave', this.mouseLeft);
+    timeline.removeEventListener('mouseout', this.mouseOut);
+  }
+
+  render() {
+    const { markers, cursor, anchor, clock } = this.props;
+    const clockMarker: Marker | undefined = clock > 0 ? { clock, type: 'clock' } : undefined;
+
+    const allMarkers = _.compact([...markers, cursor, anchor, clockMarker]);
+    return (
+      <div id="timeline" className="subsection">
+        <div className="timeline-body">
+          <div className="markers">
+            {allMarkers.map(marker => (
+              <MarkerUI marker={marker} timelineDuration={this.getTimelineDuration()} />
             ))}
           </div>
+        </div>
+        <div id="ruler">
+          {_.times(this.state.stepCount + 1, i => (
+            <div className="step">
+              <div className="indicator"></div>
+              <div className="time">{lib.formatTimeSeconds(i * this.getTimelineStepClock())}</div>
+            </div>
+          ))}
         </div>
       </div>
     );
