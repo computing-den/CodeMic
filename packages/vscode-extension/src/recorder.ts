@@ -103,10 +103,9 @@ class Recorder {
 
     let clock = setup.sessionSummary.duration;
     if (setup.fork) {
+      clock = setup.fork.clock;
       assert(setup.baseSessionSummary);
-      assert(setup.forkClock !== undefined);
       await db.copySessionDir(setup.baseSessionSummary, setup.sessionSummary);
-      clock = setup.forkClock;
     }
 
     const sessionIO = new SessionIO(db, setup.sessionSummary.id);
@@ -141,13 +140,13 @@ class Recorder {
   /**
    * Always returns a new object; no shared state with base
    */
-  static makeSessionSummary(base?: t.SessionSummary, fork?: boolean, forkClock?: number): t.SessionSummary {
+  static makeSessionSummary(base?: t.SessionSummary, fork?: { clock: number }): t.SessionSummary {
     if (base) {
       return {
         ..._.cloneDeep(base),
         id: fork ? uuid() : base.id,
         title: fork ? `Fork: ${base.title}` : base.title,
-        duration: forkClock ?? base.duration,
+        duration: fork?.clock ?? base.duration,
         author: {
           name: 'sean_shir',
           avatar: 'avatar1.png',

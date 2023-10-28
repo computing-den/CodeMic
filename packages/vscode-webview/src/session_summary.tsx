@@ -89,7 +89,12 @@ export class SessionSummaryListItem extends Component<ListItemProps> {
     {
       icon: 'codicon-repo-forked',
       title: 'Fork: create a new project based on this one',
-      onClick: () => postMessage({ type: 'recorder/open', sessionId: this.props.sessionSummary.id, fork: true }),
+      onClick: () =>
+        postMessage({
+          type: 'recorder/open',
+          sessionId: this.props.sessionSummary.id,
+          fork: { clock: this.props.sessionSummary.duration },
+        }),
     },
     {
       icon: 'codicon-edit',

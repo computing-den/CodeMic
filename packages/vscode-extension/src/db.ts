@@ -83,7 +83,7 @@ export default class Db {
   async copySessionDir(from: t.SessionSummary, to: t.SessionSummary) {
     const fromPath = path.abs(userPaths.data, 'sessions', from.id);
     const toPath = path.abs(userPaths.data, 'sessions', to.id);
-    await fs.promises.cp(fromPath, toPath);
+    await fs.promises.cp(fromPath, toPath, { recursive: true });
     // await this.writeSessionSummary(to);
   }
 }

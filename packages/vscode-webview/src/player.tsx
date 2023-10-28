@@ -51,8 +51,7 @@ export default class Player extends Component<Props> {
       await postMessage({
         type: 'recorder/open',
         sessionId: this.props.player.sessionSummary.id,
-        fork: true,
-        forkClock: this.props.player.clock,
+        fork: { clock: this.props.player.clock },
       });
     }
   };

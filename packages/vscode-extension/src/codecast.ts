@@ -124,13 +124,12 @@ class Codecast {
       case 'recorder/open': {
         if (await this.closeCurrentScreen()) {
           const baseSessionSummary = req.sessionId ? this.db.sessionSummaries[req.sessionId] : undefined;
-          const sessionSummary = Recorder.makeSessionSummary(baseSessionSummary, req.fork, req.forkClock);
+          const sessionSummary = Recorder.makeSessionSummary(baseSessionSummary, req.fork);
           const history = this.getFirstHistoryItemById(sessionSummary.id, baseSessionSummary?.id);
           this.setup = {
             sessionSummary,
             baseSessionSummary,
             fork: req.fork,
-            forkClock: req.forkClock,
             root: history?.root || VscWorkspace.getDefaultRoot(),
             // set history in getStore() so that it's always up-to-date
           };
@@ -506,10 +505,9 @@ class Codecast {
           isRecording: false,
           isPlaying: false,
           sessionSummary: this.setup.sessionSummary,
-          clock: this.setup.forkClock ?? this.setup.baseSessionSummary?.duration ?? 0,
+          clock: this.setup.fork?.clock ?? this.setup.baseSessionSummary?.duration ?? 0,
           root: this.setup.root,
           fork: this.setup.fork,
-          forkClock: this.setup.forkClock,
           history: this.getFirstHistoryItemById(this.setup.sessionSummary.id, this.setup.baseSessionSummary?.id),
           audioTracksWebviewUris: {},
         };

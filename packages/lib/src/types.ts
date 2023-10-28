@@ -31,7 +31,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'player/seek'; clock: number }; response: StoreResponse }
   | { request: { type: 'player/update'; changes: PlayerUpdate }; response: StoreResponse }
   | {
-      request: { type: 'recorder/open'; sessionId?: string; fork?: boolean; forkClock?: number };
+      request: { type: 'recorder/open'; sessionId?: string; fork?: { clock: number } };
       response: StoreResponse;
     }
   | { request: { type: 'recorder/load' }; response: StoreResponse }
@@ -147,8 +147,7 @@ export type RecorderState = {
   clock: number;
   sessionSummary: SessionSummary;
   root?: string;
-  fork?: boolean;
-  forkClock?: number;
+  fork?: { clock: number };
   history?: SessionHistoryItem;
   audioTracksWebviewUris: AudioTracksWebviewUris;
 };
@@ -177,8 +176,7 @@ export type PlayerUpdate = {
 export type Setup = {
   sessionSummary: SessionSummary;
   baseSessionSummary?: SessionSummary;
-  fork?: boolean;
-  forkClock?: number;
+  fork?: { clock: number };
   root?: string;
 };
 

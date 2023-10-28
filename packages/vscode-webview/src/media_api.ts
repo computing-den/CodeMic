@@ -13,6 +13,7 @@ type PostAudioEvent = (e: t.FrontendAudioEvent) => Promise<void>;
 
 export default class MediaApi {
   audioManagers: { [key: string]: AudioManager } = {};
+  audioContext?: AudioContext;
 
   constructor(public postAudioEvent: PostAudioEvent) {}
 
@@ -35,7 +36,13 @@ export default class MediaApi {
   }
 
   async prepareAll() {
-    await Promise.all(Object.values(this.audioManagers).map(a => a.prepare()));
+    try {
+      this.audioContext ??= new AudioContext();
+      this.audioContext.suspend();
+      await Promise.all(Object.values(this.audioManagers).map(a => a.prepare(this.audioContext!)));
+    } finally {
+      this.audioContext?.resume();
+    }
   }
 
   disposeById(id: string) {
@@ -55,6 +62,7 @@ export default class MediaApi {
 
 export class AudioManager {
   audio: HTMLAudioElement;
+  node?: MediaElementAudioSourceNode;
   prepared = false;
 
   constructor(public id: string, src: string, public postAudioEvent: PostAudioEvent) {
@@ -72,10 +80,18 @@ export class AudioManager {
     console.log(`AudioManager: created audio: ${id} (${src})`);
   }
 
-  async prepare() {
+  /**
+   * audioContext must be suspended before calling prepare.
+   * Puts the audio in a suspended audio context so that the initial play and pause
+   * don't trigger a sudden sound.
+   */
+  async prepare(audioContext: AudioContext) {
     if (!this.prepared) {
-      // Will this trigger a short sound?
       console.log(`AudioManager: preparing audio ${this.id} (${this.audio.src})`);
+
+      assert(audioContext.state === 'suspended');
+      this.node = audioContext.createMediaElementSource(this.audio);
+      this.node.connect(audioContext.destination);
       await this.audio.play();
       this.audio.pause();
       this.prepared = true;
@@ -109,6 +125,7 @@ export class AudioManager {
   }
 
   dispose() {
+    this.node?.disconnect();
     this.audio.pause();
     this.audio.removeEventListener('volumechange', this.handleVolumechange);
     this.audio.removeEventListener('timeupdate', this.handleTimeupdate);
