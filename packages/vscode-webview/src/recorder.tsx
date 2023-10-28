@@ -12,6 +12,7 @@ import Section from './section.jsx';
 import postMessage, { mediaApi } from './api.js';
 import { cn } from './misc.js';
 import _ from 'lodash';
+import { RangedTrack } from '@codecast/lib/src/types.js';
 
 type Props = { recorder: t.RecorderState };
 export default class Recorder extends Component<Props> {
@@ -49,13 +50,13 @@ export default class Recorder extends Component<Props> {
 
   play = async (clock?: number) => {
     await mediaApi.prepareAll();
-    if (clock) await postMessage({ type: 'recorder/seek', clock });
+    if (clock !== undefined) await postMessage({ type: 'recorder/seek', clock });
     await postMessage({ type: 'recorder/play' });
   };
 
   record = async (clock?: number) => {
     await mediaApi.prepareAll();
-    if (clock) await postMessage({ type: 'recorder/seek', clock });
+    if (clock !== undefined) await postMessage({ type: 'recorder/seek', clock });
     await postMessage({ type: 'recorder/record' });
   };
 
@@ -239,6 +240,7 @@ class DetailsView extends Component<DetailsViewProps> {
           value={ss.title}
           onInput={this.titleChanged}
           placeholder="The title of this project"
+          autoFocus={!recorder.isLoaded}
         >
           Title
         </vscode-text-area>
@@ -259,13 +261,12 @@ class DetailsView extends Component<DetailsViewProps> {
           label="Workspace"
           pickTitle="Select workspace folder"
           disabled={recorder.isLoaded}
-          autoFocus
         />
         <p className="subsection help">
           Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
         </p>
         {!recorder.isLoaded && (
-          <vscode-button className="subsection" onClick={onLoadRecorder}>
+          <vscode-button className="subsection" onClick={onLoadRecorder} autoFocus>
             {recorder.isNew ? 'Scan workspace to start' : 'Load project into workspace'}
             <span className="codicon codicon-chevron-right va-top m-left_small" />
           </vscode-button>
@@ -293,6 +294,7 @@ class EditorView extends Component<EditorViewProps> {
     cursor: undefined as Marker | undefined,
     anchor: undefined as Marker | undefined,
     markers: [] as Marker[],
+    activeTrackId: undefined as string | undefined,
   };
 
   updateState = (recipe: EditorViewStateRecipe) => this.setState(state => produce(state, recipe));
@@ -375,6 +377,7 @@ class EditorView extends Component<EditorViewProps> {
           markers={this.state.markers}
           cursor={this.state.cursor}
           anchor={this.state.anchor}
+          activeTrackId={this.state.activeTrackId}
           clock={recorder.clock}
           onChange={this.updateState}
         />
@@ -388,6 +391,7 @@ type TimelineProps = {
   markers: Marker[];
   cursor?: Marker;
   anchor?: Marker;
+  activeTrackId?: string;
   clock: number;
   onChange: (draft: EditorViewStateRecipe) => any;
 };
@@ -447,11 +451,32 @@ class Timeline extends Component<TimelineProps> {
     // }
   };
 
+  keyDown = async (e: KeyboardEvent) => {
+    if (e.key === 'Delete') {
+      if (this.props.activeTrackId) {
+        this.props.onChange(state => {
+          state.activeTrackId = undefined;
+        });
+        await postMessage({ type: 'recorder/deleteAudio', id: this.props.activeTrackId });
+      }
+    }
+  };
+
+  audioTrackClicked = (e: MouseEvent, track: t.AudioTrack) => {
+    this.props.onChange(state => {
+      state.activeTrackId = track.id;
+    });
+  };
+
   resized = () => {
     this.forceUpdate();
   };
 
   getClockUnderMouse(e: MouseEvent): number | undefined {
+    const target = e.target as HTMLElement;
+    if (target.closest('.audio-track')) {
+      return;
+    }
     const clientPos = [e.clientX, e.clientY] as t.Vec2;
     const timeline = document.getElementById('timeline')!;
     const timelineRect = timeline.getBoundingClientRect();
@@ -469,6 +494,7 @@ class Timeline extends Component<TimelineProps> {
     document.addEventListener('mousemove', this.mouseMoved);
     document.addEventListener('mousedown', this.mouseDown);
     document.addEventListener('mouseup', this.mouseUp);
+    document.addEventListener('keydown', this.keyDown);
 
     const timeline = document.getElementById('timeline')!;
     timeline.addEventListener('mouseleave', this.mouseLeft);
@@ -480,6 +506,7 @@ class Timeline extends Component<TimelineProps> {
     document.removeEventListener('mousemove', this.mouseMoved);
     document.removeEventListener('mousedown', this.mouseDown);
     document.removeEventListener('mouseup', this.mouseUp);
+    document.removeEventListener('keydown', this.keyDown);
 
     const timeline = document.getElementById('timeline')!;
     timeline.removeEventListener('mouseleave', this.mouseLeft);
@@ -487,16 +514,24 @@ class Timeline extends Component<TimelineProps> {
   }
 
   render() {
-    const { markers, cursor, anchor, clock } = this.props;
+    const { recorder, markers, cursor, anchor, activeTrackId, clock } = this.props;
     const clockMarker: Marker | undefined = clock > 0 ? { clock, type: 'clock' } : undefined;
 
     const allMarkers = _.compact([...markers, cursor, anchor, clockMarker]);
+    const timelineDuration = this.getTimelineDuration();
+
     return (
       <div id="timeline" className="subsection">
         <div className="timeline-body">
+          <AudioTracksUI
+            tracks={recorder.audioTracks}
+            timelineDuration={timelineDuration}
+            activeTrackId={activeTrackId}
+            onClick={this.audioTrackClicked}
+          />
           <div className="markers">
             {allMarkers.map(marker => (
-              <MarkerUI marker={marker} timelineDuration={this.getTimelineDuration()} />
+              <MarkerUI marker={marker} timelineDuration={timelineDuration} />
             ))}
           </div>
         </div>
@@ -513,15 +548,84 @@ class Timeline extends Component<TimelineProps> {
   }
 }
 
-type MarkerProps = { id?: string; marker: Marker; timelineDuration: number };
+type AudioTracksUIProps = {
+  tracks: t.AudioTrack[];
+  timelineDuration: number;
+  activeTrackId?: string;
+  onClick: (e: MouseEvent, track: t.AudioTrack) => any;
+};
+// type TrackLayout = {columns: TrackLayoutColumn[]};
+// type TrackLayoutColumn = {};
+type TrackLayoutColumn = t.AudioTrack[];
+class AudioTracksUI extends Component<AudioTracksUIProps> {
+  render() {
+    const { tracks, timelineDuration, activeTrackId, onClick } = this.props;
+    let columns: TrackLayoutColumn[] = [];
+
+    for (const track of tracks) {
+      this.fitTrackIntoColumns(track, columns);
+    }
+
+    columns = columns.map(column => this.orderedColumn(column));
+
+    return (
+      <div className="audio-tracks">
+        {columns.map(column => (
+          <div className="audio-tracks-column">
+            {column.map(track => {
+              const style = {
+                top: `${(track.clockRange.start / timelineDuration) * 100}%`,
+                bottom: `calc(100% - ${(track.clockRange.end / timelineDuration) * 100}%)`,
+              };
+
+              return (
+                <div
+                  className={cn('audio-track', activeTrackId === track.id && 'active')}
+                  style={style}
+                  onClick={e => onClick(e, track)}
+                >
+                  <div className="title">{track.title}</div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  private fitTrackIntoColumns(track: t.AudioTrack, columns: TrackLayoutColumn[]) {
+    for (const column of columns) {
+      if (this.doesTrackFitInColumn(track, column)) {
+        column.push(track);
+        return;
+      }
+    }
+    columns.push([track]);
+  }
+
+  private doesTrackFitInColumn(track: t.AudioTrack, column: TrackLayoutColumn): boolean {
+    return column.every(track2 => !this.doTracksIntersect(track, track2));
+  }
+
+  private doTracksIntersect(t1: t.AudioTrack, t2: t.AudioTrack): boolean {
+    return t2.clockRange.start < t1.clockRange.end && t1.clockRange.start < t2.clockRange.end;
+  }
+
+  private orderedColumn(columns: TrackLayoutColumn): TrackLayoutColumn {
+    return _.orderBy(columns, track => track.clockRange.start);
+  }
+}
+
+type MarkerProps = { marker: Marker; timelineDuration: number };
 class MarkerUI extends Component<MarkerProps> {
   render() {
-    const { id, marker, timelineDuration } = this.props;
+    const { marker, timelineDuration } = this.props;
     const style = {
       top: `${(marker.clock / timelineDuration) * 100}%`,
     };
     return (
-      <div id={id} className={cn('marker', `marker_${marker.type}`, marker.active && 'marker_active')} style={style}>
+      <div className={cn('marker', `marker_${marker.type}`, marker.active && 'marker_active')} style={style}>
         <div className="time">{lib.formatTimeSeconds(this.props.marker.clock)}</div>
       </div>
     );

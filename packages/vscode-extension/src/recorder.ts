@@ -251,6 +251,10 @@ class Recorder {
     this.sessionCtrl.insertAudioAndLoad(new AudioCtrl(audioTrack, this.postAudioMessage, this.workspace.io));
   }
 
+  async deleteAudio(id: string) {
+    this.sessionCtrl.deleteAudio(id);
+  }
+
   private async saveHistoryOpenClose() {
     this.db.mergeSessionHistory({
       id: this.sessionSummary.id,

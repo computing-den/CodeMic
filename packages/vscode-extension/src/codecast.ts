@@ -211,6 +211,11 @@ class Codecast {
         await this.recorder.insertAudio(req.uri, req.clock);
         return this.respondWithStore();
       }
+      case 'recorder/deleteAudio': {
+        assert(this.recorder);
+        await this.recorder.deleteAudio(req.id);
+        return this.respondWithStore();
+      }
       case 'confirmForkFromPlayer': {
         const wasRunning = this.player?.isPlaying;
         if (!wasRunning) return { type: 'boolean', value: true };

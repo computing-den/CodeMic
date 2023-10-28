@@ -48,6 +48,43 @@
         .timeline-body {
           flex: 1;
           position: relative;
+          display: flex;
+
+          .audio-tracks {
+            flex: 1;
+            display: flex;
+
+            .audio-tracks-column {
+              flex: 1 0 0;
+              /* display: flex; */
+              /* flex-direction: column; */
+              position: relative;
+              margin-right: var(--spacing-x-small);
+
+              .audio-track {
+                position: absolute;
+                left: 0;
+                right: 0;
+                border: 1px solid var(--track-border);
+                background: var(--track-background);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border-radius: 4px;
+                z-index: var(--track-z-index);
+                transition: background 0.2s ease-in-out;
+
+                &:hover,
+                &.active {
+                  background: var(--track-background-hover);
+                  z-index: var(--active-track-z-index);
+                }
+                &.active {
+                  border-color: var(--track-border-active);
+                }
+              }
+            }
+          }
 
           .markers {
             .marker {
@@ -56,6 +93,7 @@
               right: 0;
               /* height: 1px; */
               border-bottom: 1px solid;
+              z-index: var(--marker-z-index);
 
               /* &:hover { */
               /*   z-index: 1; */
@@ -69,7 +107,8 @@
               }
               &.marker_cursor {
                 border-color: var(--marker-cursor-color);
-                z-index: 1;
+                z-index: var(--cursor-marker-z-index);
+                pointer-events: none;
               }
               &.marker_clock {
                 border-color: var(--marker-clock-color);

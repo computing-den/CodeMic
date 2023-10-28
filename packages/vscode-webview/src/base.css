@@ -11,7 +11,7 @@
   --progress-bar-hover-width: 30px;
   --progress-bar-small-width: 3px;
   --button-danger-color: #f85149;
-  --button-danger-hover-color: #f85149e6;
+  --button-danger-hover-color: #e84139;
   --button-danger-border: #f85149;
   --container-padding-ver: var(--spacing-large);
   --container-padding-ver-small: var(--spacing-small);
@@ -20,11 +20,23 @@
   --marker-cursor-color: #5555ff;
   --marker-anchor-color: #55aaff;
   --marker-selection-color: #55ffff;
+  --marker-z-index: 10;
+  --cursor-marker-z-index: 11;
+  --track-z-index: 1;
+  --active-track-z-index: 2;
 }
 
 body.vscode-light {
+  --track-background: #d6ecf2;
+  --track-background-hover: #bbe1eb;
+  --track-border: #007acc1c;
+  --track-border-active: #007acc;
 }
 body.vscode-dark {
+  --track-background: #063b49;
+  --track-background-hover: #135e71;
+  --track-border: #007acc75;
+  --track-border-active: #007acc;
 }
 
 html,

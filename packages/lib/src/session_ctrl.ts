@@ -95,7 +95,19 @@ export default class SessionCtrl {
     this.sessionSummary.duration = Math.max(this.sessionSummary.duration, c.track.clockRange.end);
     this.audioCtrls.push(c);
     this.initAudioCtrl(c);
-    // c.load();
+    this.onChange?.();
+  }
+
+  deleteAudio(id: string) {
+    const i = this.audioCtrls.findIndex(c => c.track.id === id);
+    if (i === -1) {
+      console.error(`SessionCtrl deleteAudio did not find audio track with id ${id}`);
+      return;
+    }
+
+    this.audioCtrls[i].pause();
+    this.audioCtrls.splice(i, 1);
+    this.onChange?.();
   }
 
   handleFrontendAudioEvent(e: t.FrontendAudioEvent) {

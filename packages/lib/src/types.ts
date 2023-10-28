@@ -42,6 +42,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/save' }; response: StoreResponse }
   | { request: { type: 'recorder/update'; changes: RecorderUpdate }; response: StoreResponse }
   | { request: { type: 'recorder/insertAudio'; uri: Uri; clock: number }; response: StoreResponse }
+  | { request: { type: 'recorder/deleteAudio'; id: string }; response: StoreResponse }
   // | { request: { type: 'toggleRecorderStudio' }; response: StoreResponse }
   | { request: { type: 'deleteSession'; sessionId: string }; response: StoreResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
@@ -220,15 +221,16 @@ export type EditorTrack = {
   defaultEol: EndOfLine;
 };
 
-/**
- * Multiple audio tracks may refer to the same file.
- */
-export type AudioTrack = {
+export type RangedTrack = {
   id: string;
   clockRange: ClockRange;
   title: string;
-  file: File;
 };
+
+/**
+ * Multiple audio tracks may refer to the same file.
+ */
+export type AudioTrack = RangedTrack & { file: File };
 
 export type WebviewUris = { [key: string]: Uri };
 
