@@ -107,12 +107,12 @@ export default class Recorder extends Component<Props> {
   // }
 
   componentDidUpdate() {
-    mediaApi.loadOrDisposeAudioTracks(this.props.recorder.audioTracksWebviewUris);
+    mediaApi.loadOrDisposeAudioTracks(this.props.recorder.audioTracks, this.props.recorder.webviewUris);
   }
 
   componentDidMount() {
     console.log('Recorder componentDidMount');
-    mediaApi.loadOrDisposeAudioTracks(this.props.recorder.audioTracksWebviewUris);
+    mediaApi.loadOrDisposeAudioTracks(this.props.recorder.audioTracks, this.props.recorder.webviewUris);
   }
 
   componentWillUnmount() {

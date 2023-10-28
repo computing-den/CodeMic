@@ -21,3 +21,6 @@ export function updateStore(recipe: (draft: t.Store) => void): t.Store {
 export function setStoreListener(l: Listener) {
   listener = l;
 }
+
+//@ts-ignore
+globalThis.getStore = getStore;

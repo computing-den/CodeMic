@@ -149,7 +149,8 @@ export type RecorderState = {
   root?: string;
   fork?: { clock: number };
   history?: SessionHistoryItem;
-  audioTracksWebviewUris: AudioTracksWebviewUris;
+  audioTracks: AudioTrack[];
+  webviewUris: WebviewUris;
 };
 
 export type RecorderUpdate = {
@@ -165,7 +166,8 @@ export type PlayerState = {
   clock: number;
   root?: string;
   history?: SessionHistoryItem;
-  audioTracksWebviewUris: AudioTracksWebviewUris;
+  audioTracks: AudioTrack[];
+  webviewUris: WebviewUris;
 };
 
 export type PlayerUpdate = {
@@ -228,8 +230,7 @@ export type AudioTrack = {
   file: File;
 };
 
-export type AudioTrackWebviewUri = { audioTrack: AudioTrack; webviewUri: Uri };
-export type AudioTracksWebviewUris = { [key: string]: AudioTrackWebviewUri };
+export type WebviewUris = { [key: string]: Uri };
 
 export enum TrackCtrlStatus {
   Init,

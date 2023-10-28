@@ -467,15 +467,12 @@ class Codecast {
     return webviewUri.toString();
   }
 
-  getAudioTracksWebviewUris(sessionId: string, audioTracks: t.AudioTrack[]): t.AudioTracksWebviewUris {
+  getWebviewUris(sessionId: string, session: t.Session): t.WebviewUris {
     return Object.fromEntries(
-      audioTracks.map(audioTrack => {
+      session.audioTracks.map(audioTrack => {
         assert(audioTrack.file.type === 'local');
-        const audioTrackWebviewUri = {
-          audioTrack,
-          webviewUri: this.getSessionBlobWebviewUri(sessionId, audioTrack.file.sha1),
-        };
-        return [audioTrack.id, audioTrackWebviewUri];
+        const uri = this.getSessionBlobWebviewUri(sessionId, audioTrack.file.sha1);
+        return [audioTrack.id, uri];
       }),
     );
   }
@@ -493,10 +490,8 @@ class Codecast {
           clock: this.recorder.clock,
           root: this.recorder.root,
           history: this.db.settings.history[this.recorder.sessionSummary.id],
-          audioTracksWebviewUris: this.getAudioTracksWebviewUris(
-            this.recorder.sessionSummary.id,
-            this.recorder.session.audioTracks,
-          ),
+          audioTracks: this.recorder.session.audioTracks,
+          webviewUris: this.getWebviewUris(this.recorder.sessionSummary.id, this.recorder.session),
         };
       } else if (this.setup) {
         recorder = {
@@ -509,7 +504,8 @@ class Codecast {
           root: this.setup.root,
           fork: this.setup.fork,
           history: this.getFirstHistoryItemById(this.setup.sessionSummary.id, this.setup.baseSessionSummary?.id),
-          audioTracksWebviewUris: {},
+          audioTracks: [],
+          webviewUris: {},
         };
       }
     }
@@ -524,10 +520,8 @@ class Codecast {
           clock: this.player.clock,
           root: this.player.root,
           history: this.db.settings.history[this.player.sessionSummary.id],
-          audioTracksWebviewUris: this.getAudioTracksWebviewUris(
-            this.player.sessionSummary.id,
-            this.player.session.audioTracks,
-          ),
+          audioTracks: this.player.session.audioTracks,
+          webviewUris: this.getWebviewUris(this.player.sessionSummary.id, this.player.session),
         };
       } else if (this.setup) {
         player = {
@@ -537,7 +531,8 @@ class Codecast {
           clock: 0,
           root: this.setup.root,
           history: this.db.settings.history[this.setup.sessionSummary.id],
-          audioTracksWebviewUris: {},
+          audioTracks: [],
+          webviewUris: {},
         };
       }
     }

@@ -71,12 +71,12 @@ export default class Player extends Component<Props> {
   // }
 
   componentDidUpdate() {
-    mediaApi.loadOrDisposeAudioTracks(this.props.player.audioTracksWebviewUris);
+    mediaApi.loadOrDisposeAudioTracks(this.props.player.audioTracks, this.props.player.webviewUris);
   }
 
   componentDidMount() {
     console.log('Player componentDidMount');
-    mediaApi.loadOrDisposeAudioTracks(this.props.player.audioTracksWebviewUris);
+    mediaApi.loadOrDisposeAudioTracks(this.props.player.audioTracks, this.props.player.webviewUris);
   }
 
   componentWillUnmount() {

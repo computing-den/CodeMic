@@ -21,15 +21,15 @@ export default class MediaApi {
   //   this.audioManagers[id] = new AudioManager(id, src, this.postAudioEvent);
   // }
 
-  loadOrDisposeAudioTracks(audioTracksWebviewUris: t.AudioTracksWebviewUris) {
-    const newIds = _.keys(audioTracksWebviewUris);
-    const oldIds = _.keys(this.audioManagers);
+  loadOrDisposeAudioTracks(audioTracks: t.AudioTrack[], webviewUris: t.WebviewUris) {
+    const newIds = audioTracks.map(a => a.id);
+    const oldIds = Object.keys(this.audioManagers);
 
     const addedIds = _.difference(newIds, oldIds);
     const deletedIds = _.difference(oldIds, newIds);
 
     for (const id of addedIds) {
-      this.audioManagers[id] = new AudioManager(id, audioTracksWebviewUris[id].webviewUri, this.postAudioEvent);
+      this.audioManagers[id] = new AudioManager(id, webviewUris[id], this.postAudioEvent);
     }
 
     for (const id of deletedIds) this.disposeById(id);
