@@ -17,6 +17,20 @@ export default class VscWorkspace {
     return uri && uri.scheme === 'file' ? path.abs(uri.path) : undefined;
   }
 
+  static async askForRoot(title: string): Promise<t.AbsPath | undefined> {
+    const options = {
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+      defaultUri: vscode.workspace.workspaceFolders?.[0].uri,
+      title,
+    };
+    const uris = await vscode.window.showOpenDialog(options);
+    if (uris?.length === 1) {
+      return path.abs(uris[0].path);
+    }
+  }
+
   shouldRecordVscUri(vscUri: vscode.Uri): boolean {
     switch (vscUri.scheme) {
       case 'file':
@@ -198,5 +212,77 @@ export default class VscWorkspace {
       }
     }
     return uris;
+  }
+
+  async askToOverwriteRoot(): Promise<boolean> {
+    const overwriteTitle = 'Overwrite';
+    const answer = await vscode.window.showWarningMessage(
+      `"${this.root}" is not empty. Do you want to overwrite it?`,
+      {
+        modal: true,
+        detail:
+          'All files in the folder will be overwritten except for those specified in .gitignore and .codecastignore.',
+      },
+      { title: overwriteTitle },
+      { title: 'Cancel', isCloseAffordance: true },
+    );
+    return answer?.title === overwriteTitle;
+  }
+
+  async askAndCreateRoot(): Promise<boolean> {
+    const createPathTitle = 'Create path';
+    const answer = await vscode.window.showWarningMessage(
+      `"${this.root}" does not exist. Do you want to create it?`,
+      { modal: true },
+      { title: createPathTitle },
+      { title: 'Cancel', isCloseAffordance: true },
+    );
+    return answer?.title === createPathTitle;
+  }
+
+  async askToCreateOrOverwriteRoot(): Promise<boolean> {
+    // user confirmations and root directory creation
+    try {
+      const files = await fs.promises.readdir(this.root);
+      return files.length === 0 || (await this.askToOverwriteRoot());
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        // root doesn't exist. Ask user if they want to create it.
+        return this.askAndCreateRoot();
+      } else if (code === 'ENOTDIR') {
+        // Exists, but it's not a directory
+        vscode.window.showErrorMessage(`"${this.root}" exists but it's not a folder.`);
+      }
+      return false;
+    }
+  }
+
+  async updateWorkspaceFolder(): Promise<boolean> {
+    // const history = this.db.settings.history[this.playerSetup.sessionSummary.id];
+    if (VscWorkspace.getDefaultRoot() === this.root) return true;
+
+    // return vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length ?? 0, {
+    //   uri: vscode.Uri.file(this.root),
+    //   name: sessionTitle,
+    // });
+    const disposables: vscode.Disposable[] = [];
+    const done = new Promise((resolve, reject) => {
+      vscode.workspace.onDidChangeWorkspaceFolders(() => resolve(undefined), undefined, disposables);
+    });
+
+    const success = vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length ?? 0, {
+      uri: vscode.Uri.file(this.root),
+      // name: sessionTitle,
+    });
+
+    await done;
+    for (const d of disposables) d.dispose();
+
+    return success;
+  }
+
+  async makeRoot() {
+    await fs.promises.mkdir(this.root, { recursive: true });
   }
 }

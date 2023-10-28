@@ -9,7 +9,7 @@ export type CommonAction = {
 };
 
 export type PrimaryAction = CommonAction & {
-  type: 'recorder/record' | 'recorder/pause' | 'player/play' | 'player/pause';
+  type: 'recorder/record' | 'recorder/pause' | 'player/load' | 'player/play' | 'player/pause';
 };
 export type Action = CommonAction & {
   icon: string;
@@ -36,6 +36,11 @@ export default class MediaToolbar extends Component<Props> {
       case 'recorder/pause': {
         primaryActionIcon = 'codicon-debug-pause';
         primaryActionFor = 'for-recorder';
+        break;
+      }
+      case 'player/load': {
+        primaryActionIcon = 'codicon-sync';
+        primaryActionFor = 'for-player';
         break;
       }
       case 'player/play': {

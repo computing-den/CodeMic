@@ -15,18 +15,12 @@ type Props = { player: t.PlayerState };
 export default class Player extends Component<Props> {
   seeking = false;
 
+  loadPlayer = async () => {
+    await postMessage({ type: 'player/load' });
+  };
+
   startPlayer = async () => {
-    if (this.props.player.isLoaded) {
-      // if (this.isStoppedAlmostAtTheEnd()) await this.seek(0);
-      await postMessage({ type: 'player/play' });
-    } else {
-      if (this.props.player.root) {
-        await postMessage({ type: 'player/play' });
-      } else {
-        // TODO show error to user
-        console.error('Select a workspace folder');
-      }
-    }
+    await postMessage({ type: 'player/play' });
   };
 
   pausePlayer = async () => {
@@ -87,8 +81,13 @@ export default class Player extends Component<Props> {
     let primaryAction: MT.PrimaryAction;
     if (player.isPlaying) {
       primaryAction = { type: 'player/pause', title: 'Pause', onClick: this.pausePlayer };
-    } else {
+    } else if (player.isLoaded) {
       primaryAction = { type: 'player/play', title: 'Play', onClick: this.startPlayer };
+    } else {
+      const title = player.root
+        ? `Load the project into ${player.root}`
+        : `Select a directory and load the project into it`;
+      primaryAction = { type: 'player/load', title, onClick: this.loadPlayer };
     }
 
     const toolbarActions = [

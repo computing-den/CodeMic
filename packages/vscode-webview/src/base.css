@@ -73,6 +73,18 @@ ul.unstyled {
   margin-right: var(--spacing-small);
 }
 
+.codicon.m-left {
+  margin-left: var(--spacing-medium);
+}
+
+.codicon.m-left_x-small {
+  margin-left: var(--spacing-small);
+}
+
+.codicon.m-left_small {
+  margin-left: var(--spacing-small);
+}
+
 .codicon.va-top {
   vertical-align: top;
 }

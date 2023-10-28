@@ -25,6 +25,7 @@ export type ErrorResponse = { type: 'error' };
 export type FrontendToBackendReqRes =
   | { request: { type: 'welcome/open' }; response: StoreResponse }
   | { request: { type: 'player/open'; sessionId: string }; response: StoreResponse }
+  | { request: { type: 'player/load' }; response: StoreResponse }
   | { request: { type: 'player/play' }; response: StoreResponse }
   | { request: { type: 'player/pause' }; response: StoreResponse }
   | { request: { type: 'player/seek'; clock: number }; response: StoreResponse }
@@ -139,6 +140,7 @@ export type WelcomeState = {
 };
 
 export type RecorderState = {
+  isNew: boolean;
   isLoaded: boolean;
   isRecording: boolean;
   isPlaying: boolean;
@@ -466,7 +468,7 @@ export type SessionHistoryItem = {
   lastRecordedTimestamp?: string;
   lastWatchedTimestamp?: string;
   lastWatchedClock?: number;
-  root?: AbsPath;
+  root: AbsPath;
 };
 
 export type SeekData = { events: EditorEvent[]; direction: Direction; i: number; clock: number };

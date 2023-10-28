@@ -120,6 +120,7 @@ class Player {
     this.db.mergeSessionHistory({
       id: this.sessionSummary.id,
       lastWatchedClock: this.clock,
+      root: this.root,
     });
     await this.db.write(options);
   }

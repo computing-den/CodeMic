@@ -7,6 +7,7 @@ let codecast: Codecast;
 export async function activate(context: vscode.ExtensionContext) {
   try {
     codecast = await Codecast.fromContext(context);
+    // await codecast.restoreStateAfterRestart();
 
     // debug
     //@ts-ignore

@@ -23,25 +23,7 @@ export default class VscEditorWorkspace extends VscWorkspace {
     cutClock?: number,
   ): Promise<VscEditorWorkspace | undefined> {
     const root = path.abs(nodePath.resolve(rootStr));
-    // user confirmations and root directory creation
-    try {
-      const files = await fs.promises.readdir(root);
-      if (files.length) {
-        // root exists and is a directory but it's not empty.
-        if (!(await askToOverwriteRoot(root))) return undefined;
-      }
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code === 'ENOENT') {
-        // root doesn't exist. Ask user if they want to create it.
-        if (!(await askToCreateRoot(root))) return undefined;
-        await fs.promises.mkdir(root, { recursive: true });
-      } else if (code === 'ENOTDIR') {
-        // Exists, but it's not a directory
-        vscode.window.showErrorMessage(`"${root}" exists but it's not a folder.`);
-        return undefined;
-      }
-    }
+    await fs.promises.mkdir(root, { recursive: true });
 
     // read the session and cut it to cutClock.
     const editorTrack = await et.EditorTrack.fromJSON(root, sessionIO, session.editorTrack);
@@ -242,30 +224,4 @@ export default class VscEditorWorkspace extends VscWorkspace {
       });
     }
   }
-}
-
-async function askToOverwriteRoot(root: t.AbsPath): Promise<boolean> {
-  const overwriteTitle = 'Overwrite';
-  const answer = await vscode.window.showWarningMessage(
-    `"${root}" is not empty. Do you want to overwrite it?`,
-    {
-      modal: true,
-      detail:
-        'All files in the folder will be overwritten except for those specified in .gitignore and .codecastignore.',
-    },
-    { title: overwriteTitle },
-    { title: 'Cancel', isCloseAffordance: true },
-  );
-  return answer?.title === overwriteTitle;
-}
-
-async function askToCreateRoot(root: t.AbsPath): Promise<boolean> {
-  const createPathTitle = 'Create path';
-  const answer = await vscode.window.showWarningMessage(
-    `"${root}" does not exist. Do you want to create it?`,
-    { modal: true },
-    { title: createPathTitle },
-    { title: 'Cancel', isCloseAffordance: true },
-  );
-  return answer?.title === createPathTitle;
 }

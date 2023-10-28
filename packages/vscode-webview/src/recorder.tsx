@@ -22,7 +22,9 @@ export default class Recorder extends Component<Props> {
   // );
 
   state = {
-    tabId: 'details-view',
+    // The only time when the recorder screen is opened with already loaded recorder,
+    // is right after a vscode restart due to the change of workspace folders.
+    tabId: this.props.recorder.isLoaded ? 'editor-view' : 'details-view',
   };
 
   tabs = [
@@ -32,9 +34,17 @@ export default class Recorder extends Component<Props> {
 
   tabChanged = async (tabId: string) => {
     if (tabId === 'editor-view' && !this.props.recorder.isLoaded) {
-      await postMessage({ type: 'recorder/load' });
+      await this.loadRecorder();
+    } else {
+      this.setState({ tabId });
     }
-    this.setState({ tabId });
+  };
+
+  loadRecorder = async () => {
+    const res = await postMessage({ type: 'recorder/load' });
+    if (res.store.recorder?.isLoaded) {
+      this.setState({ tabId: 'editor-view' });
+    }
   };
 
   // setRef = (e: Element | null) => (this.panelsElem = e);
@@ -128,7 +138,7 @@ export default class Recorder extends Component<Props> {
     return (
       <Screen className="recorder">
         <Tabs tabs={this.tabs} activeTabId={this.state.tabId} onTabChange={this.tabChanged}>
-          <DetailsView id="details-view" className="" {...this.props} />
+          <DetailsView id="details-view" className="" {...this.props} onLoadRecorder={this.loadRecorder} />
           <EditorView id="editor-view" className="" {...this.props} />
         </Tabs>
         {/*
@@ -189,7 +199,9 @@ export default class Recorder extends Component<Props> {
   }
 }
 
-class DetailsView extends Component<Props & TabViewProps> {
+type DetailsViewProps = Props & TabViewProps & { onLoadRecorder: () => any };
+
+class DetailsView extends Component<DetailsViewProps> {
   titleChanged = async (e: InputEvent) => {
     const changes = { title: (e.target as HTMLInputElement).value };
     await postMessage({ type: 'recorder/update', changes });
@@ -205,7 +217,7 @@ class DetailsView extends Component<Props & TabViewProps> {
   };
 
   render() {
-    const { recorder, id, className } = this.props;
+    const { recorder, id, className, onLoadRecorder } = this.props;
     const { sessionSummary: ss } = recorder;
 
     return (
@@ -242,6 +254,12 @@ class DetailsView extends Component<Props & TabViewProps> {
         <p className="subsection help">
           Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
         </p>
+        {!recorder.isLoaded && (
+          <vscode-button className="subsection" onClick={onLoadRecorder}>
+            {recorder.isNew ? 'Scan workspace to start' : 'Load project into workspace'}
+            <span className="codicon codicon-chevron-right va-top m-left_small" />
+          </vscode-button>
+        )}
       </div>
     );
   }
