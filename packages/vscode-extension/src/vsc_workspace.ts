@@ -31,6 +31,45 @@ export default class VscWorkspace {
     }
   }
 
+  static async setUpWorkspace(
+    context: vscode.ExtensionContext,
+    screen: t.Screen,
+    setup: t.Setup,
+    options?: { afterRestart: boolean },
+  ): Promise<VscWorkspace | undefined> {
+    let root = setup.root ? path.abs(setup.root) : undefined;
+
+    if (!options?.afterRestart) {
+      root = root || (await VscWorkspace.askForRoot(`Select a workspace`));
+      if (!root) return;
+
+      const workspace = new VscWorkspace(root);
+      if (!(await workspace.askToCreateOrOverwriteRoot())) return;
+      await workspace.makeRoot();
+
+      setup.root = root;
+      console.log('scanOrPopulateRecorder(): setting globalState setup');
+      context.globalState.update('setup', setup);
+      context.globalState.update('screen', screen);
+      context.globalState.update('changingWorkspaceFolder', true);
+      await workspace.updateWorkspaceFolder();
+      console.log('scanOrPopulateRecorder(): unsetting globalState setup');
+      context.globalState.update('changingWorkspaceFolder', undefined);
+      context.globalState.update('screen', undefined);
+      context.globalState.update('setup', undefined);
+    }
+
+    if (root && VscWorkspace.getDefaultRoot() === root) {
+      return new VscWorkspace(root);
+    }
+
+    if (root) {
+      vscode.window.showErrorMessage(`Could not change the workspace folder to "${root}".`);
+    } else {
+      vscode.window.showErrorMessage('No workspace folder was selected.');
+    }
+  }
+
   shouldRecordVscUri(vscUri: vscode.Uri): boolean {
     switch (vscUri.scheme) {
       case 'file':

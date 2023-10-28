@@ -56,7 +56,7 @@ class Recorder {
   static async fromDirAndVsc(
     context: vscode.ExtensionContext,
     db: Db,
-    setup: t.RecorderSetup,
+    setup: t.Setup,
     postAudioMessage: t.PostAudioMessageToFrontend,
     getSessionBlobWebviewUri: (sha1: string) => t.Uri,
     onUpdateFrontend: () => any,
@@ -92,7 +92,7 @@ class Recorder {
   static async populateSession(
     context: vscode.ExtensionContext,
     db: Db,
-    setup: t.RecorderSetup,
+    setup: t.Setup,
     postAudioMessage: t.PostAudioMessageToFrontend,
     getSessionBlobWebviewUri: (sha1: string) => t.Uri,
     onUpdateFrontend: () => any,

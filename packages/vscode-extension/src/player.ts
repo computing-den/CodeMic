@@ -51,7 +51,7 @@ class Player {
   static async populateSession(
     context: vscode.ExtensionContext,
     db: Db,
-    setup: t.PlayerSetup,
+    setup: t.Setup,
     postAudioMessage: t.PostAudioMessageToFrontend,
     getSessionBlobWebviewUri: (sha1: string) => t.Uri,
     onUpdateFrontend: () => any,

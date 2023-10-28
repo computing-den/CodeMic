@@ -11,9 +11,8 @@ import { types as t, lib, path } from '@codecast/lib';
 class Codecast {
   screen: t.Screen = t.Screen.Welcome;
   recorder?: Recorder;
-  recorderSetup?: t.RecorderSetup;
+  setup?: t.Setup;
   player?: Player;
-  playerSetup?: t.PlayerSetup;
   webview: WebviewProvider;
   test: any = 0;
 
@@ -45,31 +44,21 @@ class Codecast {
     const afterRestart = Boolean(this.context.globalState.get<boolean>('changingWorkspaceFolder'));
     this.context.globalState.update('changingWorkspaceFolder', undefined);
 
-    const playerSetup = this.context.globalState.get<t.PlayerSetup>('playerSetup');
-    console.log('restoreStateAfterRestart(): ', playerSetup);
-    if (playerSetup) {
-      this.context.globalState.update('playerSetup', undefined);
-      this.playerSetup = playerSetup;
-      this.player = await this.populatePlayer({ afterRestart });
+    const setup = this.context.globalState.get<t.Setup>('setup');
+    const screen = this.context.globalState.get<t.Screen>('screen');
+    console.log('restoreStateAfterRestart(): ', setup);
+    if (setup) {
+      assert(screen === t.Screen.Player || screen === t.Screen.Recorder);
 
-      this.screen = t.Screen.Player;
-      this.updateViewTitle();
-      vscode.commands.executeCommand('setContext', 'codecast.canGoHome', true);
+      this.context.globalState.update('setup', undefined);
+      this.setup = setup;
+      if (screen === t.Screen.Player) {
+        this.player = await this.populatePlayer({ afterRestart });
+      } else {
+        this.recorder = await this.scanOrPopulateRecorder({ afterRestart });
+      }
 
-      return this.postUpdateStore();
-    }
-
-    const recorderSetup = this.context.globalState.get<t.RecorderSetup>('recorderSetup');
-    console.log('restoreStateAfterRestart(): ', recorderSetup);
-    if (recorderSetup) {
-      this.context.globalState.update('recorderSetup', undefined);
-      this.recorderSetup = recorderSetup;
-      this.recorder = await this.scanOrPopulateRecorder({ afterRestart });
-
-      this.screen = t.Screen.Recorder;
-      this.updateViewTitle();
-      vscode.commands.executeCommand('setContext', 'codecast.canGoHome', true);
-
+      this.setScreen(screen);
       return this.postUpdateStore();
     }
   }
@@ -96,14 +85,12 @@ class Codecast {
           const sessionSummary = this.db.sessionSummaries[req.sessionId];
           assert(sessionSummary);
           const history = this.db.settings.history[sessionSummary.id];
-          this.playerSetup = {
+          this.setup = {
             sessionSummary,
             root: history?.root,
             // set history in getStore() so that it's always up-to-date
           };
-          this.screen = t.Screen.Player;
-          this.updateViewTitle();
-          vscode.commands.executeCommand('setContext', 'codecast.canGoHome', true);
+          this.setScreen(t.Screen.Player);
         }
         return this.respondWithStore();
       }
@@ -131,7 +118,7 @@ class Codecast {
         if (this.player) {
           this.player.updateState(req.changes);
         } else {
-          if (req.changes.root !== undefined) this.playerSetup!.root = req.changes.root;
+          if (req.changes.root !== undefined) this.setup!.root = req.changes.root;
           // if (req.changes.clock !== undefined) throw new Error('TODO seek before player instantiation');
         }
         return this.respondWithStore();
@@ -141,7 +128,7 @@ class Codecast {
           const baseSessionSummary = req.sessionId ? this.db.sessionSummaries[req.sessionId] : undefined;
           const sessionSummary = Recorder.makeSessionSummary(baseSessionSummary, req.fork, req.forkClock);
           const history = this.getFirstHistoryItemById(sessionSummary.id, baseSessionSummary?.id);
-          this.recorderSetup = {
+          this.setup = {
             sessionSummary,
             baseSessionSummary,
             fork: req.fork,
@@ -149,9 +136,7 @@ class Codecast {
             root: history?.root || VscWorkspace.getDefaultRoot(),
             // set history in getStore() so that it's always up-to-date
           };
-          this.screen = t.Screen.Recorder;
-          this.updateViewTitle();
-          vscode.commands.executeCommand('setContext', 'codecast.canGoHome', true);
+          this.setScreen(t.Screen.Recorder);
         }
 
         return this.respondWithStore();
@@ -218,10 +203,9 @@ class Codecast {
         if (this.recorder) {
           this.recorder.updateState(req.changes);
         } else {
-          if (req.changes.title !== undefined) this.recorderSetup!.sessionSummary.title = req.changes.title;
-          if (req.changes.description !== undefined)
-            this.recorderSetup!.sessionSummary.description = req.changes.description;
-          if (req.changes.root !== undefined) this.recorderSetup!.root = req.changes.root;
+          if (req.changes.title !== undefined) this.setup!.sessionSummary.title = req.changes.title;
+          if (req.changes.description !== undefined) this.setup!.sessionSummary.description = req.changes.description;
+          if (req.changes.root !== undefined) this.setup!.root = req.changes.root;
         }
         return this.respondWithStore();
       }
@@ -306,10 +290,14 @@ class Codecast {
     }
   }
 
+  setScreen(screen: t.Screen) {
+    this.screen = screen;
+    this.updateViewTitle();
+    vscode.commands.executeCommand('setContext', 'codecast.canGoHome', screen !== t.Screen.Welcome);
+  }
+
   async goHome() {
     await this.closeCurrentScreen();
-    this.updateViewTitle();
-    vscode.commands.executeCommand('setContext', 'codecast.canGoHome', false);
   }
 
   async goHomeCommand() {
@@ -318,91 +306,40 @@ class Codecast {
   }
 
   async scanOrPopulateRecorder(options?: { afterRestart: boolean }): Promise<Recorder | undefined> {
-    assert(this.recorderSetup);
+    assert(this.setup);
+    if (!(await VscWorkspace.setUpWorkspace(this.context, this.screen, this.setup, options))) return;
 
-    if (!options?.afterRestart) {
-      let root = this.recorderSetup.root && path.abs(this.recorderSetup.root);
-      root = root || (await VscWorkspace.askForRoot(`Select a workspace`));
-      if (!root) return;
-
-      const workspace = new VscWorkspace(root);
-      if (!options?.afterRestart && !(await workspace.askToCreateOrOverwriteRoot())) return;
-      await workspace.makeRoot();
-
-      this.recorderSetup.root = root;
-      console.log('scanOrPopulateRecorder(): setting globalState recorderSetup');
-      this.context.globalState.update('recorderSetup', this.recorderSetup);
-      this.context.globalState.update('changingWorkspaceFolder', true);
-      await workspace.updateWorkspaceFolder();
-      console.log('scanOrPopulateRecorder(): unsetting globalState recorderSetup');
-      this.context.globalState.update('changingWorkspaceFolder', undefined);
-      this.context.globalState.update('recorderSetup', undefined);
-    }
-
-    if (VscWorkspace.getDefaultRoot() !== this.recorderSetup.root) {
-      vscode.window.showErrorMessage(`Could not change the workspace folder to "${this.recorderSetup.root}".`);
-      return;
-    }
-
-    if (this.recorderSetup.baseSessionSummary) {
+    if (this.setup.baseSessionSummary) {
       return Recorder.populateSession(
         this.context,
         this.db,
-        this.recorderSetup,
+        this.setup,
         this.postAudioMessage.bind(this),
-        this.getSessionBlobWebviewUri.bind(this, this.recorderSetup.sessionSummary.id),
+        this.getSessionBlobWebviewUri.bind(this, this.setup.sessionSummary.id),
         this.recorderChanged.bind(this),
       );
     } else {
       return Recorder.fromDirAndVsc(
         this.context,
         this.db,
-        this.recorderSetup,
+        this.setup,
         this.postAudioMessage.bind(this),
-        this.getSessionBlobWebviewUri.bind(this, this.recorderSetup.sessionSummary.id),
+        this.getSessionBlobWebviewUri.bind(this, this.setup.sessionSummary.id),
         this.recorderChanged.bind(this),
       );
     }
   }
 
   async populatePlayer(options?: { afterRestart: boolean }): Promise<Player | undefined> {
-    assert(this.playerSetup);
-    let workspace: VscWorkspace;
-    if (this.playerSetup.root) {
-      workspace = new VscWorkspace(path.abs(this.playerSetup.root));
-    } else {
-      const root = await VscWorkspace.askForRoot(
-        `Select a workspace for project "${this.playerSetup.sessionSummary.title}"`,
-      );
-      if (!root) return;
-
-      workspace = new VscWorkspace(root);
-      if (!(await workspace.askToCreateOrOverwriteRoot())) return;
-
-      this.playerSetup.root = root;
-    }
-
-    assert(this.playerSetup.root);
-    await workspace.makeRoot();
-    console.log('populatePlayer(): setting globalState playerSetup');
-    this.context.globalState.update('playerSetup', this.playerSetup);
-    this.context.globalState.update('changingWorkspaceFolder', true);
-    const success = await workspace.updateWorkspaceFolder();
-    console.log('populatePlayer(): unsetting globalState playerSetup');
-    this.context.globalState.update('changingWorkspaceFolder', undefined);
-    this.context.globalState.update('playerSetup', undefined);
-
-    if (!success) {
-      vscode.window.showErrorMessage(`Could not change the workspace folder to "${this.playerSetup.root}".`);
-      return;
-    }
+    assert(this.setup);
+    if (!(await VscWorkspace.setUpWorkspace(this.context, this.screen, this.setup, options))) return;
 
     return Player.populateSession(
       this.context,
       this.db,
-      this.playerSetup,
+      this.setup,
       this.postAudioMessage.bind(this),
-      this.getSessionBlobWebviewUri.bind(this, this.playerSetup.sessionSummary.id),
+      this.getSessionBlobWebviewUri.bind(this, this.setup.sessionSummary.id),
       this.playerChanged.bind(this),
     );
   }
@@ -467,8 +404,8 @@ class Codecast {
 
     if (shouldExit) {
       this.recorder = undefined;
-      this.recorderSetup = undefined;
-      this.screen = t.Screen.Welcome;
+      this.setup = undefined;
+      this.setScreen(t.Screen.Welcome);
       return true;
     }
 
@@ -480,9 +417,9 @@ class Codecast {
       this.player.pause();
     }
 
-    this.playerSetup = undefined;
     this.player = undefined;
-    this.screen = t.Screen.Welcome;
+    this.setup = undefined;
+    this.setScreen(t.Screen.Welcome);
     return true;
   }
 
@@ -550,21 +487,18 @@ class Codecast {
           root: this.recorder.root,
           history: this.db.settings.history[this.recorder.sessionSummary.id],
         };
-      } else if (this.recorderSetup) {
+      } else if (this.setup) {
         recorder = {
-          isNew: !this.recorderSetup.baseSessionSummary,
+          isNew: !this.setup.baseSessionSummary,
           isLoaded: false,
           isRecording: false,
           isPlaying: false,
-          sessionSummary: this.recorderSetup.sessionSummary,
-          clock: this.recorderSetup.forkClock ?? this.recorderSetup.baseSessionSummary?.duration ?? 0,
-          root: this.recorderSetup.root,
-          fork: this.recorderSetup.fork,
-          forkClock: this.recorderSetup.forkClock,
-          history: this.getFirstHistoryItemById(
-            this.recorderSetup.sessionSummary.id,
-            this.recorderSetup.baseSessionSummary?.id,
-          ),
+          sessionSummary: this.setup.sessionSummary,
+          clock: this.setup.forkClock ?? this.setup.baseSessionSummary?.duration ?? 0,
+          root: this.setup.root,
+          fork: this.setup.fork,
+          forkClock: this.setup.forkClock,
+          history: this.getFirstHistoryItemById(this.setup.sessionSummary.id, this.setup.baseSessionSummary?.id),
         };
       }
     }
@@ -580,14 +514,14 @@ class Codecast {
           root: this.player.root,
           history: this.db.settings.history[this.player.sessionSummary.id],
         };
-      } else if (this.playerSetup) {
+      } else if (this.setup) {
         player = {
           isLoaded: false,
           isPlaying: false,
-          sessionSummary: this.playerSetup.sessionSummary,
+          sessionSummary: this.setup.sessionSummary,
           clock: 0,
-          root: this.playerSetup.root,
-          history: this.db.settings.history[this.playerSetup.sessionSummary.id],
+          root: this.setup.root,
+          history: this.db.settings.history[this.setup.sessionSummary.id],
         };
       }
     }

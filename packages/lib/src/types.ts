@@ -158,14 +158,6 @@ export type RecorderUpdate = {
   root?: string;
 };
 
-export type RecorderSetup = {
-  sessionSummary: SessionSummary;
-  baseSessionSummary?: SessionSummary;
-  fork?: boolean;
-  forkClock?: number;
-  root?: string;
-};
-
 export type PlayerState = {
   isLoaded: boolean;
   isPlaying: boolean;
@@ -180,8 +172,11 @@ export type PlayerUpdate = {
   // clock?: number;
 };
 
-export type PlayerSetup = {
+export type Setup = {
   sessionSummary: SessionSummary;
+  baseSessionSummary?: SessionSummary;
+  fork?: boolean;
+  forkClock?: number;
   root?: string;
 };
 
