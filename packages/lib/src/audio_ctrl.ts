@@ -14,7 +14,7 @@ export default class AudioCtrl implements t.AudioCtrl {
   constructor(
     public track: t.AudioTrack,
     private postAudioMessage: t.PostAudioMessageToFrontend,
-    private getSessionBlobWebviewUri: (sha1: string) => t.Uri,
+    // private getSessionBlobWebviewUri: (sha1: string) => t.Uri,
     private sessionIO: t.SessionIO,
   ) {}
 
@@ -22,11 +22,11 @@ export default class AudioCtrl implements t.AudioCtrl {
     assert(this.track.file.type === 'local', 'AudioCtrl: only supports local files');
     if (!this.loading && !this.loaded) {
       this.loading = true;
-      this.postAudioMessage({
-        type: 'audio/load',
-        id: this.track.id,
-        src: this.getSessionBlobWebviewUri(this.track.file.sha1),
-      }).catch(this.gotError);
+      // this.postAudioMessage({
+      //   type: 'audio/load',
+      //   id: this.track.id,
+      //   src: this.getSessionBlobWebviewUri(this.track.file.sha1),
+      // }).catch(this.gotError);
     }
   }
 

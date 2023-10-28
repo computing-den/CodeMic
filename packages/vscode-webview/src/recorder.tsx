@@ -22,7 +22,7 @@ export default class Recorder extends Component<Props> {
   // );
 
   state = {
-    // The only time when the recorder screen is opened with already loaded recorder,
+    // The only time when the recorder screen is opened with already loadned recorder,
     // is right after a vscode restart due to the change of workspace folders.
     tabId: this.props.recorder.isLoaded ? 'editor-view' : 'details-view',
   };
@@ -45,6 +45,18 @@ export default class Recorder extends Component<Props> {
     if (res.store.recorder?.isLoaded) {
       this.setState({ tabId: 'editor-view' });
     }
+  };
+
+  play = async (clock?: number) => {
+    await mediaApi.prepareAll();
+    if (clock) await postMessage({ type: 'recorder/seek', clock });
+    await postMessage({ type: 'recorder/play' });
+  };
+
+  record = async (clock?: number) => {
+    await mediaApi.prepareAll();
+    if (clock) await postMessage({ type: 'recorder/seek', clock });
+    await postMessage({ type: 'recorder/record' });
   };
 
   // setRef = (e: Element | null) => (this.panelsElem = e);
@@ -95,18 +107,16 @@ export default class Recorder extends Component<Props> {
   // }
 
   componentDidUpdate() {
-    // this.enableOrDisableMedia();
+    mediaApi.loadOrDisposeAudioTracks(this.props.recorder.audioTracksWebviewUris);
   }
 
   componentDidMount() {
     console.log('Recorder componentDidMount');
-    // this.enableOrDisableMedia();
-
-    // this.panelsElem!.addEventListener('change', this.tabChanged);
+    mediaApi.loadOrDisposeAudioTracks(this.props.recorder.audioTracksWebviewUris);
   }
 
   componentWillUnmount() {
-    // this.media.pause();
+    mediaApi.disposeAll();
   }
 
   render() {
@@ -139,7 +149,7 @@ export default class Recorder extends Component<Props> {
       <Screen className="recorder">
         <Tabs tabs={this.tabs} activeTabId={this.state.tabId} onTabChange={this.tabChanged}>
           <DetailsView id="details-view" className="" {...this.props} onLoadRecorder={this.loadRecorder} />
-          <EditorView id="editor-view" className="" {...this.props} />
+          <EditorView id="editor-view" className="" {...this.props} onRecord={this.record} onPlay={this.play} />
         </Tabs>
         {/*
         <vscode-panels ref={this.setRef}>
@@ -273,7 +283,12 @@ type Marker = {
 
 type EditorViewStateRecipe = (draft: Draft<EditorView['state']>) => EditorView['state'] | void;
 
-class EditorView extends Component<Props & TabViewProps> {
+type EditorViewProps = Props &
+  TabViewProps & {
+    onRecord: (clock?: number) => Promise<void>;
+    onPlay: (clock?: number) => Promise<void>;
+  };
+class EditorView extends Component<EditorViewProps> {
   state = {
     cursor: undefined as Marker | undefined,
     anchor: undefined as Marker | undefined,
@@ -393,7 +408,7 @@ class EditorView extends Component<Props & TabViewProps> {
   }
 
   render() {
-    const { id, recorder, className } = this.props;
+    const { id, recorder, className, onRecord, onPlay } = this.props;
     const { sessionSummary: ss } = recorder;
     let primaryAction: MT.PrimaryAction;
 
@@ -410,12 +425,7 @@ class EditorView extends Component<Props & TabViewProps> {
         type: 'recorder/record',
         title: 'Record',
         disabled: recorder.isPlaying,
-        onClick: async () => {
-          if (this.state.anchor) {
-            await postMessage({ type: 'recorder/seek', clock: this.state.anchor.clock });
-          }
-          await postMessage({ type: 'recorder/record' });
-        },
+        onClick: () => onRecord(this.state.anchor?.clock),
       };
     }
 
@@ -432,16 +442,12 @@ class EditorView extends Component<Props & TabViewProps> {
             title: 'Play',
             icon: 'codicon-play',
             disabled: recorder.isRecording,
-            onClick: async () => {
-              if (this.state.anchor) {
-                await postMessage({ type: 'recorder/seek', clock: this.state.anchor.clock });
-              }
-              await postMessage({ type: 'recorder/play' });
-            },
+            onClick: () => onPlay(this.state.anchor?.clock),
           },
       {
         title: 'Add audio',
         icon: 'codicon-mic',
+        disabled: recorder.isPlaying || recorder.isRecording,
         onClick: this.insertAudio,
       },
     ];

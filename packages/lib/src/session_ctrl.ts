@@ -95,7 +95,7 @@ export default class SessionCtrl {
     this.sessionSummary.duration = Math.max(this.sessionSummary.duration, c.track.clockRange.end);
     this.audioCtrls.push(c);
     this.initAudioCtrl(c);
-    c.load();
+    // c.load();
   }
 
   handleFrontendAudioEvent(e: t.FrontendAudioEvent) {

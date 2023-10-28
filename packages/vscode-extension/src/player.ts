@@ -35,6 +35,7 @@ class Player {
     public context: vscode.ExtensionContext,
     public db: Db,
     public sessionSummary: t.SessionSummary,
+    public session: t.Session,
     public workspace: VscEditorWorkspace,
     private sessionCtrl: SessionCtrl,
     private audioCtrls: AudioCtrl[],
@@ -53,7 +54,6 @@ class Player {
     db: Db,
     setup: t.Setup,
     postAudioMessage: t.PostAudioMessageToFrontend,
-    getSessionBlobWebviewUri: (sha1: string) => t.Uri,
     onUpdateFrontend: () => any,
     // audioSrc: string,
   ): Promise<Player | undefined> {
@@ -64,15 +64,22 @@ class Player {
     if (workspace) {
       const vscEditorPlayer = new VscEditorPlayer(context, workspace);
       const vscEditorRecorder = new VscEditorRecorder(context, workspace);
-      const audioCtrls = session.audioTracks.map(
-        audioTrack => new AudioCtrl(audioTrack, postAudioMessage, getSessionBlobWebviewUri, sessionIO),
-      );
+      const audioCtrls = session.audioTracks.map(audioTrack => new AudioCtrl(audioTrack, postAudioMessage, sessionIO));
 
       const sessionCtrl = new SessionCtrl(setup.sessionSummary, audioCtrls, vscEditorPlayer, vscEditorRecorder);
       sessionCtrl.load();
       // sessionCtrl.seek(clock);
 
-      return new Player(context, db, setup.sessionSummary, workspace, sessionCtrl, audioCtrls, onUpdateFrontend);
+      return new Player(
+        context,
+        db,
+        setup.sessionSummary,
+        session,
+        workspace,
+        sessionCtrl,
+        audioCtrls,
+        onUpdateFrontend,
+      );
     }
   }
 

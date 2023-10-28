@@ -16,21 +16,36 @@ export default class MediaApi {
 
   constructor(public postAudioEvent: PostAudioEvent) {}
 
-  async load(id: string, src: string) {
-    this.audioManagers[id] = new AudioManager(id, src, this.postAudioEvent);
+  // async load(id: string, src: string) {
+  //   this.audioManagers[id] = new AudioManager(id, src, this.postAudioEvent);
+  // }
+
+  loadOrDisposeAudioTracks(audioTracksWebviewUris: t.AudioTracksWebviewUris) {
+    const newIds = _.keys(audioTracksWebviewUris);
+    const oldIds = _.keys(this.audioManagers);
+
+    const addedIds = _.difference(newIds, oldIds);
+    const deletedIds = _.difference(oldIds, newIds);
+
+    for (const id of addedIds) {
+      this.audioManagers[id] = new AudioManager(id, audioTracksWebviewUris[id].webviewUri, this.postAudioEvent);
+    }
+
+    for (const id of deletedIds) this.disposeById(id);
   }
 
-  // async play(id: string) {
-  //   await this.getAudioManager(id).play()
-  // }
+  async prepareAll() {
+    await Promise.all(Object.values(this.audioManagers).map(a => a.prepare()));
+  }
 
-  // async pause(id: string) {
-  //   await this.getAudioManager(id).pause()
-  // }
+  disposeById(id: string) {
+    this.audioManagers[id]?.dispose();
+    delete this.audioManagers[id];
+  }
 
-  // async seek(id: string, clock: number) {
-  //   await this.getAudioManager(id).seek(clock)
-  // }
+  disposeAll() {
+    for (const id of _.keys(this.audioManagers)) this.disposeById(id);
+  }
 
   getAudioManager(id: string): AudioManager {
     assert(this.audioManagers[id], `MediaApi.getAudioManager: audio with id ${id} not found`);
@@ -40,6 +55,7 @@ export default class MediaApi {
 
 export class AudioManager {
   audio: HTMLAudioElement;
+  prepared = false;
 
   constructor(public id: string, src: string, public postAudioEvent: PostAudioEvent) {
     this.audio = new Audio();
@@ -52,10 +68,19 @@ export class AudioManager {
     }
 
     this.audio.src = src;
-    console.log(`AudioManager: loading audio: ${src}`);
-    console.log(`AudioManager: loading audio, stack: ${new Error().stack}`);
-    // this.audio.play();
-    // this.audio.pause();
+    this.audio.preload = 'auto';
+    console.log(`AudioManager: created audio: ${id} (${src})`);
+  }
+
+  async prepare() {
+    if (!this.prepared) {
+      // Will this trigger a short sound?
+      console.log(`AudioManager: preparing audio ${this.id} (${this.audio.src})`);
+      await this.audio.play();
+      this.audio.pause();
+      this.prepared = true;
+      console.log(`AudioManager: prepared audio ${this.id}`);
+    }
   }
 
   async play() {
@@ -63,22 +88,22 @@ export class AudioManager {
     await this.audio.play();
   }
 
-  async pause() {
+  pause() {
     console.log(`AudioManager pause`);
     this.audio.pause();
   }
 
-  async stop() {
+  stop() {
     console.log(`AudioManager stop`);
     this.audio.pause();
   }
 
-  async seek(clock: number) {
+  seek(clock: number) {
     console.log(`AudioManager seek ${clock}`);
     this.audio.currentTime = clock;
   }
 
-  async setPlaybackRate(rate: number) {
+  setPlaybackRate(rate: number) {
     console.log(`AudioManager setPlaybackRate ${rate}`);
     this.audio.playbackRate = rate;
   }

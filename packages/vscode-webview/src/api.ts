@@ -68,16 +68,16 @@ async function messageHandler(req: t.BackendRequest): Promise<t.FrontendResponse
     case 'todo': {
       return { type: 'ok' };
     }
-    case 'audio/load': {
-      await mediaApi.load(req.id, req.src);
-      return { type: 'ok' };
-    }
+    // case 'audio/load': {
+    //   await mediaApi.load(req.id, req.src);
+    //   return { type: 'ok' };
+    // }
     case 'audio/play': {
       await mediaApi.getAudioManager(req.id).play();
       return { type: 'ok' };
     }
     case 'audio/pause': {
-      await mediaApi.getAudioManager(req.id).pause();
+      mediaApi.getAudioManager(req.id).pause();
       return { type: 'ok' };
     }
     // case 'audio/stop': {
@@ -89,11 +89,11 @@ async function messageHandler(req: t.BackendRequest): Promise<t.FrontendResponse
       return { type: 'ok' };
     }
     case 'audio/seek': {
-      await mediaApi.getAudioManager(req.id).seek(req.clock);
+      mediaApi.getAudioManager(req.id).seek(req.clock);
       return { type: 'ok' };
     }
     case 'audio/setPlaybackRate': {
-      await mediaApi.getAudioManager(req.id).setPlaybackRate(req.rate);
+      mediaApi.getAudioManager(req.id).setPlaybackRate(req.rate);
       return { type: 'ok' };
     }
     default: {

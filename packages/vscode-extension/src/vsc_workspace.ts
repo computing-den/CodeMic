@@ -8,6 +8,7 @@ import _ from 'lodash';
 import nodePath from 'path';
 
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
+export type WorkspaceChangeGlobalState = { setup: t.Setup; screen: t.Screen };
 
 export default class VscWorkspace {
   constructor(public root: t.AbsPath) {}
@@ -48,15 +49,9 @@ export default class VscWorkspace {
       await workspace.makeRoot();
 
       setup.root = root;
-      console.log('scanOrPopulateRecorder(): setting globalState setup');
-      context.globalState.update('setup', setup);
-      context.globalState.update('screen', screen);
-      context.globalState.update('changingWorkspaceFolder', true);
+      VscWorkspace.setWorkspaceChangeGlobalState(context, { setup, screen });
       await workspace.updateWorkspaceFolder();
-      console.log('scanOrPopulateRecorder(): unsetting globalState setup');
-      context.globalState.update('changingWorkspaceFolder', undefined);
-      context.globalState.update('screen', undefined);
-      context.globalState.update('setup', undefined);
+      VscWorkspace.setWorkspaceChangeGlobalState(context, undefined);
     }
 
     if (root && VscWorkspace.getDefaultRoot() === root) {
@@ -68,6 +63,13 @@ export default class VscWorkspace {
     } else {
       vscode.window.showErrorMessage('No workspace folder was selected.');
     }
+  }
+
+  static setWorkspaceChangeGlobalState(context: vscode.ExtensionContext, state?: WorkspaceChangeGlobalState) {
+    context.globalState.update('workspaceChange', state);
+  }
+  static getWorkspaceChangeGlobalState(context: vscode.ExtensionContext): WorkspaceChangeGlobalState | undefined {
+    return context.globalState.get<WorkspaceChangeGlobalState>('workspaceChange');
   }
 
   shouldRecordVscUri(vscUri: vscode.Uri): boolean {

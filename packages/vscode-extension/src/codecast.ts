@@ -41,21 +41,19 @@ class Codecast {
   }
 
   async restoreStateAfterRestart() {
-    const afterRestart = Boolean(this.context.globalState.get<boolean>('changingWorkspaceFolder'));
-    this.context.globalState.update('changingWorkspaceFolder', undefined);
+    const workspaceChange = VscWorkspace.getWorkspaceChangeGlobalState(this.context);
+    VscWorkspace.setWorkspaceChangeGlobalState(this.context, undefined);
 
-    const setup = this.context.globalState.get<t.Setup>('setup');
-    const screen = this.context.globalState.get<t.Screen>('screen');
-    console.log('restoreStateAfterRestart(): ', setup);
-    if (setup) {
+    console.log('restoreStateAfterRestart(): ', workspaceChange?.setup);
+    if (workspaceChange) {
+      const { setup, screen } = workspaceChange;
       assert(screen === t.Screen.Player || screen === t.Screen.Recorder);
 
-      this.context.globalState.update('setup', undefined);
       this.setup = setup;
       if (screen === t.Screen.Player) {
-        this.player = await this.populatePlayer({ afterRestart });
+        this.player = await this.populatePlayer({ afterRestart: true });
       } else {
-        this.recorder = await this.scanOrPopulateRecorder({ afterRestart });
+        this.recorder = await this.scanOrPopulateRecorder({ afterRestart: true });
       }
 
       this.setScreen(screen);
@@ -315,7 +313,6 @@ class Codecast {
         this.db,
         this.setup,
         this.postAudioMessage.bind(this),
-        this.getSessionBlobWebviewUri.bind(this, this.setup.sessionSummary.id),
         this.recorderChanged.bind(this),
       );
     } else {
@@ -324,7 +321,6 @@ class Codecast {
         this.db,
         this.setup,
         this.postAudioMessage.bind(this),
-        this.getSessionBlobWebviewUri.bind(this, this.setup.sessionSummary.id),
         this.recorderChanged.bind(this),
       );
     }
@@ -339,7 +335,6 @@ class Codecast {
       this.db,
       this.setup,
       this.postAudioMessage.bind(this),
-      this.getSessionBlobWebviewUri.bind(this, this.setup.sessionSummary.id),
       this.playerChanged.bind(this),
     );
   }
@@ -473,6 +468,19 @@ class Codecast {
     return webviewUri.toString();
   }
 
+  getAudioTracksWebviewUris(sessionId: string, audioTracks: t.AudioTrack[]): t.AudioTracksWebviewUris {
+    return Object.fromEntries(
+      audioTracks.map(audioTrack => {
+        assert(audioTrack.file.type === 'local');
+        const audioTrackWebviewUri = {
+          audioTrack,
+          webviewUri: this.getSessionBlobWebviewUri(sessionId, audioTrack.file.sha1),
+        };
+        return [audioTrack.id, audioTrackWebviewUri];
+      }),
+    );
+  }
+
   getStore(): t.Store {
     let recorder: t.RecorderState | undefined;
     if (this.screen === t.Screen.Recorder) {
@@ -486,6 +494,10 @@ class Codecast {
           clock: this.recorder.clock,
           root: this.recorder.root,
           history: this.db.settings.history[this.recorder.sessionSummary.id],
+          audioTracksWebviewUris: this.getAudioTracksWebviewUris(
+            this.recorder.sessionSummary.id,
+            this.recorder.session.audioTracks,
+          ),
         };
       } else if (this.setup) {
         recorder = {
@@ -499,6 +511,7 @@ class Codecast {
           fork: this.setup.fork,
           forkClock: this.setup.forkClock,
           history: this.getFirstHistoryItemById(this.setup.sessionSummary.id, this.setup.baseSessionSummary?.id),
+          audioTracksWebviewUris: {},
         };
       }
     }
@@ -513,6 +526,10 @@ class Codecast {
           clock: this.player.clock,
           root: this.player.root,
           history: this.db.settings.history[this.player.sessionSummary.id],
+          audioTracksWebviewUris: this.getAudioTracksWebviewUris(
+            this.player.sessionSummary.id,
+            this.player.session.audioTracks,
+          ),
         };
       } else if (this.setup) {
         player = {
@@ -522,6 +539,7 @@ class Codecast {
           clock: 0,
           root: this.setup.root,
           history: this.db.settings.history[this.setup.sessionSummary.id],
+          audioTracksWebviewUris: {},
         };
       }
     }

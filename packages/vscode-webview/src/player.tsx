@@ -8,22 +8,23 @@ import { SessionSummary } from './session_summary.jsx';
 import SessionDescription from './session_description.jsx';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
-import postMessage from './api.js';
+import postMessage, { mediaApi } from './api.js';
 import _ from 'lodash';
 
 type Props = { player: t.PlayerState };
 export default class Player extends Component<Props> {
   seeking = false;
 
-  loadPlayer = async () => {
+  load = async () => {
     await postMessage({ type: 'player/load' });
   };
 
-  startPlayer = async () => {
+  play = async () => {
+    await mediaApi.prepareAll();
     await postMessage({ type: 'player/play' });
   };
 
-  pausePlayer = async () => {
+  pause = async () => {
     await postMessage({ type: 'player/pause' });
   };
 
@@ -70,8 +71,17 @@ export default class Player extends Component<Props> {
   //   );
   // }
 
+  componentDidUpdate() {
+    mediaApi.loadOrDisposeAudioTracks(this.props.player.audioTracksWebviewUris);
+  }
+
+  componentDidMount() {
+    console.log('Player componentDidMount');
+    mediaApi.loadOrDisposeAudioTracks(this.props.player.audioTracksWebviewUris);
+  }
+
   componentWillUnmount() {
-    // this.media!.stop();
+    mediaApi.disposeAll();
   }
 
   render() {
@@ -80,14 +90,14 @@ export default class Player extends Component<Props> {
 
     let primaryAction: MT.PrimaryAction;
     if (player.isPlaying) {
-      primaryAction = { type: 'player/pause', title: 'Pause', onClick: this.pausePlayer };
+      primaryAction = { type: 'player/pause', title: 'Pause', onClick: this.pause };
     } else if (player.isLoaded) {
-      primaryAction = { type: 'player/play', title: 'Play', onClick: this.startPlayer };
+      primaryAction = { type: 'player/play', title: 'Play', onClick: this.play };
     } else {
       const title = player.root
         ? `Load the project into ${player.root}`
         : `Select a directory and load the project into it`;
-      primaryAction = { type: 'player/load', title, onClick: this.loadPlayer };
+      primaryAction = { type: 'player/load', title, onClick: this.load };
     }
 
     const toolbarActions = [

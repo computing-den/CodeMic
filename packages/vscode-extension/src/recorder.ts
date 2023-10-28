@@ -11,7 +11,6 @@ import _ from 'lodash';
 import assert from 'assert';
 import fs from 'fs';
 import { v4 as uuid } from 'uuid';
-import VscWorkspace from './vsc_workspace.js';
 
 class Recorder {
   get root(): t.AbsPath {
@@ -30,6 +29,13 @@ class Recorder {
     return this.sessionCtrl.isRunning && !this.sessionCtrl.mode.recordingEditor;
   }
 
+  get session(): t.Session {
+    return {
+      editorTrack: this.workspace.editorTrack.toJSON(),
+      audioTracks: this.sessionCtrl.audioCtrls.map(p => p.track),
+    };
+  }
+
   isDirty: boolean = false;
 
   // private lastSavedClock: number;
@@ -41,7 +47,6 @@ class Recorder {
     public workspace: VscEditorWorkspace,
     private sessionCtrl: SessionCtrl,
     private postAudioMessage: t.PostAudioMessageToFrontend,
-    private getSessionBlobWebviewUri: (sha1: string) => t.Uri,
     private onUpdateFrontend: () => any,
   ) {
     sessionCtrl.onUpdateFrontend = this.sessionCtrlUpdateFrontendHandler.bind(this);
@@ -58,7 +63,6 @@ class Recorder {
     db: Db,
     setup: t.Setup,
     postAudioMessage: t.PostAudioMessageToFrontend,
-    getSessionBlobWebviewUri: (sha1: string) => t.Uri,
     onUpdateFrontend: () => any,
   ): Promise<Recorder> {
     assert(setup.root);
@@ -78,7 +82,6 @@ class Recorder {
       workspace,
       sessionCtrl,
       postAudioMessage,
-      getSessionBlobWebviewUri,
       onUpdateFrontend,
     );
 
@@ -94,7 +97,6 @@ class Recorder {
     db: Db,
     setup: t.Setup,
     postAudioMessage: t.PostAudioMessageToFrontend,
-    getSessionBlobWebviewUri: (sha1: string) => t.Uri,
     onUpdateFrontend: () => any,
   ): Promise<Recorder | undefined> {
     assert(setup.root);
@@ -115,9 +117,7 @@ class Recorder {
 
       const vscEditorPlayer = new VscEditorPlayer(context, workspace);
       const vscEditorRecorder = new VscEditorRecorder(context, workspace);
-      const audioCtrls = session.audioTracks.map(
-        audioTrack => new AudioCtrl(audioTrack, postAudioMessage, getSessionBlobWebviewUri, sessionIO),
-      );
+      const audioCtrls = session.audioTracks.map(audioTrack => new AudioCtrl(audioTrack, postAudioMessage, sessionIO));
 
       const sessionCtrl = new SessionCtrl(setup.sessionSummary, audioCtrls, vscEditorPlayer, vscEditorRecorder);
       sessionCtrl.load();
@@ -130,7 +130,6 @@ class Recorder {
         workspace,
         sessionCtrl,
         postAudioMessage,
-        getSessionBlobWebviewUri,
         onUpdateFrontend,
       );
 
@@ -232,11 +231,7 @@ class Recorder {
    */
   async save() {
     this.sessionSummary.timestamp = new Date().toISOString();
-    const session: t.Session = {
-      editorTrack: this.workspace.editorTrack.toJSON(),
-      audioTracks: this.sessionCtrl.audioCtrls.map(p => p.track),
-    };
-    await this.db.writeSession(session, this.sessionSummary);
+    await this.db.writeSession(this.session, this.sessionSummary);
     await this.saveHistoryOpenClose();
     // this.lastSavedClock = this.clock;
     this.isDirty = false;
@@ -254,9 +249,7 @@ class Recorder {
       file: { type: 'local', sha1: sha1 },
       title: path.basename(absPath, { omitExt: true }),
     };
-    this.sessionCtrl.insertAudioAndLoad(
-      new AudioCtrl(audioTrack, this.postAudioMessage, this.getSessionBlobWebviewUri, this.workspace.io),
-    );
+    this.sessionCtrl.insertAudioAndLoad(new AudioCtrl(audioTrack, this.postAudioMessage, this.workspace.io));
   }
 
   private async saveHistoryOpenClose() {
