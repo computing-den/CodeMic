@@ -27,24 +27,24 @@ class VscEditorRecorder implements t.EditorRecorder {
 
     // listen for open document events
     {
-      const disposable = vscode.workspace.onDidOpenTextDocument(vscTextDocument => {
-        this.openTextDocument(vscTextDocument);
+      const disposable = vscode.workspace.onDidOpenTextDocument(async vscTextDocument => {
+        await this.openTextDocument(vscTextDocument);
       });
       this.disposables.push(disposable);
     }
 
     // listen for show document events
     {
-      const disposable = vscode.window.onDidChangeActiveTextEditor(vscTextEditor => {
-        if (vscTextEditor) this.showTextEditor(vscTextEditor);
+      const disposable = vscode.window.onDidChangeActiveTextEditor(async vscTextEditor => {
+        if (vscTextEditor) await this.showTextEditor(vscTextEditor);
       });
       this.disposables.push(disposable);
     }
 
     // listen for text change events
     {
-      const disposable = vscode.workspace.onDidChangeTextDocument(e => {
-        this.textChange(e.document, e.contentChanges);
+      const disposable = vscode.workspace.onDidChangeTextDocument(async e => {
+        await this.textChange(e.document, e.contentChanges);
       });
       this.disposables.push(disposable);
     }
@@ -95,7 +95,7 @@ class VscEditorRecorder implements t.EditorRecorder {
     this.disposables = [];
   }
 
-  private textChange(
+  private async textChange(
     vscTextDocument: vscode.TextDocument,
     vscContentChanges: readonly vscode.TextDocumentContentChangeEvent[],
   ) {
@@ -112,31 +112,36 @@ class VscEditorRecorder implements t.EditorRecorder {
     // Here, we assume that it is possible to get a textChange without a text editor
     // because vscode's event itself does not provide a text editor.
 
-    const irTextDocument = this.openTextDocumentWithUri(vscTextDocument, uri, false);
-    const irContentChanges = vscContentChanges.map(({ range: vscRange, text }) => {
-      const range = this.workspace.rangeFromVsc(vscRange);
-      const [revRange, revText] = irTextDocument.applyContentChange(range, text, true);
-      return { range, text, revRange, revText };
-    });
+    const irTextDocument = this.track.getTextDocumentByUri(uri);
+    if (irTextDocument) {
+      const irContentChanges = vscContentChanges.map(({ range: vscRange, text }) => {
+        const range = this.workspace.rangeFromVsc(vscRange);
+        const [revRange, revText] = irTextDocument.applyContentChange(range, text, true);
+        return { range, text, revRange, revText };
+      });
 
-    this.pushEvent({
-      type: 'textChange',
-      clock: this.clock,
-      uri: irTextDocument.uri,
-      contentChanges: irContentChanges,
-    });
+      this.pushEvent({
+        type: 'textChange',
+        clock: this.clock,
+        uri: irTextDocument.uri,
+        contentChanges: irContentChanges,
+      });
+    } else {
+      // It will insert the latest text in 'openTextDocument' if necessary.
+      await this.openTextDocumentByUri(vscTextDocument, uri);
+    }
   }
 
-  private openTextDocument(vscTextDocument: vscode.TextDocument) {
+  private async openTextDocument(vscTextDocument: vscode.TextDocument) {
     if (!this.workspace.shouldRecordVscUri(vscTextDocument.uri)) return;
 
     const uri = this.workspace.uriFromVsc(vscTextDocument.uri);
     console.log(`adding openTextDocument for ${uri}`);
 
-    this.openTextDocumentWithUri(vscTextDocument, uri, true);
+    await this.openTextDocumentByUri(vscTextDocument, uri);
   }
 
-  private showTextEditor(vscTextEditor: vscode.TextEditor) {
+  private async showTextEditor(vscTextEditor: vscode.TextEditor) {
     if (!this.workspace.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
     const uri = this.workspace.uriFromVsc(vscTextEditor.document.uri);
@@ -148,7 +153,7 @@ class VscEditorRecorder implements t.EditorRecorder {
 
     // Possibly inserts an openTextDocument or textChange event if the document wasn't found in internal editorTrack or
     // its contents were different.
-    const irTextEditor = this.openTextEditorHelper(vscTextEditor, uri, true);
+    const irTextEditor = await this.openTextEditorHelper(vscTextEditor, uri);
     this.track.activeTextEditor = irTextEditor;
 
     this.pushEvent({
@@ -246,64 +251,62 @@ class VscEditorRecorder implements t.EditorRecorder {
   }
 
   /**
-   * Inserts an 'openTextDocument' event only if session does not have the document open.
-   * When checkContent is true, it will compare the content of the vsc text document with that of the internal document
-   * and if they are different, it will update internal document and insert a textChange event.
-   * Even if openTextDocument was not emitted before, it might still exist in the internal session if it was scanned
-   * from the disk.
-   * So, 'openTextDocument' event always has the text field since if the document was already in checkpoint, no
-   * 'openTextDocument' event would be generated at all.
+   * Inserts an 'openTextDocument' event only if:
+   * - item does NOT exist in internal worktree, or
+   * - item exists in internal worktree but has no document.
+   *
+   * The 'openTextDocument' will only have a text field if:
+   * - worktree item's content (document or file) is different from that of vscTextDocument.
+   *
+   * If worktree item has a document but its content is different from that of vscTextDocument,
+   * a 'textChange' will be inserted on the entire document.
+   *
    * Assumes a valid uri which has already been approved by this.workspace.shouldRecordVscUri().
    */
-  private openTextDocumentWithUri(
-    vscTextDocument: vscode.TextDocument,
-    uri: t.Uri,
-    checkContent: boolean,
-  ): et.TextDocument {
+  private async openTextDocumentByUri(vscTextDocument: vscode.TextDocument, uri: t.Uri): Promise<et.TextDocument> {
+    const isInWorktree = this.track.doesUriExist(uri);
     let irTextDocument = this.track.findTextDocumentByUri(uri);
 
-    if (irTextDocument) {
-      if (checkContent) {
-        const linesMatch =
-          irTextDocument.lines.length === vscTextDocument.lineCount &&
-          irTextDocument.lines.every((line, i) => line === vscTextDocument.lineAt(i).text);
-        if (!linesMatch) {
-          // TOOD I think this might happen if the file is changed externally, but maybe vscode automatically
-          //      detects that and emits a textChange event, or maybe it'll emit a second openTextDocument.
-          //      What if it changed on disk before it was opened in vscode? vscode wouldn't be able to detect changes anyways.
+    let irText: string | undefined;
+    const vscText = vscTextDocument.getText();
 
-          const range = irTextDocument.getRange();
-          const text = vscTextDocument.getText();
-          const [revRange, revText] = irTextDocument.applyContentChange(range, text, true);
-          this.pushEvent({
-            type: 'textChange',
-            clock: this.clock,
-            uri,
-            contentChanges: [{ range, text, revRange, revText }],
-          });
-        }
-      }
-    } else {
+    if (isInWorktree) {
+      irText = new TextDecoder().decode(await this.track.getContentByUri(uri));
+    }
+
+    if (irTextDocument && irText !== vscText) {
+      const irRange = irTextDocument.getRange();
+      const [revRange, revText] = irTextDocument.applyContentChange(irRange, vscText, true);
+      this.pushEvent({
+        type: 'textChange',
+        clock: this.clock,
+        uri,
+        contentChanges: [{ range: irRange, text: vscText, revRange, revText }],
+      });
+    } else if (!irTextDocument) {
       irTextDocument = this.workspace.textDocumentFromVsc(vscTextDocument, uri);
-      this.track.insertTextDocument(irTextDocument);
+      this.track.insertTextDocument(irTextDocument); // will insert into worktree as well
       this.pushEvent({
         type: 'openTextDocument',
         clock: this.clock,
-        text: vscTextDocument.getText(),
+        text: irText === vscText ? undefined : vscText,
         uri,
         eol: irTextDocument.eol,
+        isInWorktree,
       });
     }
+
     return irTextDocument;
   }
 
   /**
-   * It does not push a showTextEditor event but it might push an 'openTextDocument' or a 'textChange' event.
+   * It does not push a showTextEditor event but it might open the text document.
+   * Then, it will create or update the internal text editor.
    */
-  private openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri, checkContent: boolean): et.TextEditor {
+  private async openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri): Promise<et.TextEditor> {
     const selections = this.workspace.selectionsFromVsc(vscTextEditor.selections);
     const visibleRange = this.workspace.rangeFromVsc(vscTextEditor.visibleRanges[0]);
-    const textDocument = this.openTextDocumentWithUri(vscTextEditor.document, uri, checkContent);
+    const textDocument = await this.openTextDocumentByUri(vscTextEditor.document, uri);
     let textEditor = this.track.findTextEditorByUri(textDocument.uri);
     if (!textEditor) {
       textEditor = new et.TextEditor(textDocument, selections, visibleRange);

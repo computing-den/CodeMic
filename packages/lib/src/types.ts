@@ -181,6 +181,7 @@ export type Setup = {
   baseSessionSummary?: SessionSummary;
   fork?: { clock: number };
   root?: string;
+  isNew?: boolean;
 };
 
 export type TocItem = { title: string; clock: number };
@@ -360,8 +361,9 @@ export type OpenTextDocumentEvent = {
   type: 'openTextDocument';
   clock: number;
   uri: Uri;
-  text: string;
+  text?: string;
   eol: EndOfLine;
+  isInWorktree: boolean;
 };
 
 export type ShowTextEditorEvent = {

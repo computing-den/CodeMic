@@ -131,6 +131,7 @@ class Codecast {
             baseSessionSummary,
             fork: req.fork,
             root: history?.root || VscWorkspace.getDefaultRoot(),
+            isNew: !baseSessionSummary,
             // set history in getStore() so that it's always up-to-date
           };
           this.setScreen(t.Screen.Recorder);

@@ -50,10 +50,13 @@ class VscEditorEventStepper implements t.EditorEventStepper {
       // Open vsc document first.
       const vscTextDocument = await vscode.workspace.openTextDocument(this.workspace.uriToVsc(e.uri));
 
-      // We use WorkspaceEdit here because we don't necessarily want to open the text editor yet.
-      const edit = new vscode.WorkspaceEdit();
-      edit.replace(vscTextDocument.uri, this.workspace.getVscTextDocumentRange(vscTextDocument), e.text);
-      await vscode.workspace.applyEdit(edit);
+      // Set text if given.
+      if (e.text !== undefined) {
+        // We use WorkspaceEdit here because we don't necessarily want to open the text editor yet.
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(vscTextDocument.uri, this.workspace.getVscTextDocumentRange(vscTextDocument), e.text);
+        await vscode.workspace.applyEdit(edit);
+      }
     } else {
       await this.workspace.closeVscTextEditorByUri(e.uri, true);
     }

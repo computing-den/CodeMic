@@ -94,6 +94,10 @@ export class EditorTrack implements t.EditorEventStepper {
       return this.io.readFile(item.file);
     }
 
+    if (item.file.type === 'empty') {
+      return new Uint8Array();
+    }
+
     throw new Error(`getContentByUri ${uri} type "${item.file}" not supported`);
   }
 
@@ -171,10 +175,11 @@ export class EditorTrack implements t.EditorEventStepper {
     return path.workspaceUriFromAbsPath(this.root, p);
   }
 
-  // closeTextDocumentByUri(uri: t.Uri) {
-  //   this.closeTextEditorByUri(uri);
-  //   this.textDocuments = this.textDocuments.filter(x => x.uri !== uri);
-  // }
+  closeAndRemoveTextDocumentByUri(uri: t.Uri) {
+    this.closeTextEditorByUri(uri);
+    this.textDocuments = this.textDocuments.filter(x => x.uri !== uri);
+    delete this.worktree[uri];
+  }
 
   closeTextEditorByUri(uri: t.Uri) {
     if (this.worktree[uri].editor) {
@@ -337,20 +342,27 @@ export class EditorTrack implements t.EditorEventStepper {
   }
 
   async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    // All existing documents should already be in the worktree.
-    // TODO: open a new document. Keep worktree, textDocuments, and textEditors in sync.
-    throw new Error('TODO openTextDocument');
+    // The document may or may not exist in the worktree.
+    // The content must be matched if e.text is given.
 
-    // if (uriSet) uriSet[e.uri] = true;
-    // const textDocument = this.findTextDocumentByUri(e.uri);
-    // if (direction === t.Direction.Forwards) {
-    //   if (!textDocument) {
-    //     this.textDocuments.push(TextDocument.fromText(e.uri, e.text, e.eol));
-    //   }
-    // } else {
-    //   // TODO should we remove the document?
-    //   // if (textDocument) this.closeTextDocumentByUri(e.uri);
-    // }
+    if (uriSet) uriSet[e.uri] = true;
+
+    if (direction === t.Direction.Forwards) {
+      let textDocument = this.findTextDocumentByUri(e.uri);
+      if (textDocument && e.text !== undefined && e.text !== textDocument.getText()) {
+        textDocument.applyContentChange(textDocument.getRange(), e.text, false);
+      } else if (!textDocument) {
+        const text = e.text ?? new TextDecoder().decode(await this.getContentByUri(e.uri));
+        textDocument = TextDocument.fromText(e.uri, text, e.eol);
+        this.insertTextDocument(textDocument); // Will insert into worktree if necessary.
+      }
+    } else {
+      if (e.isInWorktree) {
+        this.closeTextEditorByUri(e.uri);
+      } else {
+        this.closeAndRemoveTextDocumentByUri(e.uri);
+      }
+    }
   }
 
   async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction, uriSet?: t.UriSet) {

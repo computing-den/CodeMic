@@ -45,7 +45,7 @@ export default class VscWorkspace {
       if (!root) return;
 
       const workspace = new VscWorkspace(root);
-      if (!(await workspace.askToCreateOrOverwriteRoot())) return;
+      if (!(await workspace.askToCreateOrOverwriteRoot(Boolean(setup.isNew)))) return;
       await workspace.makeRoot();
 
       setup.root = root;
@@ -281,11 +281,11 @@ export default class VscWorkspace {
     return answer?.title === createPathTitle;
   }
 
-  async askToCreateOrOverwriteRoot(): Promise<boolean> {
+  async askToCreateOrOverwriteRoot(scanning: boolean): Promise<boolean> {
     // user confirmations and root directory creation
     try {
       const files = await fs.promises.readdir(this.root);
-      return files.length === 0 || (await this.askToOverwriteRoot());
+      return files.length === 0 || scanning || (await this.askToOverwriteRoot());
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
       if (code === 'ENOENT') {
@@ -293,7 +293,7 @@ export default class VscWorkspace {
         return this.askAndCreateRoot();
       } else if (code === 'ENOTDIR') {
         // Exists, but it's not a directory
-        vscode.window.showErrorMessage(`"${this.root}" exists but it's not a folder.`);
+        vscode.window.showErrorMessage(`"${this.root}" exists but is not a folder.`);
       }
       return false;
     }
