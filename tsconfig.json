@@ -3,6 +3,8 @@
   "references": [
     { "path": "packages/vscode-extension" },
     { "path": "packages/vscode-webview" },
+    { "path": "packages/webserver" },
+    { "path": "packages/webclient" },
     { "path": "packages/lib" }
   ]
 }

@@ -4,22 +4,23 @@
   "description": "",
   "scripts": {
     "start": "npm run build && code --extensionDevelopmentPath=$PWD/packages/vscode-extension",
-    "build": "npm run build:tsc && npm run build:webview",
+    "server": "npm run build && npm run kill:server && node packages/webserver/out/server.js",
+    "kill:server": "node  kill-server.mjs",
+    "build": "npm run build:tsc && npm run build:webview && npm run build:webclient",
     "build:tsc": "tsc --build",
-    "build:webview": "cd packages/vscode-webview && node esbuild.mjs",
     "watch:tsc": "tsc --build --watch --pretty false",
-    "watch:webview": "cd packages/vscode-webview && node esbuild.mjs --watch",
+    "build:webview": "cd packages/vscode-webview && node esbuild.mjs",
+    "build:webclient": "cd packages/webclient && node esbuild.mjs",
     "clean": "rm -rf packages/*/out && rm -rf packages/*/tsconfig.tsbuildinfo"
   },
   "workspaces": [
     "packages/vscode-extension",
     "packages/vscode-webview",
+    "packages/webserver",
+    "packages/webclient",
     "packages/lib"
   ],
   "devDependencies": {
     "typescript": "^5.2.2"
-  },
-  "dependencies": {
-    "moment": "^2.29.4"
   }
 }
