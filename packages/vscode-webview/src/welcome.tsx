@@ -2,13 +2,24 @@ import { h, Fragment, Component } from 'preact';
 import { types as t, lib } from '@codecast/lib';
 import { SessionSummaryList } from './session_summary.jsx';
 import Screen from './screen.jsx';
+// import LoginBanner from './login_banner.jsx';
 import Section from './section.jsx';
 // import LatencyTest from './latency_test.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
 
-type Props = { welcome: t.WelcomeState };
+type Props = { user?: t.User; welcome: t.WelcomeState };
 export default class Welcome extends Component<Props> {
+  login = (e: Event) => {
+    e.stopPropagation();
+    e.preventDefault();
+    postMessage({ type: 'account/open' });
+  };
+  join = (e: Event) => {
+    e.stopPropagation();
+    e.preventDefault();
+    postMessage({ type: 'account/open', join: true });
+  };
   render() {
     const { welcome } = this.props;
     return (
@@ -22,6 +33,18 @@ export default class Welcome extends Component<Props> {
                 <span className="codicon codicon-device-camera-video" />
               </vscode-button>
             </div>
+            {!this.props.user && (
+              <div className="signin-subsection subsection">
+                <vscode-link href="#" onClick={this.login}>
+                  Log in
+                </vscode-link>{' '}
+                or{' '}
+                <vscode-link href="#" onClick={this.join}>
+                  join
+                </vscode-link>{' '}
+                to publish your own CodeCasts.
+              </div>
+            )}
           </Section.Body>
         </Section>
         <SessionsSection title="WORKSPACE" history={welcome.history} sessionSummaries={welcome.workspace} />

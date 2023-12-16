@@ -36,15 +36,19 @@
         "title": "Codecast"
       },
       {
-        "command": "codecast.login",
-        "title": "Login"
-      },
-      {
         "command": "codecast.home",
         "title": "Home",
         "icon": {
           "light": "../vscode-webview/resources/light/home.svg",
           "dark": "../vscode-webview/resources/dark/home.svg"
+        }
+      },
+      {
+        "command": "codecast.account",
+        "title": "Codecast account",
+        "icon": {
+          "light": "../vscode-webview/resources/light/account.svg",
+          "dark": "../vscode-webview/resources/dark/account.svg"
         }
       }
     ],
@@ -53,10 +57,11 @@
         {
           "command": "codecast.home",
           "when": "codecast.canGoHome",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
-          "command": "codecast.login"
+          "command": "codecast.account",
+          "group": "navigation@2"
         }
       ]
     }

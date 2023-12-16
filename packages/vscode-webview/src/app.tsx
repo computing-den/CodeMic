@@ -1,6 +1,7 @@
 import { h, Fragment, Component } from 'preact';
 import { types as t, lib } from '@codecast/lib';
 import postMessage from './api.js';
+import Account from './account.jsx';
 import Welcome from './welcome.jsx';
 import Recorder from './recorder.jsx';
 import Player from './player.jsx';
@@ -40,9 +41,10 @@ export default class App extends Component<AppProps> {
   // };
 
   renderers = {
-    [t.Screen.Welcome]: () => <Welcome welcome={this.props.store.welcome!} />,
-    [t.Screen.Recorder]: () => <Recorder recorder={this.props.store.recorder!} />,
-    [t.Screen.Player]: () => <Player player={this.props.store.player!} />,
+    [t.Screen.Account]: () => <Account user={this.props.store.user} account={this.props.store.account!} />,
+    [t.Screen.Welcome]: () => <Welcome user={this.props.store.user} welcome={this.props.store.welcome!} />,
+    [t.Screen.Recorder]: () => <Recorder user={this.props.store.user} recorder={this.props.store.recorder!} />,
+    [t.Screen.Player]: () => <Player user={this.props.store.user} player={this.props.store.player!} />,
   };
 
   render() {

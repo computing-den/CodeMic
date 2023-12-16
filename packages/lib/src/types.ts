@@ -23,6 +23,11 @@ export type OKResponse = { type: 'ok' };
 export type ErrorResponse = { type: 'error' };
 
 export type FrontendToBackendReqRes =
+  | { request: { type: 'account/open'; join?: boolean }; response: StoreResponse }
+  | { request: { type: 'account/update'; changes: AccountUpdate }; response: StoreResponse }
+  | { request: { type: 'account/join' }; response: StoreResponse }
+  | { request: { type: 'account/login' }; response: StoreResponse }
+  | { request: { type: 'account/logout' }; response: StoreResponse }
   | { request: { type: 'welcome/open' }; response: StoreResponse }
   | { request: { type: 'player/open'; sessionId: string }; response: StoreResponse }
   | { request: { type: 'player/load' }; response: StoreResponse }
@@ -120,6 +125,7 @@ export type PostAudioMessageToFrontend = <Req extends BackendAudioRequest>(
 ) => Promise<FrontendResponseFor<Req>>;
 
 export enum Screen {
+  Account,
   Welcome,
   Recorder,
   Player,
@@ -128,11 +134,29 @@ export enum Screen {
 // A separate field for each page
 export type Store = {
   screen: Screen;
+  user?: User;
+  account?: AccountState;
   welcome?: WelcomeState;
   recorder?: RecorderState;
   player?: PlayerState;
   test?: any;
 };
+
+export type User = {
+  token: string;
+  username: string;
+  email: string;
+};
+
+export type AccountState = {
+  email: string;
+  username: string;
+  password: string;
+  join: boolean;
+  error?: string;
+};
+
+export type AccountUpdate = Partial<AccountState>;
 
 export type WelcomeState = {
   workspace: SessionSummaryMap;

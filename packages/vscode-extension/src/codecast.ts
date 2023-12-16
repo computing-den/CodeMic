@@ -6,10 +6,12 @@ import Db from './db.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
-import { types as t, lib, path } from '@codecast/lib';
+import { types as t, lib } from '@codecast/lib';
 
 class Codecast {
   screen: t.Screen = t.Screen.Welcome;
+  user?: t.User;
+  account?: t.AccountState;
   recorder?: Recorder;
   setup?: t.Setup;
   player?: Player;
@@ -19,6 +21,7 @@ class Codecast {
   constructor(public context: vscode.ExtensionContext, public db: Db) {
     context.subscriptions.push(vscode.commands.registerCommand('codecast.openView', this.openView.bind(this)));
     context.subscriptions.push(vscode.commands.registerCommand('codecast.home', this.goHomeCommand.bind(this)));
+    context.subscriptions.push(vscode.commands.registerCommand('codecast.account', this.openAccountCommand.bind(this)));
 
     this.webview = new WebviewProvider(context, this.messageHandler.bind(this), this.viewOpened.bind(this));
 
@@ -74,8 +77,73 @@ class Codecast {
     // console.log('extension received: ', req);
 
     switch (req.type) {
+      case 'account/open': {
+        await this.openAccount(req);
+        return this.respondWithStore();
+      }
+      case 'account/update': {
+        assert(this.account);
+        this.account = { ...this.account, ...req.changes };
+        return this.respondWithStore();
+      }
+      case 'account/join': {
+        assert(this.account);
+
+        let { email, username, password } = this.account;
+        email = _.toLower(_.trim(email));
+        username = _.toLower(_.trim(username));
+        if (!email) {
+          this.account.error = 'Missing email.';
+        } else if (!username) {
+          this.account.error = 'Missing username.';
+        } else if (!password) {
+          this.account.error = 'Missing password.';
+        } else if (email === 'a') {
+          this.account.error = 'Email is already registered.';
+        } else if (username === 'a') {
+          this.account.error = 'Username is already registered.';
+        } else {
+          this.account.error = undefined;
+          this.user = {
+            email,
+            username,
+            token: 'aaa',
+          };
+          await this.goHome();
+        }
+
+        return this.respondWithStore();
+      }
+      case 'account/login': {
+        assert(this.account);
+        this.account.join = false;
+
+        let { username, password } = this.account;
+        username = _.toLower(_.trim(username));
+        if (!username) {
+          this.account.error = 'Missing username.';
+        } else if (!password) {
+          this.account.error = 'Missing password.';
+        } else if (username === 'a' && password === 'a') {
+          this.account.error = undefined;
+          this.user = {
+            email: 'sean@computing-den.com',
+            token: 'aaa',
+            username: 'sean_shir',
+          };
+          await this.goHome();
+        } else {
+          this.account.error = 'Wrong username or password.';
+        }
+        return this.respondWithStore();
+      }
+      case 'account/logout': {
+        this.user = undefined;
+        await this.goHome();
+        return this.respondWithStore();
+      }
       case 'welcome/open': {
-        this.goHome();
+        await this.goHome();
         return this.respondWithStore();
       }
       case 'player/open': {
@@ -288,7 +356,10 @@ class Codecast {
   updateViewTitle() {
     console.log('updateViewTitle: webview.view ' + (this.webview.view ? 'is set' : 'is NOT set'));
     if (this.webview.view) {
-      const title = ' sean_shir / ' + SCREEN_TITLES[this.screen]; // TODO get the logged-in username
+      const username = this.user?.username;
+      const title = username
+        ? ` ${username} / ` + SCREEN_TITLES[this.screen]
+        : SCREEN_TITLES[this.screen] + ` (not logged in) `;
       this.webview.view.title = title;
     }
   }
@@ -305,6 +376,23 @@ class Codecast {
 
   async goHomeCommand() {
     await this.goHome();
+    await this.postUpdateStore();
+  }
+
+  async openAccount(options?: { join?: boolean }) {
+    if (await this.closeCurrentScreen()) {
+      this.account = {
+        email: '',
+        username: '',
+        password: '',
+        join: options?.join ?? false,
+      };
+      this.setScreen(t.Screen.Account);
+    }
+  }
+
+  async openAccountCommand() {
+    await this.openAccount();
     await this.postUpdateStore();
   }
 
@@ -345,15 +433,27 @@ class Codecast {
   }
 
   async closeCurrentScreen(): Promise<boolean> {
-    if (this.screen === t.Screen.Recorder) {
-      return await this.closeRecorder();
+    let canClose = true;
+    if (this.screen === t.Screen.Account) {
+      canClose = await this.accountWillClose();
+    } else if (this.screen === t.Screen.Recorder) {
+      canClose = await this.recorderWillClose();
     } else if (this.screen === t.Screen.Player) {
-      return await this.closePlayer();
+      canClose = await this.playerWillClose();
     }
+
+    if (canClose) {
+      this.setScreen(t.Screen.Welcome);
+    }
+    return canClose;
+  }
+
+  async accountWillClose(): Promise<boolean> {
+    this.account = undefined;
     return true;
   }
 
-  async closeRecorder(): Promise<boolean> {
+  async recorderWillClose(): Promise<boolean> {
     let shouldExit = true;
 
     if (this.recorder) {
@@ -405,21 +505,19 @@ class Codecast {
     if (shouldExit) {
       this.recorder = undefined;
       this.setup = undefined;
-      this.setScreen(t.Screen.Welcome);
       return true;
     }
 
     return false;
   }
 
-  async closePlayer(): Promise<boolean> {
+  async playerWillClose(): Promise<boolean> {
     if (this.player) {
       this.player.pause();
     }
 
     this.player = undefined;
     this.setup = undefined;
-    this.setScreen(t.Screen.Welcome);
     return true;
   }
 
@@ -554,6 +652,8 @@ class Codecast {
 
     return {
       screen: this.screen,
+      user: this.user,
+      account: this.account,
       welcome,
       recorder,
       player,
@@ -563,6 +663,7 @@ class Codecast {
 }
 
 const SCREEN_TITLES = {
+  [t.Screen.Account]: 'account',
   [t.Screen.Welcome]: 'projects',
   [t.Screen.Player]: 'player',
   [t.Screen.Recorder]: 'studio',

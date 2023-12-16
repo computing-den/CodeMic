@@ -11,7 +11,7 @@ import Section from './section.jsx';
 import postMessage, { mediaApi } from './api.js';
 import _ from 'lodash';
 
-type Props = { player: t.PlayerState };
+type Props = { user?: t.User; player: t.PlayerState };
 export default class Player extends Component<Props> {
   seeking = false;
 

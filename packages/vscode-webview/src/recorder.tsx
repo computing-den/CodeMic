@@ -14,7 +14,7 @@ import { cn } from './misc.js';
 import _ from 'lodash';
 import { RangedTrack } from '@codecast/lib/src/types.js';
 
-type Props = { recorder: t.RecorderState };
+type Props = { user?: t.User; recorder: t.RecorderState };
 export default class Recorder extends Component<Props> {
   // panelsElem: Element | null = null;
   // media: FakeMedia = new FakeMedia(
