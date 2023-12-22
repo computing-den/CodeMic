@@ -69,6 +69,7 @@
   "devDependencies": {
     "@types/lodash": "^4.14.199",
     "@types/node": "20.x",
+    "@types/node-fetch": "^2.6.9",
     "@types/vscode": "^1.82.0",
     "@vscode/test-electron": "^2.3.4"
   },
@@ -78,6 +79,7 @@
     "ignore": "^5.2.4",
     "lodash": "^4.17.21",
     "moment": "^2.29.4",
+    "node-fetch": "^2.7.0",
     "uuid": "^9.0.1"
   }
 }

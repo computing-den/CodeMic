@@ -10,9 +10,13 @@ export default class Account extends Component<Props> {
   fieldChanged = async (field: keyof t.AccountUpdate, value: any) => {
     await postMessage({ type: 'account/update', changes: { [field]: value } });
   };
-  emailChanged = (e: InputEvent) => this.fieldChanged('email', (e.target as HTMLInputElement).value);
-  usernameChanged = (e: InputEvent) => this.fieldChanged('username', (e.target as HTMLInputElement).value);
-  passwordChanged = (e: InputEvent) => this.fieldChanged('password', (e.target as HTMLInputElement).value);
+  credentialsChanged = async (field: keyof t.Credentials, value: any) => {
+    const credentials = { ...this.props.account.credentials, [field]: value };
+    await postMessage({ type: 'account/update', changes: { credentials } });
+  };
+  emailChanged = (e: InputEvent) => this.credentialsChanged('email', (e.target as HTMLInputElement).value);
+  usernameChanged = (e: InputEvent) => this.credentialsChanged('username', (e.target as HTMLInputElement).value);
+  passwordChanged = (e: InputEvent) => this.credentialsChanged('password', (e.target as HTMLInputElement).value);
   login = async () => {
     await postMessage({ type: 'account/login' });
   };
@@ -39,7 +43,7 @@ export default class Account extends Component<Props> {
 
   render() {
     const { user, account } = this.props;
-    const { email, username, password, join, error } = account;
+    const { credentials, join, error } = account;
 
     const wrap = (body: h.JSX.Element) => (
       <Screen className="account">
@@ -73,7 +77,7 @@ export default class Account extends Component<Props> {
       <>
         <div className="fields-subsection subsection">
           <vscode-text-field
-            value={username}
+            value={credentials.username}
             onInput={this.usernameChanged}
             onKeyDown={this.keyDown}
             placeholder="Example: sean_shirazi"
@@ -82,7 +86,7 @@ export default class Account extends Component<Props> {
             Username
           </vscode-text-field>
           <vscode-text-field
-            value={password}
+            value={credentials.password}
             onInput={this.passwordChanged}
             onKeyDown={this.keyDown}
             type="password"
@@ -92,7 +96,7 @@ export default class Account extends Component<Props> {
           </vscode-text-field>
           {join && (
             <vscode-text-field
-              value={email}
+              value={credentials.email}
               onInput={this.emailChanged}
               onKeyDown={this.keyDown}
               placeholder="Example: sean@computing-den.com"

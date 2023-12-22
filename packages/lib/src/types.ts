@@ -20,7 +20,7 @@ export type StoreResponse = { type: 'store'; store: Store };
 export type UrisResponse = { type: 'uris'; uris?: Uri[] };
 export type BooleanResponse = { type: 'boolean'; value: boolean };
 export type OKResponse = { type: 'ok' };
-export type ErrorResponse = { type: 'error' };
+export type ErrorResponse = { type: 'error'; message?: string };
 
 export type FrontendToBackendReqRes =
   | { request: { type: 'account/open'; join?: boolean }; response: StoreResponse }
@@ -124,6 +124,20 @@ export type PostAudioMessageToFrontend = <Req extends BackendAudioRequest>(
   req: Req,
 ) => Promise<FrontendResponseFor<Req>>;
 
+export type BackendToServerReqRes =
+  | {
+      request: { type: 'account/join'; credentials: Credentials };
+      response: { type: 'user'; user: User };
+    }
+  | {
+      request: { type: 'account/login'; credentials: Credentials };
+      response: { type: 'user'; user: User };
+    };
+export type BackendToServerRequest = BackendToServerReqRes['request'];
+export type ServerResponse = BackendToServerReqRes['response'] | ErrorResponse;
+export type ServerResponseFor<Req extends BackendToServerRequest> =
+  | Extract<BackendToServerReqRes, { request: { type: Req['type'] } }>['response'];
+
 export enum Screen {
   Account,
   Welcome,
@@ -148,10 +162,14 @@ export type User = {
   email: string;
 };
 
-export type AccountState = {
-  email: string;
+export type Credentials = {
   username: string;
   password: string;
+  email: string;
+};
+
+export type AccountState = {
+  credentials: Credentials;
   join: boolean;
   error?: string;
 };

@@ -40,6 +40,10 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     this.onViewOpen();
   }
 
+  hasView(): boolean {
+    return Boolean(this.view);
+  }
+
   show() {
     this.view?.show();
   }

@@ -3,6 +3,7 @@ import Player from './player.js';
 import VscWorkspace from './vsc_workspace.js';
 import WebviewProvider from './webview_provider.js';
 import Db from './db.js';
+import * as serverApi from './server_api.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
@@ -31,6 +32,8 @@ class Codecast {
       }),
     );
 
+    this.restoreStateAfterRestart().catch(console.error);
+
     // DEV
     // if (this.webview.bus) {
     //   this.messageHandler({ type: 'recorder/open', sessionId: 'ecc7e7e8-1f38-4a3a-91b1-774f1c91ba21' })
@@ -44,6 +47,8 @@ class Codecast {
   }
 
   async restoreStateAfterRestart() {
+    this.user = this.context.globalState.get<t.User>('user');
+
     const workspaceChange = VscWorkspace.getWorkspaceChangeGlobalState(this.context);
     VscWorkspace.setWorkspaceChangeGlobalState(this.context, undefined);
 
@@ -60,14 +65,15 @@ class Codecast {
       }
 
       this.setScreen(screen);
-      return this.postUpdateStore();
+      if (this.webview.hasView()) {
+        return this.postUpdateStore();
+      }
     }
   }
 
   async viewOpened() {
     try {
       this.updateViewTitle();
-      await this.restoreStateAfterRestart();
     } catch (error) {
       console.error(error);
     }
@@ -89,27 +95,15 @@ class Codecast {
       case 'account/join': {
         assert(this.account);
 
-        let { email, username, password } = this.account;
-        email = _.toLower(_.trim(email));
-        username = _.toLower(_.trim(username));
-        if (!email) {
-          this.account.error = 'Missing email.';
-        } else if (!username) {
-          this.account.error = 'Missing username.';
-        } else if (!password) {
-          this.account.error = 'Missing password.';
-        } else if (email === 'a') {
-          this.account.error = 'Email is already registered.';
-        } else if (username === 'a') {
-          this.account.error = 'Username is already registered.';
-        } else {
+        try {
+          const res = await serverApi.send({ type: 'account/join', credentials: this.account.credentials });
+          this.user = res.user;
           this.account.error = undefined;
-          this.user = {
-            email,
-            username,
-            token: 'aaa',
-          };
+          this.context.globalState.update('user', this.user);
           await this.goHome();
+        } catch (error) {
+          console.error(error);
+          this.account.error = (error as Error).message;
         }
 
         return this.respondWithStore();
@@ -118,27 +112,22 @@ class Codecast {
         assert(this.account);
         this.account.join = false;
 
-        let { username, password } = this.account;
-        username = _.toLower(_.trim(username));
-        if (!username) {
-          this.account.error = 'Missing username.';
-        } else if (!password) {
-          this.account.error = 'Missing password.';
-        } else if (username === 'a' && password === 'a') {
+        try {
+          const res = await serverApi.send({ type: 'account/login', credentials: this.account.credentials });
+          this.user = res.user;
           this.account.error = undefined;
-          this.user = {
-            email: 'sean@computing-den.com',
-            token: 'aaa',
-            username: 'sean_shir',
-          };
+          this.context.globalState.update('user', this.user);
           await this.goHome();
-        } else {
-          this.account.error = 'Wrong username or password.';
+        } catch (error) {
+          console.error(error);
+          this.account.error = (error as Error).message;
         }
+
         return this.respondWithStore();
       }
       case 'account/logout': {
         this.user = undefined;
+        this.context.globalState.update('user', undefined);
         await this.goHome();
         return this.respondWithStore();
       }
@@ -354,13 +343,13 @@ class Codecast {
   }
 
   updateViewTitle() {
-    console.log('updateViewTitle: webview.view ' + (this.webview.view ? 'is set' : 'is NOT set'));
-    if (this.webview.view) {
+    // console.log('updateViewTitle: webview.view ' + (this.webview.view ? 'is set' : 'is NOT set'));
+    if (this.webview.hasView()) {
       const username = this.user?.username;
       const title = username
         ? ` ${username} / ` + SCREEN_TITLES[this.screen]
         : SCREEN_TITLES[this.screen] + ` (not logged in) `;
-      this.webview.view.title = title;
+      this.webview.view!.title = title;
     }
   }
 
@@ -382,9 +371,11 @@ class Codecast {
   async openAccount(options?: { join?: boolean }) {
     if (await this.closeCurrentScreen()) {
       this.account = {
-        email: '',
-        username: '',
-        password: '',
+        credentials: {
+          email: '',
+          username: '',
+          password: '',
+        },
         join: options?.join ?? false,
       };
       this.setScreen(t.Screen.Account);
