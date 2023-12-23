@@ -4,4 +4,5 @@ node_modules
 /packages/*/out
 *.tsbuildinfo
 .server.pid
-/config.json
+/packages/*/config.json
+/private

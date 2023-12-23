@@ -157,9 +157,20 @@ export type Store = {
 };
 
 export type User = {
-  token: string;
   username: string;
   email: string;
+  token: string;
+  joinTimestamp: string;
+  tokenTimestamp: string;
+};
+
+export type DBUser = {
+  username: string;
+  hash: string;
+  email: string;
+  token: string;
+  join_timestamp: string;
+  token_timestamp: string;
 };
 
 export type Credentials = {

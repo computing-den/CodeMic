@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 
 export type Config = {
   port: number;
+  data: string;
 };
 
 const config = JSON.parse(

@@ -4,6 +4,7 @@ import Screen from './screen.jsx';
 import Section from './section.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
+import moment from 'moment';
 
 type Props = { user?: t.User; account: t.AccountState };
 export default class Account extends Component<Props> {
@@ -62,8 +63,9 @@ export default class Account extends Component<Props> {
       return wrap(
         <div className="user-subsection subsection">
           <p>
-            Logged in as <b>{user.username}</b>
+            Logged in as <b>{user.username}.</b>
           </p>
+          <p>Joined on {moment(user.joinTimestamp).format('DD MMM YYYY')}.</p>
           <p>
             <vscode-link href="#" onClick={this.logout}>
               Log out
