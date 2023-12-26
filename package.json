@@ -5,6 +5,7 @@
   "scripts": {
     "start": "npm run build && code --extensionDevelopmentPath=$PWD/packages/vscode-extension",
     "server": "npm run build && npm run kill:server && node --enable-source-maps packages/webserver/out/server.js",
+    "dev:server": "npm run build && npm run kill:server && node --enable-source-maps --inspect=9230 packages/webserver/out/server.js",
     "kill:server": "node  kill-server.mjs",
     "build": "npm run build:tsc && npm run build:webview && npm run build:webclient",
     "build:tsc": "tsc --build",

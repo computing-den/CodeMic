@@ -1,11 +1,22 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import _ from 'lodash';
 import config from './config.js';
 import { types as t, assert } from '@codecast/lib';
 import Database from 'better-sqlite3';
 import crypto from 'crypto';
+import multer from 'multer';
+
+const upload = multer({
+  dest: path.join(os.tmpdir(), 'codecast'),
+  limits: {
+    fieldNameSize: 1000,
+    fieldSize: 100 * 10 ** 6,
+    files: 100,
+  },
+});
 
 const ASSETS = path.join(process.cwd(), 'packages/webserver/src/assets');
 const DIST = path.join(process.cwd(), 'packages/webclient/out');
@@ -68,6 +79,17 @@ function initRoutes() {
   app.post('/api', async (req, res, next) => {
     try {
       res.send(await handleRequest(req.body as t.BackendToServerRequest));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/publish', upload.single('file'), async (req, res, next) => {
+    try {
+      console.log('file:', req.file);
+      console.log('body:', req.body);
+
+      res.send('OK');
     } catch (error) {
       next(error);
     }

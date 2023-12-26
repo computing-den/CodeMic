@@ -8,6 +8,7 @@ import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
 import { types as t, lib } from '@codecast/lib';
+import fs from 'fs';
 
 class Codecast {
   screen: t.Screen = t.Screen.Welcome;
@@ -236,6 +237,21 @@ class Codecast {
         } else {
           vscode.window.showInformationMessage('Nothing to save.');
         }
+
+        return this.respondWithStore();
+      }
+      case 'recorder/publish': {
+        let sessionId: string;
+        if (this.recorder) {
+          await this.recorder.save();
+          sessionId = this.recorder.sessionSummary.id;
+        } else {
+          assert(this.setup);
+          sessionId = this.setup.sessionSummary.id;
+        }
+        const packagePath = await this.db.packageSession(sessionId);
+        await serverApi.publish(packagePath);
+        vscode.window.showInformationMessage('Published session.');
 
         return this.respondWithStore();
       }

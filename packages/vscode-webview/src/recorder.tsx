@@ -227,6 +227,14 @@ class DetailsView extends Component<DetailsViewProps> {
     await postMessage({ type: 'recorder/update', changes: { root } });
   };
 
+  save = async () => {
+    await postMessage({ type: 'recorder/save' });
+  };
+
+  publish = async () => {
+    await postMessage({ type: 'recorder/publish' });
+  };
+
   render() {
     const { recorder, id, className, onLoadRecorder } = this.props;
     const { sessionSummary: ss } = recorder;
@@ -265,6 +273,12 @@ class DetailsView extends Component<DetailsViewProps> {
         <p className="subsection help">
           Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
         </p>
+        <vscode-button className="subsection" onClick={this.save} disabled={recorder.isNew} appearance="secondary">
+          Save
+        </vscode-button>
+        <vscode-button className="subsection" onClick={this.publish} disabled={recorder.isNew} appearance="secondary">
+          Publish
+        </vscode-button>
         {!recorder.isLoaded && (
           <vscode-button className="subsection" onClick={onLoadRecorder} autoFocus>
             {recorder.isNew ? 'Scan workspace to start' : 'Load project into workspace'}

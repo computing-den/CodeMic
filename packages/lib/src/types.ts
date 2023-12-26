@@ -45,6 +45,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/pause' }; response: StoreResponse }
   | { request: { type: 'recorder/seek'; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/save' }; response: StoreResponse }
+  | { request: { type: 'recorder/publish' }; response: StoreResponse }
   | { request: { type: 'recorder/update'; changes: RecorderUpdate }; response: StoreResponse }
   | { request: { type: 'recorder/insertAudio'; uri: Uri; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/deleteAudio'; id: string }; response: StoreResponse }

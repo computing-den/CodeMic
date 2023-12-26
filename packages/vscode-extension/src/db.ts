@@ -1,7 +1,9 @@
 import { types as t, lib, path, assert } from '@codecast/lib';
 import userPaths from './user_paths.js';
 import fs from 'fs';
+import os from 'os';
 import _ from 'lodash';
+import archiver from 'archiver';
 
 export type DbData = {
   sessionSummaries: t.SessionSummaryMap;
@@ -85,6 +87,40 @@ export default class Db {
     const toPath = path.abs(userPaths.data, 'sessions', to.id);
     await fs.promises.cp(fromPath, toPath, { recursive: true });
     // await this.writeSessionSummary(to);
+  }
+
+  getSessionDir(sessionId: string): t.AbsPath {
+    return path.abs(userPaths.data, 'sessions', sessionId);
+  }
+
+  async packageSession(sessionId: string): Promise<t.AbsPath> {
+    return new Promise((resolve, reject) => {
+      const packagePath = path.abs(os.tmpdir(), sessionId + '.zip');
+      const sessionPath = this.getSessionDir(sessionId);
+
+      const output = fs.createWriteStream(packagePath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+
+      // 'close' event is fired only when a file descriptor is involved
+      output.on('close', () => {
+        resolve(packagePath);
+      });
+
+      // This event is fired when the data source is drained no matter what was the data source.
+      // output.on('end',  () => {});
+
+      archive.on('warning', error => {
+        console.warn(error);
+      });
+
+      archive.on('error', error => {
+        reject(error);
+      });
+
+      archive.pipe(output);
+      archive.directory(sessionPath, false);
+      archive.finalize();
+    });
   }
 }
 

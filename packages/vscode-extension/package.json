@@ -75,7 +75,10 @@
   },
   "dependencies": {
     "@codecast/lib": "^1.0.0",
+    "@types/archiver": "^6.0.2",
     "@types/uuid": "^9.0.4",
+    "archiver": "^6.0.1",
+    "form-data": "^4.0.0",
     "ignore": "^5.2.4",
     "lodash": "^4.17.21",
     "moment": "^2.29.4",
