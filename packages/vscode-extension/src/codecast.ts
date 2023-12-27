@@ -190,6 +190,7 @@ class Codecast {
             fork: req.fork,
             root: history?.root || VscWorkspace.getDefaultRoot(),
             isNew: !baseSessionSummary,
+            isDirty: false,
             // set history in getStore() so that it's always up-to-date
           };
           this.setScreen(t.Screen.Recorder);
@@ -231,28 +232,38 @@ class Codecast {
         return this.respondWithStore();
       }
       case 'recorder/save': {
-        if (this.recorder?.isDirty) {
-          await this.recorder.save();
-          vscode.window.showInformationMessage('Saved session.');
-        } else {
-          vscode.window.showInformationMessage('Nothing to save.');
-        }
+        await this.saveRecorder({ forExit: false, ask: false, verbose: true });
 
         return this.respondWithStore();
       }
       case 'recorder/publish': {
-        let sessionId: string;
-        if (this.recorder) {
-          await this.recorder.save();
-          sessionId = this.recorder.sessionSummary.id;
-        } else {
-          assert(this.setup);
-          sessionId = this.setup.sessionSummary.id;
-        }
-        const packagePath = await this.db.packageSession(sessionId);
-        await serverApi.publish(packagePath);
-        vscode.window.showInformationMessage('Published session.');
+        let sessionSummary: t.SessionSummary;
+        if (await this.saveRecorder({ forExit: false, ask: true, verbose: false })) {
+          if (this.recorder) {
+            sessionSummary = this.recorder.sessionSummary;
+          } else {
+            sessionSummary = this.setup!.sessionSummary;
+          }
+          const packagePath = await this.db.packageSession(sessionSummary.id);
+          const answer = await serverApi.publish(sessionSummary, packagePath);
 
+          if (answer?.id !== sessionSummary.id) {
+            vscode.window.showErrorMessage('Publish received unrecognized answer from server.');
+          } else {
+            if (this.recorder) {
+              this.recorder.sessionSummary = answer;
+            } else {
+              this.setup!.sessionSummary = answer;
+            }
+
+            await this.db.writeSessionSummary(answer);
+            // Cannot call this.saveRecorder unless we set isDirty on this.recorder or this.setup first.
+            // Also, we don't want any messages to be shown from saveRecorder.
+            // await this.saveRecorder({ forExit: false, ask: false, verbose: false });
+
+            vscode.window.showInformationMessage('Published session.');
+          }
+        }
         return this.respondWithStore();
       }
       case 'getStore': {
@@ -274,9 +285,11 @@ class Codecast {
         if (this.recorder) {
           this.recorder.updateState(req.changes);
         } else {
-          if (req.changes.title !== undefined) this.setup!.sessionSummary.title = req.changes.title;
-          if (req.changes.description !== undefined) this.setup!.sessionSummary.description = req.changes.description;
-          if (req.changes.root !== undefined) this.setup!.root = req.changes.root;
+          assert(this.setup);
+          if (req.changes.title !== undefined) this.setup.sessionSummary.title = req.changes.title;
+          if (req.changes.description !== undefined) this.setup.sessionSummary.description = req.changes.description;
+          if (req.changes.root !== undefined) this.setup.root = req.changes.root;
+          this.setup.isDirty = true;
         }
         return this.respondWithStore();
       }
@@ -461,7 +474,23 @@ class Codecast {
   }
 
   async recorderWillClose(): Promise<boolean> {
-    let shouldExit = true;
+    if (await this.saveRecorder({ forExit: true, ask: true, verbose: false })) {
+      this.recorder = undefined;
+      this.setup = undefined;
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Returns true if successfull and false if cancelled.
+   * In verbose mode, it'll show a message even when there are no changes to save.
+   */
+  async saveRecorder(options: { forExit: boolean; ask: boolean; verbose: boolean }): Promise<boolean> {
+    let cancelled = false;
+    let shouldSave = false;
+    let isDirty: boolean;
 
     if (this.recorder) {
       const wasPlaying = this.recorder.isPlaying;
@@ -473,26 +502,18 @@ class Codecast {
         this.postUpdateStore();
       }
 
-      let shouldSave = this.recorder.isDirty;
-      if (shouldSave) {
-        // Ask to save the session.
-        const saveTitle = 'Save';
-        const dontSaveTitle = "Don't Save";
-        const cancelTitle = 'Cancel';
-        const answer = await vscode.window.showWarningMessage(
-          'Do you want to save this session?',
-          { modal: true, detail: "Your changes will be lost if you don't save them." },
-          { title: saveTitle },
-          { title: cancelTitle, isCloseAffordance: true },
-          { title: dontSaveTitle },
-        );
-        shouldExit = answer?.title !== cancelTitle;
-        shouldSave = answer?.title === saveTitle;
+      isDirty = this.recorder.isDirty;
+      if (isDirty) {
+        if (options.ask) {
+          [shouldSave, cancelled] = await this.askToSaveSession(options);
+        } else {
+          shouldSave = true;
+        }
       }
 
       // If we want to exit recorder, stop recording and intercepting editor events.
       // Otherwise, resume recording if we were initially recording.
-      if (shouldExit) {
+      if (!cancelled) {
         this.recorder.pause();
       } else if (wasRecording) {
         this.recorder.record();
@@ -505,17 +526,60 @@ class Codecast {
       // Save
       if (shouldSave) {
         await this.recorder.save();
-        vscode.window.showInformationMessage('Saved session.');
+      }
+    } else {
+      assert(this.setup);
+      isDirty = Boolean(this.setup.isDirty);
+      if (isDirty) {
+        if (options.ask) {
+          [shouldSave, cancelled] = await this.askToSaveSession(options);
+        } else {
+          shouldSave = true;
+        }
+      }
+
+      if (shouldSave) {
+        await this.db.writeSessionSummary(this.setup.sessionSummary);
+        this.setup.isDirty = false;
       }
     }
 
-    if (shouldExit) {
-      this.recorder = undefined;
-      this.setup = undefined;
-      return true;
+    if (!isDirty && options.verbose) {
+      vscode.window.showInformationMessage('Nothing to save.');
+    } else if (shouldSave) {
+      vscode.window.showInformationMessage('Saved session.');
     }
 
-    return false;
+    return !cancelled;
+  }
+
+  /**
+   * Returns [shouldSave, cancelled] booleans.
+   */
+  async askToSaveSession(options: { forExit: boolean }): Promise<[boolean, boolean]> {
+    const saveTitle = 'Save';
+    const dontSaveTitle = "Don't Save";
+    const cancelTitle = 'Cancel';
+    let answer: vscode.MessageItem | undefined;
+    if (options.forExit) {
+      answer = await vscode.window.showWarningMessage(
+        'Do you want to save this session?',
+        { modal: true, detail: "Your changes will be lost if you don't save them." },
+        { title: saveTitle },
+        { title: cancelTitle, isCloseAffordance: true },
+        { title: dontSaveTitle },
+      );
+    } else {
+      answer = await vscode.window.showWarningMessage(
+        'Do you want to save this session?',
+        { modal: true },
+        { title: saveTitle },
+        { title: cancelTitle, isCloseAffordance: true },
+      );
+    }
+    const shouldSave = answer?.title === saveTitle;
+    const cancelled = answer?.title === cancelTitle;
+    return [shouldSave, cancelled];
   }
 
   async playerWillClose(): Promise<boolean> {

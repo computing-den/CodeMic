@@ -118,7 +118,8 @@ export default class Db {
       });
 
       archive.pipe(output);
-      archive.directory(sessionPath, false);
+      archive.file(path.abs(sessionPath, 'session.json'), { name: 'session.json' });
+      archive.directory(path.abs(sessionPath, 'blobs'), 'blobs');
       archive.finalize();
     });
   }

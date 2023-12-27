@@ -236,6 +236,7 @@ export type Setup = {
   fork?: { clock: number };
   root?: string;
   isNew?: boolean;
+  isDirty?: boolean;
 };
 
 export type TocItem = { title: string; clock: number };

@@ -14,7 +14,9 @@ export default class VscWorkspace {
   constructor(public root: t.AbsPath) {}
 
   static getDefaultRoot(): t.AbsPath | undefined {
-    const uri = vscode.workspace.workspaceFolders?.[0].uri;
+    // .uri can be undefined after user deletes the only folder from workspace
+    // probably because it doesn't cause a vscode restart.
+    const uri = vscode.workspace.workspaceFolders?.[0]?.uri;
     return uri && uri.scheme === 'file' ? path.abs(uri.path) : undefined;
   }
 
@@ -23,7 +25,7 @@ export default class VscWorkspace {
       canSelectFiles: false,
       canSelectFolders: true,
       canSelectMany: false,
-      defaultUri: vscode.workspace.workspaceFolders?.[0].uri,
+      defaultUri: vscode.workspace.workspaceFolders?.[0]?.uri,
       title,
     };
     const uris = await vscode.window.showOpenDialog(options);

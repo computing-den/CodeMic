@@ -12,9 +12,10 @@ export async function send<Req extends t.BackendToServerRequest>(req: Req): Prom
   }
 }
 
-export async function publish(filePath: t.AbsPath): Promise<string> {
+export async function publish(sessionSummary: t.SessionSummary, filePath: t.AbsPath): Promise<t.SessionSummary> {
   try {
     const form = new FormData();
+    form.append('sessionSummary', JSON.stringify(sessionSummary));
     form.append('file', fs.createReadStream(filePath));
 
     return (
@@ -24,7 +25,7 @@ export async function publish(filePath: t.AbsPath): Promise<string> {
       })
     ).data;
   } catch (error) {
-    handleAxiosError('uploading files', error as Error);
+    handleAxiosError('publish', error as Error);
   }
 }
 

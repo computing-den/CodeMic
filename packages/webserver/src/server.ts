@@ -89,7 +89,11 @@ function initRoutes() {
       console.log('file:', req.file);
       console.log('body:', req.body);
 
-      res.send('OK');
+      const sessionSummary = JSON.parse(req.body.sessionSummary);
+      console.log('sessionSummary:', sessionSummary);
+      sessionSummary.published = true;
+
+      res.send(sessionSummary);
     } catch (error) {
       next(error);
     }
