@@ -68,7 +68,7 @@ function initDB() {
       title TEXT,
       description TEXT,
       author TEXT,
-      duration TEXT,
+      duration REAL,
       views INTEGER,
       likes INTEGER,
       publish_timestamp TEXT,
