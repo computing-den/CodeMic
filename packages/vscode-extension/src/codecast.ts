@@ -9,6 +9,7 @@ import _ from 'lodash';
 import assert from 'assert';
 import { types as t, lib } from '@codecast/lib';
 import fs from 'fs';
+import { SessionSummary } from '@codecast/lib/src/types.js';
 
 class Codecast {
   screen: t.Screen = t.Screen.Welcome;
@@ -18,6 +19,7 @@ class Codecast {
   setup?: t.Setup;
   player?: Player;
   webview: WebviewProvider;
+  featured?: SessionSummary[];
   test: any = 0;
 
   constructor(public context: vscode.ExtensionContext, public db: Db) {
@@ -725,8 +727,8 @@ class Codecast {
     let welcome: t.WelcomeState | undefined;
     if (this.screen === t.Screen.Welcome) {
       welcome = {
-        workspace: this.db.sessionSummaries,
-        featured: FEATURED_SESSIONS,
+        workspace: Object.values(this.db.sessionSummaries),
+        featured: this.featured || [],
         history: this.db.settings.history,
       };
     }

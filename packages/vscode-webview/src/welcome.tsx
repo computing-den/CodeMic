@@ -56,7 +56,7 @@ export default class Welcome extends Component<Props> {
 
 type SessionsSectionProps = {
   title: string;
-  sessionSummaries: t.SessionSummaryMap;
+  sessionSummaries: t.SessionSummary[];
   history: t.SessionHistory;
   bordered?: boolean;
 };

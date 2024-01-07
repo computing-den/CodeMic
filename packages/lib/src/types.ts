@@ -198,8 +198,8 @@ export type AccountState = {
 export type AccountUpdate = Partial<AccountState>;
 
 export type WelcomeState = {
-  workspace: SessionSummaryMap;
-  featured: SessionSummaryMap;
+  workspace: SessionSummary[];
+  featured: SessionSummary[];
   history: SessionHistory;
 };
 

@@ -129,7 +129,7 @@ export class SessionSummaryListItem extends Component<ListItemProps> {
 }
 
 export type SessionSummaryListProps = {
-  sessionSummaries: t.SessionSummaryMap;
+  sessionSummaries: t.SessionSummary[];
   history: t.SessionHistory;
   className?: string;
 };
