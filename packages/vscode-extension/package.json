@@ -36,7 +36,7 @@
         "title": "Codecast"
       },
       {
-        "command": "codecast.home",
+        "command": "codecast.openWelcome",
         "title": "Home",
         "icon": {
           "light": "../vscode-webview/resources/light/home.svg",
@@ -55,12 +55,13 @@
     "menus": {
       "view/title": [
         {
-          "command": "codecast.home",
-          "when": "codecast.canGoHome",
+          "command": "codecast.openWelcome",
+          "when": "view == codecast-view && codecast.canOpenWelcome",
           "group": "navigation@1"
         },
         {
           "command": "codecast.account",
+          "when": "view == codecast-view",
           "group": "navigation@2"
         }
       ]

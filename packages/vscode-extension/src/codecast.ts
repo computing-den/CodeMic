@@ -24,7 +24,9 @@ class Codecast {
 
   constructor(public context: vscode.ExtensionContext, public db: Db) {
     context.subscriptions.push(vscode.commands.registerCommand('codecast.openView', this.openView.bind(this)));
-    context.subscriptions.push(vscode.commands.registerCommand('codecast.home', this.goHomeCommand.bind(this)));
+    context.subscriptions.push(
+      vscode.commands.registerCommand('codecast.openWelcome', this.openWelcomeCommand.bind(this)),
+    );
     context.subscriptions.push(vscode.commands.registerCommand('codecast.account', this.openAccountCommand.bind(this)));
 
     this.webview = new WebviewProvider(context, this.messageHandler.bind(this), this.viewOpened.bind(this));
@@ -103,7 +105,7 @@ class Codecast {
           this.user = res.user;
           this.account.error = undefined;
           this.context.globalState.update('user', this.user);
-          await this.goHome();
+          await this.openWelcome();
         } catch (error) {
           console.error(error);
           this.account.error = (error as Error).message;
@@ -120,7 +122,7 @@ class Codecast {
           this.user = res.user;
           this.account.error = undefined;
           this.context.globalState.update('user', this.user);
-          await this.goHome();
+          await this.openWelcome();
         } catch (error) {
           console.error(error);
           this.account.error = (error as Error).message;
@@ -131,11 +133,11 @@ class Codecast {
       case 'account/logout': {
         this.user = undefined;
         this.context.globalState.update('user', undefined);
-        await this.goHome();
+        await this.openWelcome();
         return this.respondWithStore();
       }
       case 'welcome/open': {
-        await this.goHome();
+        await this.openWelcome();
         return this.respondWithStore();
       }
       case 'player/open': {
@@ -395,15 +397,17 @@ class Codecast {
   setScreen(screen: t.Screen) {
     this.screen = screen;
     this.updateViewTitle();
-    vscode.commands.executeCommand('setContext', 'codecast.canGoHome', screen !== t.Screen.Welcome);
+    vscode.commands.executeCommand('setContext', 'codecast.canOpenWelcome', screen !== t.Screen.Welcome);
   }
 
-  async goHome() {
-    await this.closeCurrentScreen();
+  async openWelcome() {
+    if (this.screen !== t.Screen.Welcome) {
+      await this.closeCurrentScreen();
+    }
   }
 
-  async goHomeCommand() {
-    await this.goHome();
+  async openWelcomeCommand() {
+    await this.openWelcome();
     await this.postUpdateStore();
   }
 
