@@ -3,7 +3,7 @@ import * as t from './types.js';
 import editorEventStepperDispatch from './editor_event_stepper_dispatch.js';
 import * as lib from './lib.js';
 import * as path from './path.js';
-import assert from './assert.js';
+import { assert } from './assert.js';
 
 // Not every TextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.

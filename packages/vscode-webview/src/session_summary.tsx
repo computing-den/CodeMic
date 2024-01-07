@@ -30,11 +30,11 @@ export class SessionSummary extends Component<NormalProps> {
     const { className, withAuthor, sessionSummary: s } = this.props;
 
     return (
-      <WithAvatar className={cn('session-summary', className)} src={this.props.sessionSummary.author.avatar}>
+      <WithAvatar className={cn('session-summary', className)} src={this.props.sessionSummary.author?.avatar}>
         <div className="title">{s.title || 'Untitled'}</div>
         {withAuthor && (
           <div className="footer">
-            <span className="footer-item author">{s.author.name}</span>
+            <span className="footer-item author">{s.author?.username || 'anonymous'}</span>
           </div>
         )}
       </WithAvatar>
@@ -48,7 +48,7 @@ export class SessionSummaryForList extends Component<ForListProps> {
     const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
 
     return (
-      <WithAvatar className={cn('session-summary for-list', className)} src={this.props.sessionSummary.author.avatar}>
+      <WithAvatar className={cn('session-summary for-list', className)} src={this.props.sessionSummary.author?.avatar}>
         <div className="title">{s.title || 'Untitled'}</div>
         {s.description && <div className="description">{s.description}</div>}
         <div className="footer">
@@ -58,12 +58,12 @@ export class SessionSummaryForList extends Component<ForListProps> {
                 Last opened <TimeFromNow timestamp={lastOpenedTimestamp} />
               </span>
             ) : (
-              <TimeFromNow timestamp={s.timestamp} capitalize />
+              <TimeFromNow timestamp={s.publishTimestamp ?? s.modificationTimestamp} capitalize />
             )}
           </span>
         </div>
         <div className="footer">
-          <span className="footer-item author">{s.author.name}</span>
+          <span className="footer-item author">{s.author?.username || 'anonymous'}</span>
           <div className="footer-item badge">
             <span className="codicon codicon-eye va-top m-right_small" />
             <span className="count">{s.views}</span>

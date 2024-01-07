@@ -15,7 +15,7 @@ export default class SessionDescription extends Component<Props> {
       <div className={cn('session-description', className)}>
         <div className="header">
           <span className="item timestamp">
-            <TimeFromNow timestamp={s.timestamp} capitalize />
+            <TimeFromNow timestamp={s.publishTimestamp ?? s.modificationTimestamp} capitalize />
           </span>
           <div className="item views">
             <span className="codicon codicon-eye va-top m-right_small" />

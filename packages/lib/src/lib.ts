@@ -133,3 +133,22 @@ export function clockToLocal(clock: number, range: t.ClockRange): number {
 export function clockToGlobal(clock: number, range: t.ClockRange): number {
   return clock + range.start;
 }
+
+export function dbUserToUser(dbUser: t.DBUser): t.User {
+  return {
+    username: dbUser.username,
+    email: dbUser.email,
+    token: dbUser.token,
+    avatar: dbUser.avatar,
+    joinTimestamp: dbUser.join_timestamp,
+    tokenTimestamp: dbUser.token_timestamp,
+  };
+}
+
+export function userToUserSummary(user: t.User): t.UserSummary {
+  return _.pick(user, 'username', 'email', 'avatar', 'joinTimestamp');
+}
+
+export function dbUserToUserSummary(dbUser: t.DBUser): t.UserSummary {
+  return userToUserSummary(dbUserToUser(dbUser));
+}

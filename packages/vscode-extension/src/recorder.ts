@@ -95,6 +95,7 @@ class Recorder {
   static async populateSession(
     context: vscode.ExtensionContext,
     db: Db,
+    user: t.User | undefined,
     setup: t.Setup,
     postAudioMessage: t.PostAudioMessageToFrontend,
     onUpdateFrontend: () => any,
@@ -108,8 +109,8 @@ class Recorder {
       await db.copySessionDir(setup.baseSessionSummary, setup.sessionSummary);
     }
 
+    const session = await db.fetchSession(setup.sessionSummary.id, user);
     const sessionIO = new SessionIO(db, setup.sessionSummary.id);
-    const session = await db.readSession(setup.sessionSummary.id);
     const workspace = await VscEditorWorkspace.populateEditorTrack(setup.root, session, sessionIO, clock, clock);
     if (workspace) {
       // TODO cut all tracks or remove them completely if out of range.
@@ -140,18 +141,19 @@ class Recorder {
   /**
    * Always returns a new object; no shared state with base
    */
-  static makeSessionSummary(base?: t.SessionSummary, fork?: { clock: number }): t.SessionSummary {
+  static makeSessionSummary(
+    author?: t.UserSummary,
+    base?: t.SessionSummary,
+    fork?: { clock: number },
+  ): t.SessionSummary {
     if (base) {
       return {
         ..._.cloneDeep(base),
         id: fork ? uuid() : base.id,
         title: fork ? `Fork: ${base.title}` : base.title,
         duration: fork?.clock ?? base.duration,
-        author: {
-          name: 'sean_shir',
-          avatar: 'avatar1.png',
-        },
-        timestamp: new Date().toISOString(), // will be overwritten at the end
+        author,
+        modificationTimestamp: new Date().toISOString(), // will be overwritten at the end
         forkedFrom: fork ? base.id : undefined,
       };
     } else {
@@ -159,15 +161,12 @@ class Recorder {
         id: uuid(),
         title: '',
         description: '',
-        author: {
-          name: 'sean_shir',
-          avatar: 'avatar1.png',
-        },
+        author,
         published: false,
         duration: 0,
         views: 0,
         likes: 0,
-        timestamp: new Date().toISOString(), // will be overwritten at the end
+        modificationTimestamp: new Date().toISOString(), // will be overwritten at the end
         toc: [],
       };
     }
@@ -229,7 +228,7 @@ class Recorder {
    * May be called without pause().
    */
   async save() {
-    this.sessionSummary.timestamp = new Date().toISOString();
+    this.sessionSummary.modificationTimestamp = new Date().toISOString();
     await this.db.writeSession(this.session, this.sessionSummary);
     await this.saveHistoryOpenClose();
     // this.lastSavedClock = this.clock;

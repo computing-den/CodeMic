@@ -1,5 +1,5 @@
 import * as lib from './lib.js';
-import assert from './assert.js';
+import { assert } from './assert.js';
 import * as t from './types.js';
 
 export default class AudioCtrl implements t.AudioCtrl {

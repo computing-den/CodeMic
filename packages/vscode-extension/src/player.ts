@@ -52,14 +52,15 @@ class Player {
   static async populateSession(
     context: vscode.ExtensionContext,
     db: Db,
+    user: t.User | undefined,
     setup: t.Setup,
     postAudioMessage: t.PostAudioMessageToFrontend,
     onUpdateFrontend: () => any,
     // audioSrc: string,
   ): Promise<Player | undefined> {
     assert(setup.root);
+    const session = await db.fetchSession(setup.sessionSummary.id, user);
     const sessionIO = new SessionIO(db, setup.sessionSummary.id);
-    const session = await db.readSession(setup.sessionSummary.id);
     const workspace = await VscEditorWorkspace.populateEditorTrack(setup.root, session, sessionIO);
     if (workspace) {
       const vscEditorPlayer = new VscEditorPlayer(context, workspace);

@@ -4,10 +4,12 @@ import fs from 'fs';
 import os from 'os';
 import _ from 'lodash';
 import config from './config.js';
-import { types as t, assert } from '@codecast/lib';
+import { types as t, assert, lib } from '@codecast/lib';
 import Database from 'better-sqlite3';
 import crypto from 'crypto';
 import multer from 'multer';
+import stream from 'stream';
+import { v4 as uuid } from 'uuid';
 
 const upload = multer({
   dest: path.join(os.tmpdir(), 'codecast'),
@@ -51,17 +53,37 @@ function initDB() {
       hash TEXT,
       email TEXT,
       token TEXT,
+      avatar TEXT,
       join_timestamp TEXT,
       token_timestamp TEXT
     )`,
   ).run();
   db.prepare(`CREATE INDEX IF NOT EXISTS index_users_email on users (email)`).run();
+  db.prepare(`CREATE INDEX IF NOT EXISTS index_users_token on users (token)`).run();
+
+  db.prepare(
+    `
+    CREATE TABLE IF NOT EXISTS session_summaries (
+      id TEXT PRIMARY KEY,
+      title TEXT,
+      description TEXT,
+      author TEXT,
+      duration TEXT,
+      views INTEGER,
+      likes INTEGER,
+      publish_timestamp TEXT,
+      modification_timestamp TEXT,
+      forked_from TEXT
+    )`,
+  ).run();
 
   return db;
 }
 
 function initRoutes() {
   const app = express();
+
+  app.use(requestLogger);
 
   app.use(express.json());
 
@@ -84,16 +106,19 @@ function initRoutes() {
     }
   });
 
-  app.post('/publish', upload.single('file'), async (req, res, next) => {
+  app.post('/publish_session', fillLocals, authenticate, upload.single('file'), async (req, res, next) => {
     try {
-      console.log('file:', req.file);
-      console.log('body:', req.body);
+      assert(req.file, '/publish_session expects a zip file to be uploaded.');
 
-      const sessionSummary = JSON.parse(req.body.sessionSummary);
-      console.log('sessionSummary:', sessionSummary);
-      sessionSummary.published = true;
+      res.send(await handlePublishSession(req.body, req.file, res.locals));
+    } catch (error) {
+      next(error);
+    }
+  });
 
-      res.send(sessionSummary);
+  app.get('/download_session', fillLocals, upload.single('file'), async (req, res, next) => {
+    try {
+      await handleDownloadSession(req, res);
     } catch (error) {
       next(error);
     }
@@ -101,12 +126,16 @@ function initRoutes() {
 
   app.use((error: Error, req: any, res: any, next: any) => {
     console.error(error);
-    res.status(500).send(error.message);
+    let code = 500;
+    if (error instanceof ServerError) {
+      code = error.code;
+    }
+    res.status(code).send(error.message);
   });
 }
 
 //==================================================
-// Request handlers
+// End of express routes
 //==================================================
 
 async function handleRequest<Req extends t.BackendToServerRequest>(req: Req): Promise<t.ServerResponseFor<Req>> {
@@ -204,6 +233,140 @@ async function handleRequest<Req extends t.BackendToServerRequest>(req: Req): Pr
   }
 }
 
+async function handlePublishSession(body: any, file: Express.Multer.File, locals: MyLocals): Promise<t.SessionSummary> {
+  const { dbUser } = locals;
+  assert(dbUser);
+
+  const sessionSummary = JSON.parse(body.sessionSummary) as t.SessionSummary;
+  console.log('sessionSummary:', sessionSummary);
+  console.log('dbUser: ', locals.dbUser);
+
+  if (!sessionSummary.id) {
+    throw new ServerError('Missing session ID.', 400);
+  }
+  // if (sessionSummary.author.username !== locals.dbUser.username) {
+  //   throw new ServerError('Forbidden: trying to publish as a different user.', 403);
+  // }
+
+  // sessionSummary.id is picked by user and must be checked to make sure it doesn't
+  // belong to another user.
+  let dbSessionSummary = db.prepare(`SELECT * from session_summaries where id = ?`).get(sessionSummary.id) as
+    | t.DBSessionSummary
+    | undefined;
+  if (dbSessionSummary && dbSessionSummary.author !== dbUser.username) {
+    throw new ServerError('Forbidden: this session does not belong to you.', 403);
+  }
+
+  // Store session file named
+  const sessionPath = path.join(config.data, 'sessions', dbUser.username, `${sessionSummary.id}.zip`);
+  await fs.promises.mkdir(path.dirname(sessionPath), { recursive: true });
+  await fs.promises.copyFile(file.path, sessionPath);
+
+  const now = new Date().toISOString();
+
+  dbSessionSummary = {
+    id: sessionSummary.id,
+    title: sessionSummary.title ?? '',
+    description: sessionSummary.description ?? '',
+    author: dbUser.username,
+    duration: sessionSummary.duration,
+    views: dbSessionSummary?.views ?? 0,
+    likes: dbSessionSummary?.likes ?? 0,
+    forked_from: sessionSummary.forkedFrom,
+    publish_timestamp: dbSessionSummary?.publish_timestamp ?? now,
+    modification_timestamp: dbSessionSummary?.modification_timestamp ?? now,
+  };
+
+  db.prepare(
+    `
+      INSERT OR REPLACE INTO session_summaries
+      (
+        id,
+        title,
+        description,
+        author,
+        duration,
+        views,
+        likes,
+        forked_from,
+        publish_timestamp,
+        modification_timestamp
+      )
+      VALUES
+      (
+        :id,
+        :title,
+        :description,
+        :author,
+        :duration,
+        :views,
+        :likes,
+        :forked_from,
+        :publish_timestamp,
+        :modification_timestamp
+      )`,
+  ).run(dbSessionSummary);
+
+  return fetchSessionSummary(sessionSummary.id);
+}
+
+async function handleDownloadSession(req: express.Request, res: express.Response) {
+  // const { dbUser } = res.locals;
+  const { id } = req.query;
+  if (!id) throw new ServerError('Missing session id', 400);
+  const author = db.prepare(`SELECT author FROM session_summaries WHERE id = ?`).pluck().get(id) as string;
+  if (!author) throw new ServerError('Session not found', 404);
+
+  // sessionPath must be absolute because it'll be used for res.sendFile.
+  const sessionPath = path.resolve(config.data, 'sessions', author, `${id}.zip`);
+  await new Promise((resolve, reject) => {
+    res.sendFile(sessionPath, error => {
+      if (error) reject(error);
+      else resolve(null);
+    });
+  });
+}
+
+function fetchSessionSummary(id: string): t.SessionSummary {
+  const dbSessionSummary = db.prepare(`SELECT * FROM session_summaries WHERE id = ?`).get(id) as t.DBSessionSummary;
+  return {
+    id: dbSessionSummary.id,
+    title: dbSessionSummary.title,
+    description: dbSessionSummary.description,
+    author: fetchUserSummary(dbSessionSummary.author),
+    duration: dbSessionSummary.duration,
+    views: dbSessionSummary.views,
+    likes: dbSessionSummary.likes,
+    publishTimestamp: dbSessionSummary.publish_timestamp,
+    modificationTimestamp: dbSessionSummary.modification_timestamp,
+    forkedFrom: dbSessionSummary.forked_from,
+    published: true,
+    toc: [],
+  };
+}
+
+function fetchUserSummary(username: string): t.UserSummary {
+  const dbUser = db.prepare(`SELECT * FROM users WHERE username = ?`).get(username) as t.DBUser;
+  assert(dbUser);
+  return lib.dbUserToUserSummary(dbUser);
+}
+
+async function fillLocals(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (req.query.token) {
+    const dbUser = db.prepare(`SELECT * from users where token = ?`).get(req.query.token) as t.DBUser | undefined;
+    res.locals = { dbUser };
+  }
+  next();
+}
+
+async function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!res.locals.dbUser) {
+    next(new ServerError('Forbidden', 403));
+  } else {
+    next();
+  }
+}
+
 async function hashPassword(username: string, password: string) {
   // Add salt based on the username.
   const salted = username + password + String(username.length * 131 + 530982758);
@@ -220,4 +383,44 @@ function createToken(): string {
   return Array.from(crypto.randomBytes(64))
     .map(x => x.toString(16).padStart(2, '0'))
     .join('');
+}
+
+export default function requestLogger(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const startTime = Date.now();
+
+  const logRequest = () => {
+    console.log({
+      // '%s - [%d ms] - %s - %s - %s',
+      // timestampISO: new Date().toISOString(),
+      responseTime: (Date.now() - startTime) / 1000,
+      method: req.method,
+      ip: req.ip || req.connection?.remoteAddress,
+      url: req.originalUrl || req.url,
+      query: req.query,
+      status: res.statusCode,
+      contentLength: res.getHeader('content-length'),
+      userAgent: req.headers['user-agent'],
+      locals: res.locals,
+    });
+  };
+
+  res.on('close', logRequest);
+
+  next();
+}
+
+class ServerError extends Error {
+  constructor(message: string, public code: number) {
+    super(message);
+  }
+}
+
+interface MyLocals {
+  dbUser?: t.DBUser;
+}
+
+declare module 'express' {
+  export interface Response {
+    locals: MyLocals;
+  }
 }

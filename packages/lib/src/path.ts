@@ -1,4 +1,4 @@
-import assert from './assert.js';
+import { assert } from './assert.js';
 import type * as t from './types.js';
 
 export function workspaceUriFromRelPath(p: t.RelPath): t.Uri {

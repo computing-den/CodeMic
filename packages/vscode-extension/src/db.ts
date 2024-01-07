@@ -1,9 +1,13 @@
 import { types as t, lib, path, assert } from '@codecast/lib';
 import userPaths from './user_paths.js';
+import * as serverApi from './server_api.js';
+import * as misc from './misc.js';
 import fs from 'fs';
 import os from 'os';
 import _ from 'lodash';
 import archiver from 'archiver';
+import unzipper from 'unzipper';
+import stream from 'stream';
 
 export type DbData = {
   sessionSummaries: t.SessionSummaryMap;
@@ -55,8 +59,20 @@ export default class Db {
     this.sessionSummaries[sessionSummary.id] = sessionSummary;
   }
 
-  async readSession(id: string): Promise<t.Session> {
-    return readSession(id);
+  async fetchSession(id: string, user?: t.User): Promise<t.Session> {
+    const sessionDirPath = path.abs(userPaths.data, 'sessions', id);
+    const sessionPath = path.abs(sessionDirPath, `session.json`);
+    const zipPath = path.abs(sessionDirPath, `${id}.zip`);
+
+    if (!(await misc.fileExists(sessionPath))) {
+      await serverApi.downloadSession(id, zipPath, user?.token);
+      // For some reason when stream.pipeline() resolves, the extracted files have not
+      // yet been written. So we have to wait on out.promise().
+      const out = unzipper.Extract({ path: sessionDirPath, verbose: true });
+      await stream.promises.pipeline(fs.createReadStream(zipPath), out);
+      await out.promise();
+    }
+    return readAndParseJSON<t.Session>(sessionPath);
   }
 
   async readSessionBlobBySha1(sessionId: string, sha1: string): Promise<Uint8Array> {
@@ -178,10 +194,6 @@ function readSessionSummary(id: string): Promise<t.SessionSummary> {
 
 function readSettings(): Promise<t.Settings> {
   return readAndParseJSON<t.Settings>(path.abs(userPaths.data, 'settings.json'), makeDefaultSettings);
-}
-
-function readSession(id: string): Promise<t.Session> {
-  return readAndParseJSON<t.Session>(path.abs(userPaths.data, 'sessions', id, `session.json`));
 }
 
 function makeDefaultSettings(): t.Settings {

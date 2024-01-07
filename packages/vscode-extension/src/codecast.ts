@@ -182,7 +182,11 @@ class Codecast {
       case 'recorder/open': {
         if (await this.closeCurrentScreen()) {
           const baseSessionSummary = req.sessionId ? this.db.sessionSummaries[req.sessionId] : undefined;
-          const sessionSummary = Recorder.makeSessionSummary(baseSessionSummary, req.fork);
+          const sessionSummary = Recorder.makeSessionSummary(
+            this.user && lib.userToUserSummary(this.user),
+            baseSessionSummary,
+            req.fork,
+          );
           const history = this.getFirstHistoryItemById(sessionSummary.id, baseSessionSummary?.id);
           this.setup = {
             sessionSummary,
@@ -237,32 +241,36 @@ class Codecast {
         return this.respondWithStore();
       }
       case 'recorder/publish': {
-        let sessionSummary: t.SessionSummary;
-        if (await this.saveRecorder({ forExit: false, ask: true, verbose: false })) {
-          if (this.recorder) {
-            sessionSummary = this.recorder.sessionSummary;
-          } else {
-            sessionSummary = this.setup!.sessionSummary;
-          }
-          const packagePath = await this.db.packageSession(sessionSummary.id);
-          const answer = await serverApi.publish(sessionSummary, packagePath);
-
-          if (answer?.id !== sessionSummary.id) {
-            vscode.window.showErrorMessage('Publish received unrecognized answer from server.');
-          } else {
+        try {
+          let sessionSummary: t.SessionSummary;
+          if (await this.saveRecorder({ forExit: false, ask: true, verbose: false })) {
             if (this.recorder) {
-              this.recorder.sessionSummary = answer;
+              sessionSummary = this.recorder.sessionSummary;
             } else {
-              this.setup!.sessionSummary = answer;
+              sessionSummary = this.setup!.sessionSummary;
             }
+            const packagePath = await this.db.packageSession(sessionSummary.id);
+            const answer = await serverApi.publishSession(sessionSummary, packagePath, this.user?.token);
 
-            await this.db.writeSessionSummary(answer);
-            // Cannot call this.saveRecorder unless we set isDirty on this.recorder or this.setup first.
-            // Also, we don't want any messages to be shown from saveRecorder.
-            // await this.saveRecorder({ forExit: false, ask: false, verbose: false });
+            if (answer?.id !== sessionSummary.id) {
+              vscode.window.showErrorMessage('Publish received unrecognized answer from server.');
+            } else {
+              if (this.recorder) {
+                this.recorder.sessionSummary = answer;
+              } else {
+                this.setup!.sessionSummary = answer;
+              }
 
-            vscode.window.showInformationMessage('Published session.');
+              await this.db.writeSessionSummary(answer);
+              // Cannot call this.saveRecorder unless we set isDirty on this.recorder or this.setup first.
+              // Also, we don't want any messages to be shown from saveRecorder.
+              // await this.saveRecorder({ forExit: false, ask: false, verbose: false });
+
+              vscode.window.showInformationMessage('Published session.');
+            }
           }
+        } catch (error) {
+          vscode.window.showErrorMessage((error as Error).message);
         }
         return this.respondWithStore();
       }
@@ -424,6 +432,7 @@ class Codecast {
       return Recorder.populateSession(
         this.context,
         this.db,
+        this.user,
         this.setup,
         this.postAudioMessage.bind(this),
         this.recorderChanged.bind(this),
@@ -446,6 +455,7 @@ class Codecast {
     return Player.populateSession(
       this.context,
       this.db,
+      this.user,
       this.setup,
       this.postAudioMessage.bind(this),
       this.playerChanged.bind(this),
@@ -748,15 +758,17 @@ const FEATURED_SESSIONS: t.SessionSummaryMap = _.keyBy(
       title: 'DumDB part 2',
       description: 'A small DB easy to use',
       author: {
-        name: 'sean_shir',
+        username: 'sean_shirazi',
         avatar: 'avatar1.png',
+        email: 'example@site.com',
+        joinTimestamp: '2020-01-01T14:22:35.344Z',
       },
       published: false,
       defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
       duration: 78,
       views: 0,
       likes: 0,
-      timestamp: '2023-07-08T14:22:35.344Z',
+      modificationTimestamp: '2023-07-08T14:22:35.344Z',
       toc: [
         { title: 'Intro', clock: 0 },
         { title: 'Setting things up', clock: 3 },
@@ -774,15 +786,17 @@ const FEATURED_SESSIONS: t.SessionSummaryMap = _.keyBy(
       title: 'cThruLisp',
       description: 'An interesting take on lisp',
       author: {
-        name: 'sean_shir',
+        username: 'sean_shirazi',
         avatar: 'avatar2.png',
+        email: 'example@site.com',
+        joinTimestamp: '2020-01-01T14:22:35.344Z',
       },
       published: false,
       defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
       duration: 4023,
       views: 0,
       likes: 0,
-      timestamp: '2023-08-08T14:22:35.344Z',
+      modificationTimestamp: '2023-08-08T14:22:35.344Z',
       toc: [],
     },
     {
@@ -790,15 +804,18 @@ const FEATURED_SESSIONS: t.SessionSummaryMap = _.keyBy(
       title: 'DumDB part 1',
       description: 'A small DB easy to use',
       author: {
-        name: 'sean_shir',
+        username: 'sean_shirazi',
         avatar: 'https://cdn-icons-png.flaticon.com/512/924/924915.png',
+        email: 'example@site.com',
+        joinTimestamp: '2020-01-01T14:22:35.344Z',
       },
       published: true,
       defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
       duration: 62,
       views: 123,
       likes: 11,
-      timestamp: '2023-06-06T14:22:35.344Z',
+      publishTimestamp: '2023-02-06T14:22:35.344Z',
+      modificationTimestamp: '2023-06-06T14:22:35.344Z',
       toc: [],
     },
     {
@@ -807,15 +824,18 @@ const FEATURED_SESSIONS: t.SessionSummaryMap = _.keyBy(
       description:
         'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
       author: {
-        name: 'jane',
+        username: 'jane',
         avatar: 'avatar2.png',
+        email: 'example@site.com',
+        joinTimestamp: '2020-01-01T14:22:35.344Z',
       },
       published: true,
       defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
       duration: 662,
       views: 100,
       likes: 45,
-      timestamp: '2023-08-06T10:22:35.344Z',
+      publishTimestamp: '2023-06-06T10:22:35.344Z',
+      modificationTimestamp: '2023-08-06T10:22:35.344Z',
       toc: [],
     },
   ],

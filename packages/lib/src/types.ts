@@ -161,8 +161,16 @@ export type User = {
   username: string;
   email: string;
   token: string;
+  avatar?: string;
   joinTimestamp: string;
   tokenTimestamp: string;
+};
+
+export type UserSummary = {
+  username: string;
+  email: string;
+  avatar?: string;
+  joinTimestamp: string;
 };
 
 export type DBUser = {
@@ -170,6 +178,7 @@ export type DBUser = {
   hash: string;
   email: string;
   token: string;
+  avatar?: string;
   join_timestamp: string;
   token_timestamp: string;
 };
@@ -245,21 +254,32 @@ export type SessionSummary = {
   id: string;
   title: string;
   description: string;
-  author: {
-    avatar: string;
-    name: string;
-  };
+  author?: UserSummary;
   published: boolean;
-  publishedUri?: Uri;
+  // publishedUri?: Uri;
   duration: number;
   views: number;
   likes: number;
-  timestamp: string;
+  publishTimestamp?: string;
+  modificationTimestamp: string;
   toc: TocItem[];
   forkedFrom?: string;
 };
 
 export type SessionSummaryMap = { [key: string]: SessionSummary };
+
+export type DBSessionSummary = {
+  id: string;
+  title: string;
+  description: string;
+  author: string;
+  duration: number;
+  views: number;
+  likes: number;
+  publish_timestamp: string;
+  modification_timestamp: string;
+  forked_from?: string;
+};
 
 export type Session = {
   editorTrack: EditorTrack;
