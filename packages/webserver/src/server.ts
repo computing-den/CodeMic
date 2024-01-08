@@ -116,7 +116,7 @@ function initRoutes() {
     }
   });
 
-  app.get('/download_session', fillLocals, upload.single('file'), async (req, res, next) => {
+  app.get('/session', fillLocals, upload.single('file'), async (req, res, next) => {
     try {
       await handleDownloadSession(req, res);
     } catch (error) {

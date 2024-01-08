@@ -48,7 +48,7 @@ export async function downloadSession(id: string, dst: t.AbsPath, token?: string
     },
     async progress => {
       try {
-        const res = await axios.get(getURLString('/download_session', { token, id }), {
+        const res = await axios.get(getURLString('/session', { token, id }), {
           responseType: 'stream',
           maxContentLength: Infinity,
         });
