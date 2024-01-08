@@ -20,6 +20,7 @@ export default class Welcome extends Component<Props> {
     e.preventDefault();
     postMessage({ type: 'account/open', join: true });
   };
+
   render() {
     const { welcome } = this.props;
     return (

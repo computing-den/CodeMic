@@ -9,7 +9,7 @@ import stream from 'stream';
 export async function send<Req extends t.BackendToServerRequest>(
   req: Req,
   token?: string,
-): Promise<t.ServerResponseFor<Req>> {
+): Promise<t.ExtractResponse<t.BackendToServerReqRes, Req>> {
   try {
     return (await axios.post(getURLString('/api', { token }).toString(), req)).data;
   } catch (error) {

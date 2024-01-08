@@ -1,6 +1,6 @@
 import Recorder from './recorder.js';
 import Player from './player.js';
-import VscWorkspace from './vsc_workspace.js';
+import VscWorkspace, { type WorkspaceChangeGlobalState } from './vsc_workspace.js';
 import WebviewProvider from './webview_provider.js';
 import Db from './db.js';
 import * as serverApi from './server_api.js';
@@ -59,20 +59,23 @@ class Codecast {
 
     console.log('restoreStateAfterRestart(): ', workspaceChange?.setup);
     if (workspaceChange) {
-      const { setup, screen } = workspaceChange;
+      const { setup, screen, featured } = workspaceChange;
       assert(screen === t.Screen.Player || screen === t.Screen.Recorder);
 
       this.setup = setup;
+      this.featured = featured;
       if (screen === t.Screen.Player) {
         this.player = await this.populatePlayer({ afterRestart: true });
       } else {
         this.recorder = await this.scanOrPopulateRecorder({ afterRestart: true });
       }
-
       this.setScreen(screen);
-      if (this.webview.hasView()) {
-        return this.postUpdateStore();
-      }
+    } else {
+      await this.fetchFeatured();
+    }
+
+    if (this.webview.hasView()) {
+      await this.postUpdateStore();
     }
   }
 
@@ -432,7 +435,8 @@ class Codecast {
 
   async scanOrPopulateRecorder(options?: { afterRestart: boolean }): Promise<Recorder | undefined> {
     assert(this.setup);
-    if (!(await VscWorkspace.setUpWorkspace(this.context, this.screen, this.setup, options))) return;
+    const state = this.createWorkspaceChangeGlobalState();
+    if (!(await VscWorkspace.setUpWorkspace(this.context, state, options))) return;
 
     if (this.setup.baseSessionSummary) {
       return Recorder.populateSession(
@@ -456,7 +460,8 @@ class Codecast {
 
   async populatePlayer(options?: { afterRestart: boolean }): Promise<Player | undefined> {
     assert(this.setup);
-    if (!(await VscWorkspace.setUpWorkspace(this.context, this.screen, this.setup, options))) return;
+    const state = this.createWorkspaceChangeGlobalState();
+    if (!(await VscWorkspace.setUpWorkspace(this.context, state, options))) return;
 
     return Player.populateSession(
       this.context,
@@ -616,6 +621,11 @@ class Codecast {
     await this.postUpdateStore();
   }
 
+  async fetchFeatured() {
+    const res = await serverApi.send({ type: 'featured/get' }, this.user?.token);
+    this.featured = res.sessionSummaries;
+  }
+
   // async showOpenSessionDialog(): Promise<t.Uri | undefined> {
   //   const uris = await vscode.window.showOpenDialog({
   //     canSelectFiles: true,
@@ -647,7 +657,7 @@ class Codecast {
       .find(Boolean);
   }
 
-  async postAudioMessage<Req extends t.BackendAudioRequest>(req: Req): Promise<t.FrontendResponseFor<Req>> {
+  async postAudioMessage(req: t.BackendAudioRequest): Promise<t.FrontendAudioResponse> {
     return this.webview.postMessage(req);
   }
 
@@ -666,6 +676,15 @@ class Codecast {
         return [audioTrack.id, uri];
       }),
     );
+  }
+
+  createWorkspaceChangeGlobalState(): WorkspaceChangeGlobalState {
+    assert(this.setup);
+    return {
+      screen: this.screen,
+      setup: this.setup,
+      featured: this.featured,
+    };
   }
 
   getStore(): t.Store {

@@ -100,30 +100,46 @@ export type BackendResponse = FrontendToBackendReqRes['response'] | ErrorRespons
 export type BackendRequest = BackendToFrontendReqRes['request'];
 export type FrontendResponse = BackendToFrontendReqRes['response'] | ErrorResponse;
 
-export type BackendResponseFor<Req extends FrontendRequest> = Extract<
-  FrontendToBackendReqRes,
+export type ReqRes = { request: { type: string }; response: { type: string } };
+export type ExtractResponse<RR extends ReqRes, Req extends { type: string }> = Extract<
+  RR,
   { request: { type: Req['type'] } }
 >['response'];
 
-export type FrontendResponseFor<Req extends BackendRequest> = Extract<
-  BackendToFrontendReqRes,
-  { request: { type: Req['type'] } }
->['response'];
+// export type BackendResponseFor<Req extends FrontendRequest> =
+
+// export type BackendResponseFor<Req extends FrontendRequest> = Extract<
+//   FrontendToBackendReqRes,
+//   { request: { type: Req['type'] } }
+// >['response'];
+
+// export type FrontendResponseFor<Req extends BackendRequest> = Extract<
+//   BackendToFrontendReqRes,
+//   { request: { type: Req['type'] } }
+// >['response'];
 
 export type PostMessageOptions = {
   performDefaultActions: boolean;
 };
 
-export type PostMessageToFrontend = <Req extends BackendRequest>(req: Req) => Promise<FrontendResponseFor<Req>>;
-export type PostMessageToBackend = <Req extends FrontendRequest>(
-  req: Req,
-  options?: PostMessageOptions,
-) => Promise<BackendResponseFor<Req>>;
+// export type PostMessageToFrontend = <Req extends BackendRequest>(req: Req) => Promise<FrontendResponseFor<Req>>;
+// export type PostMessageToBackend = <Req extends FrontendRequest>(
+//   req: Req,
+//   options?: PostMessageOptions,
+// ) => Promise<BackendResponseFor<Req>>;
 
 export type BackendAudioRequest = BackendAudioToFrontendReqRes['request'];
-export type PostAudioMessageToFrontend = <Req extends BackendAudioRequest>(
-  req: Req,
-) => Promise<FrontendResponseFor<Req>>;
+export type FrontendAudioResponse = BackendAudioToFrontendReqRes['response'] | ErrorResponse;
+export type PostAudioMessageToFrontend = (req: BackendAudioRequest) => Promise<FrontendAudioResponse>;
+
+// export type B2SReqAccountJoin = { type: 'account/join'; credentials: Credentials };
+// export type B2SResAccountJoin = { type: 'user'; user: User };
+
+// export type B2SReqAccountLogin = { type: 'account/login'; credentials: Credentials };
+// export type B2SResAccountLogin = { type: 'user'; user: User };
+
+// export type B2SReqFeaturedGet = { type: 'featured/get' };
+// export type B2SResFeaturedGet = { type: 'sessionSummaries'; sessionSummaries: SessionSummary[] };
 
 export type BackendToServerReqRes =
   | {
@@ -132,12 +148,21 @@ export type BackendToServerReqRes =
     }
   | {
       request: { type: 'account/login'; credentials: Credentials };
-      response: { type: 'user'; user: User };
+      response: { type: 'user'; user: User; x: string };
+    }
+  | {
+      request: { type: 'featured/get' };
+      response: { type: 'sessionSummaries'; sessionSummaries: SessionSummary[] };
     };
 export type BackendToServerRequest = BackendToServerReqRes['request'];
 export type ServerResponse = BackendToServerReqRes['response'] | ErrorResponse;
-export type ServerResponseFor<Req extends BackendToServerRequest> =
-  | Extract<BackendToServerReqRes, { request: { type: Req['type'] } }>['response'];
+// export type ServerResponseFor<Req extends BackendToServerRequest> = Extract<
+//   BackendToServerReqRes,
+//   { request: { type: Req['type'] } }
+// >['response'];
+
+// const y: ServerResponseFor<{type: 'account/join'; credentials: Credentials}>
+// const z: ServerResponseFor<{type: 'account/login'; credentials: Credentials}>
 
 export enum Screen {
   Account,

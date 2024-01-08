@@ -8,7 +8,7 @@ import _ from 'lodash';
 import nodePath from 'path';
 
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
-export type WorkspaceChangeGlobalState = { setup: t.Setup; screen: t.Screen };
+export type WorkspaceChangeGlobalState = { setup: t.Setup; screen: t.Screen; featured?: t.SessionSummary[] };
 
 export default class VscWorkspace {
   constructor(public root: t.AbsPath) {}
@@ -36,22 +36,21 @@ export default class VscWorkspace {
 
   static async setUpWorkspace(
     context: vscode.ExtensionContext,
-    screen: t.Screen,
-    setup: t.Setup,
+    state: WorkspaceChangeGlobalState,
     options?: { afterRestart: boolean },
   ): Promise<VscWorkspace | undefined> {
-    let root = setup.root ? path.abs(setup.root) : undefined;
+    let root = state.setup.root ? path.abs(state.setup.root) : undefined;
 
     if (!options?.afterRestart) {
       root = root || (await VscWorkspace.askForRoot(`Select a workspace`));
       if (!root) return;
 
       const workspace = new VscWorkspace(root);
-      if (!(await workspace.askToCreateOrOverwriteRoot(Boolean(setup.isNew)))) return;
+      if (!(await workspace.askToCreateOrOverwriteRoot(Boolean(state.setup.isNew)))) return;
       await workspace.makeRoot();
 
-      setup.root = root;
-      VscWorkspace.setWorkspaceChangeGlobalState(context, { setup, screen });
+      state.setup.root = root;
+      VscWorkspace.setWorkspaceChangeGlobalState(context, state);
       await workspace.updateWorkspaceFolder();
       VscWorkspace.setWorkspaceChangeGlobalState(context, undefined);
     }

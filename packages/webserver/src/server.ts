@@ -98,9 +98,9 @@ function initRoutes() {
     res.sendFile(path.join(ASSETS, 'index.html'));
   });
 
-  app.post('/api', async (req, res, next) => {
+  app.post('/api', fillLocals, async (req, res, next) => {
     try {
-      res.send(await handleRequest(req.body as t.BackendToServerRequest));
+      res.send(await handleRequest(req.body as t.BackendToServerRequest, res.locals));
     } catch (error) {
       next(error);
     }
@@ -138,7 +138,7 @@ function initRoutes() {
 // End of express routes
 //==================================================
 
-async function handleRequest<Req extends t.BackendToServerRequest>(req: Req): Promise<t.ServerResponseFor<Req>> {
+async function handleRequest(req: t.BackendToServerRequest, locals: MyLocals): Promise<t.ServerResponse> {
   switch (req.type) {
     case 'account/join': {
       let { email, password, username } = req.credentials;
@@ -230,6 +230,22 @@ async function handleRequest<Req extends t.BackendToServerRequest>(req: Req): Pr
         },
       };
     }
+    case 'featured/get': {
+      const { dbUser } = locals;
+
+      const dbSessionSummaries = db
+        .prepare(`SELECT * FROM session_summaries WHERE author != ? ORDER BY likes DESC LIMIT 100`)
+        .all(dbUser?.username) as t.DBSessionSummary[];
+
+      const sessionSummaries = dbSessionSummariesToSessionSummaries(dbSessionSummaries);
+
+      return {
+        type: 'sessionSummaries',
+        sessionSummaries,
+      };
+    }
+    default:
+      lib.unreachable(req);
   }
 }
 
@@ -329,26 +345,44 @@ async function handleDownloadSession(req: express.Request, res: express.Response
 
 function fetchSessionSummary(id: string): t.SessionSummary {
   const dbSessionSummary = db.prepare(`SELECT * FROM session_summaries WHERE id = ?`).get(id) as t.DBSessionSummary;
-  return {
-    id: dbSessionSummary.id,
-    title: dbSessionSummary.title,
-    description: dbSessionSummary.description,
-    author: fetchUserSummary(dbSessionSummary.author),
-    duration: dbSessionSummary.duration,
-    views: dbSessionSummary.views,
-    likes: dbSessionSummary.likes,
-    publishTimestamp: dbSessionSummary.publish_timestamp,
-    modificationTimestamp: dbSessionSummary.modification_timestamp,
-    forkedFrom: dbSessionSummary.forked_from,
-    published: true,
-    toc: [],
-  };
+  return dbSessionSummaryToSessionSummary(dbSessionSummary);
 }
 
-function fetchUserSummary(username: string): t.UserSummary {
-  const dbUser = db.prepare(`SELECT * FROM users WHERE username = ?`).get(username) as t.DBUser;
-  assert(dbUser);
-  return lib.dbUserToUserSummary(dbUser);
+function dbSessionSummariesToSessionSummaries(dbSessionSummaries: t.DBSessionSummary[]): t.SessionSummary[] {
+  const authors = fetchUserSummaries(dbSessionSummaries.map(s => s.author));
+  const pairs = _.zip(dbSessionSummaries, authors);
+
+  return pairs.map(([s, author]) => {
+    assert(s);
+    assert(author);
+    return {
+      id: s.id,
+      title: s.title,
+      description: s.description,
+      author,
+      duration: s.duration,
+      views: s.views,
+      likes: s.likes,
+      publishTimestamp: s.publish_timestamp,
+      modificationTimestamp: s.modification_timestamp,
+      forkedFrom: s.forked_from,
+      published: true,
+      toc: [],
+    };
+  });
+}
+
+function dbSessionSummaryToSessionSummary(dbSessionSummary: t.DBSessionSummary): t.SessionSummary {
+  return dbSessionSummariesToSessionSummaries([dbSessionSummary])[0];
+}
+
+function fetchUserSummaries(usernames: string[]): t.UserSummary[] {
+  const dbUsers = db
+    .prepare(`SELECT * FROM users WHERE username IN (${_.times(usernames.length, () => '?').join(',')})`)
+    .all(usernames) as t.DBUser[];
+  assert(dbUsers.length === usernames.length);
+  const dbUsersMap = _.keyBy(dbUsers, 'username');
+  return usernames.map(username => lib.dbUserToUserSummary(dbUsersMap[username]));
 }
 
 async function fillLocals(req: express.Request, res: express.Response, next: express.NextFunction) {

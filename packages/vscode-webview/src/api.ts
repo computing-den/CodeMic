@@ -25,10 +25,10 @@ export type PostMessageOptions = {
 export default async function postMessage<Req extends t.FrontendRequest>(
   req: Req,
   options?: PostMessageOptions,
-): Promise<t.BackendResponseFor<Req>> {
+): Promise<t.ExtractResponse<t.FrontendToBackendReqRes, Req>> {
   const performDefaultActions = options?.performDefaultActions ?? true;
 
-  const res = (await bus.post(req)) as t.BackendResponseFor<Req> | t.ErrorResponse;
+  const res = (await bus.post(req)) as t.BackendResponse;
 
   if (res.type === 'error') {
     throw new Error(`Got error for request ${JSON.stringify(req)}`);
@@ -45,7 +45,7 @@ export default async function postMessage<Req extends t.FrontendRequest>(
     }
   }
 
-  return res;
+  return res as any;
 }
 
 async function postAudioEvent(event: t.FrontendAudioEvent) {
