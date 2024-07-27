@@ -12,7 +12,7 @@ export type CommonProps = {
   sessionSummary: t.SessionSummary;
 };
 export type ForListProps = CommonProps & {
-  history?: t.SessionHistoryItem;
+  history?: t.SessionHistory;
 };
 export type ListItemProps = ForListProps & {
   // onOpen: (id: string) => unknown;
@@ -93,7 +93,8 @@ export class SessionSummaryListItem extends Component<ListItemProps> {
         postMessage({
           type: 'recorder/open',
           sessionId: this.props.sessionSummary.id,
-          fork: { clock: this.props.sessionSummary.duration },
+          clock: this.props.sessionSummary.duration,
+          fork: true,
         }),
     },
     {
@@ -130,14 +131,14 @@ export class SessionSummaryListItem extends Component<ListItemProps> {
 
 export type SessionSummaryListProps = {
   sessionSummaries: t.SessionSummary[];
-  history: t.SessionHistory;
+  history: t.SessionsHistory;
   className?: string;
 };
-type SHPair = [t.SessionSummary, t.SessionHistoryItem];
+type SHPair = [t.SessionSummary, t.SessionHistory];
 
 export class SessionSummaryList extends Component<SessionSummaryListProps> {
   render() {
-    const iteratee = ([s, h]: [t.SessionSummary, t.SessionHistoryItem]) =>
+    const iteratee = ([s, h]: [t.SessionSummary, t.SessionHistory]) =>
       (h && lib.getSessionHistoryItemLastOpenTimestamp(h)) || '';
     let pairs: SHPair[] = _.map(this.props.sessionSummaries, s => [s, this.props.history[s.id]]);
     pairs = _.orderBy(pairs, iteratee, 'desc');

@@ -58,11 +58,11 @@ export default class Welcome extends Component<Props> {
 type SessionsSectionProps = {
   title: string;
   sessionSummaries: t.SessionSummary[];
-  history: t.SessionHistory;
+  history: t.SessionsHistory;
   bordered?: boolean;
 };
 
-type SessionAndHistory = { sessionSummary: t.SessionSummary; history?: t.SessionHistoryItem };
+type SessionAndHistory = { sessionSummary: t.SessionSummary; history?: t.SessionHistory };
 
 class SessionsSection extends Component<SessionsSectionProps> {
   render() {

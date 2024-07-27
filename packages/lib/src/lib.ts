@@ -98,7 +98,7 @@ export function formatTimeSeconds(time: number, full: boolean = false): string {
   return h || full ? `${hStr}:${mStr}:${sStr}` : `${mStr}:${sStr}`;
 }
 
-export function getSessionHistoryItemLastOpenTimestamp(h: t.SessionHistoryItem): string | undefined {
+export function getSessionHistoryItemLastOpenTimestamp(h: t.SessionHistory): string | undefined {
   return _.max([h.lastRecordedTimestamp, h.lastWatchedTimestamp]);
 }
 

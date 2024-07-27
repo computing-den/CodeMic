@@ -3,7 +3,7 @@ import assert from 'assert';
 import _ from 'lodash';
 import { v4 as uuid } from 'uuid';
 import { types as t, bus as b } from '@codecast/lib';
-import userPaths from './user_paths.js';
+import { basePaths } from './paths.js';
 
 class WebviewProvider implements vscode.WebviewViewProvider {
   static readonly viewType = 'codecast-view';
@@ -32,7 +32,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
 
       // Allow access to files from these directories
-      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, '..', '..'), vscode.Uri.file(userPaths.data)],
+      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, '..', '..'), vscode.Uri.file(basePaths.data)],
     };
 
     webviewView.webview.html = this.getHtmlForWebview();
@@ -40,13 +40,13 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     this.onViewOpen();
   }
 
-  hasView(): boolean {
-    return Boolean(this.view);
-  }
+  // hasView(): boolean {
+  //   return Boolean(this.view);
+  // }
 
-  show() {
-    this.view?.show();
-  }
+  // show() {
+  //   this.view?.show();
+  // }
 
   async postMessage(req: t.BackendRequest): Promise<t.FrontendResponse> {
     assert(this.bus);
@@ -58,9 +58,9 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     return res;
   }
 
-  asWebviewUri(uri: vscode.Uri): vscode.Uri | undefined {
-    return this.view?.webview.asWebviewUri(uri);
-  }
+  // asWebviewUri(uri: vscode.Uri): vscode.Uri | undefined {
+  //   return this.view?.webview.asWebviewUri(uri);
+  // }
 
   private postParcel(parcel: b.Parcel): Promise<boolean> {
     assert(this.view);
@@ -68,7 +68,8 @@ class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private getHtmlForWebview() {
-    const getPath = (...args: string[]) => this.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, ...args))!;
+    const getPath = (...args: string[]) =>
+      this.view!.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, ...args));
 
     const resourcesUri = getPath('..', 'vscode-webview', 'resources');
     const webviewJs = getPath('..', 'vscode-webview', 'out', 'webview.js');

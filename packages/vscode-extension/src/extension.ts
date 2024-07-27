@@ -4,14 +4,16 @@ import * as vscode from 'vscode';
 
 let codecast: Codecast;
 
-export async function activate(context: vscode.ExtensionContext) {
+export async function activate(extensionContext: vscode.ExtensionContext) {
   try {
-    codecast = await Codecast.fromContext(context);
+    codecast = await Codecast.fromExtensionContext(extensionContext);
     // await codecast.restoreStateAfterRestart();
 
     // debug
     //@ts-ignore
-    globalThis.context = context;
+    globalThis.extensionContext = extensionContext;
+    //@ts-ignore
+    globalThis.codecast = codecast;
     //@ts-ignore
     globalThis.vscode = vscode;
     //@ts-ignore

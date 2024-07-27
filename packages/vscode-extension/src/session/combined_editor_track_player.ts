@@ -1,35 +1,39 @@
-import { types as t, path, lib, editorTrack as et } from '@codecast/lib';
-import VscEditorWorkspace from './vsc_editor_workspace.js';
+import { types as t, path, lib, internalEditorTrackCtrl as ietc } from '@codecast/lib';
 import VscEditorEventStepper from './vsc_editor_event_stepper.js';
-import Db, { type WriteOptions } from './db.js';
+import type Session from './session.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
-import fs from 'fs';
 
-class VscEditorPlayer implements t.EditorPlayer {
-  isPlaying = false;
+class CombinedEditorTrackPlayer {
+  playing = false;
   onError?: (error: Error) => any;
 
-  get track(): et.EditorTrack {
-    return this.workspace.editorTrack;
-  }
-
-  private vscEditorEventStepper = new VscEditorEventStepper(this.workspace);
+  private session: Session;
   private disposables: vscode.Disposable[] = [];
   private updateQueue = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
-  constructor(public context: vscode.ExtensionContext, public workspace: VscEditorWorkspace) {}
+  get internalCtrl(): ietc.InternalEditorTrackCtrl {
+    return this.session.ctrls!.internalEditorTrackCtrl;
+  }
+
+  get vscEditorEventStepper(): VscEditorEventStepper {
+    return this.session.ctrls!.vscEditorEventStepper;
+  }
+
+  constructor(session: Session) {
+    this.session = session;
+  }
 
   play() {
-    if (this.isPlaying) return;
-    this.isPlaying = true;
+    if (this.playing) return;
+    this.playing = true;
 
     // ignore user input
     {
       const disposable = vscode.commands.registerCommand('type', (e: { text: string }) => {
         const uri = vscode.window.activeTextEditor?.document.uri;
-        if (!uri || !this.workspace.shouldRecordVscUri(uri)) {
+        if (!uri || !this.session.shouldRecordVscUri(uri)) {
           // approve the default type command
           vscode.commands.executeCommand('default:type', e);
         }
@@ -38,12 +42,12 @@ class VscEditorPlayer implements t.EditorPlayer {
     }
 
     // register disposables
-    this.context.subscriptions.push(...this.disposables);
+    this.session.context.extension.subscriptions.push(...this.disposables);
   }
 
   pause() {
-    if (!this.isPlaying) return;
-    this.isPlaying = false;
+    if (!this.playing) return;
+    this.playing = false;
     this.dispose();
   }
 
@@ -55,9 +59,9 @@ class VscEditorPlayer implements t.EditorPlayer {
    * Assumes that the editor track is modified externally.
    */
   setClock(clock: number) {
-    assert(this.updateQueue.length === 0, 'VscEditorPlayer setClock requires updateQueue to be empty');
-    const seekData = this.workspace.editorTrack.getSeekData(clock);
-    this.workspace.editorTrack.finalizeSeek(seekData);
+    assert(this.updateQueue.length === 0, 'CombinedEditorTrackPlayer setClock requires updateQueue to be empty');
+    const seekData = this.internalCtrl.getSeekData(clock);
+    this.internalCtrl.finalizeSeek(seekData);
   }
 
   private dispose() {
@@ -82,23 +86,22 @@ class VscEditorPlayer implements t.EditorPlayer {
   }
 
   private async updateImmediately(clock: number) {
-    const { editorTrack } = this.workspace;
-    const seekData = editorTrack.getSeekData(clock);
+    const seekData = this.internalCtrl.getSeekData(clock);
 
     if (seekData.events.length > 10) {
       console.log('updateImmediately: applying wholesale', seekData);
-      // Update by seeking the internal editorTrack first, then syncing the editorTrack to vscode and disk
+      // Update by seeking the internal this.internalCtrl first, then syncing the this.internalCtrl to vscode and disk
       const uriSet: t.UriSet = {};
-      await editorTrack.seek(seekData, uriSet);
-      await this.workspace.syncEditorTrackToVscodeAndDisk(Object.keys(uriSet));
+      await this.internalCtrl.seek(seekData, uriSet);
+      await this.session.syncInternalEditorTrackToVscodeAndDisk(Object.keys(uriSet));
     } else {
       console.log('updateImmediately: applying one at a time', seekData);
       // Apply updates one at a time
       for (let i = 0; i < seekData.events.length; i++) {
-        await editorTrack.applySeekStep(seekData, i);
+        await this.internalCtrl.applySeekStep(seekData, i);
         await this.vscEditorEventStepper.applySeekStep(seekData, i);
       }
-      editorTrack.finalizeSeek(seekData);
+      this.internalCtrl.finalizeSeek(seekData);
       this.vscEditorEventStepper.finalizeSeek(seekData);
     }
   }
@@ -108,4 +111,4 @@ class VscEditorPlayer implements t.EditorPlayer {
   };
 }
 
-export default VscEditorPlayer;
+export default CombinedEditorTrackPlayer;

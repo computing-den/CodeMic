@@ -25,7 +25,7 @@ export default class Recorder extends Component<Props> {
   state = {
     // The only time when the recorder screen is opened with already loadned recorder,
     // is right after a vscode restart due to the change of workspace folders.
-    tabId: this.props.recorder.isLoaded ? 'editor-view' : 'details-view',
+    tabId: this.props.recorder.loaded ? 'editor-view' : 'details-view',
   };
 
   tabs = [
@@ -34,7 +34,7 @@ export default class Recorder extends Component<Props> {
   ];
 
   tabChanged = async (tabId: string) => {
-    if (tabId === 'editor-view' && !this.props.recorder.isLoaded) {
+    if (tabId === 'editor-view' && !this.props.recorder.loaded) {
       await this.loadRecorder();
     } else {
       this.setState({ tabId });
@@ -43,7 +43,7 @@ export default class Recorder extends Component<Props> {
 
   loadRecorder = async () => {
     const res = await postMessage({ type: 'recorder/load' });
-    if (res.store.recorder?.isLoaded) {
+    if (res.store.recorder?.loaded) {
       this.setState({ tabId: 'editor-view' });
     }
   };
@@ -89,10 +89,10 @@ export default class Recorder extends Component<Props> {
   // };
 
   // enableOrDisableMedia() {
-  //   const isRecording = Boolean(this.props.recorder.status === t.TrackPlayerStatus.Running);
-  //   if (isRecording !== this.media.isActive()) {
+  //   const recording = Boolean(this.props.recorder.status === t.TrackPlayerStatus.Running);
+  //   if (recording !== this.media.isActive()) {
   //     this.media.timeMs = this.props.recorder.clock * 1000;
-  //     if (isRecording) {
+  //     if (recording) {
   //       this.media.start();
   //     } else {
   //       this.media.pause();
@@ -107,13 +107,19 @@ export default class Recorder extends Component<Props> {
   //   }
   // }
 
+  loadOrDisposeAudioTracks() {
+    const { audioTracks, webviewUris } = this.props.recorder;
+    if (audioTracks && webviewUris) {
+      mediaApi.loadOrDisposeAudioTracks(audioTracks, webviewUris);
+    }
+  }
+
   componentDidUpdate() {
-    mediaApi.loadOrDisposeAudioTracks(this.props.recorder.audioTracks, this.props.recorder.webviewUris);
+    this.loadOrDisposeAudioTracks();
   }
 
   componentDidMount() {
-    console.log('Recorder componentDidMount');
-    mediaApi.loadOrDisposeAudioTracks(this.props.recorder.audioTracks, this.props.recorder.webviewUris);
+    this.loadOrDisposeAudioTracks();
   }
 
   componentWillUnmount() {
@@ -186,7 +192,7 @@ export default class Recorder extends Component<Props> {
     //   throw new Error('Recorder:render(): no session');
     // }
 
-    // const toggleButton = session.isRecording ? (
+    // const toggleButton = session.recording ? (
     //   <vscode-button onClick={this.pauseRecorder} appearance="secondary">
     //     <div className="codicon codicon-debug-pause" />
     //   </vscode-button>
@@ -223,9 +229,9 @@ class DetailsView extends Component<DetailsViewProps> {
     await postMessage({ type: 'recorder/update', changes });
   };
 
-  rootChanged = async (root: string) => {
-    await postMessage({ type: 'recorder/update', changes: { root } });
-  };
+  // rootChanged = async (root: string) => {
+  //   await postMessage({ type: 'recorder/update', changes: { root } });
+  // };
 
   save = async () => {
     await postMessage({ type: 'recorder/save' });
@@ -248,7 +254,7 @@ class DetailsView extends Component<DetailsViewProps> {
           value={ss.title}
           onInput={this.titleChanged}
           placeholder="The title of this project"
-          autoFocus={!recorder.isLoaded}
+          autoFocus={!recorder.loaded}
         >
           Title
         </vscode-text-area>
@@ -262,26 +268,26 @@ class DetailsView extends Component<DetailsViewProps> {
         >
           Description
         </vscode-text-area>
-        <PathField
+        {/*<PathField
           className="subsection"
           onChange={this.rootChanged}
-          value={this.props.recorder.root}
+          value={this.props.recorder.workspace}
           label="Workspace"
           pickTitle="Select workspace folder"
-          disabled={recorder.isLoaded}
-        />
+          disabled={recorder.loaded}
+          />*/}
         <p className="subsection help">
           Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
         </p>
-        <vscode-button className="subsection" onClick={this.save} disabled={recorder.isNew}>
+        <vscode-button className="subsection" onClick={this.save} disabled={!recorder.onDisk}>
           Save
         </vscode-button>
-        <vscode-button className="subsection" onClick={this.publish} disabled={recorder.isNew}>
+        <vscode-button className="subsection" onClick={this.publish} disabled={!recorder.onDisk}>
           Publish
         </vscode-button>
-        {!recorder.isLoaded && (
+        {!recorder.loaded && (
           <vscode-button className="subsection" onClick={onLoadRecorder} autoFocus>
-            {recorder.isNew ? 'Scan workspace to start' : 'Load project into workspace'}
+            {recorder.onDisk ? 'Load project into workspace' : 'Scan workspace to start'}
             <span className="codicon codicon-chevron-right va-top m-left_small" />
           </vscode-button>
         )}
@@ -337,7 +343,7 @@ class EditorView extends Component<EditorViewProps> {
     const { sessionSummary: ss } = recorder;
     let primaryAction: MT.PrimaryAction;
 
-    if (recorder.isRecording) {
+    if (recorder.recording) {
       primaryAction = {
         type: 'recorder/pause',
         title: 'Record',
@@ -349,13 +355,13 @@ class EditorView extends Component<EditorViewProps> {
       primaryAction = {
         type: 'recorder/record',
         title: 'Record',
-        disabled: recorder.isPlaying,
+        disabled: recorder.playing,
         onClick: () => onRecord(this.state.anchor?.clock),
       };
     }
 
     const toolbarActions = [
-      recorder.isPlaying
+      recorder.playing
         ? {
             title: 'Pause',
             icon: 'codicon-debug-pause',
@@ -366,13 +372,13 @@ class EditorView extends Component<EditorViewProps> {
         : {
             title: 'Play',
             icon: 'codicon-play',
-            disabled: recorder.isRecording,
+            disabled: recorder.recording,
             onClick: () => onPlay(this.state.anchor?.clock),
           },
       {
         title: 'Add audio',
         icon: 'codicon-mic',
-        disabled: recorder.isPlaying || recorder.isRecording,
+        disabled: recorder.playing || recorder.recording,
         onClick: this.insertAudio,
       },
     ];
@@ -538,7 +544,7 @@ class Timeline extends Component<TimelineProps> {
       <div id="timeline" className="subsection">
         <div className="timeline-body">
           <AudioTracksUI
-            tracks={recorder.audioTracks}
+            tracks={recorder.audioTracks ?? []}
             timelineDuration={timelineDuration}
             activeTrackId={activeTrackId}
             onClick={this.audioTrackClicked}

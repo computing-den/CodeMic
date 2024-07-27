@@ -1,0 +1,116 @@
+
+
+#+begin_src
+
+Why do we need InternalEditorTrackCtrl in Session instead of VscEditorTrackCtrlForPlayer/Recorder or SessionTracksCtrl?
+SessionTracksCtrl shouldn't be in lib at all.
+Then get rid of t.EditorTrackCtrlForRecorder/Player.
+Move the following to SessionTracksCtrl:
+
+loadInternalEditorTrack(seekClock, cutClock)  (without sync to vscode and disk)
+syncInternalEditorTrackToVscodeAndDisk()
+saveAllRelevantVscTabs()
+scanDirAndVsc()
+  makeSnapshotFromDirAndVsc
+
+
+
+Session
+  SessionTracksCtrl
+    InternalEditorTrackCtrl
+      SessionI
+    AudioTrackCtrl
+      Session or Context (needs AudioTrack JSON and postAudioMessage function)
+    CombinedEditorTrackRecorder
+      Session (needs InternalEditorTrackCtrl)
+    CombinedEditorTrackPlayer
+      Session (needs InternalEditorTrackCtrl)
+
+
+
+SessionI (lib)
+  - workspace
+  - SessionSummary
+  - SessionBody?
+  - readFile
+  - copyToBlob
+
+
+_________________________
+
+SessionTracksCtrl  (lib)
+ - SessionI (needs its SessionSummary JSON)
+ - AudioTrackCtrl
+ - EditorTrackCtrlForPlayer
+ - EditorTrackCtrlForRecorder
+
+Session compatible with t.Session
+  - SessionSummary JSON
+  - SessionBody JSON
+  - InternalEditorTrackCtrl
+
+InternalEditorTrackCtrl implements EditorEventStepper   (lib)
+  - SessionI (needs its body's EditorTrack JSON)
+
+CombinedEditorTrackCtrlForRecorder implements EditorTrackCtrlForRecorder
+  - Session (needs its InternalEditorTrackCtrl)
+
+CombinedEditorTrackCtrlForPlayer implements EditorTrackCtrlForPlayer
+  - Session (needs its InternalEditorTrackCtrl)
+
+AudioTrackCtrl implements t.AudioTrackCtrl (lib)
+  - SessionI
+  - AudioTrack or ID of audio track inside SessionI
+
+VscEditorEventStepper implements EditorEventStepper
+  - Session
+
+
+SessionBody JSON (lib)
+  - EditorTrack JSON
+  - AudioTrack[] JSON
+
+Recorder
+  - Session (needs its SessionTracksCtrl)
+
+
+
+
+#+end_src
+
+______________________________________________-
+
+#+begin_src 
+
+CombinedEditorTrackRecorder implements EditorRecorder
+  - EditorTrack
+
+CombinedEditorTrackPlayer implements EditorPlayer
+  - EditorTrack
+
+VscEditorEventStepper implements EditorEventStepper
+
+EditorTrack implements EditorEventStepper   (lib)
+  - SessionIO
+  - EditorTrack JSON (inlined so the class acts like t.EditorTrack)
+
+Session
+  - SessionSummary JSON
+  - SessionBody JSON
+  - EditorTrack (class but compatible with JSON)
+
+Recorder
+  - SessionCtrl
+
+AudioCtrl implements t.AudioCtrl
+  - SessionIO
+  - AudioTrack JSON
+
+SessionCtrl  (lib)
+ - SessionSummary (JSON)
+ - AudioCtrl
+ - EditorPlayer
+ - EditorRecorder
+
+
+#+end_src

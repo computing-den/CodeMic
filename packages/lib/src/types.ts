@@ -34,9 +34,9 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'player/play' }; response: StoreResponse }
   | { request: { type: 'player/pause' }; response: StoreResponse }
   | { request: { type: 'player/seek'; clock: number }; response: StoreResponse }
-  | { request: { type: 'player/update'; changes: PlayerUpdate }; response: StoreResponse }
+  // | { request: { type: 'player/update'; changes: PlayerUpdate }; response: StoreResponse }
   | {
-      request: { type: 'recorder/open'; sessionId?: string; fork?: { clock: number } };
+      request: { type: 'recorder/open'; sessionId?: string; clock?: number; fork?: boolean };
       response: StoreResponse;
     }
   | { request: { type: 'recorder/load' }; response: StoreResponse }
@@ -54,7 +54,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'getStore' }; response: StoreResponse }
   | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }
   | { request: { type: 'confirmForkFromPlayer'; clock: number }; response: BooleanResponse }
-  | { request: { type: 'confirmEditFromPlayer' }; response: BooleanResponse }
+  | { request: { type: 'confirmEditFromPlayer'; clock: number }; response: BooleanResponse }
   | { request: { type: 'test'; value: any }; response: StoreResponse }
   | { request: { type: 'audio'; event: FrontendAudioEvent }; response: OKResponse };
 
@@ -171,7 +171,6 @@ export enum Screen {
   Player,
 }
 
-// A separate field for each page
 export type Store = {
   screen: Screen;
   user?: User;
@@ -225,53 +224,53 @@ export type AccountUpdate = Partial<AccountState>;
 export type WelcomeState = {
   workspace: SessionSummary[];
   featured: SessionSummary[];
-  history: SessionHistory;
+  history: SessionsHistory;
 };
 
 export type RecorderState = {
-  isNew: boolean;
-  isLoaded: boolean;
-  isRecording: boolean;
-  isPlaying: boolean;
+  onDisk: boolean;
+  loaded: boolean;
+  recording: boolean;
+  playing: boolean;
   clock: number;
   sessionSummary: SessionSummary;
-  root?: string;
-  fork?: { clock: number };
-  history?: SessionHistoryItem;
-  audioTracks: AudioTrack[];
-  webviewUris: WebviewUris;
+  workspace?: string;
+  // fork?: { clock: number };
+  history?: SessionHistory;
+  audioTracks?: AudioTrack[];
+  webviewUris?: WebviewUris;
 };
 
 export type RecorderUpdate = {
   title?: string;
   description?: string;
-  root?: string;
+  workspace?: string;
 };
 
 export type PlayerState = {
-  isLoaded: boolean;
-  isPlaying: boolean;
+  loaded: boolean;
+  playing: boolean;
   sessionSummary: SessionSummary;
   clock: number;
-  root?: string;
-  history?: SessionHistoryItem;
-  audioTracks: AudioTrack[];
-  webviewUris: WebviewUris;
+  workspace?: string;
+  history?: SessionHistory;
+  audioTracks?: AudioTrack[];
+  webviewUris?: WebviewUris;
 };
 
-export type PlayerUpdate = {
-  root?: string;
-  // clock?: number;
-};
+// export type PlayerUpdate = {
+//   workspace?: string;
+//   // clock?: number;
+// };
 
-export type Setup = {
-  sessionSummary: SessionSummary;
-  baseSessionSummary?: SessionSummary;
-  fork?: { clock: number };
-  root?: string;
-  isNew?: boolean;
-  isDirty?: boolean;
-};
+// export type Setup = {
+//   sessionSummary: SessionSummary;
+//   baseSessionSummary?: SessionSummary;
+//   fork?: { clock: number };
+//   workspace?: string;
+//   isNew?: boolean;
+//   dirty?: boolean;
+// };
 
 export type TocItem = { title: string; clock: number };
 
@@ -291,7 +290,7 @@ export type SessionSummary = {
   forkedFrom?: string;
 };
 
-export type SessionSummaryMap = { [key: string]: SessionSummary };
+export type SessionSummaryMap = { [key: string]: SessionSummary | undefined };
 
 export type DBSessionSummary = {
   id: string;
@@ -306,8 +305,8 @@ export type DBSessionSummary = {
   forked_from?: string;
 };
 
-export type Session = {
-  editorTrack: EditorTrack;
+export type SessionBody = {
+  editorTrack: InternalEditorTrack;
   audioTracks: AudioTrack[];
 };
 
@@ -316,8 +315,8 @@ export type ClockRange = {
   end: number;
 };
 
-export type EditorTrack = {
-  initSnapshot: EditorTrackSnapshot;
+export type InternalEditorTrack = {
+  initSnapshot: InternalEditorTrackSnapshot;
   events: EditorEvent[];
   defaultEol: EndOfLine;
 };
@@ -335,51 +334,39 @@ export type AudioTrack = RangedTrack & { file: File };
 
 export type WebviewUris = { [key: string]: Uri };
 
-export enum TrackCtrlStatus {
-  Init,
-  Error,
-  Running,
-  Paused,
-}
+// export interface EditorPlayer {
+//   readonly track: InternalEditorTrack;
+//   readonly playing: boolean;
+//   onError?: (error: Error) => any;
 
-export type SessionCtrlMode = {
-  status: TrackCtrlStatus;
-  recordingEditor: boolean;
-};
+//   play(): void;
+//   pause(): void;
+//   seek(clock: number): void;
+//   setClock(clock: number): void;
+// }
 
-export interface EditorPlayer {
-  readonly track: EditorTrack;
-  readonly isPlaying: boolean;
-  onError?: (error: Error) => any;
+// export interface EditorRecorder {
+//   readonly track: InternalEditorTrack;
+//   readonly recording: boolean;
+//   onChange?: () => any;
+//   onError?: (error: Error) => any;
 
-  play(): void;
-  pause(): void;
-  seek(clock: number): void;
-  setClock(clock: number): void;
-}
+//   record(): void;
+//   pause(): void;
+//   setClock(clock: number): void;
+// }
 
-export interface EditorRecorder {
-  readonly track: EditorTrack;
-  readonly isRecording: boolean;
-  onChange?: () => any;
-  onError?: (error: Error) => any;
+// export interface AudioCtrl {
+//   readonly running: boolean;
+//   readonly track: AudioTrack;
+//   onError?: (error: Error) => any;
 
-  record(): void;
-  pause(): void;
-  setClock(clock: number): void;
-}
-
-export interface AudioCtrl {
-  readonly isRunning: boolean;
-  readonly track: AudioTrack;
-  onError?: (error: Error) => any;
-
-  load(): void;
-  play(): void;
-  pause(): void;
-  seek(clock: number): void;
-  handleAudioEvent(e: FrontendAudioEvent): void;
-}
+//   load(): void;
+//   play(): void;
+//   pause(): void;
+//   seek(clock: number): void;
+//   handleAudioEvent(e: FrontendAudioEvent): void;
+// }
 
 // export interface TrackPlayer {
 //   name: string;
@@ -410,7 +397,7 @@ export interface AudioCtrl {
 //   playbackRate: number;
 // };
 
-export type EditorTrackSnapshot = {
+export type InternalEditorTrackSnapshot = {
   worktree: Worktree;
   textEditors: TextEditor[];
   activeTextEditorUri?: Uri;
@@ -425,10 +412,13 @@ export type OpenDialogOptions = {
   title?: string;
 };
 
-export interface SessionIO {
-  init(): Promise<void>;
+export interface Session {
+  workspace: AbsPath;
+  summary: SessionSummary;
+  body?: SessionBody;
+  loaded: boolean;
   readFile(file: File): Promise<Uint8Array>;
-  copyLocalFile(src: AbsPath, sha1: string): Promise<void>;
+  copyToBlob(src: AbsPath, sha1: string): Promise<void>;
 }
 
 export interface EditorEventStepper {
@@ -507,7 +497,7 @@ export enum Direction {
   Backwards,
 }
 
-export type UriSet = { [key: Uri]: true };
+export type UriSet = { [key: Uri]: true | undefined };
 
 export type ContentChange = {
   range: Range;
@@ -561,17 +551,17 @@ export type TextEditor = {
 export type EndOfLine = '\n' | '\r\n';
 
 export type Settings = {
-  history: SessionHistory;
+  history: SessionsHistory;
 };
 
-export type SessionHistory = { [key: string]: SessionHistoryItem };
+export type SessionsHistory = { [key: string]: SessionHistory };
 
-export type SessionHistoryItem = {
+export type SessionHistory = {
   id: string;
   lastRecordedTimestamp?: string;
   lastWatchedTimestamp?: string;
   lastWatchedClock?: number;
-  root: AbsPath;
+  workspace: AbsPath;
 };
 
 export type SeekData = { events: EditorEvent[]; direction: Direction; i: number; clock: number };

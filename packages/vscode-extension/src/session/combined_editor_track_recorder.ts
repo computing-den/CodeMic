@@ -1,29 +1,33 @@
-import { types as t, path, lib, editorTrack as et } from '@codecast/lib';
-import VscEditorWorkspace from './vsc_editor_workspace.js';
+import { types as t, path, lib, internalEditorTrackCtrl as ietc } from '@codecast/lib';
+import type Session from './session.js';
 import * as vscode from 'vscode';
+
 import _ from 'lodash';
 
 const SCROLL_LINES_TRIGGER = 2;
 
-class VscEditorRecorder implements t.EditorRecorder {
-  isRecording = false;
+class CombinedEditorTrackRecorder {
+  recording = false;
   onChange?: () => any;
   onError?: (error: Error) => any;
 
-  get track(): et.EditorTrack {
-    return this.workspace.editorTrack;
-  }
-
+  private session: Session;
   private clock = 0;
   private disposables: vscode.Disposable[] = [];
   private scrolling: boolean = false;
   private scrollStartRange?: t.Range;
 
-  constructor(public context: vscode.ExtensionContext, public workspace: VscEditorWorkspace) {}
+  get internalCtrl(): ietc.InternalEditorTrackCtrl {
+    return this.session.ctrls!.internalEditorTrackCtrl;
+  }
+
+  constructor(session: Session) {
+    this.session = session;
+  }
 
   record() {
-    if (this.isRecording) return;
-    this.isRecording = true;
+    if (this.recording) return;
+    this.recording = true;
 
     // listen for open document events
     {
@@ -76,12 +80,12 @@ class VscEditorRecorder implements t.EditorRecorder {
     }
 
     // register disposables
-    this.context.subscriptions.push(...this.disposables);
+    this.session.context.extension.subscriptions.push(...this.disposables);
   }
 
   pause() {
-    if (!this.isRecording) return;
-    this.isRecording = false;
+    if (!this.recording) return;
+    this.recording = false;
 
     this.dispose();
   }
@@ -99,9 +103,9 @@ class VscEditorRecorder implements t.EditorRecorder {
     vscTextDocument: vscode.TextDocument,
     vscContentChanges: readonly vscode.TextDocumentContentChangeEvent[],
   ) {
-    if (!this.workspace.shouldRecordVscUri(vscTextDocument.uri)) return;
+    if (!this.session.shouldRecordVscUri(vscTextDocument.uri)) return;
 
-    const uri = this.workspace.uriFromVsc(vscTextDocument.uri);
+    const uri = this.session.uriFromVsc(vscTextDocument.uri);
     console.log(`adding textChange for ${uri}`);
 
     if (vscContentChanges.length === 0) {
@@ -112,10 +116,10 @@ class VscEditorRecorder implements t.EditorRecorder {
     // Here, we assume that it is possible to get a textChange without a text editor
     // because vscode's event itself does not provide a text editor.
 
-    const irTextDocument = this.track.getTextDocumentByUri(uri);
+    const irTextDocument = this.internalCtrl.getTextDocumentByUri(uri);
     if (irTextDocument) {
       const irContentChanges = vscContentChanges.map(({ range: vscRange, text }) => {
-        const range = this.workspace.rangeFromVsc(vscRange);
+        const range = this.session.rangeFromVsc(vscRange);
         const [revRange, revText] = irTextDocument.applyContentChange(range, text, true);
         return { range, text, revRange, revText };
       });
@@ -133,28 +137,28 @@ class VscEditorRecorder implements t.EditorRecorder {
   }
 
   private async openTextDocument(vscTextDocument: vscode.TextDocument) {
-    if (!this.workspace.shouldRecordVscUri(vscTextDocument.uri)) return;
+    if (!this.session.shouldRecordVscUri(vscTextDocument.uri)) return;
 
-    const uri = this.workspace.uriFromVsc(vscTextDocument.uri);
+    const uri = this.session.uriFromVsc(vscTextDocument.uri);
     console.log(`adding openTextDocument for ${uri}`);
 
     await this.openTextDocumentByUri(vscTextDocument, uri);
   }
 
   private async showTextEditor(vscTextEditor: vscode.TextEditor) {
-    if (!this.workspace.shouldRecordVscUri(vscTextEditor.document.uri)) return;
+    if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
-    const uri = this.workspace.uriFromVsc(vscTextEditor.document.uri);
+    const uri = this.session.uriFromVsc(vscTextEditor.document.uri);
     console.log(`adding showTextEditor for ${uri}`);
 
-    const revUri = this.track.activeTextEditor?.document.uri;
-    const revSelections = this.track.activeTextEditor?.selections;
-    const revVisibleRange = this.track.activeTextEditor?.visibleRange;
+    const revUri = this.internalCtrl.activeTextEditor?.document.uri;
+    const revSelections = this.internalCtrl.activeTextEditor?.selections;
+    const revVisibleRange = this.internalCtrl.activeTextEditor?.visibleRange;
 
     // Possibly inserts an openTextDocument or textChange event if the document wasn't found in internal editorTrack or
     // its contents were different.
     const irTextEditor = await this.openTextEditorHelper(vscTextEditor, uri);
-    this.track.activeTextEditor = irTextEditor;
+    this.internalCtrl.activeTextEditor = irTextEditor;
 
     this.pushEvent({
       type: 'showTextEditor',
@@ -169,20 +173,20 @@ class VscEditorRecorder implements t.EditorRecorder {
   }
 
   private select(vscTextEditor: vscode.TextEditor, selections: readonly vscode.Selection[]) {
-    if (!this.workspace.shouldRecordVscUri(vscTextEditor.document.uri)) return;
+    if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
-    const uri = this.workspace.uriFromVsc(vscTextEditor.document.uri);
+    const uri = this.session.uriFromVsc(vscTextEditor.document.uri);
     console.log(`adding select for ${uri}`);
     console.log(
       `visibleRange: ${vscTextEditor.visibleRanges[0].start.line}:${vscTextEditor.visibleRanges[0].end.line}`,
     );
 
-    const irTextEditor = this.track.getTextEditorByUri(uri);
+    const irTextEditor = this.internalCtrl.getTextEditorByUri(uri);
     const revSelections = irTextEditor.selections;
     const revVisibleRanges = irTextEditor.visibleRange;
     irTextEditor.select(
-      this.workspace.selectionsFromVsc(selections),
-      this.workspace.rangeFromVsc(vscTextEditor.visibleRanges[0]),
+      this.session.selectionsFromVsc(selections),
+      this.session.rangeFromVsc(vscTextEditor.visibleRanges[0]),
     );
 
     this.pushEvent({
@@ -197,9 +201,9 @@ class VscEditorRecorder implements t.EditorRecorder {
   }
 
   private saveTextDocument(vscTextDocument: vscode.TextDocument) {
-    if (!this.workspace.shouldRecordVscUri(vscTextDocument.uri)) return;
+    if (!this.session.shouldRecordVscUri(vscTextDocument.uri)) return;
 
-    const uri = this.workspace.uriFromVsc(vscTextDocument.uri);
+    const uri = this.session.uriFromVsc(vscTextDocument.uri);
     console.log(`adding save for ${uri}`);
 
     this.pushEvent({
@@ -210,10 +214,10 @@ class VscEditorRecorder implements t.EditorRecorder {
   }
 
   private scroll(vscTextEditor: vscode.TextEditor, visibleRanges: readonly vscode.Range[]) {
-    if (!this.workspace.shouldRecordVscUri(vscTextEditor.document.uri)) return;
+    if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
-    const uri = this.workspace.uriFromVsc(vscTextEditor.document.uri);
-    const visibleRange = this.workspace.rangeFromVsc(visibleRanges[0]);
+    const uri = this.session.uriFromVsc(vscTextEditor.document.uri);
+    const visibleRange = this.session.rangeFromVsc(visibleRanges[0]);
     console.log(`visible range: ${visibleRange.start.line}:${visibleRange.end.line}`);
 
     if (!this.scrolling) {
@@ -228,7 +232,7 @@ class VscEditorRecorder implements t.EditorRecorder {
 
     console.log(`adding scroll for ${uri}`);
 
-    const irTextEditor = this.track.getTextEditorByUri(uri);
+    const irTextEditor = this.internalCtrl.getTextEditorByUri(uri);
     const revVisibleRange = irTextEditor.visibleRange;
     irTextEditor.scroll(visibleRange);
 
@@ -246,7 +250,7 @@ class VscEditorRecorder implements t.EditorRecorder {
       this.scrolling = false;
       this.scrollStartRange = undefined;
     }
-    this.track.events.push(e);
+    this.session.body!.editorTrack.events.push(e);
     this.onChange?.();
   }
 
@@ -261,17 +265,17 @@ class VscEditorRecorder implements t.EditorRecorder {
    * If worktree item has a document but its content is different from that of vscTextDocument,
    * a 'textChange' will be inserted on the entire document.
    *
-   * Assumes a valid uri which has already been approved by this.workspace.shouldRecordVscUri().
+   * Assumes a valid uri which has already been approved by this.session.shouldRecordVscUri().
    */
-  private async openTextDocumentByUri(vscTextDocument: vscode.TextDocument, uri: t.Uri): Promise<et.TextDocument> {
-    const isInWorktree = this.track.doesUriExist(uri);
-    let irTextDocument = this.track.findTextDocumentByUri(uri);
+  private async openTextDocumentByUri(vscTextDocument: vscode.TextDocument, uri: t.Uri): Promise<ietc.TextDocument> {
+    const isInWorktree = this.internalCtrl.doesUriExist(uri);
+    let irTextDocument = this.internalCtrl.findTextDocumentByUri(uri);
 
     let irText: string | undefined;
     const vscText = vscTextDocument.getText();
 
     if (isInWorktree) {
-      irText = new TextDecoder().decode(await this.track.getContentByUri(uri));
+      irText = new TextDecoder().decode(await this.internalCtrl.getContentByUri(uri));
     }
 
     if (irTextDocument && irText !== vscText) {
@@ -284,8 +288,8 @@ class VscEditorRecorder implements t.EditorRecorder {
         contentChanges: [{ range: irRange, text: vscText, revRange, revText }],
       });
     } else if (!irTextDocument) {
-      irTextDocument = this.workspace.textDocumentFromVsc(vscTextDocument, uri);
-      this.track.insertTextDocument(irTextDocument); // will insert into worktree as well
+      irTextDocument = this.session.textDocumentFromVsc(vscTextDocument, uri);
+      this.internalCtrl.insertTextDocument(irTextDocument); // will insert into worktree as well
       this.pushEvent({
         type: 'openTextDocument',
         clock: this.clock,
@@ -303,14 +307,14 @@ class VscEditorRecorder implements t.EditorRecorder {
    * It does not push a showTextEditor event but it might open the text document.
    * Then, it will create or update the internal text editor.
    */
-  private async openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri): Promise<et.TextEditor> {
-    const selections = this.workspace.selectionsFromVsc(vscTextEditor.selections);
-    const visibleRange = this.workspace.rangeFromVsc(vscTextEditor.visibleRanges[0]);
+  private async openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri): Promise<ietc.TextEditor> {
+    const selections = this.session.selectionsFromVsc(vscTextEditor.selections);
+    const visibleRange = this.session.rangeFromVsc(vscTextEditor.visibleRanges[0]);
     const textDocument = await this.openTextDocumentByUri(vscTextEditor.document, uri);
-    let textEditor = this.track.findTextEditorByUri(textDocument.uri);
+    let textEditor = this.internalCtrl.findTextEditorByUri(textDocument.uri);
     if (!textEditor) {
-      textEditor = new et.TextEditor(textDocument, selections, visibleRange);
-      this.track.insertTextEditor(textEditor);
+      textEditor = new ietc.TextEditor(textDocument, selections, visibleRange);
+      this.internalCtrl.insertTextEditor(textEditor);
     } else {
       textEditor.select(selections, visibleRange);
     }
@@ -318,4 +322,4 @@ class VscEditorRecorder implements t.EditorRecorder {
   }
 }
 
-export default VscEditorRecorder;
+export default CombinedEditorTrackRecorder;

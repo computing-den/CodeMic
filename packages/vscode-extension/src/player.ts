@@ -1,94 +1,26 @@
-import { SessionIO } from './session.js';
-import { types as t, path, lib, SessionCtrl, AudioCtrl } from '@codecast/lib';
-import VscEditorWorkspace from './vsc_editor_workspace.js';
-import VscEditorPlayer from './vsc_editor_player.js';
-import VscEditorRecorder from './vsc_editor_recorder.js';
-import Db, { type WriteOptions } from './db.js';
-import * as vscode from 'vscode';
+import type { SessionCtrls } from './types.js';
+import type Session from './session/session.js';
+import type SessionTracksCtrl from './session/session_tracks_ctrl.js';
 import _ from 'lodash';
 import assert from 'assert';
 
+type WriteOptions = { ifDirtyForLong: boolean };
+
 class Player {
-  // get trackPlayerSummary(): t.TrackPlayerSummary {
-  //   return lib.getTrackPlayerSummary(this.sessionCtrl);
-  // }
-
-  // get DEV_trackPlayerSummaries(): t.TrackPlayerSummary[] {
-  //   return this.sessionCtrl.DEV_trackPlayerSummaries;
-  // }
-
-  get root(): t.AbsPath {
-    return this.workspace.root;
+  constructor(public session: Session) {
+    // assert(session.ctrls);
   }
 
-  get clock(): number {
-    return this.sessionCtrl.clock;
+  get ctrls(): SessionCtrls {
+    return this.session.ctrls!;
   }
 
-  get isPlaying(): boolean {
-    return this.sessionCtrl.isRunning;
+  get sessionTracksCtrl(): SessionTracksCtrl {
+    return this.ctrls.sessionTracksCtrl;
   }
 
-  // private vscEditorEventStepper = new VscEditorEventStepper(this.workspace);
-
-  constructor(
-    public context: vscode.ExtensionContext,
-    public db: Db,
-    public sessionSummary: t.SessionSummary,
-    public session: t.Session,
-    public workspace: VscEditorWorkspace,
-    private sessionCtrl: SessionCtrl,
-    private audioCtrls: AudioCtrl[],
-    private onUpdateFrontend: () => any,
-  ) {
-    sessionCtrl.onUpdateFrontend = this.sessionCtrlUpdateFrontendHandler.bind(this);
-    sessionCtrl.onError = this.sessionCtrlErrorHandler.bind(this);
-  }
-
-  /**
-   * root must be already resolved.
-   * May return undefined if user decides not to overwrite root or create it.
-   */
-  static async populateSession(
-    context: vscode.ExtensionContext,
-    db: Db,
-    user: t.User | undefined,
-    setup: t.Setup,
-    postAudioMessage: t.PostAudioMessageToFrontend,
-    onUpdateFrontend: () => any,
-    // audioSrc: string,
-  ): Promise<Player | undefined> {
-    assert(setup.root);
-    const session = await db.fetchSession(setup.sessionSummary.id, user);
-    const sessionIO = new SessionIO(db, setup.sessionSummary.id);
-    const workspace = await VscEditorWorkspace.populateEditorTrack(setup.root, session, sessionIO);
-    if (workspace) {
-      const vscEditorPlayer = new VscEditorPlayer(context, workspace);
-      const vscEditorRecorder = new VscEditorRecorder(context, workspace);
-      const audioCtrls = session.audioTracks.map(audioTrack => new AudioCtrl(audioTrack, postAudioMessage, sessionIO));
-
-      const sessionCtrl = new SessionCtrl(setup.sessionSummary, audioCtrls, vscEditorPlayer, vscEditorRecorder);
-      sessionCtrl.load();
-      // sessionCtrl.seek(clock);
-
-      return new Player(
-        context,
-        db,
-        setup.sessionSummary,
-        session,
-        workspace,
-        sessionCtrl,
-        audioCtrls,
-        onUpdateFrontend,
-      );
-    }
-  }
-
-  async sessionCtrlUpdateFrontendHandler() {
-    // update frontend
-    this.onUpdateFrontend();
-
-    // save history
+  async sessionCtrlChangeOrProgressHandler() {
+    this.session.context.updateFrontend?.();
     await this.saveHistoryClock({ ifDirtyForLong: true });
   }
 
@@ -97,49 +29,47 @@ class Player {
     console.error(error);
   }
 
+  async load() {
+    // TODO continue from last position left off
+    await this.session.readBody({ download: true });
+    await this.session.load();
+    this.ctrls.sessionTracksCtrl.onChangeOrProgress = this.sessionCtrlChangeOrProgressHandler.bind(this);
+    this.ctrls.sessionTracksCtrl.onError = this.sessionCtrlErrorHandler.bind(this);
+  }
+
   play() {
-    this.sessionCtrl.play();
+    this.sessionTracksCtrl.play();
     this.saveHistoryOpenClose().catch(console.error);
   }
 
   pause() {
-    this.sessionCtrl.pause();
+    this.sessionTracksCtrl.pause();
     this.saveHistoryClock().catch(console.error);
   }
 
   seek(clock: number) {
-    this.sessionCtrl.seek(clock);
+    this.sessionTracksCtrl.seek(clock);
   }
 
   dispose() {
-    // this.sessionCtrl.dispose();
-  }
-
-  handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
-    this.sessionCtrl.handleFrontendAudioEvent(e);
-  }
-
-  updateState(changes: t.PlayerUpdate) {
-    if (changes.root !== undefined) throw new Error('Player: cannot modify root while playing');
-    // if (changes.clock !== undefined) await this.enqueueUpdate(changes.clock);
+    // this.sessionTracksCtrl.dispose();
   }
 
   private async saveHistoryClock(options?: WriteOptions) {
-    this.db.mergeSessionHistory({
-      id: this.sessionSummary.id,
-      lastWatchedClock: this.clock,
-      root: this.root,
-    });
-    await this.db.write(options);
+    // TODO support options.ifDirtyForLong
+    await this.session.writeHistory(history => ({
+      ...history,
+      lastWatchedClock: this.session.clock!,
+      workspace: this.session.workspace,
+    }));
   }
 
   private async saveHistoryOpenClose() {
-    this.db.mergeSessionHistory({
-      id: this.sessionSummary.id,
+    await this.session.writeHistory(history => ({
+      ...history,
       lastWatchedTimestamp: new Date().toISOString(),
-      root: this.root,
-    });
-    await this.db.write();
+      workspace: this.session.workspace,
+    }));
   }
 }
 

@@ -23,8 +23,10 @@ const upload = multer({
 const ASSETS = path.join(process.cwd(), 'packages/webserver/src/assets');
 const DIST = path.join(process.cwd(), 'packages/webclient/out');
 
+const PASSWORD_LENGTH_MIN = 8;
 const PASSWORD_LENGTH_MAX = 100;
 const EMAIL_LENGTH_MAX = 250;
+const USERNAME_LENGTH_MIN = 3;
 const USERNAME_LENGTH_MAX = 50;
 
 let db: Database.Database;
@@ -147,6 +149,9 @@ async function handleRequest(req: t.BackendToServerRequest, locals: MyLocals): P
       if (!username) {
         throw new Error('Missing username.');
       }
+      if (username.length < USERNAME_LENGTH_MIN) {
+        throw new Error(`Username must be at least ${USERNAME_LENGTH_MIN} characters`);
+      }
       if (username.length > USERNAME_LENGTH_MAX) {
         throw new Error(`Username must be at most ${USERNAME_LENGTH_MAX} characters`);
       }
@@ -162,8 +167,8 @@ async function handleRequest(req: t.BackendToServerRequest, locals: MyLocals): P
       if (!password) {
         throw new Error('Missing password.');
       }
-      if (password.length < 8) {
-        throw new Error('Password must be at least 8 characters');
+      if (password.length < PASSWORD_LENGTH_MIN) {
+        throw new Error(`Password must be at least ${PASSWORD_LENGTH_MIN} characters`);
       }
       if (password.length > PASSWORD_LENGTH_MAX) {
         throw new Error(`Password must be at most ${PASSWORD_LENGTH_MAX} characters`);

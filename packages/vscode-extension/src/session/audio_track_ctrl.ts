@@ -1,46 +1,46 @@
-import * as lib from './lib.js';
-import { assert } from './assert.js';
-import * as t from './types.js';
+import { types as t, assert, lib } from '@codecast/lib';
+import type Session from './session.js';
+import _ from 'lodash';
 
-export default class AudioCtrl implements t.AudioCtrl {
-  isRunning = false;
+export default class AudioTrackCtrl {
+  audioTrack: t.AudioTrack;
+  running = false;
   onError?: (error: Error) => any;
 
+  private session: Session;
   private clock = 0;
   private loaded = false;
   private loading = false;
   private seekAfterLoad = false;
 
-  constructor(
-    public track: t.AudioTrack,
-    private postAudioMessage: t.PostAudioMessageToFrontend,
-    // private getSessionBlobWebviewUri: (sha1: string) => t.Uri,
-    private sessionIO: t.SessionIO,
-  ) {}
+  constructor(session: Session, audioTrack: t.AudioTrack) {
+    this.session = session;
+    this.audioTrack = audioTrack;
+  }
 
   load() {
-    assert(this.track.file.type === 'local', 'AudioCtrl: only supports local files');
+    assert(this.audioTrack.file.type === 'local', 'AudioTrackCtrl: only supports local files');
     if (!this.loading && !this.loaded) {
       this.loading = true;
       // this.postAudioMessage({
       //   type: 'audio/load',
-      //   id: this.track.id,
-      //   src: this.getSessionBlobWebviewUri(this.track.file.sha1),
+      //   id: this.audioTrack.id,
+      //   src: this.getSessionBlobWebviewUri(this.audioTrack.file.sha1),
       // }).catch(this.gotError);
     }
   }
 
   play() {
-    this.isRunning = true;
+    this.running = true;
     if (this.loaded) {
-      this.postAudioMessage({ type: 'audio/play', id: this.track.id }).catch(this.gotError);
+      this.session.context.postAudioMessage?.({ type: 'audio/play', id: this.audioTrack.id }).catch(this.gotError);
     }
   }
 
   pause() {
-    this.isRunning = false;
+    this.running = false;
     if (this.loaded) {
-      this.postAudioMessage({ type: 'audio/pause', id: this.track.id }).catch(this.gotError);
+      this.session.context.postAudioMessage?.({ type: 'audio/pause', id: this.audioTrack.id }).catch(this.gotError);
     }
   }
 
@@ -49,7 +49,9 @@ export default class AudioCtrl implements t.AudioCtrl {
     if (!this.loaded) {
       this.seekAfterLoad = true;
     } else {
-      this.postAudioMessage({ type: 'audio/seek', id: this.track.id, clock }).catch(this.gotError);
+      this.session.context
+        .postAudioMessage?.({ type: 'audio/seek', id: this.audioTrack.id, clock })
+        .catch(this.gotError);
     }
   }
 
@@ -57,11 +59,11 @@ export default class AudioCtrl implements t.AudioCtrl {
   //   assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
 
   //   this.playbackRate = rate;
-  //   this.postAudioMessage({ type: 'audio/setPlaybackRate', rate, id: this.track.id }).catch(this.gotError);
+  //   this.postAudioMessage({ type: 'audio/setPlaybackRate', rate, id: this.audioTrack.id }).catch(this.gotError);
   // }
 
   // dispose() {
-  //   this.postAudioMessage({ type: 'audio/dispose', id: this.track.id }).catch(this.gotError);
+  //   this.postAudioMessage({ type: 'audio/dispose', id: this.audioTrack.id }).catch(this.gotError);
   // }
 
   handleAudioEvent(e: t.FrontendAudioEvent) {
@@ -103,7 +105,7 @@ export default class AudioCtrl implements t.AudioCtrl {
             this.seek(this.clock);
           }
 
-          if (this.isRunning) {
+          if (this.running) {
             this.play();
           }
         }

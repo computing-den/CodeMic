@@ -4,7 +4,7 @@ import os from 'os';
 import process from 'process';
 import _ from 'lodash';
 
-export type UserPaths = {
+export type BasePaths = {
   data: t.AbsPath;
   config: t.AbsPath;
   cache: t.AbsPath;
@@ -12,7 +12,32 @@ export type UserPaths = {
   temp: t.AbsPath;
 };
 
-function macos(name: string): UserPaths {
+export type DataPaths = {
+  root: t.AbsPath;
+  settings: t.AbsPath;
+  sessions: t.AbsPath;
+  session: (id: string) => SessionDataPaths;
+};
+
+export type SessionDataPaths = {
+  root: t.AbsPath;
+  summary: t.AbsPath;
+  body: t.AbsPath;
+  zip: t.AbsPath;
+  blobs: t.AbsPath;
+  blob: (sha1: string) => t.AbsPath;
+};
+
+export type DefaultWorkspacePaths = {
+  root: t.AbsPath;
+  session: (id: string) => DefaultSessionWorkspacePaths;
+};
+
+export type DefaultSessionWorkspacePaths = {
+  root: t.AbsPath;
+};
+
+function macos(name: string): BasePaths {
   return {
     data: path.abs(os.homedir(), 'Library', 'Application Support', name),
     config: path.abs(os.homedir(), 'Library', 'Preferences', name),
@@ -22,7 +47,7 @@ function macos(name: string): UserPaths {
   };
 }
 
-function windows(name: string): UserPaths {
+function windows(name: string): BasePaths {
   const appData = process.env.APPDATA || path.abs(os.homedir(), 'AppData', 'Roaming');
   const localAppData = process.env.LOCALAPPDATA || path.abs(os.homedir(), 'AppData', 'Local');
 
@@ -37,7 +62,7 @@ function windows(name: string): UserPaths {
 }
 
 // https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
-function linux(name: string): UserPaths {
+function linux(name: string): BasePaths {
   return {
     data: path.abs(process.env.XDG_DATA_HOME || path.abs(os.homedir(), '.local', 'share'), name),
     config: path.abs(process.env.XDG_CONFIG_HOME || path.abs(os.homedir(), '.config'), name),
@@ -48,10 +73,44 @@ function linux(name: string): UserPaths {
   };
 }
 
-function getUserPaths(name: string) {
+function getBasePaths(name: string) {
   if (process.platform === 'darwin') return macos(name);
   if (process.platform === 'win32') return windows(name);
   return linux(name);
 }
 
-export default getUserPaths('codecast');
+export const basePaths = getBasePaths('codecast');
+
+export const ANONYM = '_'; // minimum valid username is 3 characters
+
+export const dataPaths = _.memoize((username?: string): DataPaths => {
+  const root = path.abs(basePaths.data, username ?? ANONYM);
+  return {
+    root,
+    settings: path.abs(root, 'settings.json'),
+    sessions: path.abs(root, 'sessions'),
+    session: _.memoize(id => {
+      const sessionRoot = path.abs(root, 'sessions', id);
+      return {
+        root: sessionRoot,
+        summary: path.abs(sessionRoot, 'summary.json'),
+        body: path.abs(sessionRoot, 'body.json'),
+        zip: path.abs(sessionRoot, 'body.zip'),
+        blobs: path.abs(sessionRoot, 'blobs'),
+        blob: _.memoize(sha1 => path.abs(sessionRoot, 'blobs', sha1)),
+      };
+    }),
+  };
+});
+
+const workspacePath = path.abs(os.homedir(), 'codecast');
+
+export const defaultWorkspacePaths = {
+  root: workspacePath,
+  session: _.memoize(id => {
+    const sessionRoot = path.abs(workspacePath, id);
+    return {
+      root: sessionRoot,
+    };
+  }),
+};

@@ -28,12 +28,12 @@ export default class Player extends Component<Props> {
     await postMessage({ type: 'player/pause' });
   };
 
-  rootChanged = async (root: string) => {
-    await postMessage({ type: 'player/update', changes: { root } });
-  };
+  // rootChanged = async (root: string) => {
+  //   await postMessage({ type: 'player/update', changes: { root } });
+  // };
 
   seek = async (clock: number) => {
-    if (!this.props.player.isLoaded) {
+    if (!this.props.player.loaded) {
       console.error(`Cannot seek track that is not loaded`);
       return;
     }
@@ -51,13 +51,14 @@ export default class Player extends Component<Props> {
       await postMessage({
         type: 'recorder/open',
         sessionId: this.props.player.sessionSummary.id,
-        fork: { clock: this.props.player.clock },
+        fork: true,
+        clock: this.props.player.clock,
       });
     }
   };
 
   edit = async () => {
-    const res = await postMessage({ type: 'confirmEditFromPlayer' });
+    const res = await postMessage({ type: 'confirmEditFromPlayer', clock: this.props.player.clock });
     if (res.value) {
       await postMessage({ type: 'recorder/open', sessionId: this.props.player.sessionSummary.id });
     }
@@ -70,13 +71,19 @@ export default class Player extends Component<Props> {
   //   );
   // }
 
+  loadOrDisposeAudioTracks() {
+    const { audioTracks, webviewUris } = this.props.player;
+    if (audioTracks && webviewUris) {
+      mediaApi.loadOrDisposeAudioTracks(audioTracks, webviewUris);
+    }
+  }
+
   componentDidUpdate() {
-    mediaApi.loadOrDisposeAudioTracks(this.props.player.audioTracks, this.props.player.webviewUris);
+    this.loadOrDisposeAudioTracks();
   }
 
   componentDidMount() {
-    console.log('Player componentDidMount');
-    mediaApi.loadOrDisposeAudioTracks(this.props.player.audioTracks, this.props.player.webviewUris);
+    this.loadOrDisposeAudioTracks();
   }
 
   componentWillUnmount() {
@@ -88,20 +95,20 @@ export default class Player extends Component<Props> {
     const { sessionSummary: ss } = player;
 
     let primaryAction: MT.PrimaryAction;
-    if (player.isPlaying) {
+    if (player.playing) {
       primaryAction = { type: 'player/pause', title: 'Pause', onClick: this.pause };
-    } else if (player.isLoaded) {
+    } else if (player.loaded) {
       primaryAction = { type: 'player/play', title: 'Play', onClick: this.play };
     } else {
-      const title = player.root
-        ? `Load the project into ${player.root}`
+      const title = player.workspace
+        ? `Load the project into ${player.workspace}`
         : `Select a directory and load the project into it`;
       primaryAction = { type: 'player/load', title, onClick: this.load };
     }
 
     const toolbarActions = [
       {
-        title: player.isPlaying
+        title: player.playing
           ? `Fork: create a new project starting at this point`
           : `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`,
         icon: 'codicon-repo-forked',
@@ -130,7 +137,7 @@ export default class Player extends Component<Props> {
 
     return (
       <Screen className="player">
-        {player.isLoaded && <ProgressBar duration={ss.duration} onSeek={this.seek} clock={player.clock} />}
+        {player.loaded && <ProgressBar duration={ss.duration} onSeek={this.seek} clock={player.clock} />}
         <Section className="main-section">
           {/*
           <Section.Header
@@ -149,16 +156,16 @@ export default class Player extends Component<Props> {
               duration={ss.duration}
             />
             <SessionDescription className="subsection subsection_spaced" sessionSummary={ss} />
-            {!player.isLoaded && (
+            {/*!player.loaded && (
               <PathField
                 className="subsection"
                 onChange={this.rootChanged}
-                value={player.root}
+                value={player.workspace}
                 label="Workspace"
                 pickTitle="Select workspace folder"
                 autoFocus
               />
-            )}
+              )*/}
           </Section.Body>
         </Section>
         <Section className="contents-section">

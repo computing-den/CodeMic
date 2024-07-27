@@ -1,81 +1,56 @@
 import _ from 'lodash';
 import * as t from './types.js';
 import editorEventStepperDispatch from './editor_event_stepper_dispatch.js';
-import * as lib from './lib.js';
 import * as path from './path.js';
 import { assert } from './assert.js';
 
 // Not every TextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
-export class EditorTrack implements t.EditorEventStepper {
-  // These fields remain the same regardless of the clock
-  root: t.AbsPath;
-  io: t.SessionIO;
-  initSnapshot: t.EditorTrackSnapshot;
-  events: t.EditorEvent[];
-  defaultEol: t.EndOfLine;
-
+export class InternalEditorTrackCtrl implements t.EditorEventStepper {
   // These fields change with the clock/eventIndex
   // TODO sync the entire worktree structure including directories.
   // If a TextDocument is in this.textDocuments, it is also in this.worktree.
   // If a TextEditor is in this.textEditors, it is also in this.worktree.
-  // clock: number;
   eventIndex: number;
-  worktree: Worktree;
+  worktree: LiveWorktree;
   textDocuments: TextDocument[];
   textEditors: TextEditor[];
   activeTextEditor?: TextEditor;
 
-  private constructor(root: t.AbsPath, io: t.SessionIO, editorTrack: t.EditorTrack) {
-    this.root = root;
-    this.io = io;
-    // this.summary = summary;
-    this.initSnapshot = editorTrack.initSnapshot;
-    this.events = editorTrack.events;
-    this.defaultEol = editorTrack.defaultEol;
-
+  private constructor(public session: t.Session) {
     this.eventIndex = -1;
-    this.worktree = {};
+    this.worktree = new Map();
     this.textDocuments = [];
     this.textEditors = [];
   }
 
-  static async fromJSON(root: t.AbsPath, io: t.SessionIO, editorTrackJSON: t.EditorTrack): Promise<EditorTrack> {
-    const editorTrack = new EditorTrack(root, io, editorTrackJSON);
-    await editorTrack.restoreInitSnapshot();
-    return editorTrack;
+  get editorTrack(): t.InternalEditorTrack {
+    return this.session.body!.editorTrack;
   }
 
-  toJSON(): t.EditorTrack {
-    return {
-      events: this.events,
-      defaultEol: this.defaultEol,
-      initSnapshot: this.initSnapshot,
-    };
-  }
-
-  async setInitSnapshotAndRestore(initSnapshot: t.EditorTrackSnapshot) {
-    this.initSnapshot = initSnapshot;
-    await this.restoreInitSnapshot();
+  static async fromSession(session: t.Session): Promise<InternalEditorTrackCtrl> {
+    const track = new InternalEditorTrackCtrl(session);
+    await track.restoreInitSnapshot();
+    return track;
   }
 
   async restoreInitSnapshot() {
     this.eventIndex = -1;
-    this.worktree = makeWorktree(this.initSnapshot.worktree);
+    this.worktree = makeLiveWorktree(this.editorTrack.initSnapshot.worktree);
     this.textDocuments = [];
     this.textEditors = [];
 
-    for (const textEditor of this.initSnapshot.textEditors) {
+    for (const textEditor of this.editorTrack.initSnapshot.textEditors) {
       await this.openTextEditorByUri(textEditor.uri, textEditor.selections, textEditor.visibleRange);
     }
 
-    if (this.initSnapshot.activeTextEditorUri) {
-      this.activeTextEditor = this.findTextEditorByUri(this.initSnapshot.activeTextEditorUri);
+    if (this.editorTrack.initSnapshot.activeTextEditorUri) {
+      this.activeTextEditor = this.findTextEditorByUri(this.editorTrack.initSnapshot.activeTextEditorUri);
     }
   }
 
   doesUriExist(uri: t.Uri): boolean {
-    return Boolean(this.worktree[uri]);
+    return Boolean(this.worktree.get(uri));
   }
 
   getWorktreeUris(): t.Uri[] {
@@ -83,7 +58,7 @@ export class EditorTrack implements t.EditorEventStepper {
   }
 
   async getContentByUri(uri: t.Uri): Promise<Uint8Array> {
-    const item = this.worktree[uri];
+    const item = this.worktree.get(uri);
     assert(item);
 
     if (item.document) {
@@ -91,7 +66,7 @@ export class EditorTrack implements t.EditorEventStepper {
     }
 
     if (item.file.type === 'local') {
-      return this.io.readFile(item.file);
+      return this.session.readFile(item.file);
     }
 
     if (item.file.type === 'empty') {
@@ -102,12 +77,12 @@ export class EditorTrack implements t.EditorEventStepper {
   }
 
   findTextDocumentByUri(uri: t.Uri): TextDocument | undefined {
-    const textDocument = this.worktree[uri]?.document;
+    const textDocument = this.worktree.get(uri)?.document;
     return textDocument instanceof TextDocument ? textDocument : undefined;
   }
 
   findTextEditorByUri(uri: t.Uri): TextEditor | undefined {
-    const textEditor = this.worktree[uri]?.editor;
+    const textEditor = this.worktree.get(uri)?.editor;
     return textEditor instanceof TextEditor ? textEditor : undefined;
   }
 
@@ -124,7 +99,7 @@ export class EditorTrack implements t.EditorEventStepper {
   }
 
   async openTextDocumentByUri(uri: t.Uri): Promise<TextDocument> {
-    const worktreeItem = this.worktree[uri];
+    const worktreeItem = this.worktree.get(uri);
     if (!worktreeItem) throw new Error(`file not found ${uri}`);
 
     if (worktreeItem.document) {
@@ -134,20 +109,21 @@ export class EditorTrack implements t.EditorEventStepper {
       return worktreeItem.document;
     }
 
-    const text = new TextDecoder().decode(await this.io.readFile(worktreeItem.file));
-    const textDocument = TextDocument.fromText(uri, text, this.defaultEol);
+    const text = new TextDecoder().decode(await this.session.readFile(worktreeItem.file));
+    const textDocument = TextDocument.fromText(uri, text, this.editorTrack.defaultEol);
     this.insertTextDocument(textDocument);
     return textDocument;
   }
 
   insertTextDocument(textDocument: TextDocument) {
-    this.worktree[textDocument.uri] ??= { file: { type: 'empty' } };
-    this.worktree[textDocument.uri].document = textDocument;
+    const item = this.worktree.get(textDocument.uri) ?? { file: { type: 'empty' } };
+    item.document = textDocument;
+    this.worktree.set(textDocument.uri, item);
     this.textDocuments.push(textDocument);
   }
 
   async openTextEditorByUri(uri: t.Uri, selections?: t.Selection[], visibleRange?: t.Range): Promise<TextEditor> {
-    const worktreeItem = this.worktree[uri];
+    const worktreeItem = this.worktree.get(uri);
     if (!worktreeItem) throw new Error(`file not found ${uri}`);
 
     if (worktreeItem.editor) {
@@ -166,24 +142,28 @@ export class EditorTrack implements t.EditorEventStepper {
   }
 
   insertTextEditor(textEditor: TextEditor) {
-    this.worktree[textEditor.document.uri] ??= { file: { type: 'empty' }, document: textEditor.document };
-    this.worktree[textEditor.document.uri].editor = textEditor;
+    const item = this.worktree.get(textEditor.document.uri) ?? {
+      file: { type: 'empty' },
+      document: textEditor.document,
+    };
+    item.editor = textEditor;
+    this.worktree.set(textEditor.document.uri, item);
     this.textEditors.push(textEditor);
   }
 
   toWorkspaceUri(p: t.AbsPath): t.Uri {
-    return path.workspaceUriFromAbsPath(this.root, p);
+    return path.workspaceUriFromAbsPath(this.session.workspace, p);
   }
 
   closeAndRemoveTextDocumentByUri(uri: t.Uri) {
     this.closeTextEditorByUri(uri);
     this.textDocuments = this.textDocuments.filter(x => x.uri !== uri);
-    delete this.worktree[uri];
+    this.worktree.delete(uri);
   }
 
   closeTextEditorByUri(uri: t.Uri) {
-    if (this.worktree[uri].editor) {
-      this.worktree[uri].editor = undefined;
+    if (this.worktree.get(uri)?.editor) {
+      this.worktree.get(uri)!.editor = undefined;
       this.textEditors = this.textEditors.filter(x => x.document.uri !== uri);
     }
     if (this.activeTextEditor?.document.uri === uri) {
@@ -192,7 +172,7 @@ export class EditorTrack implements t.EditorEventStepper {
   }
 
   clockAt(i: number): number {
-    return this.events[i]?.clock ?? 0;
+    return this.editorTrack.events[i]?.clock ?? 0;
   }
 
   getSeekData(toClock: number): t.SeekData {
@@ -267,20 +247,20 @@ export class EditorTrack implements t.EditorEventStepper {
     // new i:                   ^
 
     const events = [];
-    const n = this.events.length;
+    const n = this.editorTrack.events.length;
     let direction = t.Direction.Forwards;
     let i = this.eventIndex;
     if (i < 0 || toClock > this.clockAt(i)) {
       // go forwards
       for (let j = i + 1; j < n && toClock >= this.clockAt(j); j++) {
-        events.push(this.events[j]);
+        events.push(this.editorTrack.events[j]);
         i = j;
       }
     } else if (toClock < this.clockAt(i)) {
       // go backwards
       direction = t.Direction.Backwards;
       for (; i >= 0 && toClock <= this.clockAt(i); i--) {
-        events.push(this.events[i]);
+        events.push(this.editorTrack.events[i]);
       }
     }
 
@@ -319,8 +299,8 @@ export class EditorTrack implements t.EditorEventStepper {
    * Sets summary.duration to clock as well.
    */
   cut(clock: number) {
-    const i = this.events.findIndex(e => e.clock > clock);
-    if (i >= 0) this.events.length = i;
+    const i = this.editorTrack.events.findIndex(e => e.clock > clock);
+    if (i >= 0) this.editorTrack.events.length = i;
     // this.clockRange.end = clock;
   }
 
@@ -406,8 +386,16 @@ export class EditorTrack implements t.EditorEventStepper {
  * it should always be retrieved from there.
  * Otherwise, its uri refers to the base file stored on disk.
  */
-export type Worktree = { [key: t.Uri]: WorktreeItem };
-type WorktreeItem = { file: t.File; document?: Document; editor?: Editor };
+type LiveWorktreeItem = { file: t.File; document?: Document; editor?: Editor };
+type LiveWorktree = Map<t.Uri, LiveWorktreeItem>;
+
+function makeLiveWorktree(worktree: t.Worktree): LiveWorktree {
+  const map = new Map<t.Uri, LiveWorktreeItem>();
+  for (const [key, file] of Object.entries(worktree)) {
+    map.set(key, { file });
+  }
+  return map;
+}
 
 export interface Document {
   getContent(): Uint8Array;
@@ -554,12 +542,20 @@ export function makeSelectionN(
   return { anchor: makePosition(anchorLine, anchorCharacter), active: makePosition(activeLine, activeCharacter) };
 }
 
-export function makeEmptySnapshot(): t.EditorTrackSnapshot {
-  return {
-    worktree: {},
-    textEditors: [],
-  };
-}
+// export function makeEmptySnapshot(): t.InternalEditorTrackSnapshot {
+//   return {
+//     worktree: {},
+//     textEditors: [],
+//   };
+// }
+
+// export function makeEmptyEditorTrackJSON(defaultEol: t.EndOfLine): t.InternalEditorTrack {
+//   return {
+//     events: [],
+//     defaultEol,
+//     initSnapshot: makeEmptySnapshot(),
+//   };
+// }
 
 export function makeTextEditorSnapshot(
   uri: t.Uri,
@@ -567,8 +563,4 @@ export function makeTextEditorSnapshot(
   visibleRange: t.Range = makeRangeN(0, 0, 1, 0),
 ): t.TextEditor {
   return { uri, selections, visibleRange };
-}
-
-function makeWorktree(worktree: t.Worktree): Worktree {
-  return _.mapValues(worktree, file => ({ file }));
 }
