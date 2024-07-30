@@ -279,15 +279,15 @@ class DetailsView extends Component<DetailsViewProps> {
         <p className="subsection help">
           Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
         </p>
-        <vscode-button className="subsection" onClick={this.save} disabled={!recorder.onDisk}>
+        <vscode-button className="subsection" onClick={this.save} disabled={recorder.mustScan}>
           Save
         </vscode-button>
-        <vscode-button className="subsection" onClick={this.publish} disabled={!recorder.onDisk}>
+        <vscode-button className="subsection" onClick={this.publish} disabled={recorder.mustScan}>
           Publish
         </vscode-button>
         {!recorder.loaded && (
           <vscode-button className="subsection" onClick={onLoadRecorder} autoFocus>
-            {recorder.onDisk ? 'Load project into workspace' : 'Scan workspace to start'}
+            {recorder.mustScan ? 'Scan workspace to start' : 'Load project into workspace'}
             <span className="codicon codicon-chevron-right va-top m-left_small" />
           </vscode-button>
         )}

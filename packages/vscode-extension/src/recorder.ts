@@ -10,7 +10,7 @@ import fs from 'fs';
 import { v4 as uuid } from 'uuid';
 
 class Recorder {
-  constructor(public session: Session) {}
+  constructor(public session: Session, public mustScan: boolean) {}
 
   get sessionTracksCtrl(): SessionTracksCtrl | undefined {
     return this.session.ctrls?.sessionTracksCtrl;
@@ -20,15 +20,6 @@ class Recorder {
 
   // private lastSavedClock: number;
 
-  /**
-   * root must be already resolved.
-   */
-  async scan() {
-    await this.session.scan();
-    await this.save();
-    this.initSessionTracksCtrlsHandlers();
-  }
-
   async load() {
     // let clock = setup.sessionSummary.duration;
     // if (setup.fork) {
@@ -37,8 +28,13 @@ class Recorder {
     //   await db.copySessionDir(setup.baseSessionSummary, setup.sessionSummary);
     // }
 
-    // TODO pass seekclock and cutclock
-    await this.session.load();
+    if (this.mustScan) {
+      await this.session.scan();
+      this.mustScan = false;
+    } else {
+      // TODO pass seekclock and cutclock
+      await this.session.load();
+    }
     await this.save();
     this.initSessionTracksCtrlsHandlers();
   }

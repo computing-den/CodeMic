@@ -24,7 +24,6 @@ export class Session implements t.Session {
   workspace: t.AbsPath;
   summary: t.SessionSummary;
   loaded = false;
-  onDisk: boolean;
   body?: t.SessionBody;
   ctrls?: SessionCtrls;
 
@@ -32,11 +31,10 @@ export class Session implements t.Session {
   // editorRecorder?: CombinedEditorTrackRecorder;
   // audioCtrls?: AudioCtrl[];
 
-  constructor(context: Context, workspace: t.AbsPath, summary: t.SessionSummary, onDisk: boolean) {
+  constructor(context: Context, workspace: t.AbsPath, summary: t.SessionSummary) {
     this.context = context;
     this.workspace = workspace;
     this.summary = summary;
-    this.onDisk = onDisk;
   }
 
   get sessionDataPaths(): SessionDataPaths {
@@ -62,7 +60,7 @@ export class Session implements t.Session {
   static async fromExisting(context: Context, id: string): Promise<Session | undefined> {
     const workspace = Session.getWorkspace(context, id);
     const summary = await Session.summaryFromExisting(context, id);
-    return summary && new Session(context, workspace, summary, true);
+    return summary && new Session(context, workspace, summary);
   }
 
   static async summaryFromExisting(context: Context, id: string): Promise<SessionSummary | undefined> {
@@ -70,62 +68,12 @@ export class Session implements t.Session {
     return storage.readJSONOptional<t.SessionSummary>(summaryPath);
   }
 
-  static async fromNew(context: Context, summary: t.SessionSummary): Promise<Session> {
-    const workspace = misc.getDefaultVscWorkspace();
-    // TODO ask user to select a workspace
-    assert(workspace);
-    return new Session(context, workspace, summary, false);
+  static async fromNew(context: Context, workspace: t.AbsPath, summary: t.SessionSummary): Promise<Session> {
+    return new Session(context, workspace, summary);
   }
 
   static getWorkspace(context: Context, id: string): t.AbsPath {
     return context.settings.history[id]?.workspace ?? context.defaultWorkspacePaths.session(id).root;
-  }
-
-  // static async askForRoot(title: string): Promise<t.AbsPath | undefined> {
-  //   const options = {
-  //     canSelectFiles: false,
-  //     canSelectFolders: true,
-  //     canSelectMany: false,
-  //     defaultUri: vscode.workspace.workspaceFolders?.[0]?.uri,
-  //     title,
-  //   };
-  //   const uris = await vscode.window.showOpenDialog(options);
-  //   if (uris?.length === 1) {
-  //     return path.abs(uris[0].path);
-  //   }
-  // }
-
-  static async setUpWorkspace(
-    context: Context,
-    // state: WorkspaceChangeGlobalState,
-    options?: { afterRestart: boolean },
-  ): Promise<Session | undefined> {
-    throw new Error('TODO set up session tracks ctrl and workspace');
-    // let root = state.setup.root ? path.abs(state.setup.root) : undefined;
-
-    // if (!options?.afterRestart) {
-    //   root = root || (await Session.askForRoot(`Select a workspace`));
-    //   if (!root) return;
-
-    //   const workspace = new Session(context, root);
-    //   if (!(await workspace.askToCreateOrOverwriteWorkspace(Boolean(state.setup.isNew)))) return;
-    //   await workspace.makeRoot();
-
-    //   state.setup.root = root;
-    //   Session.setWorkspaceChangeGlobalState(context.extension, state);
-    //   await workspace.updateWorkspaceFolder();
-    //   Session.setWorkspaceChangeGlobalState(context.extension, undefined);
-    // }
-
-    // if (root && Session.getDefaultVscWorkspace() === root) {
-    //   return new Session(root);
-    // }
-
-    // if (root) {
-    //   vscode.window.showErrorMessage(`Could not change the workspace folder to "${root}".`);
-    // } else {
-    //   vscode.window.showErrorMessage('No workspace folder was selected.');
-    // }
   }
 
   static makeNewSummary(author?: t.UserSummary): t.SessionSummary {
@@ -437,13 +385,11 @@ export class Session implements t.Session {
 
   async writeSummary() {
     await storage.writeJSON(this.sessionDataPaths.summary, this.summary);
-    this.onDisk = true;
   }
 
   async writeBody() {
     assert(this.body, 'writeBody: body is not yet loaded.');
     await storage.writeJSON(this.sessionDataPaths.body, this.body);
-    this.onDisk = true;
   }
 
   async writeHistory(update?: (history: t.SessionHistory) => t.SessionHistory) {

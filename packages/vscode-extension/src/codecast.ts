@@ -1,3 +1,4 @@
+import * as misc from './misc.js';
 import Recorder from './recorder.js';
 import Player from './player.js';
 import WebviewProvider from './webview_provider.js';
@@ -9,7 +10,7 @@ import * as paths from './paths.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
-import { types as t, lib } from '@codecast/lib';
+import { types as t, lib, path } from '@codecast/lib';
 import { SessionSummary } from '@codecast/lib/src/types.js';
 
 class Codecast {
@@ -46,7 +47,15 @@ class Codecast {
       }),
     );
 
-    this.restoreStateAfterRestart().catch(console.error);
+    this.onStartUp().catch(console.error);
+  }
+
+  async onStartUp() {
+    await this.restoreStateAfterRestart();
+    await this.updateFrontend();
+
+    await this.fetchFeatured();
+    await this.updateFrontend();
 
     // DEV
     // if (this.webviewProvider.bus) {
@@ -69,33 +78,76 @@ class Codecast {
     return { history: {} };
   }
 
-  static setWorkspaceChangeGlobalState(context: vscode.ExtensionContext, state?: WorkspaceChangeGlobalState) {
-    context.globalState.update('workspaceChange', state);
+  async setWorkspaceChangeGlobalState(state?: WorkspaceChangeGlobalState) {
+    await this.context.extension.globalState.update('workspaceChange', state);
   }
-  static getWorkspaceChangeGlobalState(context: vscode.ExtensionContext): WorkspaceChangeGlobalState | undefined {
-    return context.globalState.get<WorkspaceChangeGlobalState>('workspaceChange');
+  getWorkspaceChangeGlobalState(): WorkspaceChangeGlobalState | undefined {
+    return this.context.extension.globalState.get<WorkspaceChangeGlobalState>('workspaceChange');
+  }
+
+  async setUpWorkspace() {
+    assert(this.session);
+
+    // Is workspace already up-to-date?
+    if (misc.getDefaultVscWorkspace() === this.session.workspace) return;
+
+    // Save recorder first so that we can restore it after vscode restart.
+    if (this.recorder) {
+      await this.recorder.save();
+    }
+
+    // Set global state to get ready for possible restart.
+    await this.setWorkspaceChangeGlobalState({
+      screen: this.screen,
+      sessionId: this.session?.summary.id,
+      mustScan: this.recorder?.mustScan,
+    });
+
+    // Change vscode's workspace folders.
+    {
+      const disposables: vscode.Disposable[] = [];
+      const done = new Promise(resolve => {
+        vscode.workspace.onDidChangeWorkspaceFolders(() => resolve(undefined), undefined, disposables);
+      });
+      const success = vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length ?? 0, {
+        uri: vscode.Uri.file(this.session.workspace),
+      });
+      assert(success);
+      await done;
+      for (const d of disposables) d.dispose();
+    }
+
+    // Clear global state.
+    await this.setWorkspaceChangeGlobalState();
+
+    // Make sure workspace is updated properly.
+    assert(misc.getDefaultVscWorkspace() === this.session.workspace);
   }
 
   async restoreStateAfterRestart() {
-    // const workspaceChange = Codecast.getWorkspaceChangeGlobalState(this.context.extension);
-    // Codecast.setWorkspaceChangeGlobalState(this.context.extension, undefined);
-    // console.log('restoreStateAfterRestart(): ', workspaceChange?.setup);
-    // if (workspaceChange) {
-    //   const { screen, featured } = workspaceChange;
-    //   assert(screen === t.Screen.Player || screen === t.Screen.Recorder);
-    //   this.featured = featured;
-    //   if (screen === t.Screen.Player) {
-    //     this.player = await this.loadPlayer({ afterRestart: true });
-    //   } else {
-    //     this.recorder = await this.scanOrLoadRecorder({ afterRestart: true });
-    //   }
-    //   this.setScreen(screen);
-    // } else {
-    //   await this.fetchFeatured();
-    // }
-    // if (this.context.view) {
-    //   await this.updateFrontend();
-    // }
+    const workspaceChange = this.getWorkspaceChangeGlobalState();
+    await this.setWorkspaceChangeGlobalState();
+
+    console.log('restoreStateAfterRestart(): ', workspaceChange);
+    if (workspaceChange) {
+      const { screen, sessionId, mustScan } = workspaceChange;
+
+      if (sessionId) {
+        const session = await Session.fromExisting(this.context, sessionId);
+        assert(session);
+        assert(misc.getDefaultVscWorkspace() === session.workspace);
+
+        this.session = session;
+        if (screen === t.Screen.Player) {
+          this.player = new Player(this.session);
+          await this.player.load();
+        } else if (screen === t.Screen.Recorder) {
+          this.recorder = new Recorder(this.session, Boolean(mustScan));
+          await this.recorder.load();
+        }
+      }
+      this.setScreen(screen);
+    }
   }
 
   async viewOpened() {
@@ -176,7 +228,8 @@ class Codecast {
       }
       case 'player/load': {
         assert(this.player);
-        await this.loadPlayer();
+        await this.setUpWorkspace();
+        await this.player.load();
         return this.respondWithStore();
       }
       case 'player/play': {
@@ -201,8 +254,8 @@ class Codecast {
       //   // return this.respondWithStore();
       // }
       case 'recorder/open': {
-        let session: Session;
-
+        let session: Session | undefined;
+        let mustScan = false;
         const user = this.context.user && lib.userToUserSummary(this.context.user);
 
         if (req.sessionId) {
@@ -224,29 +277,39 @@ class Codecast {
           }
         } else {
           // Create new session.
+          // We will call setUpWorkspace() on load/scan.
           const summary = Session.makeNewSummary(user);
-          session = await Session.fromNew(this.context, summary);
+          let workspace = misc.getDefaultVscWorkspace();
+          if (!workspace) {
+            const options = {
+              canSelectFiles: false,
+              canSelectFolders: true,
+              canSelectMany: false,
+              title: 'Select a directory to start recording.',
+            };
+            const uris = await vscode.window.showOpenDialog(options);
+            if (uris?.length === 1) workspace = path.abs(uris[0].path);
+          }
+
+          if (workspace) {
+            session = await Session.fromNew(this.context, workspace, summary);
+            mustScan = true;
+          }
         }
 
-        if (await this.closeCurrentScreen()) {
+        if (session && (await this.closeCurrentScreen())) {
           this.session = session;
-          this.recorder = new Recorder(session);
+          this.recorder = new Recorder(session, mustScan);
           this.setScreen(t.Screen.Recorder);
         }
 
         return this.respondWithStore();
       }
       case 'recorder/load': {
+        assert(this.session);
         assert(this.recorder);
-        // for (const vscTextDocument of vscode.workspace.textDocuments) {
-        //   if (vscTextDocument.dirty) {
-        //     vscode.window.showErrorMessage(
-        //       'There are unsaved files in the current workspace. Please save them first and then try again.',
-        //     );
-        //     return { type: 'error' };
-        //   }
-        // }
-        await this.scanOrLoadRecorder();
+        await this.setUpWorkspace();
+        await this.recorder.load();
         return this.respondWithStore();
       }
       case 'recorder/record': {
@@ -429,36 +492,16 @@ class Codecast {
     await this.updateFrontend();
   }
 
-  async scanOrLoadRecorder(options?: { afterRestart: boolean }) {
-    assert(this.session);
-    assert(this.recorder);
-    // TODO set up vscode workspace
-    // const state = this.createWorkspaceChangeGlobalState();
-    // if (!(await Session.setUpWorkspace(this.context, state, options))) return;
+  // async scanOrLoadRecorder(options?: { afterRestart: boolean }) {
+  //   assert(this.session);
+  //   assert(this.recorder);
 
-    if (this.session.onDisk) {
-      await this.recorder.load();
-    } else {
-      await this.recorder.scan();
-    }
-  }
+  // }
 
-  async loadPlayer(options?: { afterRestart: boolean }) {
-    assert(this.player);
+  // async loadPlayer(options?: { afterRestart: boolean }) {
+  //   assert(this.player);
 
-    // TODO possibly change vscode workspace
-    await this.player.load();
-
-    // const state = this.createWorkspaceChangeGlobalState();
-    // if (!(await Session.setUpWorkspace(this.context, state, options))) return;
-
-    // return Player.loadSession(
-    //   this.context,
-    //   this.setup,
-    //   this.postAudioMessage.bind(this),
-    //   this.playerChanged.bind(this),
-    // );
-  }
+  // }
 
   async closeCurrentScreen(): Promise<boolean> {
     let canClose = true;
@@ -599,8 +642,12 @@ class Codecast {
   }
 
   async fetchFeatured() {
-    const res = await serverApi.send({ type: 'featured/get' }, this.context.user?.token);
-    this.featured = res.sessionSummaries;
+    try {
+      const res = await serverApi.send({ type: 'featured/get' }, this.context.user?.token);
+      this.featured = res.sessionSummaries;
+    } catch (error) {
+      vscode.window.showErrorMessage('Failed to fetch featured items:', (error as Error).message);
+    }
   }
 
   // async showOpenSessionDialog(): Promise<t.Uri | undefined> {
@@ -636,7 +683,9 @@ class Codecast {
   }
 
   async updateFrontend() {
-    await this.webviewProvider.postMessage({ type: 'updateStore', store: await this.getStore() });
+    if (this.context.view) {
+      await this.webviewProvider.postMessage({ type: 'updateStore', store: await this.getStore() });
+    }
   }
 
   getFirstSessionHistoryById(...ids: (string | undefined)[]): t.SessionHistory | undefined {
@@ -649,20 +698,13 @@ class Codecast {
     return this.webviewProvider.postMessage(req);
   }
 
-  createWorkspaceChangeGlobalState(): WorkspaceChangeGlobalState {
-    return {
-      screen: this.screen,
-      featured: this.featured,
-    };
-  }
-
   async getStore(): Promise<t.Store> {
     let recorder: t.RecorderState | undefined;
     if (this.screen === t.Screen.Recorder) {
       assert(this.recorder);
       assert(this.session);
       recorder = {
-        onDisk: this.session.onDisk,
+        mustScan: this.recorder.mustScan,
         loaded: this.session.loaded,
         recording: this.session.recording,
         playing: this.session.playing,

@@ -228,7 +228,7 @@ export type WelcomeState = {
 };
 
 export type RecorderState = {
-  onDisk: boolean;
+  mustScan: boolean;
   loaded: boolean;
   recording: boolean;
   playing: boolean;
