@@ -111,6 +111,7 @@ export default class SessionTracksCtrl {
   insertAudioAndLoad(audioTrack: t.AudioTrack) {
     const audioTrackCtrl = new AudioTrackCtrl(this.session, audioTrack);
     this.session.summary.duration = Math.max(this.session.summary.duration, audioTrack.clockRange.end);
+    this.session.body!.audioTracks.push(audioTrack);
     this.ctrls.audioTrackCtrls.push(audioTrackCtrl);
     this.initAudioCtrl(audioTrackCtrl);
     this.onChange?.();
@@ -121,6 +122,11 @@ export default class SessionTracksCtrl {
     if (i === -1) {
       console.error(`SessionTracksCtrl deleteAudio did not find audio track with id ${id}`);
       return;
+    }
+
+    const j = this.session.body!.audioTracks.findIndex(t => t.id === id);
+    if (j !== -1) {
+      this.session.body!.audioTracks.splice(j, 1);
     }
 
     this.ctrls.audioTrackCtrls[i].pause();
@@ -237,7 +243,6 @@ export default class SessionTracksCtrl {
       this.clock = Math.min(this.session.summary.duration, this.clock);
     }
 
-    // TODO should we await this?
     this.seekEditor();
     this.seekInRangeAudiosThatAreNotRunning();
     if (this.running) this.playInRangeAudios();

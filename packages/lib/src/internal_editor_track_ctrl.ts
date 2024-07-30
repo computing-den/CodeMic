@@ -54,7 +54,7 @@ export class InternalEditorTrackCtrl implements t.EditorEventStepper {
   }
 
   getWorktreeUris(): t.Uri[] {
-    return Object.keys(this.worktree);
+    return Array.from(this.worktree.keys());
   }
 
   async getContentByUri(uri: t.Uri): Promise<Uint8Array> {

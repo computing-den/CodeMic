@@ -12,8 +12,8 @@ import { v4 as uuid } from 'uuid';
 class Recorder {
   constructor(public session: Session) {}
 
-  get sessionTracksCtrl(): SessionTracksCtrl {
-    return this.session.ctrls!.sessionTracksCtrl;
+  get sessionTracksCtrl(): SessionTracksCtrl | undefined {
+    return this.session.ctrls?.sessionTracksCtrl;
   }
 
   dirty: boolean = false;
@@ -44,7 +44,7 @@ class Recorder {
   }
 
   initSessionTracksCtrlsHandlers() {
-    assert(this.session.ctrls);
+    assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.onChangeOrProgress = this.sessionCtrlChangeOrProgressHandler.bind(this);
     this.sessionTracksCtrl.onChange = this.sessionCtrlChangeHandler.bind(this);
     this.sessionTracksCtrl.onError = this.sessionCtrlErrorHandler.bind(this);
@@ -64,20 +64,24 @@ class Recorder {
   }
 
   record() {
+    assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.record();
     this.saveHistoryOpenClose().catch(console.error);
   }
 
   play() {
+    assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.play();
     this.saveHistoryOpenClose().catch(console.error);
   }
 
   pause() {
+    assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.pause();
   }
 
   seek(clock: number) {
+    assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.seek(clock);
   }
 
@@ -110,6 +114,7 @@ class Recorder {
   }
 
   async insertAudio(uri: t.Uri, clock: number) {
+    assert(this.sessionTracksCtrl);
     const absPath = path.getFileUriPath(uri);
     const data = await fs.promises.readFile(absPath);
     const duration = getMp3Duration(data);
@@ -125,6 +130,7 @@ class Recorder {
   }
 
   async deleteAudio(id: string) {
+    assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.deleteAudio(id);
   }
 

@@ -77,15 +77,12 @@ class Codecast {
   }
 
   async restoreStateAfterRestart() {
-    throw new Error('TODO');
     // const workspaceChange = Codecast.getWorkspaceChangeGlobalState(this.context.extension);
     // Codecast.setWorkspaceChangeGlobalState(this.context.extension, undefined);
-
     // console.log('restoreStateAfterRestart(): ', workspaceChange?.setup);
     // if (workspaceChange) {
     //   const { screen, featured } = workspaceChange;
     //   assert(screen === t.Screen.Player || screen === t.Screen.Recorder);
-
     //   this.featured = featured;
     //   if (screen === t.Screen.Player) {
     //     this.player = await this.loadPlayer({ afterRestart: true });
@@ -96,7 +93,6 @@ class Codecast {
     // } else {
     //   await this.fetchFeatured();
     // }
-
     // if (this.context.view) {
     //   await this.updateFrontend();
     // }
@@ -169,8 +165,12 @@ class Codecast {
       case 'player/open': {
         if (await this.closeCurrentScreen()) {
           this.session = await Session.fromExisting(this.context, req.sessionId);
-          this.player = new Player(this.session);
-          this.setScreen(t.Screen.Player);
+          if (!this.session) {
+            vscode.window.showErrorMessage(`Session files don't exist.`);
+          } else {
+            this.player = new Player(this.session);
+            this.setScreen(t.Screen.Player);
+          }
         }
         return this.respondWithStore();
       }
@@ -352,16 +352,19 @@ class Codecast {
       }
       case 'deleteSession': {
         const session = await Session.fromExisting(this.context, req.sessionId);
-        const confirmTitle = 'Delete';
-        const answer = await vscode.window.showWarningMessage(
-          `Do you want to delete session "${session.summary?.title || 'Untitled'}"?`,
-          { modal: true },
-          { title: 'Cancel', isCloseAffordance: true },
-          { title: confirmTitle },
-        );
-        if (answer?.title === confirmTitle) {
-          await session.delete();
+        if (session) {
+          const confirmTitle = 'Delete';
+          const answer = await vscode.window.showWarningMessage(
+            `Do you want to delete session "${session.summary?.title || 'Untitled'}"?`,
+            { modal: true },
+            { title: 'Cancel', isCloseAffordance: true },
+            { title: confirmTitle },
+          );
+          if (answer?.title === confirmTitle) {
+            await session.delete();
+          }
         }
+
         return this.respondWithStore();
       }
       case 'audio': {
@@ -494,7 +497,9 @@ class Codecast {
   async saveRecorder(options: { forExit: boolean; ask: boolean; verbose: boolean }): Promise<boolean> {
     assert(this.recorder);
 
-    // TODO user confirmation
+    if (this.session?.running) {
+      this.recorder.pause();
+    }
     await this.recorder.save();
     return true;
 
@@ -585,7 +590,7 @@ class Codecast {
   }
 
   async playerWillClose(): Promise<boolean> {
-    if (this.player) {
+    if (this.player && this.session?.running) {
       this.player.pause();
     }
 
@@ -689,11 +694,9 @@ class Codecast {
     let welcome: t.WelcomeState | undefined;
     if (this.screen === t.Screen.Welcome) {
       const ids = Object.keys(this.context.settings.history);
+      const workspace = _.compact(await Promise.all(ids.map(id => Session.summaryFromExisting(this.context, id))));
       welcome = {
-        workspace: await Promise.all(
-          // TODO fix this weird thing. Read session summary directly.
-          ids.map(id => Session.fromExisting(this.context, id).then(session => session.summary)),
-        ),
+        workspace,
         featured: this.featured || [],
         history: this.context.settings.history,
       };

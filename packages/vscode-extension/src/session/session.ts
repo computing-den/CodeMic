@@ -17,6 +17,7 @@ import stream from 'stream';
 import os from 'os';
 import * as vscode from 'vscode';
 import { v4 as uuid } from 'uuid';
+import { SessionSummary } from '@codecast/lib/src/types.js';
 
 export class Session implements t.Session {
   context: Context;
@@ -58,11 +59,15 @@ export class Session implements t.Session {
     return Boolean(this.running && !this.ctrls?.sessionTracksCtrl.mode.recordingEditor);
   }
 
-  static async fromExisting(context: Context, id: string): Promise<Session> {
+  static async fromExisting(context: Context, id: string): Promise<Session | undefined> {
     const workspace = Session.getWorkspace(context, id);
+    const summary = await Session.summaryFromExisting(context, id);
+    return summary && new Session(context, workspace, summary, true);
+  }
+
+  static async summaryFromExisting(context: Context, id: string): Promise<SessionSummary | undefined> {
     const summaryPath = context.dataPaths.session(id).summary;
-    const summary = await storage.readJSON<t.SessionSummary>(summaryPath);
-    return new Session(context, workspace, summary, true);
+    return storage.readJSONOptional<t.SessionSummary>(summaryPath);
   }
 
   static async fromNew(context: Context, summary: t.SessionSummary): Promise<Session> {
@@ -175,6 +180,7 @@ export class Session implements t.Session {
     // this.workspace = path.abs(nodePath.resolve(rootStr));
     await fs.promises.mkdir(this.workspace, { recursive: true });
 
+    // Initialize track controllers.
     await this.initTrackCtrls();
     assert(this.ctrls);
 
@@ -483,6 +489,8 @@ export class Session implements t.Session {
 
   async delete() {
     await fs.promises.rm(this.sessionDataPaths.root, { force: true, recursive: true });
+    delete this.context.settings.history[this.summary.id];
+    await storage.writeJSON(this.context.dataPaths.settings, this.context.settings);
   }
 
   async copy(to: Session) {

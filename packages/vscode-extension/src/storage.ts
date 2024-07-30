@@ -24,6 +24,10 @@ export async function readJSON<T>(p: t.AbsPath, defaultFn?: () => T): Promise<T>
   }
 }
 
+export async function readJSONOptional<T>(p: t.AbsPath): Promise<T | undefined> {
+  return readJSON(p, () => undefined);
+}
+
 export async function writeJSON(p: t.AbsPath, data: any) {
   await fs.promises.mkdir(path.dirname(p), { recursive: true });
   await fs.promises.writeFile(p, pretty(data), 'utf8');

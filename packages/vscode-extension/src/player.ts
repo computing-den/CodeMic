@@ -11,12 +11,12 @@ class Player {
     // assert(session.ctrls);
   }
 
-  get ctrls(): SessionCtrls {
-    return this.session.ctrls!;
+  get ctrls(): SessionCtrls | undefined {
+    return this.session.ctrls;
   }
 
-  get sessionTracksCtrl(): SessionTracksCtrl {
-    return this.ctrls.sessionTracksCtrl;
+  get sessionTracksCtrl(): SessionTracksCtrl | undefined {
+    return this.ctrls?.sessionTracksCtrl;
   }
 
   async sessionCtrlChangeOrProgressHandler() {
@@ -33,21 +33,25 @@ class Player {
     // TODO continue from last position left off
     await this.session.readBody({ download: true });
     await this.session.load();
+    assert(this.ctrls);
     this.ctrls.sessionTracksCtrl.onChangeOrProgress = this.sessionCtrlChangeOrProgressHandler.bind(this);
     this.ctrls.sessionTracksCtrl.onError = this.sessionCtrlErrorHandler.bind(this);
   }
 
   play() {
+    assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.play();
     this.saveHistoryOpenClose().catch(console.error);
   }
 
   pause() {
+    assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.pause();
     this.saveHistoryClock().catch(console.error);
   }
 
   seek(clock: number) {
+    assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.seek(clock);
   }
 
