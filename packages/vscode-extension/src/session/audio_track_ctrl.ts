@@ -55,6 +55,15 @@ export default class AudioTrackCtrl {
     }
   }
 
+  // /**
+  //  * Current clock must be < cut clock.
+  //  */
+  // cut(clock: number) {
+  //   assert(this.clock <= clock);
+  //   const { clockRange } = this.audioTrack;
+  //   this.audioTrack.clockRange = { start: Math.min(clockRange.start, clock), end: Math.min(clockRange.end, clock) };
+  // }
+
   // setPlaybackRate(rate: number) {
   //   assert(this.state.status !== t.TrackPlayerStatus.Error, 'Track has error');
 

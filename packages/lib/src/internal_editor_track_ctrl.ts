@@ -296,12 +296,12 @@ export class InternalEditorTrackCtrl implements t.EditorEventStepper {
 
   /**
    * Cuts all events whose clock is > clock.
-   * Sets summary.duration to clock as well.
+   * Current clock must be < cut clock.
    */
   cut(clock: number) {
     const i = this.editorTrack.events.findIndex(e => e.clock > clock);
+    assert(this.eventIndex < i);
     if (i >= 0) this.editorTrack.events.length = i;
-    // this.clockRange.end = clock;
   }
 
   async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {

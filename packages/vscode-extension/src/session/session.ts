@@ -91,23 +91,24 @@ export class Session implements t.Session {
     };
   }
 
-  static makeForkSummary(base: t.SessionSummary, clock: number, author?: t.UserSummary): t.SessionSummary {
-    return {
-      ..._.cloneDeep(base),
-      id: uuid(),
-      title: `Fork: ${base.title}`,
-      duration: clock,
-      author,
-      forkedFrom: base.id,
-    };
+  static async fromFork(
+    context: Context,
+    baseId: string,
+    options?: { author?: t.UserSummary },
+  ): Promise<Session | undefined> {
+    const base = await Session.fromExisting(context, baseId);
+    if (base) {
+      const summary = await base.fork(options);
+      return Session.fromExisting(context, summary.id);
+    }
   }
 
-  static makeEditSummary(base: t.SessionSummary, author?: t.UserSummary): t.SessionSummary {
-    return {
-      ..._.cloneDeep(base),
-      author,
-    };
-  }
+  // static makeEditSummary(base: t.SessionSummary, author?: t.UserSummary): t.SessionSummary {
+  //   return {
+  //     ..._.cloneDeep(base),
+  //     author,
+  //   };
+  // }
 
   static makeBody(): t.SessionBody {
     return {
@@ -124,6 +125,7 @@ export class Session implements t.Session {
   }
 
   async load(options?: { seekClock?: number; cutClock?: number }) {
+    assert(!this.loaded);
     assert(this.body);
     // this.workspace = path.abs(nodePath.resolve(rootStr));
     await fs.promises.mkdir(this.workspace, { recursive: true });
@@ -132,8 +134,17 @@ export class Session implements t.Session {
     await this.initTrackCtrls();
     assert(this.ctrls);
 
+    if (options?.cutClock && options?.seekClock) {
+      assert(options.cutClock >= options.seekClock);
+    }
+
     // cut it to cutClock.
-    if (options?.cutClock !== undefined) this.ctrls.internalEditorTrackCtrl.cut(options.cutClock);
+    if (options?.cutClock !== undefined) {
+      // We don't need to cut audio because playback ends when it reaches session's duration.
+      this.ctrls.internalEditorTrackCtrl.cut(options.cutClock);
+      // for (const c of this.ctrls.audioTrackCtrls) c.cut(options.cutClock);
+      this.summary.duration = options.cutClock;
+    }
 
     // seek if necessary
     let targetUris: t.Uri[] | undefined;
@@ -152,14 +163,38 @@ export class Session implements t.Session {
   }
 
   async scan() {
+    assert(!this.loaded);
+
     this.body = Session.makeBody();
     await this.initTrackCtrls();
     assert(this.ctrls);
+
+    // Make sure workspace path exists.
+    await fs.promises.mkdir(this.workspace, { recursive: true });
 
     this.body.editorTrack.initSnapshot = await this.makeSnapshotFromDirAndVsc();
     await this.ctrls.internalEditorTrackCtrl.restoreInitSnapshot();
 
     this.loaded = true;
+  }
+
+  async fork(options?: { author?: t.UserSummary }): Promise<t.SessionSummary> {
+    await this.download({ skipIfExists: true });
+    const forkSummary = {
+      ..._.cloneDeep(this.summary),
+      id: uuid(),
+      title: `Fork: ${this.summary.title}`,
+      duration: this.summary.duration,
+      author: options?.author ?? this.summary.author,
+      forkedFrom: this.summary.id,
+    };
+
+    // Copy the entire session data, then rewrite the summary.
+    const forkSessionDataPaths = this.context.dataPaths.session(forkSummary.id);
+    await fs.promises.cp(this.sessionDataPaths.root, forkSessionDataPaths.root, { recursive: true });
+    await storage.writeJSON(forkSessionDataPaths.summary, forkSummary);
+
+    return forkSummary;
   }
 
   async initTrackCtrls() {
@@ -278,6 +313,9 @@ export class Session implements t.Session {
         }
       }
     }
+
+    // Make sure workspace path exists.
+    await fs.promises.mkdir(this.workspace, { recursive: true });
 
     if (targetUris) {
       // all files in targetUris that are no longer in ctrl's worktree should be deleted
@@ -437,10 +475,6 @@ export class Session implements t.Session {
     await fs.promises.rm(this.sessionDataPaths.root, { force: true, recursive: true });
     delete this.context.settings.history[this.summary.id];
     await storage.writeJSON(this.context.dataPaths.settings, this.context.settings);
-  }
-
-  async copy(to: Session) {
-    await fs.promises.cp(this.sessionDataPaths.root, to.sessionDataPaths.root, { recursive: true });
   }
 
   async package() {
@@ -691,9 +725,9 @@ export class Session implements t.Session {
     return success;
   }
 
-  async makeWorkspace() {
-    await fs.promises.mkdir(this.workspace, { recursive: true });
-  }
+  // async makeWorkspace() {
+  //   await fs.promises.mkdir(this.workspace, { recursive: true });
+  // }
 
   getAudioTrackWebviewUri(audioTrack: t.AudioTrack): t.Uri {
     assert(audioTrack.file.type === 'local');

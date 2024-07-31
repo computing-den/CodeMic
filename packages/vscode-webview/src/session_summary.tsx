@@ -93,7 +93,6 @@ export class SessionSummaryListItem extends Component<ListItemProps> {
         postMessage({
           type: 'recorder/open',
           sessionId: this.props.sessionSummary.id,
-          clock: this.props.sessionSummary.duration,
           fork: true,
         }),
     },

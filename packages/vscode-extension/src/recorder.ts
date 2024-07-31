@@ -20,7 +20,7 @@ class Recorder {
 
   // private lastSavedClock: number;
 
-  async load() {
+  async load(options?: { seekClock?: number; cutClock?: number }) {
     // let clock = setup.sessionSummary.duration;
     // if (setup.fork) {
     //   clock = setup.fork.clock;
@@ -32,10 +32,9 @@ class Recorder {
       await this.session.scan();
       this.mustScan = false;
     } else {
-      // TODO pass seekclock and cutclock
-      await this.session.load();
+      await this.session.load(options);
     }
-    await this.save();
+    await this.save(); // session may have changed due to options.cutClock and must be saved.
     this.initSessionTracksCtrlsHandlers();
   }
 

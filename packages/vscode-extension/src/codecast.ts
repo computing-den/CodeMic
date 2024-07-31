@@ -254,15 +254,21 @@ class Codecast {
       //   // return this.respondWithStore();
       // }
       case 'recorder/open': {
-        let session: Session | undefined;
-        let mustScan = false;
         const user = this.context.user && lib.userToUserSummary(this.context.user);
 
         if (req.sessionId) {
+          let session: Session | undefined;
+          let seekClock: number | undefined;
+          let cutClock: number | undefined;
+
+          // TODO check if this.session already contains req.sessionId
           if (req.fork) {
             // Fork existing session.
-            throw new Error('TODO');
-            // use Session.makeForkSummary()
+            session = await Session.fromFork(this.context, req.sessionId, { author: user });
+            if (req.clock !== undefined && req.clock > 0) {
+              seekClock = req.clock;
+              cutClock = req.clock;
+            }
             //
             // let clock = setup.sessionSummary.duration;
             // if (setup.fork) {
@@ -272,8 +278,19 @@ class Codecast {
             // }
           } else {
             // Edit existing session.
-            throw new Error('TODO');
-            // use Session.makeEditSummary()
+            session = await Session.fromExisting(this.context, req.sessionId);
+            if (req.clock !== undefined && req.clock > 0) {
+              seekClock = req.clock;
+            }
+          }
+
+          if (session && (await this.closeCurrentScreen())) {
+            this.session = session;
+
+            await this.session.readBody({ download: true });
+            this.recorder = new Recorder(this.session, false);
+            await this.recorder.load({ seekClock, cutClock });
+            this.setScreen(t.Screen.Recorder);
           }
         } else {
           // Create new session.
@@ -292,15 +309,14 @@ class Codecast {
           }
 
           if (workspace) {
-            session = await Session.fromNew(this.context, workspace, summary);
-            mustScan = true;
-          }
-        }
+            const session = await Session.fromNew(this.context, workspace, summary);
 
-        if (session && (await this.closeCurrentScreen())) {
-          this.session = session;
-          this.recorder = new Recorder(session, mustScan);
-          this.setScreen(t.Screen.Recorder);
+            if (await this.closeCurrentScreen()) {
+              this.session = session;
+              this.recorder = new Recorder(session, true);
+              this.setScreen(t.Screen.Recorder);
+            }
+          }
         }
 
         return this.respondWithStore();

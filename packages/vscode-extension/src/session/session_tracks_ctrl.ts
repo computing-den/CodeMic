@@ -1,4 +1,4 @@
-import { types as t, path, internalEditorTrackCtrl as iet, lib, assert } from '@codecast/lib';
+import { types as t, path, lib, assert } from '@codecast/lib';
 import type { Session } from './session.js';
 import type { SessionCtrls } from '../types.js';
 import AudioTrackCtrl from './audio_track_ctrl.js';
