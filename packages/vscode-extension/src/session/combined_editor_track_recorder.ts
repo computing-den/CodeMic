@@ -116,7 +116,7 @@ class CombinedEditorTrackRecorder {
     // Here, we assume that it is possible to get a textChange without a text editor
     // because vscode's event itself does not provide a text editor.
 
-    const irTextDocument = this.internalCtrl.getTextDocumentByUri(uri);
+    const irTextDocument = this.internalCtrl.findTextDocumentByUri(uri);
     if (irTextDocument) {
       const irContentChanges = vscContentChanges.map(({ range: vscRange, text }) => {
         const range = this.session.rangeFromVsc(vscRange);
