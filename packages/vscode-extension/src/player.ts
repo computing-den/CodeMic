@@ -31,7 +31,6 @@ class Player {
 
   async load() {
     // TODO continue from last position left off
-    await this.session.readBody({ download: true });
     await this.session.load();
     assert(this.ctrls);
     this.ctrls.sessionTracksCtrl.onChangeOrProgress = this.sessionCtrlChangeOrProgressHandler.bind(this);

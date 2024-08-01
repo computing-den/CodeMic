@@ -82,7 +82,6 @@ export class Session implements t.Session {
       title: '',
       description: '',
       author,
-      published: false,
       duration: 0,
       views: 0,
       likes: 0,
@@ -126,19 +125,23 @@ export class Session implements t.Session {
 
   async load(options?: { seekClock?: number; cutClock?: number }) {
     assert(!this.loaded);
-    assert(this.body);
-    // this.workspace = path.abs(nodePath.resolve(rootStr));
+
+    // Read or download body.
+    await this.readBody({ download: true });
+
+    // Create workspace directory..
     await fs.promises.mkdir(this.workspace, { recursive: true });
 
     // Initialize track controllers.
     await this.initTrackCtrls();
     assert(this.ctrls);
 
+    // Make sure cut and seek clocks are valid.
     if (options?.cutClock && options?.seekClock) {
       assert(options.cutClock >= options.seekClock);
     }
 
-    // cut it to cutClock.
+    // Cut to cutClock.
     if (options?.cutClock !== undefined) {
       // We don't need to cut audio because playback ends when it reaches session's duration.
       this.ctrls.internalEditorTrackCtrl.cut(options.cutClock);
@@ -146,7 +149,7 @@ export class Session implements t.Session {
       this.summary.duration = options.cutClock;
     }
 
-    // seek if necessary
+    // Seek to seekClock.
     let targetUris: t.Uri[] | undefined;
     if (options?.seekClock) {
       const uriSet: t.UriSet = {};
@@ -155,10 +158,11 @@ export class Session implements t.Session {
       targetUris = Object.keys(uriSet);
     }
 
-    // sync and save
+    // Sync and save.
     await this.syncInternalEditorTrackToVscodeAndDisk(targetUris);
     await this.saveAllRelevantVscTabs();
 
+    // Loaded.
     this.loaded = true;
   }
 
@@ -180,12 +184,17 @@ export class Session implements t.Session {
 
   async fork(options?: { author?: t.UserSummary }): Promise<t.SessionSummary> {
     await this.download({ skipIfExists: true });
-    const forkSummary = {
-      ..._.cloneDeep(this.summary),
+    const forkSummary: t.SessionSummary = {
       id: uuid(),
       title: `Fork: ${this.summary.title}`,
-      duration: this.summary.duration,
+      description: this.summary.description,
       author: options?.author ?? this.summary.author,
+      duration: this.summary.duration,
+      views: 0,
+      likes: 0,
+      publishTimestamp: undefined,
+      modificationTimestamp: this.summary.modificationTimestamp,
+      toc: this.summary.toc,
       forkedFrom: this.summary.id,
     };
 
@@ -510,9 +519,7 @@ export class Session implements t.Session {
   async publish() {
     await this.package();
     const res = await serverApi.publishSession(this.summary, this.sessionDataPaths.zip, this.context.user?.token);
-    assert(res?.id !== this.summary.id);
     this.summary = res;
-
     await this.write();
   }
 

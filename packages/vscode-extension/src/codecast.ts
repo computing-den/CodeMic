@@ -5,7 +5,7 @@ import WebviewProvider from './webview_provider.js';
 import Session from './session/session.js';
 import * as storage from './storage.js';
 import * as serverApi from './server_api.js';
-import type { Context, WorkspaceChangeGlobalState } from './types.js';
+import type { Context, RecorderRestoreState, WorkspaceChangeGlobalState } from './types.js';
 import * as paths from './paths.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
@@ -85,7 +85,7 @@ class Codecast {
     return this.context.extension.globalState.get<WorkspaceChangeGlobalState>('workspaceChange');
   }
 
-  async setUpWorkspace() {
+  async setUpWorkspace(restoreState?: { recorder?: RecorderRestoreState }) {
     assert(this.session);
 
     // Is workspace already up-to-date?
@@ -100,7 +100,7 @@ class Codecast {
     await this.setWorkspaceChangeGlobalState({
       screen: this.screen,
       sessionId: this.session?.summary.id,
-      mustScan: this.recorder?.mustScan,
+      recorder: restoreState?.recorder,
     });
 
     // Change vscode's workspace folders.
@@ -130,7 +130,7 @@ class Codecast {
 
     console.log('restoreStateAfterRestart(): ', workspaceChange);
     if (workspaceChange) {
-      const { screen, sessionId, mustScan } = workspaceChange;
+      const { screen, sessionId, recorder: recorderRestoreState } = workspaceChange;
 
       if (sessionId) {
         const session = await Session.fromExisting(this.context, sessionId);
@@ -142,8 +142,9 @@ class Codecast {
           this.player = new Player(this.session);
           await this.player.load();
         } else if (screen === t.Screen.Recorder) {
-          this.recorder = new Recorder(this.session, Boolean(mustScan));
-          await this.recorder.load();
+          this.recorder = new Recorder(this.session, Boolean(recorderRestoreState?.mustScan));
+          await this.recorder.load(recorderRestoreState);
+          if (recorderRestoreState?.tabId) this.recorder.tabId = recorderRestoreState.tabId;
         }
       }
       this.setScreen(screen);
@@ -177,37 +178,32 @@ class Codecast {
       case 'account/join': {
         assert(this.account);
 
+        let user: t.User | undefined;
         try {
-          const res = await serverApi.send({ type: 'account/join', credentials: this.account.credentials });
-          await this.userChanged(res.user);
-          this.account.error = undefined;
-          await this.openWelcome();
+          user = (await serverApi.send({ type: 'account/join', credentials: this.account.credentials })).user;
         } catch (error) {
           console.error(error);
           this.account.error = (error as Error).message;
         }
-
+        if (user) await this.changeUser(user);
         return this.respondWithStore();
       }
       case 'account/login': {
         assert(this.account);
         this.account.join = false;
 
+        let user: t.User | undefined;
         try {
-          const res = await serverApi.send({ type: 'account/login', credentials: this.account.credentials });
-          await this.userChanged(res.user);
-          this.account.error = undefined;
-          await this.openWelcome();
+          user = (await serverApi.send({ type: 'account/login', credentials: this.account.credentials })).user;
         } catch (error) {
           console.error(error);
-          this.account.error = (error as Error).message;
+          if (this.account) this.account.error = (error as Error).message;
         }
-
+        if (user) await this.changeUser(user);
         return this.respondWithStore();
       }
       case 'account/logout': {
-        await this.userChanged();
-        await this.openWelcome();
+        await this.changeUser();
         return this.respondWithStore();
       }
       case 'welcome/open': {
@@ -284,17 +280,26 @@ class Codecast {
             }
           }
 
-          if (session && (await this.closeCurrentScreen())) {
-            this.session = session;
+          if (session) {
+            // await session.readBody({ download: true });
 
-            await this.session.readBody({ download: true });
-            this.recorder = new Recorder(this.session, false);
-            await this.recorder.load({ seekClock, cutClock });
-            this.setScreen(t.Screen.Recorder);
+            if (await this.closeCurrentScreen()) {
+              this.session = session;
+              this.recorder = new Recorder(this.session, false);
+              this.setScreen(t.Screen.Recorder);
+
+              // This might trigger a vscode restart in which case this.restoreStateAfterRestart() will be
+              // called and it will recreate the session, recorder, call recorder.load(), and set the screen.
+              await this.setUpWorkspace({ recorder: { mustScan: false, seekClock, cutClock } });
+
+              // Must be called after this.setUpWorkspace()
+              await this.recorder.load({ seekClock, cutClock });
+            }
           }
         } else {
           // Create new session.
-          // We will call setUpWorkspace() on load/scan.
+
+          // For new sessions, user will manually call recorder/load which will call setUpWorkspace().
           const summary = Session.makeNewSummary(user);
           let workspace = misc.getDefaultVscWorkspace();
           if (!workspace) {
@@ -321,11 +326,28 @@ class Codecast {
 
         return this.respondWithStore();
       }
+      case 'recorder/openTab': {
+        assert(this.session);
+        assert(this.recorder);
+        if (req.tabId === 'editor-view' && !this.session.loaded) {
+          // This might trigger a vscode restart in which case this.restoreStateAfterRestart() will be
+          // called and it will recreate the session, recorder, call recorder.load(), and set the screen.
+          await this.setUpWorkspace({ recorder: { mustScan: this.recorder.mustScan, tabId: 'editor-view' } });
+          await this.recorder.load();
+        }
+        this.recorder.tabId = req.tabId;
+        return this.respondWithStore();
+      }
       case 'recorder/load': {
         assert(this.session);
         assert(this.recorder);
-        await this.setUpWorkspace();
+
+        // This might trigger a vscode restart in which case this.restoreStateAfterRestart() will be
+        // called and it will recreate the session, recorder, call recorder.load(), and set the screen.
+        await this.setUpWorkspace({ recorder: { mustScan: this.recorder.mustScan, tabId: 'editor-view' } });
+
         await this.recorder.load();
+        this.recorder.tabId = 'editor-view';
         return this.respondWithStore();
       }
       case 'recorder/record': {
@@ -349,14 +371,14 @@ class Codecast {
         return this.respondWithStore();
       }
       case 'recorder/save': {
-        await this.saveRecorder({ forExit: false, ask: false, verbose: true });
+        await this.saveRecorder();
         return this.respondWithStore();
       }
       case 'recorder/publish': {
         try {
           assert(this.session);
           // let sessionSummary: t.SessionSummary;
-          if (await this.saveRecorder({ forExit: false, ask: true, verbose: false })) {
+          if (await this.saveRecorder()) {
             await this.session.publish();
             vscode.window.showInformationMessage('Published session.');
           }
@@ -541,7 +563,7 @@ class Codecast {
   }
 
   async recorderWillClose(): Promise<boolean> {
-    if (await this.saveRecorder({ forExit: true, ask: true, verbose: false })) {
+    if (await this.saveRecorder()) {
       this.recorder = undefined;
       return true;
     }
@@ -553,7 +575,7 @@ class Codecast {
    * Returns true if successfull and false if cancelled.
    * In verbose mode, it'll show a message even when there are no changes to save.
    */
-  async saveRecorder(options: { forExit: boolean; ask: boolean; verbose: boolean }): Promise<boolean> {
+  async saveRecorder(): Promise<boolean> {
     assert(this.recorder);
 
     if (this.session?.running) {
@@ -680,17 +702,22 @@ class Codecast {
   }
 
   async deactivate() {
+    if (this.session) {
+      await this.session.write();
+    }
     // await this.db.write();
   }
 
-  async userChanged(user?: t.User) {
-    assert(!this.session, 'TODO change of user while session is open');
+  async changeUser(user?: t.User) {
+    // TODO ask user to convert anonymous sessions to the new user.
+
+    const dataPaths = paths.dataPaths(user?.username);
+    const settings = await storage.readJSON<t.Settings>(this.context.dataPaths.settings, Codecast.makeDefaultSettings);
+
+    this.session = undefined;
     this.context.user = user;
-    this.context.dataPaths = paths.dataPaths(user?.username);
-    this.context.settings = await storage.readJSON<t.Settings>(
-      this.context.dataPaths.settings,
-      Codecast.makeDefaultSettings,
-    );
+    this.context.dataPaths = dataPaths;
+    this.context.settings = settings;
     this.context.extension.globalState.update('user', user);
   }
 
@@ -720,6 +747,7 @@ class Codecast {
       assert(this.recorder);
       assert(this.session);
       recorder = {
+        tabId: this.recorder.tabId,
         mustScan: this.recorder.mustScan,
         loaded: this.session.loaded,
         recording: this.session.recording,
@@ -751,8 +779,15 @@ class Codecast {
 
     let welcome: t.WelcomeState | undefined;
     if (this.screen === t.Screen.Welcome) {
+      const readSummary = async (id: string) => {
+        try {
+          return await Session.summaryFromExisting(this.context, id);
+        } catch (error) {
+          console.error(error);
+        }
+      };
       const ids = Object.keys(this.context.settings.history);
-      const workspace = _.compact(await Promise.all(ids.map(id => Session.summaryFromExisting(this.context, id))));
+      const workspace = _.compact(await Promise.all(ids.map(readSummary)));
       welcome = {
         workspace,
         featured: this.featured || [],

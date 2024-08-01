@@ -28,5 +28,12 @@ export type SessionCtrls = {
   vscEditorEventStepper: VscEditorEventStepper;
 };
 
-export type WorkspaceChangeGlobalState = { screen: t.Screen; sessionId?: string; mustScan?: boolean };
+export type RecorderRestoreState = {
+  mustScan: boolean;
+  seekClock?: number;
+  cutClock?: number;
+  tabId?: t.RecorderTabId;
+};
+
+export type WorkspaceChangeGlobalState = { screen: t.Screen; sessionId?: string; recorder?: RecorderRestoreState };
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };

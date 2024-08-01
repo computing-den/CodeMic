@@ -51,27 +51,34 @@ export class SessionSummaryForList extends Component<ForListProps> {
       <WithAvatar className={cn('session-summary for-list', className)} src={this.props.sessionSummary.author?.avatar}>
         <div className="title">{s.title || 'Untitled'}</div>
         {s.description && <div className="description">{s.description}</div>}
-        <div className="footer">
-          <span className="footer-item timestamp">
-            {lastOpenedTimestamp ? (
-              <span>
-                Last opened <TimeFromNow timestamp={lastOpenedTimestamp} />
-              </span>
-            ) : (
-              <TimeFromNow timestamp={s.publishTimestamp ?? s.modificationTimestamp} capitalize />
-            )}
-          </span>
-        </div>
+        {lastOpenedTimestamp && (
+          <div className="footer">
+            <span className="footer-item timestamp">
+              Last opened <TimeFromNow timestamp={lastOpenedTimestamp} />
+            </span>
+          </div>
+        )}
+        {s.publishTimestamp && (
+          <div className="footer">
+            <span className="footer-item timestamp">
+              Published <TimeFromNow timestamp={s.publishTimestamp} />
+            </span>
+          </div>
+        )}
         <div className="footer">
           <span className="footer-item author">{s.author?.username || 'anonymous'}</span>
-          <div className="footer-item badge">
-            <span className="codicon codicon-eye va-top m-right_small" />
-            <span className="count">{s.views}</span>
-          </div>
-          <div className="footer-item badge">
-            <span className="codicon codicon-heart va-top m-right_small" />
-            <span className="count">{s.likes}</span>
-          </div>
+          {s.publishTimestamp && (
+            <>
+              <div className="footer-item badge">
+                <span className="codicon codicon-eye va-top m-right_small" />
+                <span className="count">{s.views}</span>
+              </div>
+              <div className="footer-item badge">
+                <span className="codicon codicon-heart va-top m-right_small" />
+                <span className="count">{s.likes}</span>
+              </div>
+            </>
+          )}
         </div>
       </WithAvatar>
     );
@@ -81,11 +88,11 @@ export class SessionSummaryForList extends Component<ForListProps> {
 export class SessionSummaryListItem extends Component<ListItemProps> {
   clicked = () => postMessage({ type: 'player/open', sessionId: this.props.sessionSummary.id });
   actions: SL.Action[] = [
-    {
-      icon: 'codicon-play',
-      title: 'Play',
-      onClick: () => postMessage({ type: 'player/open', sessionId: this.props.sessionSummary.id }),
-    },
+    // {
+    //   icon: 'codicon-play',
+    //   title: 'Play',
+    //   onClick: () => postMessage({ type: 'player/open', sessionId: this.props.sessionSummary.id }),
+    // },
     {
       icon: 'codicon-repo-forked',
       title: 'Fork: create a new project based on this one',

@@ -10,6 +10,8 @@ import fs from 'fs';
 import { v4 as uuid } from 'uuid';
 
 class Recorder {
+  tabId: t.RecorderTabId = 'details-view';
+
   constructor(public session: Session, public mustScan: boolean) {}
 
   get sessionTracksCtrl(): SessionTracksCtrl | undefined {

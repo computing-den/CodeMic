@@ -41,9 +41,9 @@ function start() {
 
 function initDB() {
   const dbPath = path.join(config.data, 'codecast.db');
-  const dbLog = (...args: any[]) => {
+  function dbLog(...args: any[]) {
     console.log('sqlite: ', ...args);
-  };
+  }
 
   db = new Database(dbPath, { verbose: dbLog });
   db.pragma('journal_mode = WAL');
@@ -111,7 +111,6 @@ function initRoutes() {
   app.post('/publish_session', fillLocals, authenticate, upload.single('file'), async (req, res, next) => {
     try {
       assert(req.file, '/publish_session expects a zip file to be uploaded.');
-
       res.send(await handlePublishSession(req.body, req.file, res.locals));
     } catch (error) {
       next(error);
@@ -371,7 +370,6 @@ function dbSessionSummariesToSessionSummaries(dbSessionSummaries: t.DBSessionSum
       publishTimestamp: s.publish_timestamp,
       modificationTimestamp: s.modification_timestamp,
       forkedFrom: s.forked_from,
-      published: true,
       toc: [],
     };
   });

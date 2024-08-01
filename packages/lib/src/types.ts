@@ -39,6 +39,7 @@ export type FrontendToBackendReqRes =
       request: { type: 'recorder/open'; sessionId?: string; clock?: number; fork?: boolean };
       response: StoreResponse;
     }
+  | { request: { type: 'recorder/openTab'; tabId: RecorderTabId }; response: StoreResponse }
   | { request: { type: 'recorder/load' }; response: StoreResponse }
   | { request: { type: 'recorder/play' }; response: StoreResponse }
   | { request: { type: 'recorder/record' }; response: StoreResponse }
@@ -148,7 +149,7 @@ export type BackendToServerReqRes =
     }
   | {
       request: { type: 'account/login'; credentials: Credentials };
-      response: { type: 'user'; user: User; x: string };
+      response: { type: 'user'; user: User };
     }
   | {
       request: { type: 'featured/get' };
@@ -228,6 +229,7 @@ export type WelcomeState = {
 };
 
 export type RecorderState = {
+  tabId: RecorderTabId;
   mustScan: boolean;
   loaded: boolean;
   recording: boolean;
@@ -240,6 +242,8 @@ export type RecorderState = {
   audioTracks?: AudioTrack[];
   webviewUris?: WebviewUris;
 };
+
+export type RecorderTabId = 'editor-view' | 'details-view';
 
 export type RecorderUpdate = {
   title?: string;
@@ -279,7 +283,7 @@ export type SessionSummary = {
   title: string;
   description: string;
   author?: UserSummary;
-  published: boolean;
+  // published: boolean;
   // publishedUri?: Uri;
   duration: number;
   views: number;

@@ -22,11 +22,9 @@ export default class Recorder extends Component<Props> {
   //   this.props.recorder.sessionSummary.duration * 1000,
   // );
 
-  state = {
-    // The only time when the recorder screen is opened with already loadned recorder,
-    // is right after a vscode restart due to the change of workspace folders.
-    tabId: this.props.recorder.loaded ? 'editor-view' : 'details-view',
-  };
+  // state = {
+  //   tabId: this.props.recorder.loaded ? 'editor-view' : 'details-view',
+  // };
 
   tabs = [
     { id: 'details-view', label: 'DETAILS' },
@@ -34,18 +32,14 @@ export default class Recorder extends Component<Props> {
   ];
 
   tabChanged = async (tabId: string) => {
-    if (tabId === 'editor-view' && !this.props.recorder.loaded) {
-      await this.loadRecorder();
-    } else {
-      this.setState({ tabId });
-    }
+    await postMessage({ type: 'recorder/openTab', tabId: tabId as t.RecorderTabId });
   };
 
   loadRecorder = async () => {
-    const res = await postMessage({ type: 'recorder/load' });
-    if (res.store.recorder?.loaded) {
-      this.setState({ tabId: 'editor-view' });
-    }
+    await postMessage({ type: 'recorder/load' });
+    // if (res.store.recorder?.loaded) {
+    //   this.setState({ tabId: 'editor-view' });
+    // }
   };
 
   play = async (clock?: number) => {
@@ -154,7 +148,7 @@ export default class Recorder extends Component<Props> {
 
     return (
       <Screen className="recorder">
-        <Tabs tabs={this.tabs} activeTabId={this.state.tabId} onTabChange={this.tabChanged}>
+        <Tabs tabs={this.tabs} activeTabId={this.props.recorder.tabId} onTabChange={this.tabChanged}>
           <DetailsView id="details-view" className="" {...this.props} onLoadRecorder={this.loadRecorder} />
           <EditorView id="editor-view" className="" {...this.props} onRecord={this.record} onPlay={this.play} />
         </Tabs>
