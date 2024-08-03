@@ -256,7 +256,7 @@ export class Session implements t.Session {
         await this.writeBlob(sha1, data);
         textEditors.push(ietc.makeTextEditorSnapshot(uri));
       } else if (vscUri.scheme === 'file') {
-        if (await misc.fileExists(path.abs(vscUri.path))) {
+        if (!(await misc.fileExists(path.abs(vscUri.path)))) {
           // File is deleted but the text editor is still there. Ignore it.
           continue;
         }

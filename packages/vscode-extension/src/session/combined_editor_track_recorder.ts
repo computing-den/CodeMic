@@ -92,9 +92,7 @@ class CombinedEditorTrackRecorder {
   }
 
   pause() {
-    if (!this.recording) return;
     this.recording = false;
-
     this.dispose();
   }
 

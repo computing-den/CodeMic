@@ -60,8 +60,14 @@ class Recorder {
     console.error(error);
   }
 
-  record() {
+  async record() {
     assert(this.sessionTracksCtrl);
+    if (this.sessionTracksCtrl.clock !== this.session.summary.duration) {
+      // await this.session.ctrls!.combinedEditorTrackPlayer.seek(this.session.summary.duration);
+      // this.session.ctrls?.internalEditorTrackCtrl.
+      await this.sessionTracksCtrl.seek(this.session.summary.duration, { noUpdate: false });
+      // await new Promise(resolve => setTimeout(resolve, 3000));
+    }
     this.sessionTracksCtrl.record();
     this.saveHistoryOpenClose().catch(console.error);
   }

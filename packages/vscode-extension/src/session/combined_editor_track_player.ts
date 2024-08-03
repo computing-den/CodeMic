@@ -46,13 +46,18 @@ class CombinedEditorTrackPlayer {
   }
 
   pause() {
-    if (!this.playing) return;
     this.playing = false;
     this.dispose();
   }
 
-  seek(clock: number) {
-    this.seekHelper(clock);
+  async seek(clock: number) {
+    try {
+      await this.enqueueUpdate(clock);
+    } catch (error) {
+      if (!(error instanceof lib.CancelledError)) {
+        this.gotError(error as Error);
+      }
+    }
   }
 
   /**
@@ -68,16 +73,6 @@ class CombinedEditorTrackPlayer {
     this.updateQueue.rejectAllInQueue();
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
-  }
-
-  private async seekHelper(clock: number) {
-    try {
-      await this.enqueueUpdate(clock);
-    } catch (error) {
-      if (!(error instanceof lib.CancelledError)) {
-        this.gotError(error as Error);
-      }
-    }
   }
 
   private async enqueueUpdate(clock: number) {

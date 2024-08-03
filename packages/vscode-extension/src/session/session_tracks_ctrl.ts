@@ -94,7 +94,7 @@ export default class SessionTracksCtrl {
   /**
    * If in recorder mode, it will pause and switch to player mode.
    */
-  seek(clock: number, options?: { noUpdate: boolean }) {
+  async seek(clock: number, options?: { noUpdate: boolean }) {
     const noUpdate = options?.noUpdate ?? false;
 
     if (this.mode.recordingEditor) {
@@ -104,9 +104,9 @@ export default class SessionTracksCtrl {
 
     this.clock = clock;
     this.seekInRangeAudios();
-    this.seekEditor();
+    await this.seekEditor();
 
-    if (!noUpdate) this.update(); // Will clear previous timeouts.
+    if (!noUpdate) await this.update(); // Will clear previous timeouts.
   }
 
   insertAudioAndLoad(audioTrack: t.AudioTrack) {
@@ -148,13 +148,13 @@ export default class SessionTracksCtrl {
     c.onError = this.gotError.bind(this);
   }
 
-  private seekEditor() {
+  private async seekEditor() {
     this.ctrls.combinedEditorTrackRecorder.setClock(this.clock);
 
     if (this.mode.recordingEditor) {
       this.ctrls.combinedEditorTrackPlayer.setClock(this.clock);
     } else {
-      this.ctrls.combinedEditorTrackPlayer.seek(this.clock);
+      await this.ctrls.combinedEditorTrackPlayer.seek(this.clock);
     }
   }
 
@@ -222,13 +222,13 @@ export default class SessionTracksCtrl {
     this.onChangeOrProgress?.();
   }
 
-  private update() {
+  private async update() {
     this.clearTimeout();
     this.timeoutTimestamp = performance.now();
-    this.updateStep();
+    await this.updateStep();
   }
 
-  private updateStep = () => {
+  private updateStep = async () => {
     const timeAtUpdate = performance.now();
     this.clock += (timeAtUpdate - this.timeoutTimestamp) / 1000;
 
@@ -246,7 +246,7 @@ export default class SessionTracksCtrl {
       this.clock = Math.min(this.session.summary.duration, this.clock);
     }
 
-    this.seekEditor();
+    await this.seekEditor();
     this.seekInRangeAudiosThatAreNotRunning();
     if (this.running) this.playInRangeAudios();
     this.pauseOutOfRangeAudios();
