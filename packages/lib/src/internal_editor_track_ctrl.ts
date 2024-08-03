@@ -332,7 +332,14 @@ export class InternalEditorTrackCtrl implements t.EditorEventStepper {
       if (textDocument && e.text !== undefined && e.text !== textDocument.getText()) {
         textDocument.applyContentChange(textDocument.getRange(), e.text, false);
       } else if (!textDocument) {
-        const text = e.text ?? new TextDecoder().decode(await this.getContentByUri(e.uri));
+        let text: string;
+        if (e.text !== undefined) {
+          text = e.text;
+        } else if (path.isUntitledUri(e.uri)) {
+          text = '';
+        } else {
+          text = new TextDecoder().decode(await this.getContentByUri(e.uri));
+        }
         textDocument = TextDocument.fromText(e.uri, text, e.eol);
         this.insertTextDocument(textDocument); // Will insert into worktree if necessary.
       }
@@ -345,13 +352,35 @@ export class InternalEditorTrackCtrl implements t.EditorEventStepper {
     }
   }
 
+  async applyCloseTextDocumentEvent(e: t.CloseTextDocumentEvent, direction: t.Direction, uriSet?: t.UriSet) {
+    if (uriSet) uriSet[e.uri] = true;
+
+    assert(path.isUntitledUri(e.uri), 'Must only record closeTextDocument for untitled URIs');
+
+    if (direction === t.Direction.Forwards) {
+      this.closeAndRemoveTextDocumentByUri(e.uri);
+    } else {
+      this.insertTextDocument(TextDocument.fromText(e.uri, e.revText, e.revEol));
+    }
+  }
+
   async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (direction === t.Direction.Forwards) {
       if (uriSet) uriSet[e.uri] = true;
       this.activeTextEditor = await this.openTextEditorByUri(e.uri, e.selections, e.visibleRange);
     } else if (e.revUri) {
       if (uriSet) uriSet[e.revUri] = true;
-      this.activeTextEditor = await this.openTextEditorByUri(e.revUri, e.revSelections!, e.revVisibleRange!);
+      this.activeTextEditor = await this.openTextEditorByUri(e.revUri, e.revSelections, e.revVisibleRange);
+    }
+  }
+
+  async applyCloseTextEditorEvent(e: t.CloseTextEditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
+    if (uriSet) uriSet[e.uri] = true;
+
+    if (direction === t.Direction.Forwards) {
+      this.closeTextEditorByUri(e.uri);
+    } else {
+      await this.openTextEditorByUri(e.uri, e.revSelections, e.revVisibleRange);
     }
   }
 

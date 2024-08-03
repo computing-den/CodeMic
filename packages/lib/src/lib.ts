@@ -152,3 +152,8 @@ export function userToUserSummary(user: t.User): t.UserSummary {
 export function dbUserToUserSummary(dbUser: t.DBUser): t.UserSummary {
   return userToUserSummary(dbUserToUser(dbUser));
 }
+
+// export async function asyncFilter<T>(collection: T[], cb: (x: T, i: number) => Promise<boolean>): Promise<T[]> {
+//   const bools = await Promise.all(collection.map(cb));
+//   return collection.filter((x, i) => bools[i]);
+// }

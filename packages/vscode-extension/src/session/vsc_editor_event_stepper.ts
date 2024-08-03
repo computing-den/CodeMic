@@ -1,4 +1,5 @@
 import { types as t, path, lib, assert, editorEventStepperDispatch } from '@codecast/lib';
+import { fileExists } from '../misc.js';
 import Session from './session.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
@@ -47,8 +48,20 @@ class VscEditorEventStepper implements t.EditorEventStepper {
    */
   async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
-      // Open vsc document first.
-      const vscTextDocument = await vscode.workspace.openTextDocument(this.session.uriToVsc(e.uri));
+      const vscUri = this.session.uriToVsc(e.uri);
+
+      // Open vsc document.
+      let vscTextDocument = this.session.findVscTextDocumentByUri(e.uri);
+
+      // If file doesn't exist, create it and open it and we're done.
+      // vscode.workspace.openTextDocument() will throw if file doesn't exist.
+      if (!vscTextDocument && vscUri.scheme === 'file') {
+        await this.session.writeFileIfNotExists(e.uri, e.text || '');
+        await vscode.workspace.openTextDocument(vscUri);
+        return;
+      }
+
+      vscTextDocument = await vscode.workspace.openTextDocument(vscUri);
 
       // Set text if given.
       if (e.text !== undefined) {
@@ -59,6 +72,19 @@ class VscEditorEventStepper implements t.EditorEventStepper {
       }
     } else {
       await this.session.closeVscTextEditorByUri(e.uri, true);
+    }
+  }
+
+  async applyCloseTextDocumentEvent(e: t.CloseTextDocumentEvent, direction: t.Direction) {
+    assert(path.isUntitledUri(e.uri), 'Must only record closeTextDocument for untitled URIs');
+
+    if (direction === t.Direction.Forwards) {
+      await this.session.closeVscTextEditorByUri(e.uri, true);
+    } else {
+      const vscTextDocument = await vscode.workspace.openTextDocument(this.session.uriToVsc(e.uri));
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(vscTextDocument.uri, this.session.getVscTextDocumentRange(vscTextDocument), e.revText);
+      await vscode.workspace.applyEdit(edit);
     }
   }
 
@@ -77,6 +103,23 @@ class VscEditorEventStepper implements t.EditorEventStepper {
       });
       vscTextEditor.selections = this.session.selectionsToVsc(e.revSelections!);
       await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange!.start.line, at: 'top' });
+    }
+  }
+
+  async applyCloseTextEditorEvent(e: t.CloseTextEditorEvent, direction: t.Direction) {
+    if (direction === t.Direction.Forwards) {
+      await this.session.closeVscTextEditorByUri(e.uri, true);
+    } else {
+      const vscTextEditor = await vscode.window.showTextDocument(this.session.uriToVsc(e.uri), {
+        preview: false,
+        preserveFocus: false,
+      });
+      if (e.revSelections) {
+        vscTextEditor.selections = this.session.selectionsToVsc(e.revSelections);
+      }
+      if (e.revVisibleRange) {
+        await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
+      }
     }
   }
 

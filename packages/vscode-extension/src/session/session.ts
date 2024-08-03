@@ -239,16 +239,35 @@ export class Session implements t.Session {
       await this.copyToBlob(path.join(this.workspace, p), sha1);
     }
 
-    // Get textEditors from vscode.window.visibleTextEditors first. These have selections and visible range.
-    // Then get the rest from vscode.window.tabGroups. These don't have selections and range.
-    const textEditors = vscode.window.visibleTextEditors
-      .filter(e => this.shouldRecordVscUri(e.document.uri))
-      .map(e => this.makeTextEditorSnapshotFromVsc(e));
+    // Walk through the relevant tabs and take snapshots of the text editors.
+    // For untitled tabs, we will also create a blob and put it into the worktree.
+    // We ignore those text editors whose files have been deleted on disk.
+    const textEditors: t.TextEditor[] = [];
+    for (const vscUri of this.getRelevantTabVscUris()) {
+      const uri = this.uriFromVsc(vscUri);
 
-    const tabUris = this.getRelevantTabUris();
-    for (const uri of tabUris) {
-      if (!textEditors.some(e => e.uri === uri)) {
+      if (vscUri.scheme === 'untitled') {
+        const vscTextDocument = this.findVscTextDocumentByVscUri(vscUri);
+        if (!vscTextDocument) continue;
+
+        const data = new TextEncoder().encode(vscTextDocument.getText());
+        const sha1 = await misc.computeSHA1(data);
+        worktree[uri] = { type: 'local', sha1 };
+        await this.writeBlob(sha1, data);
         textEditors.push(ietc.makeTextEditorSnapshot(uri));
+      } else if (vscUri.scheme === 'file') {
+        if (await misc.fileExists(path.abs(vscUri.path))) {
+          // File is deleted but the text editor is still there. Ignore it.
+          continue;
+        }
+
+        // We can only set selection and visible range if we have the vscTextEditor
+        const vscTextEditor = this.findVscTextEditorByVscUri(vscode.window.visibleTextEditors, vscUri);
+        if (vscTextEditor) {
+          textEditors.push(this.makeTextEditorSnapshotFromVsc(vscTextEditor));
+        } else {
+          textEditors.push(ietc.makeTextEditorSnapshot(uri));
+        }
       }
     }
 
@@ -314,11 +333,7 @@ export class Session implements t.Session {
       for (const tab of tabGroup.tabs) {
         if (tab.input instanceof vscode.TabInputText && this.shouldRecordVscUri(tab.input.uri)) {
           const uri = this.uriFromVsc(tab.input.uri);
-          if (!ctrl.findTextEditorByUri(uri)) {
-            const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
-            await vscTextDocument.save();
-            await vscode.window.tabGroups.close(tab);
-          }
+          if (!ctrl.findTextEditorByUri(uri)) await this.closeVscTabInputText(tab, true);
         }
       }
     }
@@ -367,21 +382,27 @@ export class Session implements t.Session {
       const targetUrisOutsideVsc: t.Uri[] = [];
       const edit = new vscode.WorkspaceEdit();
       for (const targetUri of targetUris) {
-        assert(path.isWorkspaceUri(targetUri), 'TODO currently, we only support workspace URIs');
+        if (!ctrl.doesUriExist(targetUri)) continue;
 
-        if (ctrl.doesUriExist(targetUri)) {
-          const vscTextDocument = this.findVscTextDocumentByUri(targetUri);
-          if (vscTextDocument) {
-            const text = new TextDecoder().decode(await ctrl.getContentByUri(targetUri));
-            edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), text);
-          } else {
-            targetUrisOutsideVsc.push(targetUri);
-          }
+        let vscTextDocument: vscode.TextDocument | undefined;
+        if (path.isUntitledUri(targetUri)) {
+          vscTextDocument = await vscode.workspace.openTextDocument(targetUri);
+        } else {
+          vscTextDocument = this.findVscTextDocumentByUri(targetUri);
+        }
+
+        if (vscTextDocument) {
+          const text = new TextDecoder().decode(await ctrl.getContentByUri(targetUri));
+          edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), text);
+        } else {
+          targetUrisOutsideVsc.push(targetUri);
         }
       }
       await vscode.workspace.applyEdit(edit);
 
+      // untitled uris have been opened above and not included in targetUrisOutsideVsc.
       for (const targetUri of targetUrisOutsideVsc) {
+        assert(path.isWorkspaceUri(targetUri));
         const data = await ctrl.getContentByUri(targetUri);
         const absPath = path.getFileUriPath(this.resolveUri(targetUri));
         await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
@@ -464,8 +485,20 @@ export class Session implements t.Session {
     await out.promise();
   }
 
+  async writeFileIfNotExists(uri: t.Uri, text: string) {
+    const absPath = path.getFileUriPath(this.resolveUri(uri));
+
+    if (!(await misc.fileExists(absPath))) {
+      await fs.promises.writeFile(absPath, text);
+    }
+  }
+
   async readBlob(sha1: string): Promise<Uint8Array> {
     return fs.promises.readFile(this.sessionDataPaths.blob(sha1));
+  }
+
+  async writeBlob(sha1: string, data: string | NodeJS.ArrayBufferView) {
+    await fs.promises.writeFile(this.sessionDataPaths.blob(sha1), data, 'utf8');
   }
 
   async readFile(file: t.File): Promise<Uint8Array> {
@@ -527,6 +560,8 @@ export class Session implements t.Session {
     switch (vscUri.scheme) {
       case 'file':
         return path.isBaseOf(this.workspace, path.abs(vscUri.path));
+      case 'untitled':
+        return true;
       default:
         return false;
     }
@@ -580,7 +615,6 @@ export class Session implements t.Session {
   }
 
   uriToVsc(uri: t.Uri): vscode.Uri {
-    assert(path.isWorkspaceUri(uri), 'TODO only supports workspace uri');
     return vscode.Uri.parse(this.resolveUri(uri));
   }
 
@@ -626,18 +660,32 @@ export class Session implements t.Session {
     uri = this.resolveUri(uri);
     for (const tabGroup of vscode.window.tabGroups.all) {
       for (const tab of tabGroup.tabs) {
-        if (tab.input instanceof vscode.TabInputText) {
-          if (tab.input.uri.toString() === uri) {
-            if (skipConfirmation) {
-              assert(tab.input.uri.scheme === 'file', 'TODO cannot skip save confirmation of non-file documents');
-              const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
-              await vscTextDocument.save();
-            }
-            await vscode.window.tabGroups.close(tab);
-          }
+        if (tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === uri) {
+          this.closeVscTabInputText(tab, skipConfirmation);
         }
       }
     }
+  }
+
+  async closeVscTabInputText(tab: vscode.Tab, skipConfirmation: boolean = false) {
+    assert(tab.input instanceof vscode.TabInputText);
+
+    if (skipConfirmation) {
+      const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
+      if (tab.input.uri.scheme === 'untitled') {
+        // for untitled scheme, empty it first, then can close without confirmation
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), '');
+        await vscode.workspace.applyEdit(edit);
+        // TODO We're gonna skip closing it for now. We must use unnamed untitled document
+        // to prevent vscode from showing the confirmation dialog when the content is empty.
+        // See the TODOs in notes.
+        return;
+      } else if (tab.input.uri.scheme === 'file') {
+        await vscTextDocument.save();
+      }
+    }
+    await vscode.window.tabGroups.close(tab);
   }
 
   makeTextEditorSnapshotFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {

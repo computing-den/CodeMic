@@ -429,7 +429,9 @@ export interface EditorEventStepper {
   applyEditorEvent(e: EditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyTextChangeEvent(e: TextChangeEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyOpenTextDocumentEvent(e: OpenTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyCloseTextDocumentEvent(e: CloseTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyShowTextEditorEvent(e: ShowTextEditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyCloseTextEditorEvent(e: CloseTextEditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applySelectEvent(e: SelectEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyScrollEvent(e: ScrollEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applySaveEvent(e: SaveEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
@@ -438,7 +440,9 @@ export interface EditorEventStepper {
 export type EditorEvent =
   | TextChangeEvent
   | OpenTextDocumentEvent
+  | CloseTextDocumentEvent
   | ShowTextEditorEvent
+  | CloseTextEditorEvent
   | SelectEvent
   | ScrollEvent
   | SaveEvent;
@@ -460,6 +464,14 @@ export type OpenTextDocumentEvent = {
   isInWorktree: boolean;
 };
 
+export type CloseTextDocumentEvent = {
+  type: 'closeTextDocument';
+  clock: number;
+  uri: Uri;
+  revText: string;
+  revEol: EndOfLine;
+};
+
 export type ShowTextEditorEvent = {
   type: 'showTextEditor';
   clock: number;
@@ -467,6 +479,15 @@ export type ShowTextEditorEvent = {
   selections: Selection[];
   visibleRange: Range;
   revUri?: Uri;
+  revSelections?: Selection[];
+  revVisibleRange?: Range;
+  // revSelections: Selection[];
+};
+
+export type CloseTextEditorEvent = {
+  type: 'closeTextEditor';
+  clock: number;
+  uri: Uri;
   revSelections?: Selection[];
   revVisibleRange?: Range;
   // revSelections: Selection[];

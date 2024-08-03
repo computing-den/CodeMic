@@ -11,8 +11,12 @@ export default function editorEventStepperDispatch(
       return stepper.applyTextChangeEvent(e, direction, uriSet);
     case 'openTextDocument':
       return stepper.applyOpenTextDocumentEvent(e, direction, uriSet);
+    case 'closeTextDocument':
+      return stepper.applyCloseTextDocumentEvent(e, direction, uriSet);
     case 'showTextEditor':
       return stepper.applyShowTextEditorEvent(e, direction, uriSet);
+    case 'closeTextEditor':
+      return stepper.applyCloseTextEditorEvent(e, direction, uriSet);
     case 'select':
       return stepper.applySelectEvent(e, direction, uriSet);
     case 'scroll':

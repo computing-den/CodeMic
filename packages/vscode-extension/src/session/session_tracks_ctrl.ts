@@ -1,5 +1,6 @@
 import { types as t, path, lib, assert } from '@codecast/lib';
 import type { Session } from './session.js';
+import config from '../config.js';
 import type { SessionCtrls } from '../types.js';
 import AudioTrackCtrl from './audio_track_ctrl.js';
 import _ from 'lodash';
@@ -232,12 +233,14 @@ export default class SessionTracksCtrl {
     this.clock += (timeAtUpdate - this.timeoutTimestamp) / 1000;
 
     if (this.mode.recordingEditor) {
-      console.log(
-        `SessionTracksCtrl duration ${this.session.summary.duration} -> ${Math.max(
-          this.session.summary.duration,
-          this.clock,
-        )}`,
-      );
+      if (config.logSessionTracksCtrlUpdateStep) {
+        console.log(
+          `SessionTracksCtrl duration ${this.session.summary.duration} -> ${Math.max(
+            this.session.summary.duration,
+            this.clock,
+          )}`,
+        );
+      }
       this.session.summary.duration = Math.max(this.session.summary.duration, this.clock);
     } else {
       this.clock = Math.min(this.session.summary.duration, this.clock);

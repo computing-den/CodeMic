@@ -8,7 +8,7 @@ export function workspaceUriFromAbsPath(base: t.AbsPath, p: t.AbsPath): t.Uri {
   return workspaceUriFromRelPath(relToBase(base, p));
 }
 export function untitledUriFromName(name: string): t.Uri {
-  assert(!name.includes('/'));
+  // assert(!name.includes('/'));
   return `untitled:${name}`;
 }
 export function fileUriFromAbsPath(p: t.AbsPath): t.Uri {

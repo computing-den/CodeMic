@@ -1,5 +1,6 @@
 import { types as t, path, lib, internalEditorTrackCtrl as ietc } from '@codecast/lib';
 import type Session from './session.js';
+import config from '../config.js';
 import * as vscode from 'vscode';
 
 import _ from 'lodash';
@@ -33,6 +34,13 @@ class CombinedEditorTrackRecorder {
     {
       const disposable = vscode.workspace.onDidOpenTextDocument(async vscTextDocument => {
         await this.openTextDocument(vscTextDocument);
+      });
+      this.disposables.push(disposable);
+    }
+    // listen for close document events
+    {
+      const disposable = vscode.workspace.onDidCloseTextDocument(async vscTextDocument => {
+        await this.closeTextDocument(vscTextDocument);
       });
       this.disposables.push(disposable);
     }
@@ -103,15 +111,16 @@ class CombinedEditorTrackRecorder {
     vscTextDocument: vscode.TextDocument,
     vscContentChanges: readonly vscode.TextDocumentContentChangeEvent[],
   ) {
+    logRawEvent(`event: textChange ${vscTextDocument.uri} ${JSON.stringify(vscContentChanges)}`);
     if (!this.session.shouldRecordVscUri(vscTextDocument.uri)) return;
 
     const uri = this.session.uriFromVsc(vscTextDocument.uri);
-    console.log(`adding textChange for ${uri}`);
-
     if (vscContentChanges.length === 0) {
-      console.log(`textChange: vscContentChanges for ${uri} is empty`);
+      console.log(`textChange vscContentChanges for ${uri} is empty`);
       return;
     }
+
+    logAcceptedEvent(`accepted textChange for ${uri}`);
 
     // Here, we assume that it is possible to get a textChange without a text editor
     // because vscode's event itself does not provide a text editor.
@@ -137,19 +146,61 @@ class CombinedEditorTrackRecorder {
   }
 
   private async openTextDocument(vscTextDocument: vscode.TextDocument) {
+    logRawEvent(`event: openTextDocument ${vscTextDocument.uri}`);
     if (!this.session.shouldRecordVscUri(vscTextDocument.uri)) return;
 
     const uri = this.session.uriFromVsc(vscTextDocument.uri);
-    console.log(`adding openTextDocument for ${uri}`);
+    logAcceptedEvent(`accepted openTextDocument for ${uri}`);
 
     await this.openTextDocumentByUri(vscTextDocument, uri);
   }
 
+  private async closeTextDocument(vscTextDocument: vscode.TextDocument) {
+    // When user closes a tab without saving it, vscode issues a textChange event
+    // to restore the original content before issuing a closeTextDocument
+
+    logRawEvent(`event: closeTextDocument ${vscTextDocument.uri}`);
+    if (!this.session.shouldRecordVscUri(vscTextDocument.uri)) return;
+
+    const uri = this.session.uriFromVsc(vscTextDocument.uri);
+    let irTextDocument = this.internalCtrl.findTextDocumentByUri(uri);
+    const irTextEditor = this.internalCtrl.findTextEditorByUri(uri);
+
+    if (!irTextDocument) return;
+
+    logAcceptedEvent(`accepted closeTextDocument for ${uri}`);
+
+    const revSelections = irTextEditor?.selections;
+    const revVisibleRange = irTextEditor?.visibleRange;
+    this.internalCtrl.closeTextEditorByUri(uri);
+    this.pushEvent({
+      type: 'closeTextEditor',
+      clock: this.clock,
+      uri,
+      revSelections,
+      revVisibleRange,
+    });
+
+    // No reason to remove/close the text document if it's not an untitled.
+    if (vscTextDocument.uri.scheme === 'untitled') {
+      const revText = irTextDocument.getText();
+      this.internalCtrl.closeAndRemoveTextDocumentByUri(uri);
+      this.pushEvent({
+        type: 'closeTextDocument',
+        clock: this.clock,
+        uri,
+        revText,
+        revEol: irTextDocument.eol,
+      });
+    }
+  }
+
   private async showTextEditor(vscTextEditor: vscode.TextEditor) {
+    logRawEvent(`event: showTextEditor ${vscTextEditor.document.uri}`);
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
     const uri = this.session.uriFromVsc(vscTextEditor.document.uri);
-    console.log(`adding showTextEditor for ${uri}`);
+    logAcceptedEvent(`accepted showTextEditor for ${uri}`);
 
     const revUri = this.internalCtrl.activeTextEditor?.document.uri;
     const revSelections = this.internalCtrl.activeTextEditor?.selections;
@@ -173,12 +224,12 @@ class CombinedEditorTrackRecorder {
   }
 
   private select(vscTextEditor: vscode.TextEditor, selections: readonly vscode.Selection[]) {
+    logRawEvent(`event: select ${vscTextEditor.document.uri} ${JSON.stringify(selections)}`);
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
     const uri = this.session.uriFromVsc(vscTextEditor.document.uri);
-    console.log(`adding select for ${uri}`);
-    console.log(
-      `visibleRange: ${vscTextEditor.visibleRanges[0].start.line}:${vscTextEditor.visibleRanges[0].end.line}`,
+    logAcceptedEvent(
+      `accepted select for ${uri} visibleRange: ${vscTextEditor.visibleRanges[0].start.line}:${vscTextEditor.visibleRanges[0].end.line}`,
     );
 
     const irTextEditor = this.internalCtrl.getTextEditorByUri(uri);
@@ -201,10 +252,11 @@ class CombinedEditorTrackRecorder {
   }
 
   private saveTextDocument(vscTextDocument: vscode.TextDocument) {
+    logRawEvent(`event: saveTextDocument ${vscTextDocument.uri}`);
     if (!this.session.shouldRecordVscUri(vscTextDocument.uri)) return;
 
     const uri = this.session.uriFromVsc(vscTextDocument.uri);
-    console.log(`adding save for ${uri}`);
+    logAcceptedEvent(`accepted save for ${uri}`);
 
     this.pushEvent({
       type: 'save',
@@ -214,11 +266,11 @@ class CombinedEditorTrackRecorder {
   }
 
   private scroll(vscTextEditor: vscode.TextEditor, visibleRanges: readonly vscode.Range[]) {
+    logRawEvent(`event: scroll ${vscTextEditor.document.uri} ${JSON.stringify(visibleRanges)}`);
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
     const uri = this.session.uriFromVsc(vscTextEditor.document.uri);
     const visibleRange = this.session.rangeFromVsc(visibleRanges[0]);
-    console.log(`visible range: ${visibleRange.start.line}:${visibleRange.end.line}`);
 
     if (!this.scrolling) {
       this.scrollStartRange ??= visibleRange;
@@ -230,7 +282,7 @@ class CombinedEditorTrackRecorder {
 
     if (!this.scrolling) return;
 
-    console.log(`adding scroll for ${uri}`);
+    logAcceptedEvent(`accepted scroll for ${uri} visible range: ${visibleRange.start.line}:${visibleRange.end.line}`);
 
     const irTextEditor = this.internalCtrl.getTextEditorByUri(uri);
     const revVisibleRange = irTextEditor.visibleRange;
@@ -320,6 +372,13 @@ class CombinedEditorTrackRecorder {
     }
     return textEditor;
   }
+}
+
+function logRawEvent(str: string) {
+  if (config.logRecorderRawVscEvents) console.log(str);
+}
+function logAcceptedEvent(str: string) {
+  if (config.logRecorderAcceptedVscEvents) console.log(str);
 }
 
 export default CombinedEditorTrackRecorder;
