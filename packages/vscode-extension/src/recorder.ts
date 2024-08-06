@@ -1,5 +1,5 @@
 import { types as t, path } from '@codecast/lib';
-import getMp3Duration from './get_mp3_duration.js';
+import { getMp3Duration, getVideoDuration } from './get_audio_video_duration.js';
 import * as misc from './misc.js';
 import type { SessionCtrls } from './types.js';
 import type Session from './session/session.js';
@@ -135,6 +135,27 @@ class Recorder {
   async deleteAudio(id: string) {
     assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.deleteAudio(id);
+  }
+
+  async insertVideo(uri: t.Uri, clock: number) {
+    assert(this.sessionTracksCtrl);
+    const absPath = path.getFileUriPath(uri);
+    const data = await fs.promises.readFile(absPath);
+    const duration = getVideoDuration(data);
+    const sha1 = await misc.computeSHA1(data);
+    await this.session.copyToBlob(absPath, sha1);
+    const videoTrack: t.VideoTrack = {
+      id: uuid(),
+      clockRange: { start: clock, end: clock + duration },
+      file: { type: 'local', sha1: sha1 },
+      title: path.basename(absPath, { omitExt: true }),
+    };
+    this.sessionTracksCtrl.insertVideoAndLoad(videoTrack);
+  }
+
+  async deleteVideo(id: string) {
+    assert(this.sessionTracksCtrl);
+    this.sessionTracksCtrl.deleteVideo(id);
   }
 
   private async saveHistoryOpenClose() {

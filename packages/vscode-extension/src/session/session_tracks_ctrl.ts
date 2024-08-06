@@ -40,20 +40,28 @@ export default class SessionTracksCtrl {
     return this.session.ctrls!;
   }
 
+  get videoTracks(): t.VideoTrack[] {
+    return this.session.body!.videoTracks;
+  }
+
   constructor(session: Session) {
     this.session = session;
   }
 
   init() {
     for (const c of this.ctrls.audioTrackCtrls) this.initAudioCtrl(c);
+    this.initVideoCtrl();
     this.ctrls.combinedEditorTrackPlayer.onError = this.gotError.bind(this);
     this.ctrls.combinedEditorTrackRecorder.onChange = this.combinedEditorTrackRecorderChangeHandler.bind(this);
     this.ctrls.combinedEditorTrackRecorder.onError = this.gotError.bind(this);
   }
 
   load() {
-    // Load all audios so that they're ready to play when they come into range.
+    // Load media tracks so that they're ready to play when they come into range.
     for (const c of this.ctrls.audioTrackCtrls) c.load();
+
+    const videoTrack = this.findInRangeVideoTrack();
+    if (videoTrack) this.ctrls.videoTrackCtrl.loadTrack(videoTrack);
   }
 
   play() {
@@ -66,7 +74,6 @@ export default class SessionTracksCtrl {
       this.seek(0, { noUpdate: true });
     }
 
-    // this.playInRangeAudios();
     this.ctrls.combinedEditorTrackPlayer.play();
     this.update();
   }
@@ -79,15 +86,16 @@ export default class SessionTracksCtrl {
     this.mode.recordingEditor = true;
     this.mode.status = SessionTracksCtrlStatus.Running;
 
-    // this.playInRangeAudios();
     this.ctrls.combinedEditorTrackRecorder.record();
 
     this.update();
   }
 
   pause() {
+    this.clearTimeout();
     this.mode.status = SessionTracksCtrlStatus.Paused;
     this.pauseAudios();
+    this.pauseVideo();
     this.pauseEditor();
   }
 
@@ -104,6 +112,7 @@ export default class SessionTracksCtrl {
 
     this.clock = clock;
     this.seekInRangeAudios();
+    this.loadInRangeVideoAndSeek();
     await this.seekEditor();
 
     if (!noUpdate) await this.update(); // Will clear previous timeouts.
@@ -135,7 +144,26 @@ export default class SessionTracksCtrl {
     this.onChange?.();
   }
 
-  handleFrontendAudioEvent(e: t.FrontendAudioEvent) {
+  insertVideoAndLoad(videoTrack: t.VideoTrack) {
+    // const videoTrackCtrl = new VideoTrackCtrl(this.session, videoTrack);
+    this.session.summary.duration = Math.max(this.session.summary.duration, videoTrack.clockRange.end);
+    this.session.body!.videoTracks.push(videoTrack);
+    // this.ctrls.videoTrackCtrl.insert(videoTrackCtrl);
+    this.initVideoCtrl();
+    this.onChange?.();
+  }
+
+  deleteVideo(id: string) {
+    const j = this.session.body!.videoTracks.findIndex(t => t.id === id);
+    if (j !== -1) {
+      this.session.body!.videoTracks.splice(j, 1);
+    }
+
+    this.ctrls.videoTrackCtrl.pause();
+    this.onChange?.();
+  }
+
+  handleFrontendAudioEvent(e: t.FrontendMediaEvent) {
     const audioCtrl = this.ctrls.audioTrackCtrls.find(a => a.audioTrack.id === e.id);
     if (audioCtrl) {
       audioCtrl.handleAudioEvent(e);
@@ -144,8 +172,16 @@ export default class SessionTracksCtrl {
     }
   }
 
+  handleFrontendVideoEvent(e: t.FrontendMediaEvent) {
+    this.ctrls.videoTrackCtrl.handleVideoEvent(e);
+  }
+
   private initAudioCtrl(c: AudioTrackCtrl) {
     c.onError = this.gotError.bind(this);
+  }
+
+  private initVideoCtrl() {
+    this.ctrls.videoTrackCtrl.onError = this.gotError.bind(this);
   }
 
   private async seekEditor() {
@@ -168,23 +204,23 @@ export default class SessionTracksCtrl {
 
   private seekInRangeAudios() {
     for (const c of this.ctrls.audioTrackCtrls) {
-      if (this.isAudioInRange(c)) this.seekAudio(c);
+      if (this.isTrackInRange(c.audioTrack)) this.seekAudio(c);
     }
   }
 
   private seekInRangeAudiosThatAreNotRunning() {
     for (const c of this.ctrls.audioTrackCtrls) {
-      if (!c.running && this.isAudioInRange(c)) this.seekAudio(c);
+      if (!c.running && this.isTrackInRange(c.audioTrack)) this.seekAudio(c);
     }
   }
 
   private seekAudio(c: AudioTrackCtrl) {
-    c.seek(this.globalClockToAudioLocal(c));
+    c.seek(this.globalClockToTrackLocal(c.audioTrack));
   }
 
   private playInRangeAudios() {
     for (const c of this.ctrls.audioTrackCtrls) {
-      if (!c.running && this.isAudioInRange(c)) c.play();
+      if (!c.running && this.isTrackInRange(c.audioTrack)) c.play();
     }
   }
 
@@ -196,7 +232,47 @@ export default class SessionTracksCtrl {
 
   private pauseOutOfRangeAudios() {
     for (const c of this.ctrls.audioTrackCtrls) {
-      if (c.running && !this.isAudioInRange(c)) c.pause();
+      if (c.running && !this.isTrackInRange(c.audioTrack)) c.pause();
+    }
+  }
+
+  private stopOutOfRangeVideo() {
+    const c = this.ctrls.videoTrackCtrl;
+    if (c.videoTrack && !this.isTrackInRange(c.videoTrack)) c.stop();
+  }
+
+  private pauseVideo() {
+    this.ctrls.videoTrackCtrl.pause();
+  }
+
+  private loadInRangeVideoAndSeek() {
+    const videoTrack = this.findInRangeVideoTrack();
+    if (videoTrack) {
+      this.ctrls.videoTrackCtrl.loadTrack(videoTrack);
+      this.ctrls.videoTrackCtrl.seek(this.globalClockToTrackLocal(videoTrack));
+    }
+  }
+
+  private loadInRangeVideoAndSeekIfDifferent() {
+    const videoTrack = this.findInRangeVideoTrack();
+    console.log('loadInRangeVideoAndSeekIfDifferent videoTrack', videoTrack);
+    if (videoTrack && (this.ctrls.videoTrackCtrl.videoTrack !== videoTrack || !this.ctrls.videoTrackCtrl.running)) {
+      this.ctrls.videoTrackCtrl.loadTrack(videoTrack);
+      this.ctrls.videoTrackCtrl.seek(this.globalClockToTrackLocal(videoTrack));
+    }
+  }
+
+  private findInRangeVideoTrack(): t.VideoTrack | undefined {
+    return _.findLast(this.videoTracks, t => this.isTrackInRange(t));
+  }
+
+  private playInRangeVideo() {
+    if (
+      !this.ctrls.videoTrackCtrl.running &&
+      this.ctrls.videoTrackCtrl.videoTrack &&
+      this.isTrackInRange(this.ctrls.videoTrackCtrl.videoTrack)
+    ) {
+      this.ctrls.videoTrackCtrl.play();
     }
   }
 
@@ -209,12 +285,12 @@ export default class SessionTracksCtrl {
     return this.clock > this.session.summary.duration - 1;
   }
 
-  private isAudioInRange(c: AudioTrackCtrl): boolean {
-    return lib.isClockInRange(this.clock, c.audioTrack.clockRange);
+  private isTrackInRange(t: t.RangedTrack): boolean {
+    return lib.isClockInRange(this.clock, t.clockRange);
   }
 
-  private globalClockToAudioLocal(c: AudioTrackCtrl): number {
-    return lib.clockToLocal(this.clock, c.audioTrack.clockRange);
+  private globalClockToTrackLocal(t: t.RangedTrack): number {
+    return lib.clockToLocal(this.clock, t.clockRange);
   }
 
   private combinedEditorTrackRecorderChangeHandler() {
@@ -248,8 +324,13 @@ export default class SessionTracksCtrl {
 
     await this.seekEditor();
     this.seekInRangeAudiosThatAreNotRunning();
-    if (this.running) this.playInRangeAudios();
+    this.loadInRangeVideoAndSeekIfDifferent();
+    if (this.running) {
+      this.playInRangeAudios();
+      this.playInRangeVideo();
+    }
     this.pauseOutOfRangeAudios();
+    this.stopOutOfRangeVideo();
 
     if (!this.mode.recordingEditor && this.clock === this.session.summary.duration) {
       this.pause();

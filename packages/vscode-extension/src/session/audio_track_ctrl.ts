@@ -75,7 +75,7 @@ export default class AudioTrackCtrl {
   //   this.postAudioMessage({ type: 'audio/dispose', id: this.audioTrack.id }).catch(this.gotError);
   // }
 
-  handleAudioEvent(e: t.FrontendAudioEvent) {
+  handleAudioEvent(e: t.FrontendMediaEvent) {
     switch (e.type) {
       case 'loadstart': {
         console.log('loadstart');
@@ -177,6 +177,10 @@ export default class AudioTrackCtrl {
       }
       case 'volumechange': {
         console.log('volumechange', e.volume);
+        break;
+      }
+      case 'ratechange': {
+        console.log('ratechange', e.rate);
         break;
       }
       case 'error': {

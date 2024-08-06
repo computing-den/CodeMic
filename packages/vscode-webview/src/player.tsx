@@ -8,19 +8,21 @@ import { SessionSummary } from './session_summary.jsx';
 import SessionDescription from './session_description.jsx';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
-import postMessage, { mediaApi } from './api.js';
+import postMessage, { setMediaManager } from './api.js';
+import MediaManager from './media_manager.js';
 import _ from 'lodash';
 
 type Props = { user?: t.User; player: t.PlayerState };
 export default class Player extends Component<Props> {
   seeking = false;
+  mediaManager = new MediaManager();
 
   load = async () => {
     await postMessage({ type: 'player/load' });
   };
 
   play = async () => {
-    await mediaApi.prepareAll();
+    await this.mediaManager.prepare(this.getVideoElem());
     await postMessage({ type: 'player/play' });
   };
 
@@ -38,6 +40,10 @@ export default class Player extends Component<Props> {
       return;
     }
     await postMessage({ type: 'player/seek', clock });
+  };
+
+  getVideoElem = (): HTMLVideoElement => {
+    return document.querySelector('#guide-video')!;
   };
 
   tocItemClicked = async (e: Event, item: t.TocItem) => {
@@ -71,23 +77,24 @@ export default class Player extends Component<Props> {
   //   );
   // }
 
-  loadOrDisposeAudioTracks() {
-    const { audioTracks, webviewUris } = this.props.player;
-    if (audioTracks && webviewUris) {
-      mediaApi.loadOrDisposeAudioTracks(audioTracks, webviewUris);
+  updateResources() {
+    const { audioTracks, videoTracks, webviewUris } = this.props.player;
+    if (webviewUris) {
+      this.mediaManager.updateResources(webviewUris, audioTracks, videoTracks);
     }
   }
 
   componentDidUpdate() {
-    this.loadOrDisposeAudioTracks();
+    this.updateResources();
   }
 
   componentDidMount() {
-    this.loadOrDisposeAudioTracks();
+    setMediaManager(this.mediaManager);
+    this.updateResources();
   }
 
   componentWillUnmount() {
-    mediaApi.disposeAll();
+    this.mediaManager.close();
   }
 
   render() {
@@ -111,8 +118,8 @@ export default class Player extends Component<Props> {
         title: player.playing
           ? `Fork: create a new project starting at this point`
           : player.clock > 0
-          ? `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`
-          : `Fork: create a new project based on this one`,
+            ? `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`
+            : `Fork: create a new project based on this one`,
         icon: 'codicon-repo-forked',
         onClick: this.fork,
       },
@@ -157,6 +164,7 @@ export default class Player extends Component<Props> {
               clock={player.clock}
               duration={ss.duration}
             />
+            <video id="guide-video" className="subsection" />
             <SessionDescription className="subsection subsection_spaced" sessionSummary={ss} />
             {/*!player.loaded && (
               <PathField

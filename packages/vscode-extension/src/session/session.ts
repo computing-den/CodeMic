@@ -8,6 +8,7 @@ import SessionTracksCtrl from './session_tracks_ctrl.js';
 import CombinedEditorTrackPlayer from './combined_editor_track_player.js';
 import CombinedEditorTrackRecorder from './combined_editor_track_recorder.js';
 import AudioTrackCtrl from './audio_track_ctrl.js';
+import VideoTrackCtrl from './video_track_ctrl.js';
 import VscEditorEventStepper from './vsc_editor_event_stepper.js';
 import fs from 'fs';
 import _ from 'lodash';
@@ -120,6 +121,7 @@ export class Session implements t.Session {
         },
       },
       audioTracks: [],
+      videoTracks: [],
     };
   }
 
@@ -212,6 +214,8 @@ export class Session implements t.Session {
     this.ctrls = {
       internalEditorTrackCtrl: await ietc.InternalEditorTrackCtrl.fromSession(this),
       audioTrackCtrls: this.body.audioTracks.map(audioTrack => new AudioTrackCtrl(this, audioTrack)),
+      videoTrackCtrl: new VideoTrackCtrl(this),
+      // videoTrackCtrl: new VideoTrackCtrl(this),
       combinedEditorTrackPlayer: new CombinedEditorTrackPlayer(this),
       combinedEditorTrackRecorder: new CombinedEditorTrackRecorder(this),
       vscEditorEventStepper: new VscEditorEventStepper(this),
@@ -784,15 +788,17 @@ export class Session implements t.Session {
   //   await fs.promises.mkdir(this.workspace, { recursive: true });
   // }
 
-  getAudioTrackWebviewUri(audioTrack: t.AudioTrack): t.Uri {
-    assert(audioTrack.file.type === 'local');
-    const vscUri = vscode.Uri.file(this.sessionDataPaths.blob(audioTrack.file.sha1));
+  getTrackFileWebviewUri(trackFile: t.RangedTrackFile): t.Uri {
+    assert(trackFile.file.type === 'local');
+    const vscUri = vscode.Uri.file(this.sessionDataPaths.blob(trackFile.file.sha1));
     return this.context.view!.webview.asWebviewUri(vscUri).toString();
   }
 
   getWebviewUris(): t.WebviewUris | undefined {
     if (this.body) {
-      return Object.fromEntries(this.body.audioTracks.map(t => [t.id, this.getAudioTrackWebviewUri(t)]));
+      return Object.fromEntries(
+        _.concat(this.body.audioTracks, this.body.videoTracks).map(t => [t.id, this.getTrackFileWebviewUri(t)]),
+      );
     }
   }
 }

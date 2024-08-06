@@ -1,0 +1,10 @@
+#guide-video {
+  /* margin: 1rem 0; */
+  border-radius: 5px;
+
+  border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--dropdown-border));
+  &:not([src]),
+  &[src=''] {
+    display: none;
+  }
+}

@@ -50,6 +50,8 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/update'; changes: RecorderUpdate }; response: StoreResponse }
   | { request: { type: 'recorder/insertAudio'; uri: Uri; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/deleteAudio'; id: string }; response: StoreResponse }
+  | { request: { type: 'recorder/insertVideo'; uri: Uri; clock: number }; response: StoreResponse }
+  | { request: { type: 'recorder/deleteVideo'; id: string }; response: StoreResponse }
   // | { request: { type: 'toggleRecorderStudio' }; response: StoreResponse }
   | { request: { type: 'deleteSession'; sessionId: string }; response: StoreResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
@@ -57,9 +59,10 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'confirmForkFromPlayer'; clock: number }; response: BooleanResponse }
   | { request: { type: 'confirmEditFromPlayer'; clock: number }; response: BooleanResponse }
   | { request: { type: 'test'; value: any }; response: StoreResponse }
-  | { request: { type: 'audio'; event: FrontendAudioEvent }; response: OKResponse };
+  | { request: { type: 'audio'; event: FrontendMediaEvent }; response: OKResponse }
+  | { request: { type: 'video'; event: FrontendMediaEvent }; response: OKResponse };
 
-export type FrontendAudioEvent =
+export type FrontendMediaEvent =
   | { type: 'loadstart'; id: string }
   | { type: 'durationchange'; id: string }
   | { type: 'loadedmetadata'; id: string }
@@ -79,13 +82,15 @@ export type FrontendAudioEvent =
   | { type: 'pause'; id: string }
   | { type: 'ended'; id: string }
   | { type: 'volumechange'; id: string; volume: number }
+  | { type: 'ratechange'; id: string; rate: number }
   | { type: 'seeking'; id: string }
   | { type: 'seeked'; id: string };
 
 export type BackendToFrontendReqRes =
   | { request: { type: 'updateStore'; store: Store }; response: OKResponse }
   | { request: { type: 'todo' }; response: OKResponse }
-  | BackendAudioToFrontendReqRes;
+  | BackendAudioToFrontendReqRes
+  | BackendVideoToFrontendReqRes;
 
 export type BackendAudioToFrontendReqRes =
   // | { request: { type: 'audio/load'; src: string; id: string }; response: OKResponse }
@@ -94,6 +99,14 @@ export type BackendAudioToFrontendReqRes =
   | { request: { type: 'audio/dispose'; id: string }; response: OKResponse }
   | { request: { type: 'audio/seek'; id: string; clock: number }; response: OKResponse }
   | { request: { type: 'audio/setPlaybackRate'; id: string; rate: number }; response: OKResponse };
+
+export type BackendVideoToFrontendReqRes =
+  | { request: { type: 'video/loadTrack'; id: string }; response: OKResponse }
+  | { request: { type: 'video/play' }; response: OKResponse }
+  | { request: { type: 'video/pause' }; response: OKResponse }
+  | { request: { type: 'video/stop' }; response: OKResponse }
+  | { request: { type: 'video/seek'; clock: number }; response: OKResponse }
+  | { request: { type: 'video/setPlaybackRate'; rate: number }; response: OKResponse };
 
 export type FrontendRequest = FrontendToBackendReqRes['request'];
 export type BackendResponse = FrontendToBackendReqRes['response'] | ErrorResponse;
@@ -132,6 +145,10 @@ export type PostMessageOptions = {
 export type BackendAudioRequest = BackendAudioToFrontendReqRes['request'];
 export type FrontendAudioResponse = BackendAudioToFrontendReqRes['response'] | ErrorResponse;
 export type PostAudioMessageToFrontend = (req: BackendAudioRequest) => Promise<FrontendAudioResponse>;
+
+export type BackendVideoRequest = BackendVideoToFrontendReqRes['request'];
+export type FrontendVideoResponse = BackendVideoToFrontendReqRes['response'] | ErrorResponse;
+export type PostVideoMessageToFrontend = (req: BackendVideoRequest) => Promise<FrontendVideoResponse>;
 
 // export type B2SReqAccountJoin = { type: 'account/join'; credentials: Credentials };
 // export type B2SResAccountJoin = { type: 'user'; user: User };
@@ -240,6 +257,7 @@ export type RecorderState = {
   // fork?: { clock: number };
   history?: SessionHistory;
   audioTracks?: AudioTrack[];
+  videoTracks?: VideoTrack[];
   webviewUris?: WebviewUris;
 };
 
@@ -259,6 +277,7 @@ export type PlayerState = {
   workspace?: string;
   history?: SessionHistory;
   audioTracks?: AudioTrack[];
+  videoTracks?: VideoTrack[];
   webviewUris?: WebviewUris;
 };
 
@@ -312,6 +331,7 @@ export type DBSessionSummary = {
 export type SessionBody = {
   editorTrack: InternalEditorTrack;
   audioTracks: AudioTrack[];
+  videoTracks: VideoTrack[];
 };
 
 export type ClockRange = {
@@ -331,75 +351,19 @@ export type RangedTrack = {
   title: string;
 };
 
+export type RangedTrackFile = RangedTrack & { file: File };
+
 /**
  * Multiple audio tracks may refer to the same file.
  */
-export type AudioTrack = RangedTrack & { file: File };
+export type AudioTrack = RangedTrackFile;
+
+/**
+ * Multiple video tracks may refer to the same file.
+ */
+export type VideoTrack = RangedTrackFile;
 
 export type WebviewUris = { [key: string]: Uri };
-
-// export interface EditorPlayer {
-//   readonly track: InternalEditorTrack;
-//   readonly playing: boolean;
-//   onError?: (error: Error) => any;
-
-//   play(): void;
-//   pause(): void;
-//   seek(clock: number): void;
-//   setClock(clock: number): void;
-// }
-
-// export interface EditorRecorder {
-//   readonly track: InternalEditorTrack;
-//   readonly recording: boolean;
-//   onChange?: () => any;
-//   onError?: (error: Error) => any;
-
-//   record(): void;
-//   pause(): void;
-//   setClock(clock: number): void;
-// }
-
-// export interface AudioCtrl {
-//   readonly running: boolean;
-//   readonly track: AudioTrack;
-//   onError?: (error: Error) => any;
-
-//   load(): void;
-//   play(): void;
-//   pause(): void;
-//   seek(clock: number): void;
-//   handleAudioEvent(e: FrontendAudioEvent): void;
-// }
-
-// export interface TrackPlayer {
-//   name: string;
-//   track: Track;
-//   clock: number;
-//   state: TrackPlayerState;
-//   playbackRate: number;
-//   isRecorder: boolean;
-//   onProgress?: (clock: number) => any;
-//   onStateChange?: (state: TrackPlayerState) => any;
-
-//   load(): void;
-//   start(): void;
-//   pause(): void;
-//   stop(): void;
-//   seek(clock: number): void;
-//   setClock(clock: number): void;
-//   extend(clock: number): void;
-//   setPlaybackRate(rate: number): void;
-//   dispose(): any;
-// }
-
-// export type TrackPlayerSummary = {
-//   name: string;
-//   track: Track;
-//   state: TrackPlayerState;
-//   clock: number;
-//   playbackRate: number;
-// };
 
 export type InternalEditorTrackSnapshot = {
   worktree: Worktree;

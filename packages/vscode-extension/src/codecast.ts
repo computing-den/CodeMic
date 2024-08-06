@@ -155,6 +155,7 @@ class Codecast {
     try {
       this.context.view = this.webviewProvider.view;
       this.context.postAudioMessage = this.postAudioMessage.bind(this);
+      this.context.postVideoMessage = this.postVideoMessage.bind(this);
       this.context.updateFrontend = this.updateFrontend.bind(this);
       this.updateViewTitle();
     } catch (error) {
@@ -417,6 +418,16 @@ class Codecast {
         await this.recorder.deleteAudio(req.id);
         return this.respondWithStore();
       }
+      case 'recorder/insertVideo': {
+        assert(this.recorder);
+        await this.recorder.insertVideo(req.uri, req.clock);
+        return this.respondWithStore();
+      }
+      case 'recorder/deleteVideo': {
+        assert(this.recorder);
+        await this.recorder.deleteVideo(req.id);
+        return this.respondWithStore();
+      }
       case 'confirmForkFromPlayer': {
         const wasRunning = this.session?.playing;
         if (!wasRunning) return { type: 'boolean', value: true };
@@ -471,6 +482,11 @@ class Codecast {
       case 'audio': {
         assert(this.session?.ctrls);
         this.session.ctrls.sessionTracksCtrl.handleFrontendAudioEvent(req.event);
+        return this.respondWithStore();
+      }
+      case 'video': {
+        assert(this.session?.ctrls);
+        this.session.ctrls.sessionTracksCtrl.handleFrontendVideoEvent(req.event);
         return this.respondWithStore();
       }
       case 'test': {
@@ -741,6 +757,10 @@ class Codecast {
     return this.webviewProvider.postMessage(req);
   }
 
+  async postVideoMessage(req: t.BackendVideoRequest): Promise<t.FrontendVideoResponse> {
+    return this.webviewProvider.postMessage(req);
+  }
+
   async getStore(): Promise<t.Store> {
     let recorder: t.RecorderState | undefined;
     if (this.screen === t.Screen.Recorder) {
@@ -757,6 +777,7 @@ class Codecast {
         workspace: this.session.workspace,
         history: this.context.settings.history[this.session.summary.id],
         audioTracks: this.session.body?.audioTracks,
+        videoTracks: this.session.body?.videoTracks,
         webviewUris: this.session.getWebviewUris(),
       };
     }
@@ -773,6 +794,7 @@ class Codecast {
         workspace: this.session.workspace,
         history: this.context.settings.history[this.session.summary.id],
         audioTracks: this.session.body?.audioTracks,
+        videoTracks: this.session.body?.videoTracks,
         webviewUris: this.session.getWebviewUris(),
       };
     }

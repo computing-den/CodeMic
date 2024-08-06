@@ -1,4 +1,13 @@
-// Code taken from https://github.com/transitive-bullshit
+export function getVideoDuration(buffer: Buffer) {
+  const header = Buffer.from('mvhd');
+  const start = buffer.indexOf(header) + 16;
+  const timeScale = buffer.readUInt32BE(start);
+  const duration = buffer.readUInt32BE(start + 4);
+
+  return Math.floor(duration / timeScale);
+}
+
+// Code for mp3 duration taken from https://github.com/transitive-bullshit
 
 const versions = ['2.5', 'x', '2', '1'];
 const layers = ['x', '3', '2', '1'];
@@ -46,7 +55,7 @@ const samples: { [key: string]: { [key: string]: number } } = {
   },
 };
 
-export default function getMp3Duration(buffer: Buffer): number {
+export function getMp3Duration(buffer: Buffer): number {
   const scratch = Buffer.alloc(100);
   const bytesRead = buffer.copy(scratch, 0, 0, 100);
   if (bytesRead < 100) return 0;

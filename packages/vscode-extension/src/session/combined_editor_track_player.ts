@@ -1,6 +1,7 @@
 import { types as t, path, lib, internalEditorTrackCtrl as ietc } from '@codecast/lib';
 import VscEditorEventStepper from './vsc_editor_event_stepper.js';
 import type Session from './session.js';
+import config from '../config.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
@@ -84,13 +85,17 @@ class CombinedEditorTrackPlayer {
     const seekData = this.internalCtrl.getSeekData(clock);
 
     if (seekData.events.length > 10) {
-      console.log('updateImmediately: applying wholesale', seekData);
+      if (config.logTrackPlayerUpdateStep) {
+        console.log('updateImmediately: applying wholesale', seekData);
+      }
       // Update by seeking the internal this.internalCtrl first, then syncing the this.internalCtrl to vscode and disk
       const uriSet: t.UriSet = {};
       await this.internalCtrl.seek(seekData, uriSet);
       await this.session.syncInternalEditorTrackToVscodeAndDisk(Object.keys(uriSet));
     } else {
-      console.log('updateImmediately: applying one at a time', seekData);
+      if (config.logTrackPlayerUpdateStep) {
+        console.log('updateImmediately: applying one at a time', seekData);
+      }
       // Apply updates one at a time
       for (let i = 0; i < seekData.events.length; i++) {
         await this.internalCtrl.applySeekStep(seekData, i);
