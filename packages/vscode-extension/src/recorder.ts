@@ -102,6 +102,7 @@ class Recorder {
     // if (changes.clock !== undefined) this.sessionSummary.duration = this.sessionTracksCtrl.clock = changes.clock;
     if (changes.workspace !== undefined)
       throw new Error('Recorder.updateState cannot change workspace after initialization');
+    if (changes.duration) this.session.summary.duration = changes.duration;
 
     this.dirty = true;
   }
@@ -130,17 +131,21 @@ class Recorder {
       title: path.basename(absPath, { omitExt: true }),
     };
     this.sessionTracksCtrl.insertAudioAndLoad(audioTrack);
+
+    this.dirty = true;
   }
 
   async deleteAudio(id: string) {
     assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.deleteAudio(id);
+    this.dirty = true;
   }
 
   async updateAudio(audio: Partial<t.AudioTrack>) {
     assert(this.session.body);
     const track = this.session.body.audioTracks.find(t => t.id === audio.id);
     if (track) Object.assign(track, audio);
+    this.dirty = true;
   }
 
   async insertVideo(uri: t.Uri, clock: number) {
@@ -157,17 +162,20 @@ class Recorder {
       title: path.basename(absPath, { omitExt: true }),
     };
     this.sessionTracksCtrl.insertVideoAndLoad(videoTrack);
+    this.dirty = true;
   }
 
   async deleteVideo(id: string) {
     assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.deleteVideo(id);
+    this.dirty = true;
   }
 
   async updateVideo(video: Partial<t.VideoTrack>) {
     assert(this.session.body);
     const track = this.session.body.videoTracks.find(t => t.id === video.id);
     if (track) Object.assign(track, video);
+    this.dirty = true;
   }
 
   private async saveHistoryOpenClose() {

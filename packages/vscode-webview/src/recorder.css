@@ -97,7 +97,7 @@
               left: 0;
               right: 0;
               /* height: 1px; */
-              border-bottom: 1px solid;
+              border-top: 1px solid;
               z-index: var(--marker-z-index);
 
               /* &:hover { */
@@ -108,7 +108,7 @@
               /*   display: none; */
               /* } */
               &.marker_active {
-                border-bottom-width: 2px;
+                border-width: 2px;
               }
               &.marker_cursor {
                 border-color: var(--marker-cursor-color);
@@ -124,6 +124,20 @@
               &.marker_selection {
                 border-color: var(--marker-anchor-color);
               }
+              &.marker_end {
+                border-color: var(--marker-end-color);
+                border-width: 3px;
+
+                &:hover {
+                  border-width: var(--marker-end-color-hover);
+                  border-width: 3px;
+                  font-weight: bold;
+                }
+              }
+
+              /* &.draggable { */
+              /*   cursor: grab; */
+              /* } */
 
               .time {
                 /*

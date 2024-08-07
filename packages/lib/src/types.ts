@@ -269,6 +269,7 @@ export type RecorderUpdate = {
   title?: string;
   description?: string;
   workspace?: string;
+  duration?: number;
 };
 
 export type PlayerState = {

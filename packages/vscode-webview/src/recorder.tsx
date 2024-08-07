@@ -149,8 +149,10 @@ class DetailsView extends Component<DetailsViewProps> {
 
 type Marker = {
   clock: number;
-  type: 'clock' | 'anchor' | 'cursor' | 'selection';
+  type: 'clock' | 'anchor' | 'cursor' | 'selection' | 'end';
   active?: boolean;
+  label?: string;
+  draggable?: boolean;
 };
 
 type EditorViewStateRecipe = (draft: Draft<EditorView['state']>) => EditorView['state'] | void;
@@ -268,6 +270,7 @@ class EditorView extends Component<EditorViewProps> {
           anchor={this.state.anchor}
           trackSelection={this.state.trackSelection}
           clock={recorder.clock}
+          duration={recorder.sessionSummary.duration}
           onChange={this.updateState}
         />
       </div>
@@ -282,16 +285,18 @@ type TimelineProps = {
   anchor?: Marker;
   trackSelection?: TrackSelection;
   clock: number;
+  duration: number;
   onChange: (draft: EditorViewStateRecipe) => any;
 };
 type TimelineState = {
   stepCount: number;
-  dragStart?: TrackSelection & t.RangedTrack & { clock: number };
+  trackDragStart?: TrackSelection & t.RangedTrack & { clock: number };
+  markerDragStart?: Marker;
 };
 class Timeline extends Component<TimelineProps, TimelineState> {
   state = {
     stepCount: 16,
-    dragStart: undefined,
+    trackDragStart: undefined,
   } as TimelineState;
 
   getTimelineStepClock(): number {
@@ -303,7 +308,8 @@ class Timeline extends Component<TimelineProps, TimelineState> {
   }
 
   mouseMoved = (e: MouseEvent) => {
-    const clock = this.getClockUnderMouseInRuler(e);
+    const clock = this.getClockUnderMouse(e, { emptySpace: true });
+
     // console.log(`mouseMoved to clock ${clock}`, e.target);
     this.props.onChange(state => {
       state.cursor = clock === undefined ? undefined : { clock, type: 'cursor' };
@@ -322,7 +328,7 @@ class Timeline extends Component<TimelineProps, TimelineState> {
   };
 
   mouseDown = (e: MouseEvent) => {
-    const clock = this.getClockUnderMouseInRuler(e);
+    const clock = this.getClockUnderMouse(e, { emptySpace: true });
     if (clock !== undefined) {
       this.props.onChange(state => {
         for (const marker of state.markers) marker.active = false;
@@ -332,12 +338,12 @@ class Timeline extends Component<TimelineProps, TimelineState> {
   };
 
   mouseUp = (e: MouseEvent) => {
-    // const {anchor} = this.state;
+    // const {anchor} = this.props;
     // if (anchor) {
-    //   const clock = this.getClockUnderMouseInRuler(e);
+    //   const clock = this.getClockUnderMouse(e, {emptySpace: true});
     //   const tolerance = this.getTimelineDuration() / 300;
     //   if (clock !== undefined && lib.approxEqual(clock, anchor.clock, tolerance)) {
-    //     this.updateState(state => {
+    //     this.props.onChange(state => {
     //       state.anchor = undefined;
     //       state.selection = {fromClock: anchor.clock, toClock: clock, active}
     //     })
@@ -371,26 +377,6 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     });
   };
 
-  trackDragged = async (e: DragEvent, track: t.RangedTrack) => {
-    const clock = this.getClockUnderMouse(e);
-    const { dragStart } = this.state;
-    if (!clock || !dragStart) return;
-
-    const clockDiff = clock - dragStart.clock;
-    const start = Math.max(0, dragStart.clockRange.start + clockDiff);
-    const end = start + dragStart.clockRange.end - dragStart.clockRange.start;
-
-    const clockRange: t.ClockRange = { start, end };
-
-    console.log('trackDragged', track, clock, clockDiff);
-
-    if (dragStart.type === 'audio') {
-      await postMessage({ type: 'recorder/updateAudio', audio: { id: track.id, clockRange } });
-    } else if (dragStart.type === 'video') {
-      await postMessage({ type: 'recorder/updateVideo', video: { id: track.id, clockRange } });
-    }
-  };
-
   trackDragStarted = (e: DragEvent, track: t.RangedTrack) => {
     e.dataTransfer?.setDragImage(new Image(), 0, 0);
 
@@ -399,7 +385,44 @@ class Timeline extends Component<TimelineProps, TimelineState> {
 
     console.log('trackDragStarted', track, clock);
 
-    this.setState({ dragStart: { ...this.getSelectionFromTrack(track), ...track, clock } });
+    this.setState({ trackDragStart: { ...this.getSelectionFromTrack(track), ...track, clock } });
+  };
+
+  trackDragged = async (e: DragEvent, track: t.RangedTrack) => {
+    const clock = this.getClockUnderMouse(e);
+    const { trackDragStart } = this.state;
+    if (!clock || !trackDragStart) return;
+
+    const clockDiff = clock - trackDragStart.clock;
+    const start = Math.max(0, trackDragStart.clockRange.start + clockDiff);
+    const end = start + trackDragStart.clockRange.end - trackDragStart.clockRange.start;
+
+    const clockRange: t.ClockRange = { start, end };
+
+    console.log('trackDragged', track, clock, clockDiff);
+
+    if (trackDragStart.type === 'audio') {
+      await postMessage({ type: 'recorder/updateAudio', audio: { id: track.id, clockRange } });
+    } else if (trackDragStart.type === 'video') {
+      await postMessage({ type: 'recorder/updateVideo', video: { id: track.id, clockRange } });
+    }
+  };
+
+  markerDragStarted = (e: DragEvent, marker: Marker) => {
+    e.dataTransfer?.setDragImage(new Image(), 0, 0);
+    //  if (!this.getClockUnderMouse(e)) return;
+
+    this.setState({ markerDragStart: marker });
+  };
+
+  markerDragged = async (e: DragEvent, marker: Marker) => {
+    const clock = this.getClockUnderMouse(e);
+    const { markerDragStart } = this.state;
+    if (!clock || !markerDragStart) return;
+    if (markerDragStart.type === 'end') {
+      const duration = Math.max(0, clock);
+      await postMessage({ type: 'recorder/update', changes: { duration } });
+    }
   };
 
   resized = () => {
@@ -408,12 +431,12 @@ class Timeline extends Component<TimelineProps, TimelineState> {
 
   getTracks = () => _.concat(this.props.recorder?.audioTracks ?? [], this.props.recorder?.videoTracks ?? []);
 
-  getClockUnderMouseInRuler(e: MouseEvent): number | undefined {
-    const target = e.target as HTMLElement;
-    return target.closest('.track') ? undefined : this.getClockUnderMouse(e);
-  }
+  getClockUnderMouse(e: MouseEvent, opts?: { emptySpace?: boolean }): number | undefined {
+    if (opts?.emptySpace) {
+      const target = e.target as HTMLElement;
+      return target.closest('.track') || target.closest('.marker') ? undefined : this.getClockUnderMouse(e);
+    }
 
-  getClockUnderMouse(e: MouseEvent): number | undefined {
     const clientPos = [e.clientX, e.clientY] as t.Vec2;
     const timeline = document.getElementById('timeline')!;
     const timelineRect = timeline.getBoundingClientRect();
@@ -451,10 +474,11 @@ class Timeline extends Component<TimelineProps, TimelineState> {
   }
 
   render() {
-    const { markers, cursor, anchor, clock, trackSelection } = this.props;
+    const { markers, cursor, anchor, clock, trackSelection, duration } = this.props;
     const clockMarker: Marker | undefined = clock > 0 ? { clock, type: 'clock' } : undefined;
+    const endMarker: Marker = { clock: duration, type: 'end', label: 'end', draggable: true };
 
-    const allMarkers = _.compact([...markers, cursor, anchor, clockMarker]);
+    const allMarkers = _.compact([...markers, cursor, anchor, clockMarker, endMarker]);
     const timelineDuration = this.getTimelineDuration();
 
     return (
@@ -470,7 +494,12 @@ class Timeline extends Component<TimelineProps, TimelineState> {
           />
           <div className="markers">
             {allMarkers.map(marker => (
-              <MarkerUI marker={marker} timelineDuration={timelineDuration} />
+              <MarkerUI
+                marker={marker}
+                timelineDuration={timelineDuration}
+                onDragStart={this.markerDragStarted}
+                onDrag={this.markerDragged}
+              />
             ))}
           </div>
         </div>
@@ -561,16 +590,33 @@ class TracksUI extends Component<TracksUIProps> {
   }
 }
 
-type MarkerProps = { marker: Marker; timelineDuration: number };
+type MarkerProps = {
+  marker: Marker;
+  timelineDuration: number;
+  onDragStart?: (e: DragEvent, m: Marker) => any;
+  onDrag?: (e: DragEvent, m: Marker) => any;
+};
 class MarkerUI extends Component<MarkerProps> {
+  dragStarted = (e: DragEvent) => this.props.onDragStart?.(e, this.props.marker);
+  dragged = (e: DragEvent) => this.props.onDrag?.(e, this.props.marker);
+
   render() {
-    const { marker, timelineDuration } = this.props;
+    const { marker, timelineDuration, onDragStart, onDrag } = this.props;
     const style = {
       top: `${(marker.clock / timelineDuration) * 100}%`,
     };
     return (
-      <div className={cn('marker', `marker_${marker.type}`, marker.active && 'marker_active')} style={style}>
-        <div className="time">{lib.formatTimeSeconds(this.props.marker.clock)}</div>
+      <div
+        className={cn('marker', `marker_${marker.type}`, marker.active && 'marker_active', marker.draggable)}
+        style={style}
+        onDragStart={this.dragStarted}
+        onDrag={this.dragged}
+        draggable={marker.draggable}
+      >
+        <div className="time">
+          {lib.formatTimeSeconds(marker.clock)}
+          {marker.label ? ' ' + marker.label : ''}
+        </div>
       </div>
     );
   }

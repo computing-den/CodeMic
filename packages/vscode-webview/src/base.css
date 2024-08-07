@@ -16,9 +16,12 @@
   --container-padding-ver: var(--spacing-large);
   --container-padding-ver-small: var(--spacing-small);
   --container-padding-hor: var(--container-padding);
-  --marker-clock-color: #f85149;
+  --marker-clock-color: #fbff3a;
   --marker-cursor-color: #5555ff;
   --marker-anchor-color: #55aaff;
+  --marker-end-color: #f85149;
+  --marker-end-color-hover: #e84139;
+  --marker-base-color: #000;
   --marker-selection-color: #55ffff;
   --marker-z-index: 10;
   --cursor-marker-z-index: 11;
