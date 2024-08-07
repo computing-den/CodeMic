@@ -284,10 +284,15 @@ type TimelineProps = {
   clock: number;
   onChange: (draft: EditorViewStateRecipe) => any;
 };
-class Timeline extends Component<TimelineProps> {
+type TimelineState = {
+  stepCount: number;
+  dragStart?: TrackSelection & t.RangedTrack & { clock: number };
+};
+class Timeline extends Component<TimelineProps, TimelineState> {
   state = {
     stepCount: 16,
-  };
+    dragStart: undefined,
+  } as TimelineState;
 
   getTimelineStepClock(): number {
     return calcTimelineStepClock(this.props.recorder.sessionSummary.duration, this.state.stepCount);
@@ -298,7 +303,7 @@ class Timeline extends Component<TimelineProps> {
   }
 
   mouseMoved = (e: MouseEvent) => {
-    const clock = this.getClockUnderMouse(e);
+    const clock = this.getClockUnderMouseInRuler(e);
     // console.log(`mouseMoved to clock ${clock}`, e.target);
     this.props.onChange(state => {
       state.cursor = clock === undefined ? undefined : { clock, type: 'cursor' };
@@ -317,7 +322,7 @@ class Timeline extends Component<TimelineProps> {
   };
 
   mouseDown = (e: MouseEvent) => {
-    const clock = this.getClockUnderMouse(e);
+    const clock = this.getClockUnderMouseInRuler(e);
     if (clock !== undefined) {
       this.props.onChange(state => {
         for (const marker of state.markers) marker.active = false;
@@ -329,7 +334,7 @@ class Timeline extends Component<TimelineProps> {
   mouseUp = (e: MouseEvent) => {
     // const {anchor} = this.state;
     // if (anchor) {
-    //   const clock = this.getClockUnderMouse(e);
+    //   const clock = this.getClockUnderMouseInRuler(e);
     //   const tolerance = this.getTimelineDuration() / 300;
     //   if (clock !== undefined && lib.approxEqual(clock, anchor.clock, tolerance)) {
     //     this.updateState(state => {
@@ -355,11 +360,46 @@ class Timeline extends Component<TimelineProps> {
     }
   };
 
-  trackClicked = (e: MouseEvent, track: t.RangedTrack) => {
+  getSelectionFromTrack = (track: t.RangedTrack): TrackSelection => {
     const type = this.props.recorder.audioTracks?.find(t => t.id === track.id) ? 'audio' : 'video';
+    return { id: track.id, type };
+  };
+
+  trackClicked = (e: MouseEvent, track: t.RangedTrack) => {
     this.props.onChange(state => {
-      state.trackSelection = { id: track.id, type };
+      state.trackSelection = this.getSelectionFromTrack(track);
     });
+  };
+
+  trackDragged = async (e: DragEvent, track: t.RangedTrack) => {
+    const clock = this.getClockUnderMouse(e);
+    const { dragStart } = this.state;
+    if (!clock || !dragStart) return;
+
+    const clockDiff = clock - dragStart.clock;
+    const start = Math.max(0, dragStart.clockRange.start + clockDiff);
+    const end = start + dragStart.clockRange.end - dragStart.clockRange.start;
+
+    const clockRange: t.ClockRange = { start, end };
+
+    console.log('trackDragged', track, clock, clockDiff);
+
+    if (dragStart.type === 'audio') {
+      await postMessage({ type: 'recorder/updateAudio', audio: { id: track.id, clockRange } });
+    } else if (dragStart.type === 'video') {
+      await postMessage({ type: 'recorder/updateVideo', video: { id: track.id, clockRange } });
+    }
+  };
+
+  trackDragStarted = (e: DragEvent, track: t.RangedTrack) => {
+    e.dataTransfer?.setDragImage(new Image(), 0, 0);
+
+    const clock = this.getClockUnderMouse(e);
+    if (!clock) return;
+
+    console.log('trackDragStarted', track, clock);
+
+    this.setState({ dragStart: { ...this.getSelectionFromTrack(track), ...track, clock } });
   };
 
   resized = () => {
@@ -368,11 +408,12 @@ class Timeline extends Component<TimelineProps> {
 
   getTracks = () => _.concat(this.props.recorder?.audioTracks ?? [], this.props.recorder?.videoTracks ?? []);
 
-  getClockUnderMouse(e: MouseEvent): number | undefined {
+  getClockUnderMouseInRuler(e: MouseEvent): number | undefined {
     const target = e.target as HTMLElement;
-    if (target.closest('.track')) {
-      return;
-    }
+    return target.closest('.track') ? undefined : this.getClockUnderMouse(e);
+  }
+
+  getClockUnderMouse(e: MouseEvent): number | undefined {
     const clientPos = [e.clientX, e.clientY] as t.Vec2;
     const timeline = document.getElementById('timeline')!;
     const timelineRect = timeline.getBoundingClientRect();
@@ -424,6 +465,8 @@ class Timeline extends Component<TimelineProps> {
             timelineDuration={timelineDuration}
             trackSelection={trackSelection}
             onClick={this.trackClicked}
+            onDrag={this.trackDragged}
+            onDragStart={this.trackDragStarted}
           />
           <div className="markers">
             {allMarkers.map(marker => (
@@ -449,13 +492,15 @@ type TracksUIProps = {
   timelineDuration: number;
   trackSelection?: TrackSelection;
   onClick: (e: MouseEvent, track: t.RangedTrack) => any;
+  onDragStart: (e: DragEvent, track: t.RangedTrack) => any;
+  onDrag: (e: DragEvent, track: t.RangedTrack) => any;
 };
 // type TrackLayout = {columns: TrackLayoutColumn[]};
 // type TrackLayoutColumn = {};
 type TrackLayoutColumn = t.RangedTrack[];
 class TracksUI extends Component<TracksUIProps> {
   render() {
-    const { tracks, timelineDuration, trackSelection, onClick } = this.props;
+    const { tracks, timelineDuration, trackSelection, onClick, onDrag, onDragStart } = this.props;
     let columns: TrackLayoutColumn[] = [];
 
     for (const track of tracks) {
@@ -479,6 +524,9 @@ class TracksUI extends Component<TracksUIProps> {
                   className={cn('track', trackSelection?.id === track.id && 'active')}
                   style={style}
                   onClick={e => onClick(e, track)}
+                  onDragStart={e => onDragStart(e, track)}
+                  onDrag={e => onDrag(e, track)}
+                  draggable
                 >
                   <div className="title">{track.title}</div>
                 </div>

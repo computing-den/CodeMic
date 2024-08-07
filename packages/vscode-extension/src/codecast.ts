@@ -418,6 +418,11 @@ class Codecast {
         await this.recorder.deleteAudio(req.id);
         return this.respondWithStore();
       }
+      case 'recorder/updateAudio': {
+        assert(this.recorder);
+        await this.recorder.updateAudio(req.audio);
+        return this.respondWithStore();
+      }
       case 'recorder/insertVideo': {
         assert(this.recorder);
         await this.recorder.insertVideo(req.uri, req.clock);
@@ -426,6 +431,11 @@ class Codecast {
       case 'recorder/deleteVideo': {
         assert(this.recorder);
         await this.recorder.deleteVideo(req.id);
+        return this.respondWithStore();
+      }
+      case 'recorder/updateVideo': {
+        assert(this.recorder);
+        await this.recorder.updateVideo(req.video);
         return this.respondWithStore();
       }
       case 'confirmForkFromPlayer': {

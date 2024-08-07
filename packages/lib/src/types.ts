@@ -50,8 +50,10 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/update'; changes: RecorderUpdate }; response: StoreResponse }
   | { request: { type: 'recorder/insertAudio'; uri: Uri; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/deleteAudio'; id: string }; response: StoreResponse }
+  | { request: { type: 'recorder/updateAudio'; audio: Partial<AudioTrack> & { id: string } }; response: StoreResponse }
   | { request: { type: 'recorder/insertVideo'; uri: Uri; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/deleteVideo'; id: string }; response: StoreResponse }
+  | { request: { type: 'recorder/updateVideo'; video: Partial<VideoTrack> & { id: string } }; response: StoreResponse }
   // | { request: { type: 'toggleRecorderStudio' }; response: StoreResponse }
   | { request: { type: 'deleteSession'; sessionId: string }; response: StoreResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }

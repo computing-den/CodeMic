@@ -137,6 +137,12 @@ class Recorder {
     this.sessionTracksCtrl.deleteAudio(id);
   }
 
+  async updateAudio(audio: Partial<t.AudioTrack>) {
+    assert(this.session.body);
+    const track = this.session.body.audioTracks.find(t => t.id === audio.id);
+    if (track) Object.assign(track, audio);
+  }
+
   async insertVideo(uri: t.Uri, clock: number) {
     assert(this.sessionTracksCtrl);
     const absPath = path.getFileUriPath(uri);
@@ -156,6 +162,12 @@ class Recorder {
   async deleteVideo(id: string) {
     assert(this.sessionTracksCtrl);
     this.sessionTracksCtrl.deleteVideo(id);
+  }
+
+  async updateVideo(video: Partial<t.VideoTrack>) {
+    assert(this.session.body);
+    const track = this.session.body.videoTracks.find(t => t.id === video.id);
+    if (track) Object.assign(track, video);
   }
 
   private async saveHistoryOpenClose() {
