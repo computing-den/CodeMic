@@ -74,7 +74,7 @@ export class SessionSummaryForList extends Component<ForListProps> {
                 <span className="count">{s.views}</span>
               </div>
               <div className="footer-item badge">
-                <span className="codicon codicon-heart va-top m-right_small" />
+                <span className="codicon codicon-heart-filled va-top m-right_small" />
                 <span className="count">{s.likes}</span>
               </div>
             </>
@@ -109,7 +109,7 @@ export class SessionSummaryListItem extends Component<ListItemProps> {
       onClick: () => postMessage({ type: 'recorder/open', sessionId: this.props.sessionSummary.id }),
     },
     {
-      icon: 'codicon-heart',
+      icon: 'codicon-heart-filled',
       title: 'Like',
       onClick: () => {
         console.log('TODO');

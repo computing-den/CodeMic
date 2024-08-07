@@ -74,7 +74,8 @@
           .codicon-eye {
             margin-bottom: -2px;
           }
-          .codicon-heart {
+          .codicon-heart,
+          .codicon-heart-filled {
             margin-bottom: -2px;
             font-size: 0.8rem;
           }

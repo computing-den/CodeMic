@@ -171,8 +171,16 @@ export class InternalEditorTrackCtrl implements t.EditorEventStepper {
     }
   }
 
+  /**
+   * Returns 0 for i === -1. Otherwise, i must be in range.
+   */
   clockAt(i: number): number {
-    return this.editorTrack.events[i]?.clock ?? 0;
+    return i < 0 ? 0 : this.eventAt(i).clock;
+  }
+
+  private eventAt(i: number): t.EditorEvent {
+    assert(i >= 0 && i < this.editorTrack.events.length, 'out of bound event index');
+    return this.editorTrack.events[i];
   }
 
   getSeekData(toClock: number): t.SeekData {
@@ -253,14 +261,14 @@ export class InternalEditorTrackCtrl implements t.EditorEventStepper {
     if (i < 0 || toClock > this.clockAt(i)) {
       // go forwards
       for (let j = i + 1; j < n && toClock >= this.clockAt(j); j++) {
-        events.push(this.editorTrack.events[j]);
+        events.push(this.eventAt(j));
         i = j;
       }
     } else if (toClock < this.clockAt(i)) {
       // go backwards
       direction = t.Direction.Backwards;
       for (; i >= 0 && toClock <= this.clockAt(i); i--) {
-        events.push(this.editorTrack.events[i]);
+        events.push(this.eventAt(i));
       }
     }
 
@@ -285,6 +293,8 @@ export class InternalEditorTrackCtrl implements t.EditorEventStepper {
   }
 
   async applySeekStep(seekData: t.SeekData, stepIndex: number, uriSet?: t.UriSet) {
+    const event = seekData.events[stepIndex];
+    assert(event, 'applySeekStep: out of bound event index');
     await this.applyEditorEvent(seekData.events[stepIndex], seekData.direction, uriSet);
     const sign = seekData.direction === t.Direction.Forwards ? 1 : -1;
     this.eventIndex += sign * (stepIndex + 1);

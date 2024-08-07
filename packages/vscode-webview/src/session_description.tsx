@@ -22,7 +22,7 @@ export default class SessionDescription extends Component<Props> {
             <span className="count">{s.views}</span>
           </div>
           <div className="item likes">
-            <span className="codicon codicon-heart va-top m-right_small" />
+            <span className="codicon codicon-heart-filled va-top m-right_small" />
             <span className="count">{s.likes}</span>
           </div>
         </div>

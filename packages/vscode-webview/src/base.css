@@ -103,6 +103,11 @@ ul.unstyled {
   vertical-align: top;
 }
 
+.codicon-heart,
+.codicon-heart-filled {
+  color: #ff0000;
+}
+
 vscode-panels {
   /* margin-top: var(--spacing-large); */
 
