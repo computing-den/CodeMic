@@ -603,6 +603,14 @@ export class Session implements t.Session {
     return new vscode.Position(position.line, position.character);
   }
 
+  contentChangesFromVsc(contentChanges: readonly vscode.TextDocumentContentChangeEvent[]): t.ContentChange[] {
+    return contentChanges.map(cc => this.contentChangeFromVsc(cc));
+  }
+
+  contentChangeFromVsc(contentChange: vscode.TextDocumentContentChangeEvent): t.ContentChange {
+    return ietc.makeContentChange(contentChange.text, this.rangeFromVsc(contentChange.range));
+  }
+
   getVscTextDocumentRange(document: vscode.TextDocument): vscode.Range {
     return document.validateRange(new vscode.Range(0, 0, document.lineCount, 0));
   }

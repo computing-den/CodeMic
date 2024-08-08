@@ -262,7 +262,7 @@ class EditorView extends Component<EditorViewProps> {
           clock={recorder.clock}
           duration={ss.duration}
         />
-        <video id="guide-video" className="subsection" />
+        <video id="guide-video" className="subsection subsection_spaced" />
         <Timeline
           recorder={recorder}
           markers={this.state.markers}

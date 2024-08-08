@@ -1,4 +1,4 @@
-import { types as t, path, lib, internalEditorTrackCtrl as ietc } from '@codecast/lib';
+import { types as t, path, lib, internalEditorTrackCtrl as ietc, assert } from '@codecast/lib';
 import type Session from './session.js';
 import config from '../config.js';
 import * as vscode from 'vscode';
@@ -125,18 +125,59 @@ class CombinedEditorTrackRecorder {
 
     const irTextDocument = this.internalCtrl.findTextDocumentByUri(uri);
     if (irTextDocument) {
-      const irContentChanges = vscContentChanges.map(({ range: vscRange, text }) => {
-        const range = this.session.rangeFromVsc(vscRange);
-        const [revRange, revText] = irTextDocument.applyContentChange(range, text, true);
-        return { range, text, revRange, revText };
-      });
+      let debugInitIrText: string | undefined;
+      if (config.debug) {
+        debugInitIrText = irTextDocument.getText();
+      }
 
-      this.pushEvent({
+      // Read https://github.com/microsoft/vscode/issues/11487 about contentChanges array.
+      let irContentChanges = this.session.contentChangesFromVsc(vscContentChanges);
+
+      // Order content changes.
+      irContentChanges.sort(ietc.compareContentChanges);
+
+      // Validate ranges and make sure there are no overlaps.
+      for (const [i, cc] of irContentChanges.entries()) {
+        assert(irTextDocument.isRangeValid(cc.range), 'textChange: invalid range');
+        if (i > 0) {
+          assert(
+            ietc.isRangeNonOverlapping(irContentChanges[i - 1].range, cc.range),
+            'textChange: got content changes with overlapping ranges',
+          );
+        }
+      }
+
+      const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
+
+      const irTextChangeEvent: t.EditorEvent = {
         type: 'textChange',
         clock: this.clock,
         uri: irTextDocument.uri,
         contentChanges: irContentChanges,
-      });
+        revContentChanges: irRevContentChanges,
+      };
+      this.pushEvent(irTextChangeEvent);
+
+      if (config.debug) {
+        assert(
+          irTextDocument.getText() === vscTextDocument.getText(),
+          "textChange: internal text doesn't match vscode text after applying changes",
+        );
+
+        const debugNextIrText = irTextDocument.getText();
+        await this.internalCtrl.applyTextChangeEvent(irTextChangeEvent, t.Direction.Backwards);
+        const debugReInitIrText = irTextDocument.getText();
+        assert(
+          debugInitIrText === debugReInitIrText,
+          "textChange: text doesn't match what it was after applying changes in reverse",
+        );
+
+        await this.internalCtrl.applyTextChangeEvent(irTextChangeEvent, t.Direction.Forwards);
+        assert(
+          debugNextIrText === irTextDocument.getText(),
+          "textChange: text doesn't match what it was after applying changes again",
+        );
+      }
     } else {
       // It will insert the latest text in 'openTextDocument' if necessary.
       await this.openTextDocumentByUri(vscTextDocument, uri);
@@ -330,12 +371,14 @@ class CombinedEditorTrackRecorder {
 
     if (irTextDocument && irText !== vscText) {
       const irRange = irTextDocument.getRange();
-      const [revRange, revText] = irTextDocument.applyContentChange(irRange, vscText, true);
+      const irContentChanges = [{ range: irRange, text: vscText }];
+      const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
       this.pushEvent({
         type: 'textChange',
         clock: this.clock,
         uri,
-        contentChanges: [{ range: irRange, text: vscText, revRange, revText }],
+        contentChanges: irContentChanges,
+        revContentChanges: irRevContentChanges,
       });
     } else if (!irTextDocument) {
       irTextDocument = this.session.textDocumentFromVsc(vscTextDocument, uri);

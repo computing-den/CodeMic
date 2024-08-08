@@ -315,19 +315,12 @@ export class InternalEditorTrackCtrl implements t.EditorEventStepper {
   }
 
   async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    if (e.contentChanges.length > 1) {
-      throw new Error('applyTextChangeEvent: textChange does not yet support contentChanges.length > 1');
-    }
     if (uriSet) uriSet[e.uri] = true;
     const textDocument = await this.openTextDocumentByUri(e.uri);
     if (direction === t.Direction.Forwards) {
-      for (const cc of e.contentChanges) {
-        textDocument.applyContentChange(cc.range, cc.text, false);
-      }
+      textDocument.applyContentChanges(e.contentChanges, false);
     } else {
-      for (const cc of e.contentChanges) {
-        textDocument.applyContentChange(cc.revRange, cc.revText, false);
-      }
+      textDocument.applyContentChanges(e.revContentChanges, false);
     }
   }
 
@@ -340,7 +333,7 @@ export class InternalEditorTrackCtrl implements t.EditorEventStepper {
     if (direction === t.Direction.Forwards) {
       let textDocument = this.findTextDocumentByUri(e.uri);
       if (textDocument && e.text !== undefined && e.text !== textDocument.getText()) {
-        textDocument.applyContentChange(textDocument.getRange(), e.text, false);
+        textDocument.applyContentChanges([{ range: textDocument.getRange(), text: e.text }], false);
       } else if (!textDocument) {
         let text: string;
         if (e.text !== undefined) {
@@ -480,50 +473,83 @@ export class TextDocument implements Document {
     );
   }
 
-  applyContentChange(range: t.Range, text: string, calcReverse: true): [range: t.Range, text: string];
-  applyContentChange(range: t.Range, text: string, calcReverse: false): undefined;
-  applyContentChange(range: t.Range, text: string, calcReverse: boolean) {
-    assert(this.isRangeValid(range), 'applyContentChange: invalid range');
+  /**
+   * Must be in increasing order and without overlaps.
+   * We calculate in increasing order instead of doing it in reverse because it makes calculating
+   * the line and character shifts for the reverse content changes easier.
+   */
+  applyContentChanges(contentChanges: t.ContentChange[], calcReverse: true): t.ContentChange[];
+  applyContentChanges(contentChanges: t.ContentChange[], calcReverse: false): undefined;
+  applyContentChanges(contentChanges: t.ContentChange[], calcReverse: boolean) {
     const { lines } = this;
-    const newLines = text.split(/\r?\n/);
-
-    // calculate revText
-    let revText: string | undefined;
-    if (calcReverse) revText = this.getText(range);
-
-    // Prepend [0, range.start.character] of the first old line to the first new line.
-    const firstLinePrefix = lines[range.start.line].slice(0, range.start.character);
-    newLines[0] = firstLinePrefix + newLines[0];
-
-    // Append [range.end.character, END] of the last old line to the last new line.
-    const lastLineSuffix = lines[range.end.line].slice(range.end.character);
-    newLines[newLines.length - 1] += lastLineSuffix;
-
-    const rangeLineCount = range.end.line - range.start.line + 1;
-    const extraLineCount = newLines.length - rangeLineCount;
-
-    // Insert or delete extra lines.
-    if (extraLineCount > 0) {
-      const extraLines = _.times(extraLineCount, () => '');
-      lines.splice(range.start.line, 0, ...extraLines);
-    } else if (extraLineCount < 0) {
-      lines.splice(range.start.line, -extraLineCount);
-    }
-
-    // Replace lines.
-    for (let i = 0; i < newLines.length; i++) {
-      lines[i + range.start.line] = newLines[i];
-    }
-
-    // Calculate revRange.
+    let revContentChanges: t.ContentChange[] | undefined;
+    let totalLineShift: number = 0;
+    let lastLineShifted = 0;
+    let lastLineCharShift = 0;
     if (calcReverse) {
-      const endPosition = {
+      revContentChanges = [];
+    }
+
+    for (let { range, text } of contentChanges) {
+      const origRange = range;
+
+      // Apply shifts.
+      range = copyRange(range);
+      range.start.line += totalLineShift;
+      range.start.character += lastLineShifted === range.start.line ? lastLineCharShift : 0;
+      range.end.line += totalLineShift;
+      range.end.character += lastLineShifted === range.end.line ? lastLineCharShift : 0;
+
+      const newLines = text.split(/\r?\n/);
+
+      // Calculate reverse text.
+      let revText: string | undefined;
+      if (calcReverse) revText = this.getText(range);
+
+      // Prepend [0, range.start.character] of the first old line to the first new line.
+      const firstLinePrefix = lines[range.start.line].slice(0, range.start.character);
+      newLines[0] = firstLinePrefix + newLines[0];
+
+      // Append [range.end.character, END] of the last old line to the last new line.
+      const lastLineSuffix = lines[range.end.line].slice(range.end.character);
+      newLines[newLines.length - 1] += lastLineSuffix;
+
+      const rangeLineCount = range.end.line - range.start.line + 1;
+      const extraLineCount = newLines.length - rangeLineCount;
+
+      // Insert or delete extra lines.
+      if (extraLineCount > 0) {
+        const extraLines = _.times(extraLineCount, () => '');
+        lines.splice(range.start.line, 0, ...extraLines);
+      } else if (extraLineCount < 0) {
+        lines.splice(range.start.line, -extraLineCount);
+      }
+
+      // Replace lines.
+      for (let i = 0; i < newLines.length; i++) {
+        lines[i + range.start.line] = newLines[i];
+      }
+
+      // Calculate final position.
+      const finalPosition = {
         line: range.end.line + extraLineCount,
         character: newLines[newLines.length - 1].length - lastLineSuffix.length,
       };
-      const revRange = { start: range.start, end: endPosition };
-      return [revRange, revText!];
+
+      // Insert into revContentChanges.
+      if (revContentChanges) {
+        // Calculate reverse range
+        const revRange = { start: range.start, end: finalPosition };
+        revContentChanges!.push({ range: revRange, text: revText! });
+      }
+
+      // Calculate shifts for next loop iteration.
+      lastLineShifted = finalPosition.line;
+      lastLineCharShift = finalPosition.character - origRange.end.character;
+      totalLineShift += extraLineCount;
     }
+
+    return revContentChanges;
   }
 
   getRange(): t.Range {
@@ -556,8 +582,52 @@ export class TextEditor implements Editor {
   }
 }
 
+export function isPositionBefore(a: t.Position, b: t.Position): boolean {
+  return a.line < b.line || (a.line === b.line && a.character < b.character);
+}
+
+export function isPositionAfter(a: t.Position, b: t.Position): boolean {
+  return a.line > b.line || (a.line === b.line && a.character > b.character);
+}
+
+export function isPositionEqual(a: t.Position, b: t.Position): boolean {
+  return a.line === b.line && a.character === b.character;
+}
+
+export function isRangeNonOverlapping(a: t.Range, b: t.Range): boolean {
+  return (
+    isPositionBefore(a.end, b.start) ||
+    isPositionEqual(a.end, b.start) ||
+    isPositionAfter(a.start, b.end) ||
+    isPositionEqual(a.start, b.end)
+  );
+}
+
+export function isRangeOverlapping(a: t.Range, b: t.Range): boolean {
+  return !isRangeNonOverlapping(a, b);
+}
+
+export function compareContentChanges(a: t.ContentChange, b: t.ContentChange): number {
+  return compareRange(a.range, b.range);
+}
+
+export function compareRange(a: t.Range, b: t.Range): number {
+  const lineDelta = a.start.line - b.start.line;
+  if (lineDelta !== 0) return lineDelta;
+
+  return a.start.character - b.start.character;
+}
+
+export function copyRange(range: t.Range): t.Range {
+  return makeRange(copyPosition(range.start), copyPosition(range.end));
+}
+
 export function makePosition(line: number, character: number): t.Position {
   return { line, character };
+}
+
+export function copyPosition(position: t.Position): t.Position {
+  return { line: position.line, character: position.character };
 }
 
 export function makeRange(start: t.Position, end: t.Position): t.Range {
@@ -566,6 +636,10 @@ export function makeRange(start: t.Position, end: t.Position): t.Range {
 
 export function makeRangeN(startLine: number, startCharacter: number, endLine: number, endCharacter: number): t.Range {
   return { start: makePosition(startLine, startCharacter), end: makePosition(endLine, endCharacter) };
+}
+
+export function getRangeLineCount(range: t.Range): number {
+  return range.end.line - range.start.line;
 }
 
 export function makeSelection(anchor: t.Position, active: t.Position): t.Selection {
@@ -579,6 +653,10 @@ export function makeSelectionN(
   activeCharacter: number,
 ): t.Selection {
   return { anchor: makePosition(anchorLine, anchorCharacter), active: makePosition(activeLine, activeCharacter) };
+}
+
+export function makeContentChange(text: string, range: t.Range): t.ContentChange {
+  return { text, range };
 }
 
 // export function makeEmptySnapshot(): t.InternalEditorTrackSnapshot {

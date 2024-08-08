@@ -20,10 +20,6 @@ class VscEditorEventStepper implements t.EditorEventStepper {
   }
 
   async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction) {
-    if (e.contentChanges.length > 1) {
-      throw new Error('applyTextChangeEvent: TODO textChange does not yet support contentChanges.length > 1');
-    }
-
     // We use WorkspaceEdit here because we don't necessarily want to focus on the text editor yet.
     // There will be a separate select event after this if the editor had focus during recording.
 
@@ -34,9 +30,8 @@ class VscEditorEventStepper implements t.EditorEventStepper {
         edit.replace(vscUri, this.session.rangeToVsc(cc.range), cc.text);
       }
     } else {
-      for (const cc of e.contentChanges) {
-        // TODO shouldn't we apply these in reverse order?
-        edit.replace(vscUri, this.session.rangeToVsc(cc.revRange), cc.revText);
+      for (const cc of e.revContentChanges) {
+        edit.replace(vscUri, this.session.rangeToVsc(cc.range), cc.text);
       }
     }
     await vscode.workspace.applyEdit(edit);

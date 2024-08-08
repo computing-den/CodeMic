@@ -7,6 +7,7 @@ export type Config = {
   logRecorderRawVscEvents: boolean;
   logSessionTracksCtrlUpdateStep: boolean;
   logTrackPlayerUpdateStep: boolean;
+  debug: boolean;
 };
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config.json'), 'utf8')) as Config;

@@ -69,6 +69,7 @@
 }
 
 .subsection + .subsection.subsection_spaced,
-.subsection.subsection_spaced + .subsection {
+.subsection.subsection_spaced + .subsection,
+.subsection.subsection_spaced + .subsection.subsection_spaced {
   margin-top: var(--spacing-large);
 }

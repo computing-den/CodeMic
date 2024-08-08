@@ -419,7 +419,7 @@ export type TextChangeEvent = {
   clock: number;
   uri: Uri;
   contentChanges: ContentChange[];
-  // revSelections: vscode.Selection[];
+  revContentChanges: ContentChange[];
 };
 
 export type OpenTextDocumentEvent = {
@@ -494,8 +494,6 @@ export type UriSet = { [key: Uri]: true | undefined };
 export type ContentChange = {
   range: Range;
   text: string;
-  revRange: Range;
-  revText: string;
 };
 
 export type Position = {
