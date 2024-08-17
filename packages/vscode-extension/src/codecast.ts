@@ -1,4 +1,5 @@
 import * as misc from './misc.js';
+import config from './config.js';
 import Recorder from './recorder.js';
 import Player from './player.js';
 import WebviewProvider from './webview_provider.js';
@@ -58,11 +59,18 @@ class Codecast {
     await this.updateFrontend();
 
     // DEV
-    // if (this.webviewProvider.bus) {
-    //   this.messageHandler({ type: 'recorder/open', sessionId: 'ecc7e7e8-1f38-4a3a-91b1-774f1c91ba21' })
-    //     .then(this.updateFrontend)
-    //     .catch(console.error);
-    // }
+    if (config.debug) {
+      if (this.webviewProvider.bus) {
+        try {
+          await this.messageHandler({ type: 'recorder/open', sessionId: '8a232c93-39b8-4df3-a286-908079159738' });
+          // await this.messageHandler({ type: 'recorder/load' });
+          await this.messageHandler({ type: 'recorder/openTab', tabId: 'editor-view' });
+          await this.updateFrontend();
+        } catch (error) {
+          console.error('ERROR trying to open debug session:', error);
+        }
+      }
+    }
   }
 
   static async fromExtensionContext(extension: vscode.ExtensionContext): Promise<Codecast> {
@@ -253,6 +261,9 @@ class Codecast {
       case 'recorder/open': {
         const user = this.context.user && lib.userToUserSummary(this.context.user);
 
+        console.log('XXX: user', user);
+        console.log('XXX: sessionId', req.sessionId);
+
         if (req.sessionId) {
           let session: Session | undefined;
           let seekClock: number | undefined;
@@ -275,16 +286,20 @@ class Codecast {
             // }
           } else {
             // Edit existing session.
+            console.log('XXX: fromExisting');
             session = await Session.fromExisting(this.context, req.sessionId);
+            console.log('XXX: fromExisting succeeded', session);
             if (req.clock !== undefined && req.clock > 0) {
               seekClock = req.clock;
             }
           }
 
+          console.log('XXX: session', session);
           if (session) {
             // await session.readBody({ download: true });
 
             if (await this.closeCurrentScreen()) {
+              console.log('XXX: closeCurrentScreen succeeded');
               this.session = session;
               this.recorder = new Recorder(this.session, false);
               this.setScreen(t.Screen.Recorder);
@@ -292,9 +307,11 @@ class Codecast {
               // This might trigger a vscode restart in which case this.restoreStateAfterRestart() will be
               // called and it will recreate the session, recorder, call recorder.load(), and set the screen.
               await this.setUpWorkspace({ recorder: { mustScan: false, seekClock, cutClock } });
+              console.log('XXX: setUpWorkspace succeeded');
 
               // Must be called after this.setUpWorkspace()
               await this.recorder.load({ seekClock, cutClock });
+              console.log('XXX: recorder.load succeeded');
             }
           }
         } else {
@@ -786,6 +803,7 @@ class Codecast {
         clock: this.session.clock ?? 0,
         workspace: this.session.workspace,
         history: this.context.settings.history[this.session.summary.id],
+        editorTrack: this.session.body?.editorTrack,
         audioTracks: this.session.body?.audioTracks,
         videoTracks: this.session.body?.videoTracks,
         webviewUris: this.session.getWebviewUris(),

@@ -429,8 +429,6 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     this.forceUpdate();
   };
 
-  getTracks = () => _.concat(this.props.recorder?.audioTracks ?? [], this.props.recorder?.videoTracks ?? []);
-
   getClockUnderMouse(e: MouseEvent, opts?: { emptySpace?: boolean }): number | undefined {
     if (opts?.emptySpace) {
       const target = e.target as HTMLElement;
@@ -474,7 +472,7 @@ class Timeline extends Component<TimelineProps, TimelineState> {
   }
 
   render() {
-    const { markers, cursor, anchor, clock, trackSelection, duration } = this.props;
+    const { markers, cursor, anchor, clock, trackSelection, duration, recorder } = this.props;
     const clockMarker: Marker | undefined = clock > 0 ? { clock, type: 'clock' } : undefined;
     const endMarker: Marker = { clock: duration, type: 'end', label: 'end', draggable: true };
 
@@ -484,8 +482,10 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     return (
       <div id="timeline" className="subsection">
         <div className="timeline-body">
-          <TracksUI
-            tracks={this.getTracks()}
+          <EditorTrackUI editorTrack={recorder.editorTrack!} timelineDuration={timelineDuration} />
+          <RangedTracksUI
+            audioTracks={recorder.audioTracks}
+            videoTracks={recorder.videoTracks}
             timelineDuration={timelineDuration}
             trackSelection={trackSelection}
             onClick={this.trackClicked}
@@ -516,32 +516,32 @@ class Timeline extends Component<TimelineProps, TimelineState> {
   }
 }
 
-type TracksUIProps = {
-  tracks: t.RangedTrack[];
+type RangedTracksUIProps = {
+  audioTracks?: t.AudioTrack[];
+  videoTracks?: t.VideoTrack[];
   timelineDuration: number;
   trackSelection?: TrackSelection;
   onClick: (e: MouseEvent, track: t.RangedTrack) => any;
   onDragStart: (e: DragEvent, track: t.RangedTrack) => any;
   onDrag: (e: DragEvent, track: t.RangedTrack) => any;
 };
-// type TrackLayout = {columns: TrackLayoutColumn[]};
-// type TrackLayoutColumn = {};
-type TrackLayoutColumn = t.RangedTrack[];
-class TracksUI extends Component<TracksUIProps> {
+// type TrackLayout = {columns: RangedTrackLayoutColumn[]};
+// type RangedTrackLayoutColumn = {};
+type RangedTrackLayoutColumn = t.RangedTrack[];
+class RangedTracksUI extends Component<RangedTracksUIProps> {
   render() {
-    const { tracks, timelineDuration, trackSelection, onClick, onDrag, onDragStart } = this.props;
-    let columns: TrackLayoutColumn[] = [];
+    const { audioTracks, videoTracks, timelineDuration, trackSelection, onClick, onDrag, onDragStart } = this.props;
+    let columns: RangedTrackLayoutColumn[] = [];
 
-    for (const track of tracks) {
-      this.fitTrackIntoColumns(track, columns);
-    }
+    for (const track of audioTracks ?? []) this.fitTrackIntoColumns(track, columns);
+    for (const track of videoTracks ?? []) this.fitTrackIntoColumns(track, columns);
 
     columns = columns.map(column => this.orderedColumn(column));
 
     return (
-      <div className="tracks">
+      <div className="ranged-tracks">
         {columns.map(column => (
-          <div className="tracks-column">
+          <div className="column">
             {column.map(track => {
               const style = {
                 top: `${(track.clockRange.start / timelineDuration) * 100}%`,
@@ -567,7 +567,7 @@ class TracksUI extends Component<TracksUIProps> {
     );
   }
 
-  private fitTrackIntoColumns(track: t.RangedTrack, columns: TrackLayoutColumn[]) {
+  private fitTrackIntoColumns(track: t.RangedTrack, columns: RangedTrackLayoutColumn[]) {
     for (const column of columns) {
       if (this.doesTrackFitInColumn(track, column)) {
         column.push(track);
@@ -577,7 +577,7 @@ class TracksUI extends Component<TracksUIProps> {
     columns.push([track]);
   }
 
-  private doesTrackFitInColumn(track: t.RangedTrack, column: TrackLayoutColumn): boolean {
+  private doesTrackFitInColumn(track: t.RangedTrack, column: RangedTrackLayoutColumn): boolean {
     return column.every(track2 => !this.doTracksIntersect(track, track2));
   }
 
@@ -585,8 +585,36 @@ class TracksUI extends Component<TracksUIProps> {
     return t2.clockRange.start < t1.clockRange.end && t1.clockRange.start < t2.clockRange.end;
   }
 
-  private orderedColumn(columns: TrackLayoutColumn): TrackLayoutColumn {
+  private orderedColumn(columns: RangedTrackLayoutColumn): RangedTrackLayoutColumn {
     return _.orderBy(columns, track => track.clockRange.start);
+  }
+}
+
+type EditorTrackUIProps = {
+  editorTrack?: t.InternalEditorTrack;
+  timelineDuration: number;
+};
+class EditorTrackUI extends Component<EditorTrackUIProps> {
+  render() {
+    const { editorTrack, timelineDuration } = this.props;
+    const columns: h.JSX.Element[][] = _.times(5, () => []);
+
+    for (const [i, e] of (editorTrack?.events ?? []).entries()) {
+      const style = {
+        top: `${(e.clock / timelineDuration) * 100}%`,
+      };
+
+      const elem = <div className="event" title={e.type} style={style}></div>;
+      columns[i % columns.length].push(elem);
+    }
+
+    return (
+      <div className="editor-track">
+        {columns.map(column => (
+          <div className="column">{column}</div>
+        ))}
+      </div>
+    );
   }
 }
 

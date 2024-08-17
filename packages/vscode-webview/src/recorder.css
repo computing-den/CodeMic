@@ -53,13 +53,39 @@
         .timeline-body {
           flex: 1;
           position: relative;
-          display: flex;
+          display: grid;
+          grid-gap: 1rem;
+          grid-template-columns: 1fr 1fr;
+          grid-template-areas: 'editor-track ranged-tracks';
 
-          .tracks {
-            flex: 1;
+          .editor-track {
+            grid-area: editor-track;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-gap: 0.5rem;
+
+            .column {
+              position: relative;
+
+              .event {
+                --event-circle-size: 10px;
+                position: absolute;
+                left: 0;
+                width: var(--event-circle-size);
+                height: var(--event-circle-size);
+                margin-top: calc(-1 * var(--event-circle-size) / 2);
+                border-radius: 50%;
+                background: red;
+                border: 0.1px solid #000;
+              }
+            }
+          }
+
+          .ranged-tracks {
+            grid-area: ranged-tracks;
             display: flex;
 
-            .tracks-column {
+            .column {
               flex: 1 0 0;
               /* display: flex; */
               /* flex-direction: column; */
@@ -92,6 +118,8 @@
           }
 
           .markers {
+            grid-area: 1 / 3;
+
             .marker {
               position: absolute;
               left: 0;

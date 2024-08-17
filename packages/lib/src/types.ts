@@ -258,6 +258,7 @@ export type RecorderState = {
   workspace?: string;
   // fork?: { clock: number };
   history?: SessionHistory;
+  editorTrack?: InternalEditorTrack;
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
   webviewUris?: WebviewUris;
