@@ -28,18 +28,37 @@ export function isUntitledUri(uri: t.Uri): boolean {
 }
 
 export function getWorkspaceUriPath(uri: t.Uri): t.RelPath {
-  assert(isWorkspaceUri(uri));
-  return uri.slice('workspace:'.length) as t.RelPath;
+  const res = getWorkspaceUriPathOpt(uri);
+  assert(res);
+  return res;
+}
+
+export function getWorkspaceUriPathOpt(uri: t.Uri): t.RelPath | undefined {
+  if (isWorkspaceUri(uri)) return uri.slice('workspace:'.length) as t.RelPath;
 }
 
 export function getFileUriPath(uri: t.Uri): t.AbsPath {
-  assert(isFileUri(uri));
-  return uri.slice('file://'.length) as t.AbsPath;
+  const res = getFileUriPathOpt(uri);
+  assert(res);
+  return res;
+}
+
+export function getFileUriPathOpt(uri: t.Uri): t.AbsPath | undefined {
+  if (isFileUri(uri)) return uri.slice('file://'.length) as t.AbsPath;
+}
+
+export function getUriPathOpt(uri: t.Uri): t.Path | undefined {
+  return getWorkspaceUriPathOpt(uri) ?? getFileUriPathOpt(uri);
 }
 
 export function getUntitledUriName(uri: t.Uri): string {
-  assert(isUntitledUri(uri));
-  return uri.slice('untitled:'.length);
+  const res = getUntitledUriNameOpt(uri);
+  assert(res);
+  return res;
+}
+
+export function getUntitledUriNameOpt(uri: t.Uri): string | undefined {
+  if (isUntitledUri(uri)) return uri.slice('untitled:'.length);
 }
 
 export function parseUri(uri: t.Uri): t.ParsedUri {

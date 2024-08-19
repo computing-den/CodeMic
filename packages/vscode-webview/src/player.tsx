@@ -164,7 +164,9 @@ export default class Player extends Component<Props> {
               clock={player.clock}
               duration={ss.duration}
             />
-            <video id="guide-video" className="subsection" />
+            <div className="subsection hide-inactive guide-video-container">
+              <video id="guide-video" />
+            </div>
             <SessionDescription className="subsection subsection_spaced" sessionSummary={ss} />
             {/*!player.loaded && (
               <PathField

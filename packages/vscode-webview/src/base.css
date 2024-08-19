@@ -30,16 +30,37 @@
 }
 
 body.vscode-light {
-  --track-background: #d6ecf2;
-  --track-background-hover: #bbe1eb;
-  --track-border: #007acc1c;
-  --track-border-active: #007acc;
+  --ranged-track-background: #a1e0f0;
+  --ranged-track-background-hover: #5ccdea;
+  --ranged-track-border: #007acc;
+  --ranged-track-border-active: #007acc;
+
+  --editor-track-text-change-background: #a1f0dc;
+  --editor-track-text-change-background-hover: #78d5be;
+  --editor-track-text-change-border: #55a995;
+  --editor-track-text-change-border-active: #55a995;
+
+  --editor-track-document-change-background: #d1caf8;
+  --editor-track-document-change-background-hover: #b8b0e4;
+  --editor-track-document-change-border: #8f86bd;
+  --editor-track-document-change-border-active: #8f86bd;
 }
 body.vscode-dark {
-  --track-background: #063b49;
-  --track-background-hover: #135e71;
-  --track-border: #007acc75;
-  --track-border-active: #007acc;
+  --ranged-track-background: #063b49;
+  --ranged-track-background-hover: #135e71;
+  --ranged-track-border: #007acc;
+  --ranged-track-border-active: #007acc;
+
+  --editor-track-text-change-background: #063b49;
+  --editor-track-text-change-background-hover: #135e71;
+  --editor-track-text-change-border: #007acc;
+  --editor-track-text-change-border-active: #007acc;
+
+  --editor-track-document-change-background: #063b49;
+  --editor-track-document-change-background-hover: #135e71;
+  --editor-track-document-change-border: #007acc;
+  --editor-track-document-change-border-active: #007acc;
+
   --marker-cursor-color: #cccccc;
 }
 
@@ -79,32 +100,36 @@ ul.unstyled {
   }
 }
 
-.codicon.m-right {
+.m-right {
   margin-right: var(--spacing-medium);
 }
 
-.codicon.m-right_x-small {
+.m-right_x-small {
   margin-right: var(--spacing-small);
 }
 
-.codicon.m-right_small {
+.m-right_small {
   margin-right: var(--spacing-small);
 }
 
-.codicon.m-left {
+.m-left {
   margin-left: var(--spacing-medium);
 }
 
-.codicon.m-left_x-small {
+.m-left_x-small {
   margin-left: var(--spacing-small);
 }
 
-.codicon.m-left_small {
+.m-left_small {
   margin-left: var(--spacing-small);
 }
 
-.codicon.va-top {
+.va-top {
   vertical-align: top;
+}
+
+.va-middle {
+  vertical-align: middle;
 }
 
 .codicon-heart,

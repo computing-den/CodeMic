@@ -126,6 +126,7 @@ class Recorder {
     await this.session.copyToBlob(absPath, sha1);
     const audioTrack: t.AudioTrack = {
       id: uuid(),
+      type: 'audio',
       clockRange: { start: clock, end: clock + duration },
       file: { type: 'local', sha1: sha1 },
       title: path.basename(absPath, { omitExt: true }),
@@ -157,6 +158,7 @@ class Recorder {
     await this.session.copyToBlob(absPath, sha1);
     const videoTrack: t.VideoTrack = {
       id: uuid(),
+      type: 'video',
       clockRange: { start: clock, end: clock + duration },
       file: { type: 'local', sha1: sha1 },
       title: path.basename(absPath, { omitExt: true }),

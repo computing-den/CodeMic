@@ -1,11 +1,47 @@
-#guide-video {
-  /* margin: 1rem 0; */
-  border-radius: 5px;
-
+.guide-video-container {
   border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--dropdown-border));
+  overflow: hidden;
+  border-radius: 5px;
+  display: flex;
+  position: relative;
+  background: #a3a3a3;
+  justify-content: center;
 
-  &:not([src]),
-  &[src=''] {
+  &.fixed-height {
+    height: 25vh;
+  }
+
+  &.hide-inactive {
+    &:has(video:not([src])),
+    &:has(video[src='']) {
+      display: none;
+    }
+  }
+
+  &:has(video:not([src])),
+  &:has(video[src='']) {
+    .empty-content {
+      display: flex;
+
+      justify-content: center;
+      align-items: center;
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+
+      .codicon {
+        font-size: 6rem;
+        color: #d7d7d7;
+      }
+    }
+  }
+
+  video {
+  }
+
+  .empty-content {
     display: none;
   }
 }

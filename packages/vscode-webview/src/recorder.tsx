@@ -13,6 +13,14 @@ import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
 import { cn } from './misc.js';
 import _ from 'lodash';
+import {
+  CloseTextDocumentEvent,
+  CloseTextEditorEvent,
+  OpenTextDocumentEvent,
+  SelectEvent,
+  ShowTextEditorEvent,
+  TextChangeEvent,
+} from '@codecast/lib/src/types.js';
 
 type Props = { user?: t.User; recorder: t.RecorderState };
 export default class Recorder extends Component<Props> {
@@ -262,7 +270,12 @@ class EditorView extends Component<EditorViewProps> {
           clock={recorder.clock}
           duration={ss.duration}
         />
-        <video id="guide-video" className="subsection subsection_spaced" />
+        <div className="subsection subsection_spaced guide-video-container fixed-height">
+          <video id="guide-video" />
+          <div className="empty-content">
+            <span className="codicon codicon-device-camera-video" />
+          </div>
+        </div>
         <Timeline
           recorder={recorder}
           markers={this.state.markers}
@@ -548,6 +561,8 @@ class RangedTracksUI extends Component<RangedTracksUIProps> {
                 bottom: `calc(100% - ${(track.clockRange.end / timelineDuration) * 100}%)`,
               };
 
+              let icon = track.type === 'audio' ? 'codicon-mic' : 'codicon-device-camera-video';
+
               return (
                 <div
                   className={cn('track', trackSelection?.id === track.id && 'active')}
@@ -557,7 +572,10 @@ class RangedTracksUI extends Component<RangedTracksUIProps> {
                   onDrag={e => onDrag(e, track)}
                   draggable
                 >
-                  <div className="title">{track.title}</div>
+                  <p>
+                    <span className={`codicon va-middle m-right_small ${icon}`} />
+                    {track.title}
+                  </p>
                 </div>
               );
             })}
@@ -594,17 +612,101 @@ type EditorTrackUIProps = {
   editorTrack?: t.InternalEditorTrack;
   timelineDuration: number;
 };
+type EditorEventGroup =
+  | {
+      type: 'documentChange';
+      events: EditorDocumentChangeEvents[];
+    }
+  | {
+      type: 'textChange';
+      events: TextChangeEvent[];
+    };
+type EditorDocumentChangeEvents =
+  | OpenTextDocumentEvent
+  | CloseTextDocumentEvent
+  | ShowTextEditorEvent
+  | CloseTextEditorEvent;
+const EDITOR_EVENT_GROUP_TYPE_MAP: Record<string, string> = {
+  textChange: 'textChange',
+  openTextDocument: 'documentChange',
+  closeTextDocument: 'documentChange',
+  openTexEditor: 'documentChange',
+  closeTextEditor: 'documentChange',
+} as const;
+const EDITOR_TRACK_COLUMN_COUNT = 2;
 class EditorTrackUI extends Component<EditorTrackUIProps> {
-  render() {
-    const { editorTrack, timelineDuration } = this.props;
-    const columns: h.JSX.Element[][] = _.times(5, () => []);
+  getGroupEvents = () => {
+    const groups: EditorEventGroup[] = [];
+    for (const e of this.props.editorTrack?.events ?? []) {
+      const groupType = EDITOR_EVENT_GROUP_TYPE_MAP[e.type] as EditorEventGroup['type'] | undefined;
+      if (!groupType) continue;
 
-    for (const [i, e] of (editorTrack?.events ?? []).entries()) {
+      const lastGroup = groups.at(-1);
+      const lastEvent = lastGroup?.events.at(-1);
+      const groupChanged = lastGroup && groupType !== lastGroup.type;
+      const uriChanged = lastEvent && lastEvent.uri !== e.uri;
+      const thereWasALongPause = lastEvent && e.clock - lastEvent.clock > 5;
+
+      if (!lastGroup || uriChanged || groupChanged || thereWasALongPause) {
+        const newGroup: EditorEventGroup = { type: groupType, events: [e as any] };
+        groups.push(newGroup);
+      } else {
+        lastGroup.events.push(e as any);
+      }
+    }
+
+    return groups;
+  };
+
+  render() {
+    const { timelineDuration } = this.props;
+    const columns: h.JSX.Element[][] = _.times(EDITOR_TRACK_COLUMN_COUNT, () => []);
+
+    const eventGroups = this.getGroupEvents();
+
+    for (const [i, g] of eventGroups.entries()) {
       const style = {
-        top: `${(e.clock / timelineDuration) * 100}%`,
+        top: `${(g.events[0].clock / timelineDuration) * 100}%`,
+        bottom: `calc(100% - ${(g.events.at(-1)!.clock / timelineDuration) * 100}%)`,
       };
 
-      const elem = <div className="event" title={e.type} style={style}></div>;
+      let text = '';
+      if (g.type === 'textChange') {
+        text = g.events
+          .flatMap(e => e.contentChanges.map(cc => cc.text))
+          .join('')
+          .trim();
+      }
+
+      const uri = g.events.at(-1)?.uri;
+      let p: t.Path | undefined;
+      let basename: string | undefined;
+
+      if (uri) {
+        p = path.getUriPathOpt(uri);
+        basename = p && path.basename(p);
+        basename ??= path.getUntitledUriNameOpt(uri);
+      }
+
+      const title = [p, text].filter(Boolean).join('\n');
+
+      let label = '';
+      let icon = '';
+      if (g.type === 'documentChange') {
+        label = basename || 'document';
+        icon = 'codicon-file';
+      } else {
+        label = text || 'text';
+      }
+
+      const elem = (
+        <div className={`track ${g.type}`} title={title} style={style}>
+          <p>
+            {icon && <span className={`codicon va-middle m-right_small ${icon}`} />}
+            {label}
+          </p>
+        </div>
+      );
       columns[i % columns.length].push(elem);
     }
 

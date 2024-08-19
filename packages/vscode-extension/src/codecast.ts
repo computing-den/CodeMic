@@ -59,16 +59,18 @@ class Codecast {
     await this.updateFrontend();
 
     // DEV
-    if (config.debug) {
-      if (this.webviewProvider.bus) {
-        try {
-          await this.messageHandler({ type: 'recorder/open', sessionId: '8a232c93-39b8-4df3-a286-908079159738' });
+    if (config.debug && this.webviewProvider.bus) {
+      try {
+        // const sessionId = '8a232c93-39b8-4df3-a286-908079159738'; // Laptop
+        const sessionId = 'b25ec8c2-a9a1-45df-805e-e5fab7c18669'; // Desktop
+        if (await Session.fromExisting(this.context, sessionId)) {
+          await this.messageHandler({ type: 'recorder/open', sessionId });
           // await this.messageHandler({ type: 'recorder/load' });
           await this.messageHandler({ type: 'recorder/openTab', tabId: 'editor-view' });
           await this.updateFrontend();
-        } catch (error) {
-          console.error('ERROR trying to open debug session:', error);
         }
+      } catch (error) {
+        console.error('ERROR trying to open debug session:', error);
       }
     }
   }

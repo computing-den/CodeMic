@@ -36,11 +36,6 @@
       padding: var(--container-padding-ver) var(--container-padding-hor);
       /* overflow-y: scroll */
 
-      #guide-video {
-        height: 25vh;
-        background: black;
-      }
-
       #timeline {
         flex: 1;
         display: flex;
@@ -58,25 +53,85 @@
           grid-template-columns: 1fr 1fr;
           grid-template-areas: 'editor-track ranged-tracks';
 
+          .track {
+            position: absolute;
+            left: 0;
+            right: 0;
+            min-height: 15px;
+            display: flex;
+            /* justify-content: center; */
+            /* align-items: center; */
+            border-radius: 4px;
+            z-index: var(--track-z-index);
+            transition: background 0.2s ease-in-out;
+            container-type: size;
+            container-name: track;
+
+            &:hover,
+            &.active {
+              z-index: var(--active-track-z-index);
+            }
+
+            p {
+              font-size: 0.7rem;
+              width: 100%;
+              height: 100%;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: pre;
+              line-height: 6px;
+              padding: 0.2rem;
+              margin: 0;
+
+              .codicon {
+                font-size: 0.7rem;
+              }
+
+              @container (min-height: 60px) {
+                padding: 0.5rem;
+                font-size: 0.9rem;
+                .track-text .codicon {
+                  font-size: 0.9rem;
+                }
+              }
+            }
+          }
+
           .editor-track {
             grid-area: editor-track;
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             grid-gap: 0.5rem;
 
             .column {
               position: relative;
 
-              .event {
-                --event-circle-size: 10px;
-                position: absolute;
-                left: 0;
-                width: var(--event-circle-size);
-                height: var(--event-circle-size);
-                margin-top: calc(-1 * var(--event-circle-size) / 2);
-                border-radius: 50%;
-                background: red;
-                border: 0.1px solid #000;
+              .track {
+                &.textChange {
+                  border: 1px solid var(--editor-track-text-change-border);
+                  background: var(--editor-track-text-change-background);
+
+                  &:hover,
+                  &.active {
+                    background: var(--editor-track-text-change-background-hover);
+                  }
+                  &.active {
+                    border-color: var(--editor-track-text-change-border-active);
+                  }
+                }
+
+                &.documentChange {
+                  border: 1px solid var(--editor-track-document-change-border);
+                  background: var(--editor-track-document-change-background);
+
+                  &:hover,
+                  &.active {
+                    background: var(--editor-track-document-change-background-hover);
+                  }
+                  &.active {
+                    border-color: var(--editor-track-document-change-border-active);
+                  }
+                }
               }
             }
           }
@@ -93,25 +148,15 @@
               margin-right: var(--spacing-x-small);
 
               .track {
-                position: absolute;
-                left: 0;
-                right: 0;
-                border: 1px solid var(--track-border);
-                background: var(--track-background);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                border-radius: 4px;
-                z-index: var(--track-z-index);
-                transition: background 0.2s ease-in-out;
+                border: 1px solid var(--ranged-track-border);
+                background: var(--ranged-track-background);
 
                 &:hover,
                 &.active {
-                  background: var(--track-background-hover);
-                  z-index: var(--active-track-z-index);
+                  background: var(--ranged-track-background-hover);
                 }
                 &.active {
-                  border-color: var(--track-border-active);
+                  border-color: var(--ranged-track-border-active);
                 }
               }
             }

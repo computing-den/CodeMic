@@ -341,7 +341,9 @@ class CombinedEditorTrackRecorder {
       this.scrolling = false;
       this.scrollStartRange = undefined;
     }
+
     this.session.body!.editorTrack.events.push(e);
+    // this.simplifyEvents();
     this.onChange?.();
   }
 
@@ -413,6 +415,28 @@ class CombinedEditorTrackRecorder {
     }
     return textEditor;
   }
+
+  // private simplifyEvents() {
+  // TODO
+  // Remove useless selections by checking internal editor's current selection
+  // Merge sequential textChange by checking internal editor's current state.
+  // Since we need access to the internal editor, we must not do it here but in the event handlers above.
+  //
+  // const { events } = this.session.body!.editorTrack;
+  // // Remove select events immediately after textChange.
+  // {
+  //   const [event1, event2] = [events.at(-1), events.at(-2)];
+  //   if (
+  //     event1 &&
+  //     event2 &&
+  //     event1.type === 'select' &&
+  //     event2.type === 'textChange' &&
+  //     event1.clock - event2.clock < 0.1
+  //   ) {
+  //     events.pop();
+  //   }
+  // }
+  // }
 }
 
 function logRawEvent(str: string) {
