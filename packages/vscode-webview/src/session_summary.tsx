@@ -1,4 +1,5 @@
 import { types as t, lib } from '@codecast/lib';
+import TextToParagraphs from './text_to_paragraphs.jsx';
 import TimeFromNow from './time_from_now.jsx';
 import WithAvatar from './with_avatar.jsx';
 import { cn } from './misc.js';
@@ -50,7 +51,11 @@ export class SessionSummaryForList extends Component<ForListProps> {
     return (
       <WithAvatar className={cn('session-summary for-list', className)} src={this.props.sessionSummary.author?.avatar}>
         <div className="title">{s.title || 'Untitled'}</div>
-        {s.description && <div className="description">{s.description}</div>}
+        {s.description && (
+          <div className="description">
+            <TextToParagraphs text={s.description} />
+          </div>
+        )}
         {lastOpenedTimestamp && (
           <div className="footer">
             <span className="footer-item timestamp">

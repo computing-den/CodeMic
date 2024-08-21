@@ -338,6 +338,16 @@ export type SessionBody = {
   videoTracks: VideoTrack[];
 };
 
+export type Comment = {
+  id: string;
+  author: UserSummary;
+  text: string;
+  likes: number;
+  dislikes: number;
+  creation_timestamp: string;
+  // modification_timestamp: string;
+};
+
 export type ClockRange = {
   start: number;
   end: number;

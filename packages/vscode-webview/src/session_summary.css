@@ -52,7 +52,7 @@
       font-weight: bold;
 
       > .footer-item {
-        white-space: nowrap;
+        /* white-space: nowrap; */
 
         &:first-child {
           /* min-width: 80px; */

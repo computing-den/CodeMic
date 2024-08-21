@@ -15,7 +15,10 @@
 @import 'with_avatar.css';
 @import 'tabs.css';
 @import 'account.css';
-@import 'guide_video.css'; /*
+@import 'guide_video.css';
+@import 'comment.css';
+
+/*
 .card {
   display: flex;
   flex-direction: column;

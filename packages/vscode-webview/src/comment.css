@@ -1,0 +1,66 @@
+.comment {
+  > .body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+
+    > .title {
+      font-weight: bold;
+      font-size: 1em;
+    }
+
+    > .title + .text {
+      margin-top: var(--spacing-small);
+    }
+
+    > .footer {
+      margin-top: var(--spacing-small);
+      display: flex;
+      align-items: center;
+      font-weight: bold;
+      opacity: 0.6;
+
+      > .footer-item {
+        font-size: 0.9em;
+
+        &:first-child {
+          /* min-width: 80px; */
+          flex: 1;
+        }
+
+        & + .footer-item {
+          margin-left: var(--spacing-medium);
+        }
+
+        &.badge {
+          display: flex;
+          align-items: center;
+          font-size: 0.9em;
+
+          .codicon {
+            font-size: 0.9rem;
+          }
+        }
+      }
+    }
+  }
+}
+
+.comment-list {
+  & li.comment-list-item {
+    padding: var(--spacing-medium) var(--container-padding);
+  }
+}
+
+.comment-input {
+  padding: var(--spacing-medium) var(--container-padding);
+
+  > .body {
+    flex: 1;
+
+    & vscode-text-area {
+      width: 100%;
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import { types as t, lib } from '@codecast/lib';
 import TimeFromNow from './time_from_now.js';
 import { cn } from './misc.js';
+import TextToParagraphs from './text_to_paragraphs.jsx';
 import { h, Fragment, Component } from 'preact';
 
 export type Props = {
@@ -26,7 +27,9 @@ export default class SessionDescription extends Component<Props> {
             <span className="count">{s.likes}</span>
           </div>
         </div>
-        <div className="body">{s.description}</div>
+        <div className="body">
+          <TextToParagraphs text={s.description} />
+        </div>
       </div>
     );
   }
