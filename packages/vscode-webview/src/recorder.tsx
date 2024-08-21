@@ -308,7 +308,7 @@ type TimelineState = {
 };
 class Timeline extends Component<TimelineProps, TimelineState> {
   state = {
-    stepCount: 16,
+    stepCount: 10,
     trackDragStart: undefined,
   } as TimelineState;
 
@@ -630,7 +630,7 @@ const EDITOR_EVENT_GROUP_TYPE_MAP: Record<string, string> = {
   textChange: 'textChange',
   openTextDocument: 'documentChange',
   closeTextDocument: 'documentChange',
-  openTexEditor: 'documentChange',
+  showTextEditor: 'documentChange',
   closeTextEditor: 'documentChange',
 } as const;
 const EDITOR_TRACK_COLUMN_COUNT = 2;
@@ -675,6 +675,7 @@ class EditorTrackUI extends Component<EditorTrackUIProps> {
         text = g.events
           .flatMap(e => e.contentChanges.map(cc => cc.text))
           .join('')
+          .replace(/\n+/g, '\n')
           .trim();
       }
 
