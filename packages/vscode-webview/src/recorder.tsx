@@ -157,7 +157,7 @@ class DetailsView extends Component<DetailsViewProps> {
 
 type Marker = {
   clock: number;
-  type: 'clock' | 'anchor' | 'cursor' | 'selection' | 'end';
+  type: 'clock' | 'anchor' | 'cursor' | 'selection' | 'end' | 'recording';
   active?: boolean;
   label?: string;
   draggable?: boolean;
@@ -486,10 +486,13 @@ class Timeline extends Component<TimelineProps, TimelineState> {
 
   render() {
     const { markers, cursor, anchor, clock, trackSelection, duration, recorder } = this.props;
-    const clockMarker: Marker | undefined = clock > 0 ? { clock, type: 'clock' } : undefined;
-    const endMarker: Marker = { clock: duration, type: 'end', label: 'end', draggable: true };
+    const clockMarker: Marker | undefined =
+      clock > 0 && clock !== duration && !recorder.recording ? { clock, type: 'clock' } : undefined;
+    const endOrRecordingMarker: Marker = recorder.recording
+      ? { clock: duration, type: 'recording' }
+      : { clock: duration, type: 'end', draggable: true };
 
-    const allMarkers = _.compact([...markers, cursor, anchor, clockMarker, endMarker]);
+    const allMarkers = _.compact([...markers, cursor, anchor, clockMarker, endOrRecordingMarker]);
     const timelineDuration = this.getTimelineDuration();
 
     return (

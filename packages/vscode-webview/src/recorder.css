@@ -207,6 +207,9 @@
                   font-weight: bold;
                 }
               }
+              &.marker_recording {
+                border-color: var(--marker-end-color);
+              }
 
               /* &.draggable { */
               /*   cursor: grab; */
@@ -221,15 +224,15 @@
             top: -11px;
             font-weight: bold;
             */
-
                 position: absolute;
-                left: 0;
-                background: var(--vscode-sideBar-background);
-                /* padding: 5px 0px; */
-                /* font-weight: bold; */
-                top: calc(100% + 2px);
-                font-size: 0.8em;
-                opacity: 0.8;
+                left: calc(100% + 9px);
+                background: var(--input-background);
+                top: -12px;
+                font-size: 0.9em;
+                padding: var(--input-padding-vertical) var(--input-padding-horizontal);
+                border-radius: 8px;
+                border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--dropdown-border));
+                text-align: center;
               }
             }
           }
