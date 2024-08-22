@@ -4,7 +4,6 @@ import TimeFromNow from './time_from_now.jsx';
 import WithAvatar from './with_avatar.jsx';
 import { cn } from './misc.js';
 import { h, Fragment, Component } from 'preact';
-import SelectableLi, * as SL from './selectable_li.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
 
@@ -26,6 +25,9 @@ export class Comment extends Component<CommentProps> {
             {comment.author.username} <TimeFromNow timestamp={comment.creation_timestamp} />
           </span>
           <div className="footer-item badge">
+            <span className="codicon codicon-reply va-top m-right_small" />
+          </div>
+          <div className="footer-item badge">
             <span className="codicon codicon-thumbsup va-top m-right_small" />
             <span className="count">{comment.likes}</span>
           </div>
@@ -39,43 +41,43 @@ export class Comment extends Component<CommentProps> {
   }
 }
 
-export class SelectableLiComment extends Component<CommentProps> {
-  actions: SL.Action[] = [
-    {
-      icon: 'codicon-reply',
-      title: 'Reply',
-      onClick: () => {
-        console.log('TODO');
-      },
-    },
-    {
-      icon: 'codicon-thumbsup',
-      title: 'Like',
-      onClick: () => {
-        console.log('TODO');
-      },
-    },
-    {
-      icon: 'codicon-thumbsdown',
-      title: 'Dislike',
-      onClick: () => {
-        console.log('TODO');
-      },
-    },
-  ];
+// export class SelectableLiComment extends Component<CommentProps> {
+//   actions: SL.Action[] = [
+//     {
+//       icon: 'codicon-reply',
+//       title: 'Reply',
+//       onClick: () => {
+//         console.log('TODO');
+//       },
+//     },
+//     {
+//       icon: 'codicon-thumbsup',
+//       title: 'Like',
+//       onClick: () => {
+//         console.log('TODO');
+//       },
+//     },
+//     {
+//       icon: 'codicon-thumbsdown',
+//       title: 'Dislike',
+//       onClick: () => {
+//         console.log('TODO');
+//       },
+//     },
+//   ];
 
-  render() {
-    return (
-      <SelectableLi
-        className={cn('comment-list-item', this.props.className)}
-        actions={this.actions}
-        onClick={() => console.log('TODO')}
-      >
-        <Comment {...this.props} />
-      </SelectableLi>
-    );
-  }
-}
+//   render() {
+//     return (
+//       <SelectableLi
+//         className={cn('comment-list-item', this.props.className)}
+//         actions={this.actions}
+//         onClick={() => console.log('TODO')}
+//       >
+//         <Comment {...this.props} />
+//       </SelectableLi>
+//     );
+//   }
+// }
 
 export type CommentListProps = { comments: t.Comment[]; className?: string };
 export class CommentList extends Component<CommentListProps> {
@@ -83,11 +85,11 @@ export class CommentList extends Component<CommentListProps> {
     const { comments, className } = this.props;
 
     return (
-      <ul className={cn('comment-list unstyled', className)}>
+      <div className={cn('comment-list', className)}>
         {comments.map(comment => (
-          <SelectableLiComment comment={comment} />
+          <Comment comment={comment} />
         ))}
-      </ul>
+      </div>
     );
   }
 }

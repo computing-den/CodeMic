@@ -48,7 +48,7 @@
 }
 
 .comment-list {
-  & li.comment-list-item {
+  .comment {
     padding: var(--spacing-medium) var(--container-padding);
   }
 }
