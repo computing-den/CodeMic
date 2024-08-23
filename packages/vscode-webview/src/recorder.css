@@ -48,16 +48,12 @@
         .timeline-body {
           flex: 1;
           position: relative;
-          display: grid;
-          grid-gap: 1rem;
-          grid-template-columns: 1fr 1fr;
-          grid-template-areas: 'editor-track ranged-tracks';
+          display: flex;
 
           .track {
             position: absolute;
             left: 0;
             right: 0;
-            min-height: 15px;
             display: flex;
             /* justify-content: center; */
             /* align-items: center; */
@@ -97,47 +93,47 @@
             }
           }
 
-          .editor-track {
-            grid-area: editor-track;
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            grid-gap: 0.5rem;
+          /* .editor-track { */
+          /*   grid-area: editor-track; */
+          /*   display: grid; */
+          /*   grid-template-columns: repeat(2, 1fr); */
+          /*   grid-gap: 0.5rem; */
 
-            .column {
-              position: relative;
+          /*   .column { */
+          /*     position: relative; */
 
-              .track {
-                &.textChange {
-                  border: 1px solid var(--editor-track-text-change-border);
-                  background: var(--editor-track-text-change-background);
+          /*     .track { */
+          /*       &.textChange { */
+          /*         border: 1px solid var(--editor-track-text-change-border); */
+          /*         background: var(--editor-track-text-change-background); */
 
-                  &:hover,
-                  &.active {
-                    background: var(--editor-track-text-change-background-hover);
-                  }
-                  &.active {
-                    border-color: var(--editor-track-text-change-border-active);
-                  }
-                }
+          /*         &:hover, */
+          /*         &.active { */
+          /*           background: var(--editor-track-text-change-background-hover); */
+          /*         } */
+          /*         &.active { */
+          /*           border-color: var(--editor-track-text-change-border-active); */
+          /*         } */
+          /*       } */
 
-                &.documentChange {
-                  border: 1px solid var(--editor-track-document-change-border);
-                  background: var(--editor-track-document-change-background);
+          /*       &.documentChange { */
+          /*         border: 1px solid var(--editor-track-document-change-border); */
+          /*         background: var(--editor-track-document-change-background); */
 
-                  &:hover,
-                  &.active {
-                    background: var(--editor-track-document-change-background-hover);
-                  }
-                  &.active {
-                    border-color: var(--editor-track-document-change-border-active);
-                  }
-                }
-              }
-            }
-          }
+          /*         &:hover, */
+          /*         &.active { */
+          /*           background: var(--editor-track-document-change-background-hover); */
+          /*         } */
+          /*         &.active { */
+          /*           border-color: var(--editor-track-document-change-border-active); */
+          /*         } */
+          /*       } */
+          /*     } */
+          /*   } */
+          /* } */
 
           .ranged-tracks {
-            grid-area: ranged-tracks;
+            flex: 1;
             display: flex;
 
             .column {
@@ -163,8 +159,6 @@
           }
 
           .markers {
-            grid-area: 1 / 3;
-
             .marker {
               position: absolute;
               left: 0;

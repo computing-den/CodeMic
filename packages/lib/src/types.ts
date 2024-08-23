@@ -361,7 +361,7 @@ export type InternalEditorTrack = {
 
 export type RangedTrack = {
   id: string;
-  type: 'audio' | 'video';
+  type: 'audio' | 'video' | 'editor';
   clockRange: ClockRange;
   title: string;
 };
