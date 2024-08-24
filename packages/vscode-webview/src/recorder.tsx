@@ -5,7 +5,7 @@ import { types as t, path, lib, assert } from '@codecast/lib';
 // import FakeMedia from './fake_media.js';
 import PathField from './path_field.jsx';
 import Tabs, { type TabViewProps } from './tabs.jsx';
-import { SessionSummary } from './session_summary.jsx';
+import { SessionHead } from './session_head.jsx';
 import SessionDescription from './session_description.jsx';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
@@ -113,7 +113,7 @@ class DetailsView extends Component<DetailsViewProps> {
 
   render() {
     const { recorder, id, className, onLoadRecorder } = this.props;
-    const { sessionSummary: ss } = recorder;
+    const { sessionHead: ss } = recorder;
 
     return (
       <div id={id} className={className}>
@@ -257,7 +257,7 @@ class EditorView extends Component<EditorViewProps> {
 
   render() {
     const { id, recorder, className, onRecord, onPlay } = this.props;
-    const { sessionSummary: ss } = recorder;
+    const { sessionHead: ss } = recorder;
     let primaryAction: MT.PrimaryAction;
 
     if (recorder.recording) {
@@ -328,7 +328,7 @@ class EditorView extends Component<EditorViewProps> {
           anchor={this.state.anchor}
           trackSelection={this.state.trackSelection}
           clock={recorder.clock}
-          duration={recorder.sessionSummary.duration}
+          duration={recorder.sessionHead.duration}
           onChange={this.updateState}
         />
       </div>
@@ -360,7 +360,7 @@ class Timeline extends Component<TimelineProps, TimelineState> {
   } as TimelineState;
 
   getTimelineStepClock(): number {
-    return calcTimelineStepClock(this.props.recorder.sessionSummary.duration, this.state.stepCount);
+    return calcTimelineStepClock(this.props.recorder.sessionHead.duration, this.state.stepCount);
   }
 
   getTimelineDuration(): number {

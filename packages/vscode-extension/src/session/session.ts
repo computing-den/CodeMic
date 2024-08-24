@@ -18,12 +18,12 @@ import stream from 'stream';
 import os from 'os';
 import * as vscode from 'vscode';
 import { v4 as uuid } from 'uuid';
-import { SessionSummary } from '@codecast/lib/src/types.js';
+import { SessionHead } from '@codecast/lib/src/types.js';
 
 export class Session implements t.Session {
   context: Context;
   workspace: t.AbsPath;
-  summary: t.SessionSummary;
+  head: t.SessionHead;
   loaded = false;
   body?: t.SessionBody;
   ctrls?: SessionCtrls;
@@ -32,14 +32,14 @@ export class Session implements t.Session {
   // editorRecorder?: CombinedEditorTrackRecorder;
   // audioCtrls?: AudioCtrl[];
 
-  constructor(context: Context, workspace: t.AbsPath, summary: t.SessionSummary) {
+  constructor(context: Context, workspace: t.AbsPath, head: t.SessionHead) {
     this.context = context;
     this.workspace = workspace;
-    this.summary = summary;
+    this.head = head;
   }
 
   get sessionDataPaths(): SessionDataPaths {
-    return this.context.dataPaths.session(this.summary.id);
+    return this.context.dataPaths.session(this.head.id);
   }
 
   get clock(): number | undefined {
@@ -60,24 +60,24 @@ export class Session implements t.Session {
 
   static async fromExisting(context: Context, id: string): Promise<Session | undefined> {
     const workspace = Session.getWorkspace(context, id);
-    const summary = await Session.summaryFromExisting(context, id);
-    return summary && new Session(context, workspace, summary);
+    const head = await Session.headFromExisting(context, id);
+    return head && new Session(context, workspace, head);
   }
 
-  static async summaryFromExisting(context: Context, id: string): Promise<SessionSummary | undefined> {
-    const summaryPath = context.dataPaths.session(id).summary;
-    return storage.readJSONOptional<t.SessionSummary>(summaryPath);
+  static async headFromExisting(context: Context, id: string): Promise<SessionHead | undefined> {
+    const headPath = context.dataPaths.session(id).head;
+    return storage.readJSONOptional<t.SessionHead>(headPath);
   }
 
-  static async fromNew(context: Context, workspace: t.AbsPath, summary: t.SessionSummary): Promise<Session> {
-    return new Session(context, workspace, summary);
+  static async fromNew(context: Context, workspace: t.AbsPath, head: t.SessionHead): Promise<Session> {
+    return new Session(context, workspace, head);
   }
 
   static getWorkspace(context: Context, id: string): t.AbsPath {
     return context.settings.history[id]?.workspace ?? context.defaultWorkspacePaths.session(id).root;
   }
 
-  static makeNewSummary(author?: t.UserSummary): t.SessionSummary {
+  static makeNewHead(author?: t.UserSummary): t.SessionHead {
     return {
       id: uuid(),
       title: '',
@@ -98,12 +98,12 @@ export class Session implements t.Session {
   ): Promise<Session | undefined> {
     const base = await Session.fromExisting(context, baseId);
     if (base) {
-      const summary = await base.fork(options);
-      return Session.fromExisting(context, summary.id);
+      const head = await base.fork(options);
+      return Session.fromExisting(context, head.id);
     }
   }
 
-  // static makeEditSummary(base: t.SessionSummary, author?: t.UserSummary): t.SessionSummary {
+  // static makeEditHead(base: t.SessionHead, author?: t.UserSummary): t.SessionHead {
   //   return {
   //     ..._.cloneDeep(base),
   //     author,
@@ -152,7 +152,7 @@ export class Session implements t.Session {
       // We don't need to cut audio because playback ends when it reaches session's duration.
       this.ctrls.internalEditorTrackCtrl.cut(options.cutClock);
       // for (const c of this.ctrls.audioTrackCtrls) c.cut(options.cutClock);
-      this.summary.duration = options.cutClock;
+      this.head.duration = options.cutClock;
     }
 
     // Seek to seekClock.
@@ -188,28 +188,28 @@ export class Session implements t.Session {
     this.loaded = true;
   }
 
-  async fork(options?: { author?: t.UserSummary }): Promise<t.SessionSummary> {
+  async fork(options?: { author?: t.UserSummary }): Promise<t.SessionHead> {
     await this.download({ skipIfExists: true });
-    const forkSummary: t.SessionSummary = {
+    const forkHead: t.SessionHead = {
       id: uuid(),
-      title: `Fork: ${this.summary.title}`,
-      description: this.summary.description,
-      author: options?.author ?? this.summary.author,
-      duration: this.summary.duration,
+      title: `Fork: ${this.head.title}`,
+      description: this.head.description,
+      author: options?.author ?? this.head.author,
+      duration: this.head.duration,
       views: 0,
       likes: 0,
       publishTimestamp: undefined,
-      modificationTimestamp: this.summary.modificationTimestamp,
-      toc: this.summary.toc,
-      forkedFrom: this.summary.id,
+      modificationTimestamp: this.head.modificationTimestamp,
+      toc: this.head.toc,
+      forkedFrom: this.head.id,
     };
 
-    // Copy the entire session data, then rewrite the summary.
-    const forkSessionDataPaths = this.context.dataPaths.session(forkSummary.id);
+    // Copy the entire session data, then rewrite the head.
+    const forkSessionDataPaths = this.context.dataPaths.session(forkHead.id);
     await fs.promises.cp(this.sessionDataPaths.root, forkSessionDataPaths.root, { recursive: true });
-    await storage.writeJSON(forkSessionDataPaths.summary, forkSummary);
+    await storage.writeJSON(forkSessionDataPaths.head, forkHead);
 
-    return forkSummary;
+    return forkHead;
   }
 
   async initTrackCtrls() {
@@ -455,12 +455,12 @@ export class Session implements t.Session {
   }
 
   async write() {
-    await this.writeSummary();
+    await this.writeHead();
     if (this.body) await this.writeBody();
   }
 
-  async writeSummary() {
-    await storage.writeJSON(this.sessionDataPaths.summary, this.summary);
+  async writeHead() {
+    await storage.writeJSON(this.sessionDataPaths.head, this.head);
   }
 
   async writeBody() {
@@ -469,7 +469,7 @@ export class Session implements t.Session {
   }
 
   async writeHistory(update?: (history: t.SessionHistory) => t.SessionHistory) {
-    const { id } = this.summary;
+    const { id } = this.head;
     const { settings } = this.context;
     if (update) {
       settings.history[id] = update(settings.history[id] ?? { id, workspace: this.workspace });
@@ -485,7 +485,7 @@ export class Session implements t.Session {
   async download(options?: { skipIfExists: boolean }) {
     if (options?.skipIfExists && (await misc.fileExists(this.sessionDataPaths.body))) return;
 
-    await serverApi.downloadSession(this.summary.id, this.sessionDataPaths.zip, this.context.user?.token);
+    await serverApi.downloadSession(this.head.id, this.sessionDataPaths.zip, this.context.user?.token);
     // For some reason when stream.pipeline() resolves, the extracted files have not
     // yet been written. So we have to wait on out.promise().
     const out = unzipper.Extract({ path: this.sessionDataPaths.root, verbose: true });
@@ -523,7 +523,7 @@ export class Session implements t.Session {
 
   async delete() {
     await fs.promises.rm(this.sessionDataPaths.root, { force: true, recursive: true });
-    delete this.context.settings.history[this.summary.id];
+    delete this.context.settings.history[this.head.id];
     await storage.writeJSON(this.context.dataPaths.settings, this.context.settings);
   }
 
@@ -531,7 +531,7 @@ export class Session implements t.Session {
     assert(await misc.fileExists(this.sessionDataPaths.body), "Session body doesn't exist");
 
     return new Promise<t.AbsPath>((resolve, reject) => {
-      // const packagePath = path.abs(os.tmpdir(), this.summary.id + '.zip');
+      // const packagePath = path.abs(os.tmpdir(), this.head.id + '.zip');
 
       const output = fs.createWriteStream(this.sessionDataPaths.zip);
       const archive = archiver('zip', { zlib: { level: 9 } });
@@ -561,8 +561,8 @@ export class Session implements t.Session {
 
   async publish() {
     const zip = await this.package();
-    const res = await serverApi.publishSession(this.summary, zip, this.context.user?.token);
-    this.summary = res;
+    const res = await serverApi.publishSession(this.head, zip, this.context.user?.token);
+    this.head = res;
     await this.write();
   }
 
@@ -774,7 +774,7 @@ export class Session implements t.Session {
   }
 
   async updateWorkspaceFolder(): Promise<boolean> {
-    // const history = this.db.settings.history[this.playerSetup.summary.id];
+    // const history = this.db.settings.history[this.playerSetup.head.id];
     if (misc.getDefaultVscWorkspace() === this.workspace) return true;
 
     // return vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length ?? 0, {

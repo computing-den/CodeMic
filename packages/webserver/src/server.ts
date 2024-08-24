@@ -64,7 +64,7 @@ function initDB() {
 
   db.prepare(
     `
-    CREATE TABLE IF NOT EXISTS session_summaries (
+    CREATE TABLE IF NOT EXISTS session_heads (
       id TEXT PRIMARY KEY,
       title TEXT,
       description TEXT,
@@ -251,15 +251,15 @@ async function handleRequest(req: t.BackendToServerRequest, locals: MyLocals): P
     case 'featured/get': {
       const { dbUser } = locals;
 
-      const dbSessionSummaries = db
-        .prepare(`SELECT * FROM session_summaries WHERE author != ? ORDER BY likes DESC LIMIT 100`)
-        .all(dbUser?.username) as t.DBSessionSummary[];
+      const dbSessionHeads = db
+        .prepare(`SELECT * FROM session_heads WHERE author != ? ORDER BY likes DESC LIMIT 100`)
+        .all(dbUser?.username) as t.DBSessionHead[];
 
-      const sessionSummaries = dbSessionSummariesToSessionSummaries(dbSessionSummaries);
+      const sessionHeads = dbSessionHeadsToSessionHeads(dbSessionHeads);
 
       return {
-        type: 'sessionSummaries',
-        sessionSummaries,
+        type: 'sessionHeads',
+        sessionHeads,
       };
     }
     default:
@@ -267,53 +267,53 @@ async function handleRequest(req: t.BackendToServerRequest, locals: MyLocals): P
   }
 }
 
-async function handlePublishSession(body: any, file: Express.Multer.File, locals: MyLocals): Promise<t.SessionSummary> {
+async function handlePublishSession(body: any, file: Express.Multer.File, locals: MyLocals): Promise<t.SessionHead> {
   const { dbUser } = locals;
   assert(dbUser);
 
-  const sessionSummary = JSON.parse(body.sessionSummary) as t.SessionSummary;
-  console.log('sessionSummary:', sessionSummary);
+  const sessionHead = JSON.parse(body.sessionHead) as t.SessionHead;
+  console.log('sessionHead:', sessionHead);
   console.log('dbUser: ', locals.dbUser);
 
-  if (!sessionSummary.id) {
+  if (!sessionHead.id) {
     throw new ServerError('Missing session ID.', 400);
   }
-  // if (sessionSummary.author.username !== locals.dbUser.username) {
+  // if (sessionHead.author.username !== locals.dbUser.username) {
   //   throw new ServerError('Forbidden: trying to publish as a different user.', 403);
   // }
 
-  // sessionSummary.id is picked by user and must be checked to make sure it doesn't
+  // sessionHead.id is picked by user and must be checked to make sure it doesn't
   // belong to another user.
-  let dbSessionSummary = db.prepare(`SELECT * from session_summaries where id = ?`).get(sessionSummary.id) as
-    | t.DBSessionSummary
+  let dbSessionHead = db.prepare(`SELECT * from session_heads where id = ?`).get(sessionHead.id) as
+    | t.DBSessionHead
     | undefined;
-  if (dbSessionSummary && dbSessionSummary.author !== dbUser.username) {
+  if (dbSessionHead && dbSessionHead.author !== dbUser.username) {
     throw new ServerError('Forbidden: this session does not belong to you.', 403);
   }
 
   // Store session file named
-  const sessionPath = path.resolve(config.data, 'sessions', dbUser.username, `${sessionSummary.id}.zip`);
+  const sessionPath = path.resolve(config.data, 'sessions', dbUser.username, `${sessionHead.id}.zip`);
   await fs.promises.mkdir(path.dirname(sessionPath), { recursive: true });
   await fs.promises.copyFile(file.path, sessionPath);
 
   const now = new Date().toISOString();
 
-  dbSessionSummary = {
-    id: sessionSummary.id,
-    title: sessionSummary.title ?? '',
-    description: sessionSummary.description ?? '',
+  dbSessionHead = {
+    id: sessionHead.id,
+    title: sessionHead.title ?? '',
+    description: sessionHead.description ?? '',
     author: dbUser.username,
-    duration: sessionSummary.duration,
-    views: dbSessionSummary?.views ?? 0,
-    likes: dbSessionSummary?.likes ?? 0,
-    forked_from: sessionSummary.forkedFrom,
-    publish_timestamp: dbSessionSummary?.publish_timestamp ?? now,
-    modification_timestamp: dbSessionSummary?.modification_timestamp ?? now,
+    duration: sessionHead.duration,
+    views: dbSessionHead?.views ?? 0,
+    likes: dbSessionHead?.likes ?? 0,
+    forked_from: sessionHead.forkedFrom,
+    publish_timestamp: dbSessionHead?.publish_timestamp ?? now,
+    modification_timestamp: dbSessionHead?.modification_timestamp ?? now,
   };
 
   db.prepare(
     `
-      INSERT OR REPLACE INTO session_summaries
+      INSERT OR REPLACE INTO session_heads
       (
         id,
         title,
@@ -339,16 +339,16 @@ async function handlePublishSession(body: any, file: Express.Multer.File, locals
         :publish_timestamp,
         :modification_timestamp
       )`,
-  ).run(dbSessionSummary);
+  ).run(dbSessionHead);
 
-  return fetchSessionSummary(sessionSummary.id);
+  return fetchSessionHead(sessionHead.id);
 }
 
 async function handleDownloadSession(req: express.Request, res: express.Response) {
   // const { dbUser } = res.locals;
   const { id } = req.query;
   if (!id) throw new ServerError('Missing session id', 400);
-  const author = db.prepare(`SELECT author FROM session_summaries WHERE id = ?`).pluck().get(id) as string;
+  const author = db.prepare(`SELECT author FROM session_heads WHERE id = ?`).pluck().get(id) as string;
   if (!author) throw new ServerError('Session not found', 404);
 
   // sessionPath must be absolute because it'll be used for res.sendFile.
@@ -361,14 +361,14 @@ async function handleDownloadSession(req: express.Request, res: express.Response
   });
 }
 
-function fetchSessionSummary(id: string): t.SessionSummary {
-  const dbSessionSummary = db.prepare(`SELECT * FROM session_summaries WHERE id = ?`).get(id) as t.DBSessionSummary;
-  return dbSessionSummaryToSessionSummary(dbSessionSummary);
+function fetchSessionHead(id: string): t.SessionHead {
+  const dbSessionHead = db.prepare(`SELECT * FROM session_heads WHERE id = ?`).get(id) as t.DBSessionHead;
+  return dbSessionHeadToSessionHead(dbSessionHead);
 }
 
-function dbSessionSummariesToSessionSummaries(dbSessionSummaries: t.DBSessionSummary[]): t.SessionSummary[] {
-  const authors = fetchUserSummaries(dbSessionSummaries.map(s => s.author));
-  const pairs = _.zip(dbSessionSummaries, authors);
+function dbSessionHeadsToSessionHeads(dbSessionHeads: t.DBSessionHead[]): t.SessionHead[] {
+  const authors = fetchUserSummaries(dbSessionHeads.map(s => s.author));
+  const pairs = _.zip(dbSessionHeads, authors);
 
   return pairs.map(([s, author]) => {
     assert(s);
@@ -389,8 +389,8 @@ function dbSessionSummariesToSessionSummaries(dbSessionSummaries: t.DBSessionSum
   });
 }
 
-function dbSessionSummaryToSessionSummary(dbSessionSummary: t.DBSessionSummary): t.SessionSummary {
-  return dbSessionSummariesToSessionSummaries([dbSessionSummary])[0];
+function dbSessionHeadToSessionHead(dbSessionHead: t.DBSessionHead): t.SessionHead {
+  return dbSessionHeadsToSessionHeads([dbSessionHead])[0];
 }
 
 function fetchUserSummaries(usernames: string[]): t.UserSummary[] {

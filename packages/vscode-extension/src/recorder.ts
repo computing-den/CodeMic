@@ -23,11 +23,11 @@ class Recorder {
   // private lastSavedClock: number;
 
   async load(options?: { seekClock?: number; cutClock?: number }) {
-    // let clock = setup.sessionSummary.duration;
+    // let clock = setup.sessionHead.duration;
     // if (setup.fork) {
     //   clock = setup.fork.clock;
-    //   assert(setup.baseSessionSummary);
-    //   await db.copySessionDir(setup.baseSessionSummary, setup.sessionSummary);
+    //   assert(setup.baseSessionHead);
+    //   await db.copySessionDir(setup.baseSessionHead, setup.sessionHead);
     // }
 
     if (this.mustScan) {
@@ -62,10 +62,10 @@ class Recorder {
 
   async record() {
     assert(this.sessionTracksCtrl);
-    if (this.sessionTracksCtrl.clock !== this.session.summary.duration) {
-      // await this.session.ctrls!.combinedEditorTrackPlayer.seek(this.session.summary.duration);
+    if (this.sessionTracksCtrl.clock !== this.session.head.duration) {
+      // await this.session.ctrls!.combinedEditorTrackPlayer.seek(this.session.head.duration);
       // this.session.ctrls?.internalEditorTrackCtrl.
-      await this.sessionTracksCtrl.seek(this.session.summary.duration, { noUpdate: false });
+      await this.sessionTracksCtrl.seek(this.session.head.duration, { noUpdate: false });
       // await new Promise(resolve => setTimeout(resolve, 3000));
     }
     this.sessionTracksCtrl.record();
@@ -97,12 +97,12 @@ class Recorder {
   }
 
   updateState(changes: t.RecorderUpdate) {
-    if (changes.title !== undefined) this.session.summary.title = changes.title;
-    if (changes.description !== undefined) this.session.summary.description = changes.description;
-    // if (changes.clock !== undefined) this.sessionSummary.duration = this.sessionTracksCtrl.clock = changes.clock;
+    if (changes.title !== undefined) this.session.head.title = changes.title;
+    if (changes.description !== undefined) this.session.head.description = changes.description;
+    // if (changes.clock !== undefined) this.sessionHead.duration = this.sessionTracksCtrl.clock = changes.clock;
     if (changes.workspace !== undefined)
       throw new Error('Recorder.updateState cannot change workspace after initialization');
-    if (changes.duration) this.session.summary.duration = changes.duration;
+    if (changes.duration) this.session.head.duration = changes.duration;
 
     this.dirty = true;
   }
@@ -111,7 +111,7 @@ class Recorder {
    * May be called without pause().
    */
   async save() {
-    this.session.summary.modificationTimestamp = new Date().toISOString();
+    this.session.head.modificationTimestamp = new Date().toISOString();
     await this.session.write();
     await this.saveHistoryOpenClose();
     this.dirty = false;

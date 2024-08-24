@@ -1,6 +1,6 @@
 import { h, Fragment, Component } from 'preact';
 import { types as t, lib } from '@codecast/lib';
-import { SessionSummaryList } from './session_summary.jsx';
+import { SessionHeadList } from './session_head.jsx';
 import Screen from './screen.jsx';
 // import LoginBanner from './login_banner.jsx';
 import Section from './section.jsx';
@@ -48,8 +48,8 @@ export default class Welcome extends Component<Props> {
             )}
           </Section.Body>
         </Section>
-        <SessionsSection title="WORKSPACE" history={welcome.history} sessionSummaries={welcome.workspace} />
-        <SessionsSection title="FEATURED" history={welcome.history} sessionSummaries={welcome.featured} />
+        <SessionsSection title="WORKSPACE" history={welcome.history} sessionHeads={welcome.workspace} />
+        <SessionsSection title="FEATURED" history={welcome.history} sessionHeads={welcome.featured} />
       </Screen>
     );
   }
@@ -57,17 +57,17 @@ export default class Welcome extends Component<Props> {
 
 type SessionsSectionProps = {
   title: string;
-  sessionSummaries: t.SessionSummary[];
+  sessionHeads: t.SessionHead[];
   history: t.SessionsHistory;
   bordered?: boolean;
 };
 
-type SessionAndHistory = { sessionSummary: t.SessionSummary; history?: t.SessionHistory };
+type SessionAndHistory = { sessionHead: t.SessionHead; history?: t.SessionHistory };
 
 class SessionsSection extends Component<SessionsSectionProps> {
   render() {
-    let sh: SessionAndHistory[] = _.map(this.props.sessionSummaries, s => ({
-      sessionSummary: s,
+    let sh: SessionAndHistory[] = _.map(this.props.sessionHeads, s => ({
+      sessionHead: s,
       history: this.props.history[s.id],
     }));
     const iteratee = ({ history }: SessionAndHistory) =>
@@ -78,7 +78,7 @@ class SessionsSection extends Component<SessionsSectionProps> {
       <Section className="sessions-section" bordered={this.props.bordered}>
         <Section.Header title={this.props.title} collapsible />
         <Section.Body>
-          <SessionSummaryList sessionSummaries={this.props.sessionSummaries} history={this.props.history} />
+          <SessionHeadList sessionHeads={this.props.sessionHeads} history={this.props.history} />
         </Section.Body>
       </Section>
     );

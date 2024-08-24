@@ -30,7 +30,7 @@ Session
 
 SessionI (lib)
   - workspace
-  - SessionSummary
+  - SessionHead
   - SessionBody?
   - readFile
   - copyToBlob
@@ -39,13 +39,13 @@ SessionI (lib)
 _________________________
 
 SessionTracksCtrl  (lib)
- - SessionI (needs its SessionSummary JSON)
+ - SessionI (needs its SessionHead JSON)
  - AudioTrackCtrl
  - EditorTrackCtrlForPlayer
  - EditorTrackCtrlForRecorder
 
 Session compatible with t.Session
-  - SessionSummary JSON
+  - SessionHead JSON
   - SessionBody JSON
   - InternalEditorTrackCtrl
 
@@ -95,7 +95,7 @@ EditorTrack implements EditorEventStepper   (lib)
   - EditorTrack JSON (inlined so the class acts like t.EditorTrack)
 
 Session
-  - SessionSummary JSON
+  - SessionHead JSON
   - SessionBody JSON
   - EditorTrack (class but compatible with JSON)
 
@@ -107,7 +107,7 @@ AudioCtrl implements t.AudioCtrl
   - AudioTrack JSON
 
 SessionCtrl  (lib)
- - SessionSummary (JSON)
+ - SessionHead (JSON)
  - AudioCtrl
  - EditorPlayer
  - EditorRecorder

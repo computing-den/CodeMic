@@ -36,7 +36,7 @@ export async function writeJSON(p: t.AbsPath, data: any) {
 // export class AppStorage {
 //   private constructor(
 //     public storage: Storage,
-//     public settingsCache: FileCache<t.SessionSummary>,
+//     public settingsCache: FileCache<t.SessionHead>,
 //     public bodyCache: FileCache<t.SessionBody | undefined>,
 //   ) {}
 
@@ -45,22 +45,22 @@ export async function writeJSON(p: t.AbsPath, data: any) {
 // export class SessionStorage implements t.SessionIO {
 //   private constructor(
 //     public storage: Storage,
-//     public summaryCache: FileCache<t.SessionSummary>,
+//     public headCache: FileCache<t.SessionHead>,
 //     public bodyCache: FileCache<t.SessionBody | undefined>,
 //   ) {}
 
-//   static async fromSummaryFile(storage: Storage, id: string): Promise<SessionStorage> {
+//   static async fromHeadFile(storage: Storage, id: string): Promise<SessionStorage> {
 //     const sessionPaths = storage.dataPaths.session(id);
-//     const summaryCache = await FileCache.fromFile<t.SessionSummary>(storage, sessionPaths.summary);
+//     const headCache = await FileCache.fromFile<t.SessionHead>(storage, sessionPaths.head);
 //     const bodyCache = FileCache.fromData<t.SessionBody | undefined>(storage, sessionPaths.body, undefined);
-//     return new SessionStorage(storage, summaryCache, bodyCache);
+//     return new SessionStorage(storage, headCache, bodyCache);
 //   }
 
-//   static async fromSummaryData(storage: Storage, sessionSummary: t.SessionSummary): Promise<SessionStorage> {
-//     const sessionPaths = storage.dataPaths.session(sessionSummary.id);
-//     const summaryCache = FileCache.fromData<t.SessionSummary>(storage, sessionPaths.summary, sessionSummary);
+//   static async fromHeadData(storage: Storage, sessionHead: t.SessionHead): Promise<SessionStorage> {
+//     const sessionPaths = storage.dataPaths.session(sessionHead.id);
+//     const headCache = FileCache.fromData<t.SessionHead>(storage, sessionPaths.head, sessionHead);
 //     const bodyCache = FileCache.fromData<t.SessionBody | undefined>(storage, sessionPaths.body, undefined);
-//     return new SessionStorage(storage, summaryCache, bodyCache);
+//     return new SessionStorage(storage, headCache, bodyCache);
 //   }
 
 //   static createEmptyBody(): t.SessionBody {
@@ -71,7 +71,7 @@ export async function writeJSON(p: t.AbsPath, data: any) {
 //   }
 
 //   get sessionDataPaths(): SessionDataPaths {
-//     return this.storage.dataPaths.session(this.summaryCache.data.id);
+//     return this.storage.dataPaths.session(this.headCache.data.id);
 //   }
 
 //   initEmptyBody() {
@@ -79,7 +79,7 @@ export async function writeJSON(p: t.AbsPath, data: any) {
 //   }
 
 //   async write() {
-//     await this.summaryCache.write();
+//     await this.headCache.write();
 //     if (this.bodyCache.data) await this.bodyCache.write();
 //   }
 
@@ -91,7 +91,7 @@ export async function writeJSON(p: t.AbsPath, data: any) {
 //   async download(options?: { skipIfExists: boolean }) {
 //     if (options?.skipIfExists && (await misc.fileExists(this.bodyCache.filePath))) return;
 
-//     await serverApi.downloadSession(this.summaryCache.data.id, this.sessionPaths.zip, this.storage.user?.token);
+//     await serverApi.downloadSession(this.headCache.data.id, this.sessionPaths.zip, this.storage.user?.token);
 //     // For some reason when stream.pipeline() resolves, the extracted files have not
 //     // yet been written. So we have to wait on out.promise().
 //     const out = unzipper.Extract({ path: this.sessionPaths.root, verbose: true });
@@ -129,7 +129,7 @@ export async function writeJSON(p: t.AbsPath, data: any) {
 
 //   async package(): Promise<t.AbsPath> {
 //     return new Promise((resolve, reject) => {
-//       const packagePath = path.abs(os.tmpdir(), this.summaryCache.data.id + '.zip');
+//       const packagePath = path.abs(os.tmpdir(), this.headCache.data.id + '.zip');
 
 //       const output = fs.createWriteStream(packagePath);
 //       const archive = archiver('zip', { zlib: { level: 9 } });

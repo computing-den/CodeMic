@@ -159,7 +159,7 @@ export type PostVideoMessageToFrontend = (req: BackendVideoRequest) => Promise<F
 // export type B2SResAccountLogin = { type: 'user'; user: User };
 
 // export type B2SReqFeaturedGet = { type: 'featured/get' };
-// export type B2SResFeaturedGet = { type: 'sessionSummaries'; sessionSummaries: SessionSummary[] };
+// export type B2SResFeaturedGet = { type: 'sessionHeads'; sessionHeads: SessionHead[] };
 
 export type BackendToServerReqRes =
   | {
@@ -172,7 +172,7 @@ export type BackendToServerReqRes =
     }
   | {
       request: { type: 'featured/get' };
-      response: { type: 'sessionSummaries'; sessionSummaries: SessionSummary[] };
+      response: { type: 'sessionHeads'; sessionHeads: SessionHead[] };
     };
 export type BackendToServerRequest = BackendToServerReqRes['request'];
 export type ServerResponse = BackendToServerReqRes['response'] | ErrorResponse;
@@ -246,8 +246,8 @@ export type AccountState = {
 export type AccountUpdate = Partial<AccountState>;
 
 export type WelcomeState = {
-  workspace: SessionSummary[];
-  featured: SessionSummary[];
+  workspace: SessionHead[];
+  featured: SessionHead[];
   history: SessionsHistory;
 };
 
@@ -258,7 +258,7 @@ export type RecorderState = {
   recording: boolean;
   playing: boolean;
   clock: number;
-  sessionSummary: SessionSummary;
+  sessionHead: SessionHead;
   workspace?: string;
   // fork?: { clock: number };
   history?: SessionHistory;
@@ -281,7 +281,7 @@ export type RecorderUpdate = {
 export type PlayerState = {
   loaded: boolean;
   playing: boolean;
-  sessionSummary: SessionSummary;
+  sessionHead: SessionHead;
   clock: number;
   workspace?: string;
   history?: SessionHistory;
@@ -296,8 +296,8 @@ export type PlayerState = {
 // };
 
 // export type Setup = {
-//   sessionSummary: SessionSummary;
-//   baseSessionSummary?: SessionSummary;
+//   sessionHead: SessionHead;
+//   baseSessionHead?: SessionHead;
 //   fork?: { clock: number };
 //   workspace?: string;
 //   isNew?: boolean;
@@ -306,7 +306,7 @@ export type PlayerState = {
 
 export type TocItem = { title: string; clock: number };
 
-export type SessionSummary = {
+export type SessionHead = {
   id: string;
   title: string;
   description: string;
@@ -322,9 +322,9 @@ export type SessionSummary = {
   forkedFrom?: string;
 };
 
-export type SessionSummaryMap = { [key: string]: SessionSummary | undefined };
+export type SessionHeadMap = { [key: string]: SessionHead | undefined };
 
-export type DBSessionSummary = {
+export type DBSessionHead = {
   id: string;
   title: string;
   description: string;
@@ -418,7 +418,7 @@ export type OpenDialogOptions = {
 
 export interface Session {
   workspace: AbsPath;
-  summary: SessionSummary;
+  head: SessionHead;
   body?: SessionBody;
   loaded: boolean;
   readFile(file: File): Promise<Uint8Array>;

@@ -1,4 +1,4 @@
-.session-summary {
+.session-head {
   margin-left: -7px;
 
   &.for-list {
@@ -85,12 +85,12 @@
   }
 }
 
-.session-summary-list {
-  & li.session-summary-list-item {
+.session-head-list {
+  & li.session-head-list-item {
     /* margin: 0 calc(var(--container-padding) * -1); */
     padding: var(--spacing-medium) var(--container-padding);
 
-    & + li.session-summary-list-item {
+    & + li.session-head-list-item {
       /* margin-top: var(--spacing-large); */
     }
   }

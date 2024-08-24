@@ -4,7 +4,7 @@ import { types as t, path, lib } from '@codecast/lib';
 import ProgressBar from './progress_bar.jsx';
 import PathField from './path_field.jsx';
 import MediaToolbar, * as MT from './media_toolbar.jsx';
-import { SessionSummary } from './session_summary.jsx';
+import { SessionHead } from './session_head.jsx';
 import SessionDescription from './session_description.jsx';
 import { CommentInput, CommentList } from './comment.jsx';
 import Screen from './screen.jsx';
@@ -57,7 +57,7 @@ export default class Player extends Component<Props> {
     if (res.value) {
       await postMessage({
         type: 'recorder/open',
-        sessionId: this.props.player.sessionSummary.id,
+        sessionId: this.props.player.sessionHead.id,
         fork: true,
         clock: this.props.player.clock,
       });
@@ -67,14 +67,14 @@ export default class Player extends Component<Props> {
   edit = async () => {
     const res = await postMessage({ type: 'confirmEditFromPlayer', clock: this.props.player.clock });
     if (res.value) {
-      await postMessage({ type: 'recorder/open', sessionId: this.props.player.sessionSummary.id });
+      await postMessage({ type: 'recorder/open', sessionId: this.props.player.sessionHead.id });
     }
   };
 
   // isStoppedAlmostAtTheEnd(): boolean {
   //   return (
   //     this.props.player.state.status === t.TrackPlayerStatus.Stopped &&
-  //     this.props.player.clock >= this.props.player.sessionSummary.duration - 0.5
+  //     this.props.player.clock >= this.props.player.sessionHead.duration - 0.5
   //   );
   // }
 
@@ -100,7 +100,7 @@ export default class Player extends Component<Props> {
 
   render() {
     const { player, user } = this.props;
-    const { sessionSummary: ss } = player;
+    const { sessionHead: ss } = player;
 
     let primaryAction: MT.PrimaryAction;
     if (player.playing) {
@@ -192,7 +192,7 @@ export default class Player extends Component<Props> {
           />
             */}
           <Section.Body>
-            <SessionSummary className="subsection subsection_spaced" sessionSummary={ss} withAuthor />
+            <SessionHead className="subsection subsection_spaced" sessionHead={ss} withAuthor />
             <MediaToolbar
               className="subsection subsection_spaced"
               primaryAction={primaryAction}
@@ -203,7 +203,7 @@ export default class Player extends Component<Props> {
             <div className="subsection hide-inactive guide-video-container">
               <video id="guide-video" />
             </div>
-            <SessionDescription className="subsection subsection_spaced" sessionSummary={ss} />
+            <SessionDescription className="subsection subsection_spaced" sessionHead={ss} />
             {/*!player.loaded && (
               <PathField
                 className="subsection"

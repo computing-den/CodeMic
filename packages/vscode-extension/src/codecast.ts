@@ -12,7 +12,7 @@ import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
 import { types as t, lib, path } from '@codecast/lib';
-import { SessionSummary } from '@codecast/lib/src/types.js';
+import { SessionHead } from '@codecast/lib/src/types.js';
 
 class Codecast {
   screen: t.Screen = t.Screen.Welcome;
@@ -21,7 +21,7 @@ class Codecast {
   player?: Player;
 
   session?: Session;
-  featured?: SessionSummary[];
+  featured?: SessionHead[];
   webviewProvider: WebviewProvider;
   test: any = 0;
 
@@ -113,7 +113,7 @@ class Codecast {
     // Set global state to get ready for possible restart.
     await this.setWorkspaceChangeGlobalState({
       screen: this.screen,
-      sessionId: this.session?.summary.id,
+      sessionId: this.session?.head.id,
       recorder: restoreState?.recorder,
     });
 
@@ -281,11 +281,11 @@ class Codecast {
               cutClock = req.clock;
             }
             //
-            // let clock = setup.sessionSummary.duration;
+            // let clock = setup.sessionHead.duration;
             // if (setup.fork) {
             //   clock = setup.fork.clock;
-            //   assert(setup.baseSessionSummary);
-            //   await db.copySessionDir(setup.baseSessionSummary, setup.sessionSummary);
+            //   assert(setup.baseSessionHead);
+            //   await db.copySessionDir(setup.baseSessionHead, setup.sessionHead);
             // }
           } else {
             // Edit existing session.
@@ -315,7 +315,7 @@ class Codecast {
           // Create new session.
 
           // For new sessions, user will manually call recorder/load which will call setUpWorkspace().
-          const summary = Session.makeNewSummary(user);
+          const head = Session.makeNewHead(user);
           let workspace = misc.getDefaultVscWorkspace();
           if (!workspace) {
             const options = {
@@ -329,7 +329,7 @@ class Codecast {
           }
 
           if (workspace) {
-            const session = await Session.fromNew(this.context, workspace, summary);
+            const session = await Session.fromNew(this.context, workspace, head);
 
             if (await this.closeCurrentScreen()) {
               this.session = session;
@@ -392,7 +392,7 @@ class Codecast {
       case 'recorder/publish': {
         try {
           assert(this.session);
-          // let sessionSummary: t.SessionSummary;
+          // let sessionHead: t.SessionHead;
           if (await this.saveRecorder()) {
             await this.session.publish();
             vscode.window.showInformationMessage('Published session.');
@@ -491,7 +491,7 @@ class Codecast {
         if (session) {
           const confirmTitle = 'Delete';
           const answer = await vscode.window.showWarningMessage(
-            `Do you want to delete session "${session.summary?.title || 'Untitled'}"?`,
+            `Do you want to delete session "${session.head?.title || 'Untitled'}"?`,
             { modal: true },
             { title: 'Cancel', isCloseAffordance: true },
             { title: confirmTitle },
@@ -668,9 +668,9 @@ class Codecast {
     // //   }
     // // }
     // // if (shouldSave) {
-    // //   // const sessionStorage = this.context.storage.createSessionStorage(this.setup.sessionSummary.id);
+    // //   // const sessionStorage = this.context.storage.createSessionStorage(this.setup.sessionHead.id);
     // //   await this.session.write();
-    // //   // await sessionStorage.writeSessionSummary(this.setup.sessionSummary);
+    // //   // await sessionStorage.writeSessionHead(this.setup.sessionHead);
     // //   this.setup.dirty = false;
     // // }
     // if (!dirty && options.verbose) {
@@ -722,7 +722,7 @@ class Codecast {
   async fetchFeatured() {
     try {
       const res = await serverApi.send({ type: 'featured/get' }, this.context.user?.token);
-      this.featured = res.sessionSummaries;
+      this.featured = res.sessionHeads;
     } catch (error) {
       vscode.window.showErrorMessage('Failed to fetch featured items:', (error as Error).message);
     }
@@ -796,10 +796,10 @@ class Codecast {
         loaded: this.session.loaded,
         recording: this.session.recording,
         playing: this.session.playing,
-        sessionSummary: this.session.summary,
+        sessionHead: this.session.head,
         clock: this.session.clock ?? 0,
         workspace: this.session.workspace,
-        history: this.context.settings.history[this.session.summary.id],
+        history: this.context.settings.history[this.session.head.id],
         editorTrackFocusTimeline: this.session.body?.editorTrack.focusTimeline,
         audioTracks: this.session.body?.audioTracks,
         videoTracks: this.session.body?.videoTracks,
@@ -814,10 +814,10 @@ class Codecast {
       player = {
         loaded: this.session.loaded,
         playing: this.session.playing,
-        sessionSummary: this.session.summary,
+        sessionHead: this.session.head,
         clock: this.session.clock ?? 0,
         workspace: this.session.workspace,
-        history: this.context.settings.history[this.session.summary.id],
+        history: this.context.settings.history[this.session.head.id],
         audioTracks: this.session.body?.audioTracks,
         videoTracks: this.session.body?.videoTracks,
         webviewUris: this.session.getWebviewUris(),
@@ -826,15 +826,15 @@ class Codecast {
 
     let welcome: t.WelcomeState | undefined;
     if (this.screen === t.Screen.Welcome) {
-      const readSummary = async (id: string) => {
+      const readHead = async (id: string) => {
         try {
-          return await Session.summaryFromExisting(this.context, id);
+          return await Session.headFromExisting(this.context, id);
         } catch (error) {
           console.error(error);
         }
       };
       const ids = Object.keys(this.context.settings.history);
-      const workspace = _.compact(await Promise.all(ids.map(readSummary)));
+      const workspace = _.compact(await Promise.all(ids.map(readHead)));
       welcome = {
         workspace,
         featured: this.featured || [],
@@ -866,7 +866,7 @@ const SCREEN_TITLES = {
 };
 
 // // TODO delete this and fetch from internet
-// const FEATURED_SESSIONS: t.SessionSummaryMap = _.keyBy(
+// const FEATURED_SESSIONS: t.SessionHeadMap = _.keyBy(
 //   [
 //     {
 //       id: 'fd4659dd-150a-408b-aac3-1bc815a83be9',

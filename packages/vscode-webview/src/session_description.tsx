@@ -6,11 +6,11 @@ import { h, Fragment, Component } from 'preact';
 
 export type Props = {
   className?: string;
-  sessionSummary: t.SessionSummary;
+  sessionHead: t.SessionHead;
 };
 export default class SessionDescription extends Component<Props> {
   render() {
-    const { className, sessionSummary: s } = this.props;
+    const { className, sessionHead: s } = this.props;
 
     return (
       <div className={cn('session-description', className)}>

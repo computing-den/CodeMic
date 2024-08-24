@@ -81,7 +81,7 @@ export default class SessionTracksCtrl {
   record() {
     assert(!this.running);
 
-    assert(this.clock === this.session.summary.duration);
+    assert(this.clock === this.session.head.duration);
 
     this.mode.recordingEditor = true;
     this.mode.status = SessionTracksCtrlStatus.Running;
@@ -120,7 +120,7 @@ export default class SessionTracksCtrl {
 
   insertAudioAndLoad(audioTrack: t.AudioTrack) {
     const audioTrackCtrl = new AudioTrackCtrl(this.session, audioTrack);
-    this.session.summary.duration = Math.max(this.session.summary.duration, audioTrack.clockRange.end);
+    this.session.head.duration = Math.max(this.session.head.duration, audioTrack.clockRange.end);
     this.session.body!.audioTracks.push(audioTrack);
     this.ctrls.audioTrackCtrls.push(audioTrackCtrl);
     this.initAudioCtrl(audioTrackCtrl);
@@ -146,7 +146,7 @@ export default class SessionTracksCtrl {
 
   insertVideoAndLoad(videoTrack: t.VideoTrack) {
     // const videoTrackCtrl = new VideoTrackCtrl(this.session, videoTrack);
-    this.session.summary.duration = Math.max(this.session.summary.duration, videoTrack.clockRange.end);
+    this.session.head.duration = Math.max(this.session.head.duration, videoTrack.clockRange.end);
     this.session.body!.videoTracks.push(videoTrack);
     // this.ctrls.videoTrackCtrl.insert(videoTrackCtrl);
     this.initVideoCtrl();
@@ -282,7 +282,7 @@ export default class SessionTracksCtrl {
   }
 
   private isAlmostAtTheEnd() {
-    return this.clock > this.session.summary.duration - 1;
+    return this.clock > this.session.head.duration - 1;
   }
 
   private isTrackInRange(t: t.RangedTrack): boolean {
@@ -311,15 +311,15 @@ export default class SessionTracksCtrl {
     if (this.mode.recordingEditor) {
       if (config.logSessionTracksCtrlUpdateStep) {
         console.log(
-          `SessionTracksCtrl duration ${this.session.summary.duration} -> ${Math.max(
-            this.session.summary.duration,
+          `SessionTracksCtrl duration ${this.session.head.duration} -> ${Math.max(
+            this.session.head.duration,
             this.clock,
           )}`,
         );
       }
-      this.session.summary.duration = Math.max(this.session.summary.duration, this.clock);
+      this.session.head.duration = Math.max(this.session.head.duration, this.clock);
     } else {
-      this.clock = Math.min(this.session.summary.duration, this.clock);
+      this.clock = Math.min(this.session.head.duration, this.clock);
     }
 
     await this.seekEditor();
@@ -332,7 +332,7 @@ export default class SessionTracksCtrl {
     this.pauseOutOfRangeAudios();
     this.stopOutOfRangeVideo();
 
-    if (!this.mode.recordingEditor && this.clock === this.session.summary.duration) {
+    if (!this.mode.recordingEditor && this.clock === this.session.head.duration) {
       this.pause();
     }
 

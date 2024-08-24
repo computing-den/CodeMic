@@ -18,13 +18,13 @@ export async function send<Req extends t.BackendToServerRequest>(
 }
 
 export async function publishSession(
-  sessionSummary: t.SessionSummary,
+  sessionHead: t.SessionHead,
   filePath: t.AbsPath,
   token?: string,
-): Promise<t.SessionSummary> {
+): Promise<t.SessionHead> {
   try {
     const form = new FormData();
-    form.append('sessionSummary', JSON.stringify(sessionSummary));
+    form.append('sessionHead', JSON.stringify(sessionHead));
     form.append('file', fs.createReadStream(filePath));
 
     return (

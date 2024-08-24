@@ -21,7 +21,7 @@ export type DataPaths = {
 
 export type SessionDataPaths = {
   root: t.AbsPath;
-  summary: t.AbsPath;
+  head: t.AbsPath;
   body: t.AbsPath;
   zip: t.AbsPath;
   blobs: t.AbsPath;
@@ -93,7 +93,7 @@ export const dataPaths = _.memoize((username?: string): DataPaths => {
       const sessionRoot = path.abs(root, 'sessions', id);
       return {
         root: sessionRoot,
-        summary: path.abs(sessionRoot, 'summary.json'),
+        head: path.abs(sessionRoot, 'head.json'),
         body: path.abs(sessionRoot, 'body.json'),
         zip: path.abs(sessionRoot, 'body.zip'),
         blobs: path.abs(sessionRoot, 'blobs'),

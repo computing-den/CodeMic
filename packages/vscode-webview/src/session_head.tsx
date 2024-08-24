@@ -10,7 +10,7 @@ import _ from 'lodash';
 
 export type CommonProps = {
   className?: string;
-  sessionSummary: t.SessionSummary;
+  sessionHead: t.SessionHead;
 };
 export type ForListProps = CommonProps & {
   history?: t.SessionHistory;
@@ -26,12 +26,12 @@ export type NormalProps = CommonProps & {
   withAuthor?: boolean;
 };
 
-export class SessionSummary extends Component<NormalProps> {
+export class SessionHead extends Component<NormalProps> {
   render() {
-    const { className, withAuthor, sessionSummary: s } = this.props;
+    const { className, withAuthor, sessionHead: s } = this.props;
 
     return (
-      <WithAvatar className={cn('session-summary', className)} username={this.props.sessionSummary.author?.username}>
+      <WithAvatar className={cn('session-head', className)} username={this.props.sessionHead.author?.username}>
         <div className="title">{s.title || 'Untitled'}</div>
         {withAuthor && (
           <div className="footer">
@@ -43,16 +43,13 @@ export class SessionSummary extends Component<NormalProps> {
   }
 }
 
-export class SessionSummaryForList extends Component<ForListProps> {
+export class SessionHeadForList extends Component<ForListProps> {
   render() {
-    const { className, history, sessionSummary: s } = this.props;
+    const { className, history, sessionHead: s } = this.props;
     const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
 
     return (
-      <WithAvatar
-        className={cn('session-summary for-list', className)}
-        username={this.props.sessionSummary.author?.username}
-      >
+      <WithAvatar className={cn('session-head for-list', className)} username={this.props.sessionHead.author?.username}>
         <div className="title">{s.title || 'Untitled'}</div>
         {s.description && (
           <div className="description">
@@ -93,13 +90,13 @@ export class SessionSummaryForList extends Component<ForListProps> {
   }
 }
 
-export class SessionSummaryListItem extends Component<ListItemProps> {
-  clicked = () => postMessage({ type: 'player/open', sessionId: this.props.sessionSummary.id });
+export class SessionHeadListItem extends Component<ListItemProps> {
+  clicked = () => postMessage({ type: 'player/open', sessionId: this.props.sessionHead.id });
   actions: SL.Action[] = [
     // {
     //   icon: 'codicon-play',
     //   title: 'Play',
-    //   onClick: () => postMessage({ type: 'player/open', sessionId: this.props.sessionSummary.id }),
+    //   onClick: () => postMessage({ type: 'player/open', sessionId: this.props.sessionHead.id }),
     // },
     {
       icon: 'codicon-repo-forked',
@@ -107,14 +104,14 @@ export class SessionSummaryListItem extends Component<ListItemProps> {
       onClick: () =>
         postMessage({
           type: 'recorder/open',
-          sessionId: this.props.sessionSummary.id,
+          sessionId: this.props.sessionHead.id,
           fork: true,
         }),
     },
     {
       icon: 'codicon-edit',
       title: 'Edit: open this project in the Studio',
-      onClick: () => postMessage({ type: 'recorder/open', sessionId: this.props.sessionSummary.id }),
+      onClick: () => postMessage({ type: 'recorder/open', sessionId: this.props.sessionHead.id }),
     },
     {
       icon: 'codicon-heart-filled',
@@ -126,41 +123,41 @@ export class SessionSummaryListItem extends Component<ListItemProps> {
     {
       icon: 'codicon-close',
       title: 'Delete',
-      onClick: () => postMessage({ type: 'deleteSession', sessionId: this.props.sessionSummary.id }),
+      onClick: () => postMessage({ type: 'deleteSession', sessionId: this.props.sessionHead.id }),
     },
   ];
 
   render() {
     return (
       <SelectableLi
-        className={cn('session-summary-list-item', this.props.className)}
+        className={cn('session-head-list-item', this.props.className)}
         actions={this.actions}
         onClick={this.clicked}
       >
-        <SessionSummaryForList sessionSummary={this.props.sessionSummary} history={this.props.history} />
+        <SessionHeadForList sessionHead={this.props.sessionHead} history={this.props.history} />
       </SelectableLi>
     );
   }
 }
 
-export type SessionSummaryListProps = {
-  sessionSummaries: t.SessionSummary[];
+export type SessionHeadListProps = {
+  sessionHeads: t.SessionHead[];
   history: t.SessionsHistory;
   className?: string;
 };
-type SHPair = [t.SessionSummary, t.SessionHistory];
+type SHPair = [t.SessionHead, t.SessionHistory];
 
-export class SessionSummaryList extends Component<SessionSummaryListProps> {
+export class SessionHeadList extends Component<SessionHeadListProps> {
   render() {
-    const iteratee = ([s, h]: [t.SessionSummary, t.SessionHistory]) =>
+    const iteratee = ([s, h]: [t.SessionHead, t.SessionHistory]) =>
       (h && lib.getSessionHistoryItemLastOpenTimestamp(h)) || '';
-    let pairs: SHPair[] = _.map(this.props.sessionSummaries, s => [s, this.props.history[s.id]]);
+    let pairs: SHPair[] = _.map(this.props.sessionHeads, s => [s, this.props.history[s.id]]);
     pairs = _.orderBy(pairs, iteratee, 'desc');
 
     return (
-      <ul className={cn('unstyled session-summary-list', this.props.className)}>
-        {pairs.map(([sessionSummary, history]) => (
-          <SessionSummaryListItem history={history} sessionSummary={sessionSummary} />
+      <ul className={cn('unstyled session-head-list', this.props.className)}>
+        {pairs.map(([sessionHead, history]) => (
+          <SessionHeadListItem history={history} sessionHead={sessionHead} />
         ))}
       </ul>
     );
