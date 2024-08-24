@@ -138,15 +138,33 @@ class DetailsView extends Component<DetailsViewProps> {
         >
           Description
         </vscode-text-area>
+        <vscode-text-field
+          className="subsection"
+          // value={''}
+          // onInput={this.descriptionChanged}
+          placeholder="e.g. https://github.com/computing-den/codecast.git"
+        >
+          Git repository
+        </vscode-text-field>
+        <vscode-text-field
+          className="subsection"
+          // value={''}
+          // onInput={this.descriptionChanged}
+          placeholder="e.g. 86056b1"
+        >
+          Git commit
+        </vscode-text-field>
         <p className="subsection help">
-          Use <code>.gitignore</code> and <code>.codecastignore</code> to ignore paths.
+          Use <code>.codecastignore</code> to ignore paths.
         </p>
-        <vscode-button className="subsection" onClick={this.save} disabled={recorder.mustScan}>
-          Save
-        </vscode-button>
-        <vscode-button className="subsection" onClick={this.publish} disabled={recorder.mustScan}>
-          Publish
-        </vscode-button>
+        <div className="subsection buttons">
+          <vscode-button onClick={this.publish} disabled={!recorder.loaded}>
+            Publish
+          </vscode-button>
+          <vscode-button appearance="secondary" onClick={this.save} disabled={recorder.mustScan}>
+            Save
+          </vscode-button>
+        </div>
         {!recorder.loaded && (
           <vscode-button className="subsection" onClick={onLoadRecorder} autoFocus>
             {recorder.mustScan ? 'Scan workspace to start' : 'Load project into workspace'}

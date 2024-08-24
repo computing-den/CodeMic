@@ -267,9 +267,6 @@ class Codecast {
       case 'recorder/open': {
         const user = this.context.user && lib.userToUserSummary(this.context.user);
 
-        console.log('XXX: user', user);
-        console.log('XXX: sessionId', req.sessionId);
-
         if (req.sessionId) {
           let session: Session | undefined;
           let seekClock: number | undefined;
@@ -292,20 +289,16 @@ class Codecast {
             // }
           } else {
             // Edit existing session.
-            console.log('XXX: fromExisting');
             session = await Session.fromExisting(this.context, req.sessionId);
-            console.log('XXX: fromExisting succeeded', session);
             if (req.clock !== undefined && req.clock > 0) {
               seekClock = req.clock;
             }
           }
 
-          console.log('XXX: session', session);
           if (session) {
             // await session.readBody({ download: true });
 
             if (await this.closeCurrentScreen()) {
-              console.log('XXX: closeCurrentScreen succeeded');
               this.session = session;
               this.recorder = new Recorder(this.session, false);
               this.setScreen(t.Screen.Recorder);
@@ -313,11 +306,9 @@ class Codecast {
               // This might trigger a vscode restart in which case this.restoreStateAfterRestart() will be
               // called and it will recreate the session, recorder, call recorder.load(), and set the screen.
               await this.setUpWorkspace({ recorder: { mustScan: false, seekClock, cutClock } });
-              console.log('XXX: setUpWorkspace succeeded');
 
               // Must be called after this.setUpWorkspace()
               await this.recorder.load({ seekClock, cutClock });
-              console.log('XXX: recorder.load succeeded');
             }
           }
         } else {

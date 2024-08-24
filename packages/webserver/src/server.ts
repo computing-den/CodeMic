@@ -99,13 +99,10 @@ function initRoutes() {
       const maxAge = 24 * 3600 * 1000;
       const avatar = path.resolve(config.data, 'avatars', req.params.username);
       try {
-        console.log('XXX a');
         await fs.promises.access(avatar, fs.constants.R_OK);
-        console.log('XXX b');
         res.sendFile(avatar, { maxAge });
       } catch (error) {
         console.error(error);
-        console.log('XXX c');
         res.sendFile(path.resolve(ASSETS, 'default-avatar.png'));
       }
     } catch (error) {

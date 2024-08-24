@@ -18,18 +18,18 @@
         /* margin-top: var(--spacing-large); */
       }
 
-      /*
-    .subsection.buttons {
-      display: flex;
+      .subsection.buttons {
+        display: grid;
+        grid-gap: var(--spacing-small);
+        grid-template-columns: 1fr 1fr;
 
-      & vscode-button + vscode-button {
-        margin-left: var(--spacing-medium);
+        /* & vscode-button + vscode-button { */
+        /*   margin-left: var(--spacing-medium); */
+        /* } */
+        /* & vscode-button.bump-left { */
+        /*   margin-left: auto; */
+        /* } */
       }
-      & vscode-button.bump-left {
-        margin-left: auto;
-      }
-    }
-    */
     }
 
     #editor-view {

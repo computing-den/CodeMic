@@ -236,7 +236,7 @@ export class Session implements t.Session {
     // }
 
     // Create the worktree and copy files to session directory.
-    // TODO: ignore files in .gitignore and .codecastignore
+    // TODO: ignore files in .codecastignore
     const worktree: t.Worktree = {};
     const paths = await this.readDirRecursively({ includeFiles: true });
     for (const p of paths) {
@@ -330,7 +330,7 @@ export class Session implements t.Session {
 
     // TODO having both directories and files in targetUris and ctrl.worktree can make things
     //      a bit confusing. Especially when it comes to deleting directories when there's
-    //      still a file inside but is supposed to be ignored according to .gitignore or .codecastignore
+    //      still a file inside but is supposed to be ignored according to .codecastignore
     //      I think it's best to keep the directory structure in a separate variable than ctrl.worktree
     //      worktreeFiles: {[key: Uri]: WorktreeFile} vs worktreeDirs: Uri[]
     // assert(_.values(ctrl.worktree).every(item => item.file.type !== 'dir'));
@@ -528,7 +528,9 @@ export class Session implements t.Session {
   }
 
   async package() {
-    return new Promise((resolve, reject) => {
+    assert(await misc.fileExists(this.sessionDataPaths.body), "Session body doesn't exist");
+
+    return new Promise<t.AbsPath>((resolve, reject) => {
       // const packagePath = path.abs(os.tmpdir(), this.summary.id + '.zip');
 
       const output = fs.createWriteStream(this.sessionDataPaths.zip);
@@ -536,7 +538,7 @@ export class Session implements t.Session {
 
       // 'close' event is fired only when a file descriptor is involved
       output.on('close', () => {
-        resolve(null);
+        resolve(this.sessionDataPaths.zip);
       });
 
       // This event is fired when the data source is drained no matter what was the data source.
@@ -558,8 +560,8 @@ export class Session implements t.Session {
   }
 
   async publish() {
-    await this.package();
-    const res = await serverApi.publishSession(this.summary, this.sessionDataPaths.zip, this.context.user?.token);
+    const zip = await this.package();
+    const res = await serverApi.publishSession(this.summary, zip, this.context.user?.token);
     this.summary = res;
     await this.write();
   }
@@ -734,8 +736,7 @@ export class Session implements t.Session {
       `"${this.workspace}" is not empty. Do you want to overwrite it?`,
       {
         modal: true,
-        detail:
-          'All files in the folder will be overwritten except for those specified in .gitignore and .codecastignore.',
+        detail: 'All files in the folder will be overwritten except for those specified in .codecastignore.',
       },
       { title: overwriteTitle },
       { title: 'Cancel', isCloseAffordance: true },
