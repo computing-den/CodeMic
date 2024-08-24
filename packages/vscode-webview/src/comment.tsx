@@ -16,7 +16,7 @@ export class Comment extends Component<CommentProps> {
     const { className, comment } = this.props;
 
     return (
-      <WithAvatar className={cn('comment', className)} src={comment.author.avatar}>
+      <WithAvatar className={cn('comment', className)} username={comment.author.username}>
         <div className="text">
           <TextToParagraphs text={comment.text} />
         </div>
@@ -110,7 +110,7 @@ export class CommentInput extends Component<CommentInputProps> {
     const { text } = this.state;
 
     return (
-      <WithAvatar className={cn('comment-input', className)} src={author.avatar}>
+      <WithAvatar className={cn('comment-input', className)} username={author.username}>
         <vscode-text-area
           rows={2}
           resize="vertical"

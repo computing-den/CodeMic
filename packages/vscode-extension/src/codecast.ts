@@ -859,6 +859,10 @@ class Codecast {
       recorder,
       player,
       test: this.test,
+
+      // The followig values must not change.
+      debug: config.debug,
+      server: config.server,
     };
   }
 }

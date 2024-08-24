@@ -199,13 +199,17 @@ export type Store = {
   recorder?: RecorderState;
   player?: PlayerState;
   test?: any;
+
+  // The followig values must not change.
+  debug: boolean;
+  server: string;
 };
 
 export type User = {
   username: string;
   email: string;
   token: string;
-  avatar?: string;
+  // avatar?: string;
   joinTimestamp: string;
   tokenTimestamp: string;
 };
@@ -213,7 +217,7 @@ export type User = {
 export type UserSummary = {
   username: string;
   email: string;
-  avatar?: string;
+  // avatar?: string;
   joinTimestamp: string;
 };
 
@@ -222,7 +226,7 @@ export type DBUser = {
   hash: string;
   email: string;
   token: string;
-  avatar?: string;
+  // avatar?: string;
   join_timestamp: string;
   token_timestamp: string;
 };

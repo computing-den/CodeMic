@@ -176,7 +176,7 @@ class CombinedEditorTrackRecorder {
     // const last2LineFocus = lines.at(-1);
     if (!lastLineFocus) return;
 
-    if (lib.getClockRangeDur(lastLineFocus.clockRange) < 5 || lastLineFocus.text.trim().length < 5) {
+    if (lib.getClockRangeDur(lastLineFocus.clockRange) < 3 || lastLineFocus.text.trim().length < 5) {
       lines.pop();
     }
   }

@@ -160,14 +160,13 @@ export function dbUserToUser(dbUser: t.DBUser): t.User {
     username: dbUser.username,
     email: dbUser.email,
     token: dbUser.token,
-    avatar: dbUser.avatar,
     joinTimestamp: dbUser.join_timestamp,
     tokenTimestamp: dbUser.token_timestamp,
   };
 }
 
 export function userToUserSummary(user: t.User): t.UserSummary {
-  return _.pick(user, 'username', 'email', 'avatar', 'joinTimestamp');
+  return _.pick(user, 'username', 'email', 'joinTimestamp');
 }
 
 export function dbUserToUserSummary(dbUser: t.DBUser): t.UserSummary {

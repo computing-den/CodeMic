@@ -1,15 +1,17 @@
 import { cn } from './misc.js';
 import { h, Fragment, Component } from 'preact';
+import { getStore } from './store.js';
 
-type Props = { className?: string; src?: string };
+type Props = { className?: string; username?: string };
 export default class WithAvatar extends Component<Props> {
   render() {
+    const { className, username, children } = this.props;
     return (
-      <div className={cn('with-avatar', this.props.className)}>
+      <div className={cn('with-avatar', className)}>
         <div className="avatar">
-          <img src={this.props.src ?? 'default-avatar.png'} />
+          <img src={`${getStore().server}/avatars/${username}`} />
         </div>
-        <div className="body">{this.props.children}</div>
+        <div className="body">{children}</div>
       </div>
     );
   }

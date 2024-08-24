@@ -91,7 +91,7 @@
           }
 
           .editor-track {
-            --left-border-width: 2px;
+            --left-border-width: 3px;
             --hor-padding: var(--spacing-medium);
             position: absolute;
             top: 0;

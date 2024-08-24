@@ -119,8 +119,8 @@ export default class Player extends Component<Props> {
         title: player.playing
           ? `Fork: create a new project starting at this point`
           : player.clock > 0
-            ? `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`
-            : `Fork: create a new project based on this one`,
+          ? `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`
+          : `Fork: create a new project based on this one`,
         icon: 'codicon-repo-forked',
         onClick: this.fork,
       },
@@ -148,7 +148,7 @@ export default class Player extends Component<Props> {
     const comments: t.Comment[] = [
       {
         id: 'z',
-        author: { username: 'Addy', avatar: 'avatar2.png', email: '', joinTimestamp: '' },
+        author: { username: 'addy', email: '', joinTimestamp: '' },
         creation_timestamp: '2024-08-21T11:28:40.042Z',
         likes: 11,
         dislikes: 0,
@@ -156,7 +156,7 @@ export default class Player extends Component<Props> {
       },
       {
         id: 'y',
-        author: { username: 'Addy', avatar: 'avatar2.png', email: '', joinTimestamp: '' },
+        author: { username: 'addy', email: '', joinTimestamp: '' },
         creation_timestamp: '2024-08-21T11:23:40.042Z',
         text: "now, I won't go too far into this...\nProceeds to present a highly detailed and informative picture for the next 50 minutes.",
         likes: 8,
@@ -164,7 +164,7 @@ export default class Player extends Component<Props> {
       },
       {
         id: 'x',
-        author: { username: 'Lukas', avatar: 'avatar2.png', email: '', joinTimestamp: '' },
+        author: { username: 'lukas', email: '', joinTimestamp: '' },
         creation_timestamp: '2024-08-21T11:13:40.042Z',
         text: 'Great episode!',
         likes: 3,
@@ -172,7 +172,7 @@ export default class Player extends Component<Props> {
       },
       {
         id: 'a',
-        author: { username: 'Olivia', avatar: 'avatar1.png', email: '', joinTimestamp: '' },
+        author: { username: 'olivia', email: '', joinTimestamp: '' },
         creation_timestamp: '2024-08-21T10:13:40.042Z',
         text: 'Thanks for the great content',
         likes: 0,

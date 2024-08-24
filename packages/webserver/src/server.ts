@@ -12,7 +12,7 @@ import stream from 'stream';
 import { v4 as uuid } from 'uuid';
 
 const upload = multer({
-  dest: path.join(os.tmpdir(), 'codecast'),
+  dest: path.resolve(os.tmpdir(), 'codecast'),
   limits: {
     fieldNameSize: 1000,
     fieldSize: 100 * 10 ** 6,
@@ -20,8 +20,8 @@ const upload = multer({
   },
 });
 
-const ASSETS = path.join(process.cwd(), 'packages/webserver/src/assets');
-const DIST = path.join(process.cwd(), 'packages/webclient/out');
+const ASSETS = path.resolve(process.cwd(), 'packages/webserver/src/assets');
+const DIST = path.resolve(process.cwd(), 'packages/webclient/out');
 
 const PASSWORD_LENGTH_MIN = 8;
 const PASSWORD_LENGTH_MAX = 100;
@@ -40,7 +40,7 @@ function start() {
 }
 
 function initDB() {
-  const dbPath = path.join(config.data, 'codecast.db');
+  const dbPath = path.resolve(config.data, 'codecast.db');
   function dbLog(...args: any[]) {
     console.log('sqlite: ', ...args);
   }
@@ -55,7 +55,6 @@ function initDB() {
       hash TEXT,
       email TEXT,
       token TEXT,
-      avatar TEXT,
       join_timestamp TEXT,
       token_timestamp TEXT
     )`,
@@ -95,9 +94,27 @@ function initRoutes() {
 
   app.use('/assets', express.static(ASSETS));
   app.use('/dist', express.static(DIST));
+  app.get('/avatars/:username', async (req, res, next) => {
+    try {
+      const maxAge = 24 * 3600 * 1000;
+      const avatar = path.resolve(config.data, 'avatars', req.params.username);
+      try {
+        console.log('XXX a');
+        await fs.promises.access(avatar, fs.constants.R_OK);
+        console.log('XXX b');
+        res.sendFile(avatar, { maxAge });
+      } catch (error) {
+        console.error(error);
+        console.log('XXX c');
+        res.sendFile(path.resolve(ASSETS, 'default-avatar.png'));
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
 
   app.get('/', (req, res) => {
-    res.sendFile(path.join(ASSETS, 'index.html'));
+    res.sendFile(path.resolve(ASSETS, 'index.html'));
   });
 
   app.post('/api', fillLocals, async (req, res, next) => {
@@ -278,7 +295,7 @@ async function handlePublishSession(body: any, file: Express.Multer.File, locals
   }
 
   // Store session file named
-  const sessionPath = path.join(config.data, 'sessions', dbUser.username, `${sessionSummary.id}.zip`);
+  const sessionPath = path.resolve(config.data, 'sessions', dbUser.username, `${sessionSummary.id}.zip`);
   await fs.promises.mkdir(path.dirname(sessionPath), { recursive: true });
   await fs.promises.copyFile(file.path, sessionPath);
 

@@ -31,7 +31,7 @@ export class SessionSummary extends Component<NormalProps> {
     const { className, withAuthor, sessionSummary: s } = this.props;
 
     return (
-      <WithAvatar className={cn('session-summary', className)} src={this.props.sessionSummary.author?.avatar}>
+      <WithAvatar className={cn('session-summary', className)} username={this.props.sessionSummary.author?.username}>
         <div className="title">{s.title || 'Untitled'}</div>
         {withAuthor && (
           <div className="footer">
@@ -49,7 +49,10 @@ export class SessionSummaryForList extends Component<ForListProps> {
     const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
 
     return (
-      <WithAvatar className={cn('session-summary for-list', className)} src={this.props.sessionSummary.author?.avatar}>
+      <WithAvatar
+        className={cn('session-summary for-list', className)}
+        username={this.props.sessionSummary.author?.username}
+      >
         <div className="title">{s.title || 'Untitled'}</div>
         {s.description && (
           <div className="description">

@@ -9,7 +9,8 @@
       width: 42px;
       height: 42px;
       flex-shrink: 0;
-      object-fit: contain;
+      object-fit: cover;
+      object-position: center top;
       margin-right: var(--spacing-large);
       border-radius: 50%;
       border: 1px solid var(--vscode-input-border, var(--dropdown-border));
