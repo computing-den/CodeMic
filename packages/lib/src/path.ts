@@ -61,6 +61,11 @@ export function getUntitledUriNameOpt(uri: t.Uri): string | undefined {
   if (isUntitledUri(uri)) return uri.slice('untitled:'.length);
 }
 
+export function getUriShortNameOpt(uri: t.Uri): string | undefined {
+  const p = getUriPathOpt(uri);
+  return p ? basename(p) : getUntitledUriName(uri);
+}
+
 export function parseUri(uri: t.Uri): t.ParsedUri {
   if (uri.startsWith('workspace:')) {
     return { scheme: 'workspace', path: uri.slice('workspace:'.length) as t.RelPath };

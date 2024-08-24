@@ -126,6 +126,27 @@ export function isClockInRange(clock: number, range: t.ClockRange): boolean {
   return clock >= range.start && clock < range.end;
 }
 
+export function doClockRangesIntersect(a: t.ClockRange, b: t.ClockRange): boolean {
+  /*
+     a: 0-5, b: 5-10
+     a: -----
+     b:      -----
+     NO INTERSECTION: b.start (5) < a.end (5) && a.start (0) < b.end (10)
+
+
+     a: 0-5, b: 4-10
+     a: -----
+     b:     -----
+     INTERSECTION: b.start (4) < a.end (5) && a.start (0) < b.end (10)
+
+  */
+  return b.start < a.end && a.start < b.end;
+}
+
+export function getClockRangeDur(r: t.ClockRange): number {
+  return r.end - r.start;
+}
+
 export function clockToLocal(clock: number, range: t.ClockRange): number {
   return clock - range.start;
 }

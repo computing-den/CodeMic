@@ -51,10 +51,7 @@
           display: flex;
 
           .track {
-            position: absolute;
-            left: 0;
-            right: 0;
-            display: flex;
+            /* display: flex; */
             /* justify-content: center; */
             /* align-items: center; */
             border-radius: 4px;
@@ -90,6 +87,47 @@
                   font-size: 0.9rem;
                 }
               }
+            }
+          }
+
+          .editor-track {
+            --left-border-width: 2px;
+            --hor-padding: var(--spacing-medium);
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            /* flex: 1; */
+            /* position: relative; */
+
+            .document-focus {
+              position: absolute;
+              left: 0;
+              font-size: 0.8rem;
+              white-space: nowrap;
+              overflow: hidden;
+              border-left: var(--left-border-width) solid;
+              /* border-right: 0; */
+              /* border-bottom: 0; */
+              /* border-top-left-radius: 5px; */
+              padding: var(--spacing-x-small) var(--hor-padding);
+              border-color: var(--editor-track-document-focus-color-1);
+              font-weight: bold;
+            }
+            .document-focus:nth-child(even) {
+              border-color: var(--editor-track-document-focus-color-2);
+            }
+
+            .line-focus {
+              position: absolute;
+              left: var(--left-border-width);
+              font-size: 0.8rem;
+              white-space: nowrap;
+              overflow: hidden;
+              padding: 0 var(--hor-padding);
+              text-overflow: ellipsis;
+              width: calc(100% - 2 * var(--hor-padding));
             }
           }
 
@@ -133,27 +171,25 @@
           /* } */
 
           .ranged-tracks {
-            flex: 1;
-            display: flex;
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            /* left: 0; */
+            width: 130px;
+            /* position: relative; */
 
-            .column {
-              flex: 1 0 0;
-              /* display: flex; */
-              /* flex-direction: column; */
-              position: relative;
-              margin-right: var(--spacing-x-small);
+            .track {
+              position: absolute;
+              border: 1px solid var(--ranged-track-border);
+              background: var(--ranged-track-background);
 
-              .track {
-                border: 1px solid var(--ranged-track-border);
-                background: var(--ranged-track-background);
-
-                &:hover,
-                &.active {
-                  background: var(--ranged-track-background-hover);
-                }
-                &.active {
-                  border-color: var(--ranged-track-border-active);
-                }
+              &:hover,
+              &.active {
+                background: var(--ranged-track-background-hover);
+              }
+              &.active {
+                border-color: var(--ranged-track-border-active);
               }
             }
           }

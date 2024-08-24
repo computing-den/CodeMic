@@ -258,7 +258,8 @@ export type RecorderState = {
   workspace?: string;
   // fork?: { clock: number };
   history?: SessionHistory;
-  editorTrack?: InternalEditorTrack;
+  // editorTrack?: InternalEditorTrack;
+  editorTrackFocusTimeline?: EditorTrackFocusTimeline;
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
   webviewUris?: WebviewUris;
@@ -357,6 +358,22 @@ export type InternalEditorTrack = {
   initSnapshot: InternalEditorTrackSnapshot;
   events: EditorEvent[];
   defaultEol: EndOfLine;
+  focusTimeline: EditorTrackFocusTimeline;
+};
+
+export type EditorTrackFocusTimeline = {
+  documents: DocumentFocus[];
+  lines: LineFocus[];
+};
+
+export type DocumentFocus = {
+  uri: Uri;
+  clockRange: ClockRange;
+};
+
+export type LineFocus = {
+  clockRange: ClockRange;
+  text: string;
 };
 
 export type RangedTrack = {

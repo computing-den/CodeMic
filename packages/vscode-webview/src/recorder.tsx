@@ -469,9 +469,12 @@ class Timeline extends Component<TimelineProps, TimelineState> {
   };
 
   resized = () => {
+    this.updateTimelineHeightPx();
+  };
+
+  updateTimelineHeightPx = () => {
     const timelineHeightPx = document.getElementById('timeline')!.getBoundingClientRect().height;
     this.setState({ timelineHeightPx });
-    // this.forceUpdate();
   };
 
   getClockUnderMouse(e: MouseEvent, opts?: { emptySpace?: boolean }): number | undefined {
@@ -502,6 +505,8 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     const timeline = document.getElementById('timeline')!;
     timeline.addEventListener('mouseleave', this.mouseLeft);
     timeline.addEventListener('mouseout', this.mouseOut);
+
+    this.updateTimelineHeightPx();
   }
 
   componentWillUnmount() {
@@ -528,12 +533,20 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     const allMarkers = _.compact([...markers, cursor, anchor, clockMarker, endOrRecordingMarker]);
     const timelineDuration = this.getTimelineDuration();
 
-    const groupedEditorTracks = groupEditorEvents(recorder.editorTrack!.events, timelineDuration, timelineHeightPx);
-    const tracks = _.concat<t.RangedTrack>(recorder.audioTracks ?? [], recorder.videoTracks ?? [], groupedEditorTracks);
+    // const groupedEditorTracks = groupEditorEvents(recorder.editorTrack!.events, timelineDuration, timelineHeightPx);
+    const tracks = _.orderBy(
+      _.concat<t.RangedTrack>(recorder.audioTracks ?? [], recorder.videoTracks ?? []),
+      track => track.clockRange.start,
+    );
 
     return (
       <div id="timeline" className="subsection">
         <div className="timeline-body">
+          <EditorTrackUI
+            editorTrackFocusTimeline={recorder.editorTrackFocusTimeline}
+            timelineDuration={timelineDuration}
+            timelineHeightPx={timelineHeightPx}
+          />
           <RangedTracksUI
             timelineDuration={timelineDuration}
             tracks={tracks}
@@ -574,102 +587,153 @@ type RangedTracksUIProps = {
   onDragStart: (e: DragEvent, track: t.RangedTrack) => any;
   onDrag: (e: DragEvent, track: t.RangedTrack) => any;
 };
+type RangedTrackLayout = {
+  start: number;
+  end: number;
+  track: t.RangedTrack;
+};
 // type TrackLayout = {columns: RangedTrackLayoutColumn[]};
 // type RangedTrackLayoutColumn = {};
-type RangedTrackLayoutColumn = t.RangedTrack[];
+// type RangedTrackLayoutColumn = t.RangedTrack[];
 class RangedTracksUI extends Component<RangedTracksUIProps> {
   render() {
     const { tracks, timelineDuration, trackSelection, onClick, onDrag, onDragStart } = this.props;
 
-    let columns: RangedTrackLayoutColumn[] = [];
+    let layouts: RangedTrackLayout[] = [];
 
-    for (const track of tracks) this.fitTrackIntoColumns(track, columns);
-    columns = columns.map(column => this.orderedColumn(column));
+    // Two columns
+    // for (let i = 0; i < tracks.length; ) {
+    //   if (i === tracks.length - 1 || !doClockRangesIntersect(tracks[i], tracks[i + 1])) {
+    //     layouts.push({ start: 0, end: 2, track: tracks[i] });
+    //     i++;
+    //   } else {
+    //     layouts.push({ start: 0, end: 1, track: tracks[i] });
+    //     layouts.push({ start: 1, end: 2, track: tracks[i + 1] });
+    //     i += 2;
+    //   }
+    // }
+
+    // Single column
+    for (const track of tracks) layouts.push({ start: 0, end: 2, track });
+
+    const columnHalfGap = 0.25;
 
     return (
       <div className="ranged-tracks">
-        {columns.map(column => (
-          <div className="column">
-            {column.map(track => {
-              const style = {
-                top: `${(track.clockRange.start / timelineDuration) * 100}%`,
-                bottom: `calc(100% - ${(track.clockRange.end / timelineDuration) * 100}%)`,
-                minHeight: `${TRACK_MIN_HEIGHT_PX}px`,
-              };
+        {layouts.map(({ start, end, track }) => {
+          // const leftGap = start === 0 ? 0 : columnHalfGap;
+          // const rightGap = end === 2 ? 0 : columnHalfGap;
+          // const totalGap = leftGap + rightGap;
+          const style = {
+            left: `calc(${start * 50}% + ${columnHalfGap}rem)`,
+            width: `calc(${(end - start) * 50}% - ${columnHalfGap * 2}rem)`,
+            top: `${(track.clockRange.start / timelineDuration) * 100}%`,
+            bottom: `calc(100% - ${(track.clockRange.end / timelineDuration) * 100}%)`,
+            minHeight: `${TRACK_MIN_HEIGHT_PX}px`,
+          };
 
-              const icon =
-                track.type === 'audio' ? 'codicon-mic' : track.type === 'video' ? 'codicon-device-camera-video' : '';
+          const icon =
+            track.type === 'audio' ? 'codicon-mic' : track.type === 'video' ? 'codicon-device-camera-video' : '';
 
-              return (
-                <div
-                  className={cn('track', trackSelection?.id === track.id && 'active')}
-                  style={style}
-                  onClick={e => onClick(e, track)}
-                  onDragStart={e => onDragStart(e, track)}
-                  onDrag={e => onDrag(e, track)}
-                  draggable
-                >
-                  <p>
-                    <span className={`codicon va-middle m-right_small ${icon}`} />
-                    {track.title}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        ))}
+          return (
+            <div
+              key={track.id}
+              className={cn('track', trackSelection?.id === track.id && 'active')}
+              style={style}
+              onClick={e => onClick(e, track)}
+              onDragStart={e => onDragStart(e, track)}
+              onDrag={e => onDrag(e, track)}
+              draggable
+            >
+              <p>
+                <span className={`codicon va-middle m-right_small ${icon}`} />
+                {track.title}
+              </p>
+            </div>
+          );
+        })}
       </div>
     );
   }
 
-  private fitTrackIntoColumns(track: t.RangedTrack, columns: RangedTrackLayoutColumn[]) {
-    /*
+  // private fitTrackIntoColumns(track: t.RangedTrack, columns: RangedTrackLayoutColumn[]) {
+  //   for (const column of columns) {
+  //     if (this.doesTrackFitInColumn(track, column)) {
+  //       column.push(track);
+  //       return;
+  //     }
+  //   }
+  //   columns.push([track]);
+  // }
 
-         XXX
-         XXX   XXX
-               XXX   XXX
-         YYYYYYYYY   XXX
-         YYYYYYYYY
+  // private doesTrackFitInColumn(track: t.RangedTrack, column: RangedTrackLayoutColumn): boolean {
+  //   return column.every(track2 => !this.doClockRangesIntersect(track, track2));
+  // }
 
+  // private orderedColumn(columns: RangedTrackLayoutColumn): RangedTrackLayoutColumn {
+  //   return _.orderBy(columns, track => track.clockRange.start);
+  // }
+}
 
-         XXX
-         XXX   XXX
-         ZZZ   XXX
-         ZZZ   YYY
-               YYY
+type EditorTrackUIProps = {
+  timelineDuration: number;
+  timelineHeightPx: number;
+  editorTrackFocusTimeline?: t.EditorTrackFocusTimeline;
+};
+class EditorTrackUI extends Component<EditorTrackUIProps> {
+  render() {
+    const { timelineDuration, timelineHeightPx, editorTrackFocusTimeline } = this.props;
 
+    // const lineFocusItems:t.LineFocus [] = [];
+    // if (editorTrackFocusTimeline) {
+    //   const { documents, lines } = editorTrackFocusTimeline;
+    //   const durationOfOneLine = (TRACK_MIN_HEIGHT_PX * timelineDuration) / timelineHeightPx;
 
+    //   // Cut duration of document focus items to durationOfOneLine.
+    //   const clockRangesOfOccupiedLines: t.ClockRange[] = documents.map(x => ({
+    //     start: x.clockRange.start,
+    //     end: x.clockRange.start + durationOfOneLine,
+    //   }));
 
+    //   for (const line of lines) {
+    //     const lineClockRange: t.ClockRange = {
+    //       start: line.clockRange.start,
+    //       end: line.clockRange.start + durationOfOneLine,
+    //     };
 
-         XXXXXXX
-         XXXXXXX XXXXXXX
-         ZZZZZZZ XXXXXXX
-         ZZZZZZZ YYYYYYY
-                 YYYYYYY
+    //     // TODO write an algorithm with better time complexity.
+    //     if (!clockRangesOfOccupiedLines.some(x => lib.doClockRangesIntersect(x, lineClockRange))) {
+    //       lineFocusItems.push(line);
+    //     }
+    //   }
+    // }
 
-
-
-     */
-
-    for (const column of columns) {
-      if (this.doesTrackFitInColumn(track, column)) {
-        column.push(track);
-        return;
-      }
-    }
-    columns.push([track]);
-  }
-
-  private doesTrackFitInColumn(track: t.RangedTrack, column: RangedTrackLayoutColumn): boolean {
-    return column.every(track2 => !this.doTracksIntersect(track, track2));
-  }
-
-  private doTracksIntersect(t1: t.RangedTrack, t2: t.RangedTrack): boolean {
-    return t2.clockRange.start < t1.clockRange.end && t1.clockRange.start < t2.clockRange.end;
-  }
-
-  private orderedColumn(columns: RangedTrackLayoutColumn): RangedTrackLayoutColumn {
-    return _.orderBy(columns, track => track.clockRange.start);
+    return (
+      <div className="editor-track">
+        {editorTrackFocusTimeline?.documents?.map(documentFocus => {
+          const style = {
+            top: `${(documentFocus.clockRange.start / timelineDuration) * 100}%`,
+            bottom: `calc(100% - ${(documentFocus.clockRange.end / timelineDuration) * 100}%)`,
+          };
+          return (
+            <div className="document-focus" style={style}>
+              {/*path.getUriShortNameOpt(documentFocus.uri) || 'unknown file'*/}
+            </div>
+          );
+        })}
+        {editorTrackFocusTimeline?.lines.map(lineFocus => {
+          const style = {
+            top: `${(lineFocus.clockRange.start / timelineDuration) * 100}%`,
+            bottom: `calc(100% - ${(lineFocus.clockRange.end / timelineDuration) * 100}%)`,
+          };
+          return (
+            <div className="line-focus" style={style}>
+              {lineFocus.text}
+            </div>
+          );
+        })}
+      </div>
+    );
   }
 }
 
@@ -779,71 +843,71 @@ function calcTimelineStepClock(dur: number, steps: number): number {
   return Math.max(roundTo(dur / steps, 30), 30);
 }
 
-function groupEditorEvents(
-  events: t.EditorEvent[],
-  timelineDuration: number,
-  timelineHeightPx: number,
-): EditorRangedTrack[] {
-  const groups: EditorRangedTrack[] = [];
-  for (const e of events) {
-    const groupType = EDITOR_EVENT_GROUP_TYPE_MAP[e.type] as EditorRangedTrack['groupType'] | undefined;
-    if (!groupType) continue;
+// function groupEditorEvents(
+//   events: t.EditorEvent[],
+//   timelineDuration: number,
+//   timelineHeightPx: number,
+// ): EditorRangedTrack[] {
+//   const groups: EditorRangedTrack[] = [];
+//   for (const e of events) {
+//     const groupType = EDITOR_EVENT_GROUP_TYPE_MAP[e.type] as EditorRangedTrack['groupType'] | undefined;
+//     if (!groupType) continue;
 
-    const lastGroup = groups.at(-1);
-    const lastEvent = lastGroup?.events.at(-1);
-    const groupChanged = lastGroup && groupType !== lastGroup.groupType;
-    const uriChanged = lastEvent && lastEvent.uri !== e.uri;
-    const thereWasALongPause = lastEvent && e.clock - lastEvent.clock > 5;
+//     const lastGroup = groups.at(-1);
+//     const lastEvent = lastGroup?.events.at(-1);
+//     const groupChanged = lastGroup && groupType !== lastGroup.groupType;
+//     const uriChanged = lastEvent && lastEvent.uri !== e.uri;
+//     const thereWasALongPause = lastEvent && e.clock - lastEvent.clock > 5;
 
-    if (!lastGroup || uriChanged || groupChanged || thereWasALongPause) {
-      const newGroup: EditorRangedTrack = {
-        id: uuid(),
-        type: 'editor',
-        groupType,
-        events: [e as any],
-        clockRange: { start: 0, end: 0 },
-        title: '',
-      };
-      groups.push(newGroup);
-    } else {
-      lastGroup.events.push(e as any);
-    }
-  }
+//     if (!lastGroup || uriChanged || groupChanged || thereWasALongPause) {
+//       const newGroup: EditorRangedTrack = {
+//         id: uuid(),
+//         type: 'editor',
+//         groupType,
+//         events: [e as any],
+//         clockRange: { start: 0, end: 0 },
+//         title: '',
+//       };
+//       groups.push(newGroup);
+//     } else {
+//       lastGroup.events.push(e as any);
+//     }
+//   }
 
-  const minDuration = (TRACK_MIN_HEIGHT_PX * timelineDuration) / timelineHeightPx;
+//   const minDuration = (TRACK_MIN_HEIGHT_PX * timelineDuration) / timelineHeightPx;
 
-  for (const group of groups) {
-    group.clockRange.start = group.events[0].clock;
-    group.clockRange.end = Math.max(group.events[0].clock + minDuration, group.events.at(-1)!.clock);
+//   for (const group of groups) {
+//     group.clockRange.start = group.events[0].clock;
+//     group.clockRange.end = Math.max(group.events[0].clock + minDuration, group.events.at(-1)!.clock);
 
-    let text = '';
-    if (group.groupType === 'textChange') {
-      text = group.events
-        .flatMap(e => e.contentChanges.map(cc => cc.text))
-        .join('')
-        .replace(/\n+/g, '\n')
-        .trim();
-    }
+//     let text = '';
+//     if (group.groupType === 'textChange') {
+//       text = group.events
+//         .flatMap(e => e.contentChanges.map(cc => cc.text))
+//         .join('')
+//         .replace(/\n+/g, '\n')
+//         .trim();
+//     }
 
-    const uri = group.events.at(-1)?.uri;
-    let p: t.Path | undefined;
-    let basename: string | undefined;
+//     const uri = group.events.at(-1)?.uri;
+//     let p: t.Path | undefined;
+//     let basename: string | undefined;
 
-    if (uri) {
-      p = path.getUriPathOpt(uri);
-      basename = p && path.basename(p);
-      basename ??= path.getUntitledUriNameOpt(uri);
-    }
+//     if (uri) {
+//       p = path.getUriPathOpt(uri);
+//       basename = p && path.basename(p);
+//       basename ??= path.getUntitledUriNameOpt(uri);
+//     }
 
-    // const title = [p, text].filter(Boolean).join('\n');
+//     // const title = [p, text].filter(Boolean).join('\n');
 
-    if (group.groupType === 'documentChange') {
-      group.title = basename || 'document';
-      // icon = 'codicon-file';
-    } else {
-      group.title = text || 'text';
-    }
-  }
+//     if (group.groupType === 'documentChange') {
+//       group.title = basename || 'document';
+//       // icon = 'codicon-file';
+//     } else {
+//       group.title = text || 'text';
+//     }
+//   }
 
-  return groups;
-}
+//   return groups;
+// }

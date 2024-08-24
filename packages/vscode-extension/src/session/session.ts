@@ -119,6 +119,10 @@ export class Session implements t.Session {
           worktree: {},
           textEditors: [],
         },
+        focusTimeline: {
+          documents: [],
+          lines: [],
+        },
       },
       audioTracks: [],
       videoTracks: [],

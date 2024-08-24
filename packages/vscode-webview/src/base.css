@@ -40,10 +40,11 @@ body.vscode-light {
   --editor-track-text-change-border: #55a995;
   --editor-track-text-change-border-active: #55a995;
 
-  --editor-track-document-change-background: #d1caf8;
-  --editor-track-document-change-background-hover: #b8b0e4;
-  --editor-track-document-change-border: #8f86bd;
-  --editor-track-document-change-border-active: #8f86bd;
+  --editor-track-document-focus-color-1: #60bd90;
+  --editor-track-document-focus-color-2: #007acc;
+  /* --editor-track-document-focus-background-hover: #b8b0e4; */
+  /* --editor-track-document-focus-border: #8f86bd; */
+  /* --editor-track-document-focus-border-active: #8f86bd; */
 }
 body.vscode-dark {
   --ranged-track-background: #063b49;
@@ -56,10 +57,11 @@ body.vscode-dark {
   --editor-track-text-change-border: #007acc;
   --editor-track-text-change-border-active: #007acc;
 
-  --editor-track-document-change-background: #063b49;
-  --editor-track-document-change-background-hover: #135e71;
-  --editor-track-document-change-border: #007acc;
-  --editor-track-document-change-border-active: #007acc;
+  --editor-track-document-focus-color-1: #60bd90;
+  --editor-track-document-focus-color-2: #007acc;
+  /* --editor-track-document-focus-background-hover: #135e71; */
+  /* --editor-track-document-focus-border: #007acc; */
+  /* --editor-track-document-focus-border-active: #007acc; */
 
   --marker-cursor-color: #cccccc;
 }

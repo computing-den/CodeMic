@@ -655,6 +655,14 @@ export function makeSelectionN(
   return { anchor: makePosition(anchorLine, anchorCharacter), active: makePosition(activeLine, activeCharacter) };
 }
 
+export function getSelectionStart(selection: t.Selection): t.Position {
+  return isPositionBefore(selection.anchor, selection.active) ? selection.anchor : selection.active;
+}
+
+export function getSelectionEnd(selection: t.Selection): t.Position {
+  return isPositionAfter(selection.anchor, selection.active) ? selection.anchor : selection.active;
+}
+
 export function makeContentChange(text: string, range: t.Range): t.ContentChange {
   return { text, range };
 }

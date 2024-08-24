@@ -17,6 +17,9 @@ class CombinedEditorTrackRecorder {
   private disposables: vscode.Disposable[] = [];
   private scrolling: boolean = false;
   private scrollStartRange?: t.Range;
+  // private lastUri?: t.Uri;
+  // private lastPosition?: t.Position;
+  private lastLine: number | undefined;
 
   get internalCtrl(): ietc.InternalEditorTrackCtrl {
     return this.session.ctrls!.internalEditorTrackCtrl;
@@ -29,6 +32,9 @@ class CombinedEditorTrackRecorder {
   record() {
     if (this.recording) return;
     this.recording = true;
+
+    // update focus
+    this.updateFocus();
 
     // listen for open document events
     {
@@ -92,17 +98,87 @@ class CombinedEditorTrackRecorder {
   }
 
   pause() {
+    this.popLastLineFocusIfTrivial();
     this.recording = false;
+    this.scrolling = false;
+    this.scrollStartRange = undefined;
+
     this.dispose();
   }
 
   setClock(clock: number) {
     this.clock = clock;
+
+    if (this.recording) {
+      this.updateFocus();
+    }
   }
 
   dispose() {
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
+  }
+
+  private updateFocus() {
+    const { documents, lines } = this.session.body!.editorTrack.focusTimeline;
+    const { activeTextEditor } = this.internalCtrl;
+    const activeUri = activeTextEditor?.document.uri;
+    const lastDocumentFocus = documents.at(-1);
+    const lastLineFocus = lines.at(-1);
+
+    if (activeUri) {
+      const sameUri = activeUri === lastDocumentFocus?.uri;
+      const currentLine = this.getCurrentLine();
+      const sameLine = currentLine !== undefined && currentLine === this.lastLine;
+
+      // If we're on the same uri and the same line, update focus line, otherwise push a new one.
+      if (lastLineFocus && sameUri && sameLine) {
+        lastLineFocus.clockRange.end = this.clock;
+        lastLineFocus.text = this.getCurrentLineText() ?? '';
+      } else {
+        this.popLastLineFocusIfTrivial();
+        lines.push({ text: this.getCurrentLineText() ?? '', clockRange: { start: this.clock, end: this.clock } });
+        this.lastLine = currentLine;
+      }
+
+      // Update last document focus clockRange.
+      if (lastDocumentFocus) {
+        lastDocumentFocus.clockRange.end = this.clock;
+      }
+
+      // If uri has changed, push a new document focus.
+      if (!sameUri) {
+        documents.push({ uri: activeUri, clockRange: { start: this.clock, end: this.clock } });
+      }
+    }
+  }
+
+  private getCurrentLineText(): string | undefined {
+    const line = this.getCurrentLine();
+    if (line !== undefined) {
+      return this.internalCtrl.activeTextEditor?.document.lines[line];
+    }
+  }
+
+  private getCurrentLine(): number | undefined {
+    const { activeTextEditor } = this.internalCtrl;
+    const selection = activeTextEditor?.selections[0];
+    return selection && ietc.getSelectionStart(selection).line;
+  }
+
+  // private pushLineFocus() {
+  //   const { lines } = this.session.body!.editorTrack.focusTimeline;
+  // }
+
+  private popLastLineFocusIfTrivial() {
+    const { lines } = this.session.body!.editorTrack.focusTimeline;
+    const lastLineFocus = lines.at(-1);
+    // const last2LineFocus = lines.at(-1);
+    if (!lastLineFocus) return;
+
+    if (lib.getClockRangeDur(lastLineFocus.clockRange) < 5 || lastLineFocus.text.trim().length < 5) {
+      lines.pop();
+    }
   }
 
   private async textChange(
