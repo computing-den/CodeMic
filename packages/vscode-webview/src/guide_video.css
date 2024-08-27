@@ -8,7 +8,8 @@
   justify-content: center;
 
   &.fixed-height {
-    height: 25vh;
+    height: 400px;
+    max-height: 25vh;
   }
 
   &.hide-inactive {

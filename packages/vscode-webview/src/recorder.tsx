@@ -13,17 +13,9 @@ import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
 import { cn } from './misc.js';
 import _ from 'lodash';
-import {
-  CloseTextDocumentEvent,
-  CloseTextEditorEvent,
-  OpenTextDocumentEvent,
-  SelectEvent,
-  ShowTextEditorEvent,
-  TextChangeEvent,
-} from '@codecast/lib/src/types.js';
-import { v4 as uuid } from 'uuid';
 
-const TRACK_MIN_HEIGHT_PX = 15;
+const TRACK_HEIGHT_PX = 15;
+const TRACK_MIN_GAP_PX = 1;
 
 type Props = { user?: t.User; recorder: t.RecorderState };
 export default class Recorder extends Component<Props> {
@@ -82,8 +74,8 @@ export default class Recorder extends Component<Props> {
     return (
       <Screen className="recorder">
         <Tabs tabs={this.tabs} activeTabId={this.props.recorder.tabId} onTabChange={this.tabChanged}>
-          <DetailsView id="details-view" className="" {...this.props} onLoadRecorder={this.loadRecorder} />
-          <EditorView id="editor-view" className="" {...this.props} onRecord={this.record} onPlay={this.play} />
+          <DetailsView id="details-view" {...this.props} onLoadRecorder={this.loadRecorder} />
+          <EditorView id="editor-view" {...this.props} onRecord={this.record} onPlay={this.play} />
         </Tabs>
       </Screen>
     );
@@ -193,36 +185,13 @@ type EditorViewProps = Props &
   };
 type TrackSelection = { id: string; type: 'audio' | 'video' | 'editor' };
 
-type EditorRangedTrack = t.RangedTrack &
-  (
-    | {
-        groupType: 'documentChange';
-        events: EditorDocumentChangeEvents[];
-      }
-    | {
-        groupType: 'textChange';
-        events: TextChangeEvent[];
-      }
-  );
-type EditorDocumentChangeEvents =
-  | OpenTextDocumentEvent
-  | CloseTextDocumentEvent
-  | ShowTextEditorEvent
-  | CloseTextEditorEvent;
-const EDITOR_EVENT_GROUP_TYPE_MAP: Record<string, string> = {
-  textChange: 'textChange',
-  openTextDocument: 'documentChange',
-  closeTextDocument: 'documentChange',
-  showTextEditor: 'documentChange',
-  closeTextEditor: 'documentChange',
-} as const;
-
 class EditorView extends Component<EditorViewProps> {
   state = {
     cursor: undefined as Marker | undefined,
     anchor: undefined as Marker | undefined,
     markers: [] as Marker[],
     trackSelection: undefined as TrackSelection | undefined,
+    timelineHeightPx: 0,
   };
 
   updateState = (recipe: EditorViewStateRecipe) => this.setState(state => produce(state, recipe));
@@ -254,6 +223,33 @@ class EditorView extends Component<EditorViewProps> {
       await postMessage({ type: 'recorder/insertVideo', uri: uris[0], clock });
     }
   };
+
+  updateTimelineHeightPx = () => {
+    const timelineHeightPx = document.getElementById('timeline')!.getBoundingClientRect().height;
+    console.log('updateTimelineHeightPx', timelineHeightPx);
+    this.updateState(state => {
+      state.timelineHeightPx = timelineHeightPx;
+    });
+  };
+
+  resized = () => {
+    this.updateTimelineHeightPx();
+  };
+
+  componentDidMount() {
+    window.addEventListener('resize', this.resized);
+    this.updateTimelineHeightPx();
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('resize', this.resized);
+  }
+
+  componentDidUpdate(prevProps: EditorViewProps) {
+    if (!prevProps.active && this.props.active) {
+      this.updateTimelineHeightPx();
+    }
+  }
 
   render() {
     const { id, recorder, className, onRecord, onPlay } = this.props;
@@ -329,6 +325,7 @@ class EditorView extends Component<EditorViewProps> {
           trackSelection={this.state.trackSelection}
           clock={recorder.clock}
           duration={recorder.sessionHead.duration}
+          timelineHeightPx={this.state.timelineHeightPx}
           onChange={this.updateState}
         />
       </div>
@@ -344,19 +341,18 @@ type TimelineProps = {
   trackSelection?: TrackSelection;
   clock: number;
   duration: number;
+  timelineHeightPx: number;
   onChange: (draft: EditorViewStateRecipe) => any;
 };
 type TimelineState = {
   stepCount: number;
   trackDragStart?: TrackSelection & t.RangedTrack & { clock: number };
   markerDragStart?: Marker;
-  timelineHeightPx: number;
 };
 class Timeline extends Component<TimelineProps, TimelineState> {
   state = {
     stepCount: 10,
     trackDragStart: undefined,
-    timelineHeightPx: 0,
   } as TimelineState;
 
   getTimelineStepClock(): number {
@@ -469,6 +465,13 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     }
   };
 
+  markerClicked = (e: MouseEvent, marker: Marker) => {
+    console.log('Marker clicked', marker);
+    this.props.onChange(state => {
+      state.anchor = { clock: marker.clock, type: 'anchor', active: true };
+    });
+  };
+
   markerDragStarted = (e: DragEvent, marker: Marker) => {
     e.dataTransfer?.setDragImage(new Image(), 0, 0);
     //  if (!this.getClockUnderMouse(e)) return;
@@ -484,15 +487,6 @@ class Timeline extends Component<TimelineProps, TimelineState> {
       const duration = Math.max(0, clock);
       await postMessage({ type: 'recorder/update', changes: { duration } });
     }
-  };
-
-  resized = () => {
-    this.updateTimelineHeightPx();
-  };
-
-  updateTimelineHeightPx = () => {
-    const timelineHeightPx = document.getElementById('timeline')!.getBoundingClientRect().height;
-    this.setState({ timelineHeightPx });
   };
 
   getClockUnderMouse(e: MouseEvent, opts?: { emptySpace?: boolean }): number | undefined {
@@ -511,10 +505,7 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     }
   }
 
-  componentDidUpdate() {}
-
   componentDidMount() {
-    document.addEventListener('resize', this.resized);
     document.addEventListener('mousemove', this.mouseMoved);
     document.addEventListener('mousedown', this.mouseDown);
     document.addEventListener('mouseup', this.mouseUp);
@@ -523,12 +514,9 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     const timeline = document.getElementById('timeline')!;
     timeline.addEventListener('mouseleave', this.mouseLeft);
     timeline.addEventListener('mouseout', this.mouseOut);
-
-    this.updateTimelineHeightPx();
   }
 
   componentWillUnmount() {
-    document.removeEventListener('resize', this.resized);
     document.removeEventListener('mousemove', this.mouseMoved);
     document.removeEventListener('mousedown', this.mouseDown);
     document.removeEventListener('mouseup', this.mouseUp);
@@ -540,15 +528,21 @@ class Timeline extends Component<TimelineProps, TimelineState> {
   }
 
   render() {
-    const { markers, cursor, anchor, clock, trackSelection, duration, recorder } = this.props;
-    const { stepCount, timelineHeightPx } = this.state;
+    const { markers, cursor, anchor, clock, trackSelection, duration, timelineHeightPx, recorder } = this.props;
+    const { stepCount } = this.state;
     const clockMarker: Marker | undefined =
       clock > 0 && clock !== duration && !recorder.recording ? { clock, type: 'clock' } : undefined;
     const endOrRecordingMarker: Marker = recorder.recording
       ? { clock: duration, type: 'recording' }
       : { clock: duration, type: 'end', draggable: true };
 
-    const allMarkers = _.compact([...markers, cursor, anchor, clockMarker, endOrRecordingMarker]);
+    const allMarkers = _.compact([
+      ...markers,
+      cursor,
+      !recorder.playing && !recorder.recording && anchor,
+      clockMarker,
+      endOrRecordingMarker,
+    ]);
     const timelineDuration = this.getTimelineDuration();
 
     // const groupedEditorTracks = groupEditorEvents(recorder.editorTrack!.events, timelineDuration, timelineHeightPx);
@@ -578,6 +572,7 @@ class Timeline extends Component<TimelineProps, TimelineState> {
               <MarkerUI
                 marker={marker}
                 timelineDuration={timelineDuration}
+                onClick={this.markerClicked}
                 onDragStart={this.markerDragStarted}
                 onDrag={this.markerDragged}
               />
@@ -647,7 +642,7 @@ class RangedTracksUI extends Component<RangedTracksUIProps> {
             width: `calc(${(end - start) * 50}% - ${columnHalfGap * 2}rem)`,
             top: `${(track.clockRange.start / timelineDuration) * 100}%`,
             bottom: `calc(100% - ${(track.clockRange.end / timelineDuration) * 100}%)`,
-            minHeight: `${TRACK_MIN_HEIGHT_PX}px`,
+            minHeight: `${TRACK_HEIGHT_PX}px`,
           };
 
           const icon =
@@ -705,7 +700,7 @@ class EditorTrackUI extends Component<EditorTrackUIProps> {
     // const lineFocusItems:t.LineFocus [] = [];
     // if (editorTrackFocusTimeline) {
     //   const { documents, lines } = editorTrackFocusTimeline;
-    //   const durationOfOneLine = (TRACK_MIN_HEIGHT_PX * timelineDuration) / timelineHeightPx;
+    //   const durationOfOneLine = (TRACK_HEIGHT_PX * timelineDuration) / timelineHeightPx;
 
     //   // Cut duration of document focus items to durationOfOneLine.
     //   const clockRangesOfOccupiedLines: t.ClockRange[] = documents.map(x => ({
@@ -726,12 +721,50 @@ class EditorTrackUI extends Component<EditorTrackUIProps> {
     //   }
     // }
 
+    // Skip lines that may cut into the previous line.
+    const lineFocusTimeline: (t.LineFocus & { offsetPx?: number })[] = [];
+    const heightOf1Sec = timelineHeightPx / timelineDuration;
+    for (const lineFocus of editorTrackFocusTimeline?.lines || []) {
+      const lastLineFocus = lineFocusTimeline.at(-1);
+      if (!lastLineFocus) {
+        lineFocusTimeline.push(lineFocus);
+        continue;
+      }
+
+      // The following:
+
+      // | first line
+      // | | second line
+      // | |
+      //   |
+      //
+      // must be turned into this:
+      //
+      // | first line
+      // | |
+      // | |
+      //   | second line
+
+      const lastLineBottomPx = lastLineFocus.clockRange.start * heightOf1Sec + TRACK_HEIGHT_PX;
+      const lineOriginalTopPx = lineFocus.clockRange.start * heightOf1Sec;
+      const lineOriginalBottomPx = lineFocus.clockRange.end * heightOf1Sec;
+
+      const availableSpace = lineOriginalBottomPx - lastLineBottomPx;
+      const requiredSpace = TRACK_HEIGHT_PX + TRACK_MIN_GAP_PX;
+
+      if (availableSpace < requiredSpace) continue;
+
+      const lineTopPx = Math.max(lastLineBottomPx + TRACK_MIN_GAP_PX, lineOriginalTopPx);
+      lineFocusTimeline.push({ ...lineFocus, offsetPx: lineTopPx - lineOriginalTopPx });
+    }
+
     return (
       <div className="editor-track">
         {editorTrackFocusTimeline?.documents?.map(documentFocus => {
           const style = {
             top: `${(documentFocus.clockRange.start / timelineDuration) * 100}%`,
             bottom: `calc(100% - ${(documentFocus.clockRange.end / timelineDuration) * 100}%)`,
+            minHeight: `${TRACK_HEIGHT_PX}px`,
           };
           return (
             <div className="document-focus" style={style}>
@@ -739,10 +772,12 @@ class EditorTrackUI extends Component<EditorTrackUIProps> {
             </div>
           );
         })}
-        {editorTrackFocusTimeline?.lines.map(lineFocus => {
+        {lineFocusTimeline.map(lineFocus => {
           const style = {
             top: `${(lineFocus.clockRange.start / timelineDuration) * 100}%`,
+            paddingTop: `${lineFocus.offsetPx ?? 0}px`,
             bottom: `calc(100% - ${(lineFocus.clockRange.end / timelineDuration) * 100}%)`,
+            minHeight: `${TRACK_HEIGHT_PX}px`,
           };
           return (
             <div className="line-focus" style={style}>
@@ -823,15 +858,17 @@ class EditorTrackUI extends Component<EditorTrackUIProps> {
 type MarkerProps = {
   marker: Marker;
   timelineDuration: number;
+  onClick?: (e: MouseEvent, m: Marker) => any;
   onDragStart?: (e: DragEvent, m: Marker) => any;
   onDrag?: (e: DragEvent, m: Marker) => any;
 };
 class MarkerUI extends Component<MarkerProps> {
+  clicked = (e: MouseEvent) => this.props.onClick?.(e, this.props.marker);
   dragStarted = (e: DragEvent) => this.props.onDragStart?.(e, this.props.marker);
   dragged = (e: DragEvent) => this.props.onDrag?.(e, this.props.marker);
 
   render() {
-    const { marker, timelineDuration, onDragStart, onDrag } = this.props;
+    const { marker, timelineDuration } = this.props;
     const style = {
       top: `${(marker.clock / timelineDuration) * 100}%`,
     };
@@ -839,6 +876,7 @@ class MarkerUI extends Component<MarkerProps> {
       <div
         className={cn('marker', `marker_${marker.type}`, marker.active && 'marker_active', marker.draggable)}
         style={style}
+        onClick={this.clicked}
         onDragStart={this.dragStarted}
         onDrag={this.dragged}
         draggable={marker.draggable}
@@ -892,7 +930,7 @@ function calcTimelineStepClock(dur: number, steps: number): number {
 //     }
 //   }
 
-//   const minDuration = (TRACK_MIN_HEIGHT_PX * timelineDuration) / timelineHeightPx;
+//   const minDuration = (TRACK_HEIGHT_PX * timelineDuration) / timelineHeightPx;
 
 //   for (const group of groups) {
 //     group.clockRange.start = group.events[0].clock;

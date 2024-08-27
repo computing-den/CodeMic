@@ -347,7 +347,13 @@ class CombinedEditorTrackRecorder {
       `accepted select for ${uri} visibleRange: ${vscTextEditor.visibleRanges[0].start.line}:${vscTextEditor.visibleRanges[0].end.line}`,
     );
 
-    const irTextEditor = this.internalCtrl.getTextEditorByUri(uri);
+    const irTextEditor = this.internalCtrl.findTextEditorByUri(uri);
+
+    if (!irTextEditor) {
+      this.showTextEditor(vscTextEditor); // Will insert selection too.
+      return;
+    }
+
     const revSelections = irTextEditor.selections;
     const revVisibleRanges = irTextEditor.visibleRange;
     irTextEditor.select(
@@ -385,6 +391,12 @@ class CombinedEditorTrackRecorder {
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
     const uri = this.session.uriFromVsc(vscTextEditor.document.uri);
+    const irTextEditor = this.internalCtrl.findTextEditorByUri(uri);
+    if (!irTextEditor) {
+      this.showTextEditor(vscTextEditor); // Will insert selection.
+      return;
+    }
+
     const visibleRange = this.session.rangeFromVsc(visibleRanges[0]);
 
     if (!this.scrolling) {
@@ -399,7 +411,6 @@ class CombinedEditorTrackRecorder {
 
     logAcceptedEvent(`accepted scroll for ${uri} visible range: ${visibleRange.start.line}:${visibleRange.end.line}`);
 
-    const irTextEditor = this.internalCtrl.getTextEditorByUri(uri);
     const revVisibleRange = irTextEditor.visibleRange;
     irTextEditor.scroll(visibleRange);
 
