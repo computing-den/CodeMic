@@ -92,46 +92,47 @@ export class SessionHeadForList extends Component<ForListProps> {
 
 export class SessionHeadListItem extends Component<ListItemProps> {
   clicked = () => postMessage({ type: 'player/open', sessionId: this.props.sessionHead.id });
-  actions: SL.Action[] = [
-    // {
-    //   icon: 'codicon-play',
-    //   title: 'Play',
-    //   onClick: () => postMessage({ type: 'player/open', sessionId: this.props.sessionHead.id }),
-    // },
-    {
-      icon: 'codicon-repo-forked',
-      title: 'Fork: create a new project based on this one',
-      onClick: () =>
-        postMessage({
-          type: 'recorder/open',
-          sessionId: this.props.sessionHead.id,
-          fork: true,
-        }),
-    },
-    {
-      icon: 'codicon-edit',
-      title: 'Edit: open this project in the Studio',
-      onClick: () => postMessage({ type: 'recorder/open', sessionId: this.props.sessionHead.id }),
-    },
-    {
-      icon: 'codicon-heart-filled',
-      title: 'Like',
-      onClick: () => {
-        console.log('TODO');
-      },
-    },
-    {
-      icon: 'codicon-close',
-      title: 'Delete',
-      onClick: () => postMessage({ type: 'deleteSession', sessionId: this.props.sessionHead.id }),
-    },
-  ];
 
   render() {
+    const actions = _.compact<SL.Action>([
+      // {
+      //   icon: 'codicon-play',
+      //   title: 'Play',
+      //   onClick: () => postMessage({ type: 'player/open', sessionId: this.props.sessionHead.id }),
+      // },
+      {
+        icon: 'codicon-repo-forked',
+        title: 'Fork: create a new project based on this one',
+        onClick: () =>
+          postMessage({
+            type: 'recorder/open',
+            sessionId: this.props.sessionHead.id,
+            fork: true,
+          }),
+      },
+      {
+        icon: 'codicon-edit',
+        title: 'Edit: open this project in the Studio',
+        onClick: () => postMessage({ type: 'recorder/open', sessionId: this.props.sessionHead.id }),
+      },
+      {
+        icon: 'codicon-heart-filled',
+        title: 'Like',
+        onClick: () => {
+          console.log('TODO');
+        },
+      },
+      !this.props.sessionHead.publishTimestamp && {
+        icon: 'codicon-close',
+        title: 'Delete',
+        onClick: () => postMessage({ type: 'deleteSession', sessionId: this.props.sessionHead.id }),
+      },
+    ]);
+
     return (
       <SelectableLi
         className={cn('session-head-list-item', this.props.className)}
-        actions={this.actions}
+        actions={actions}
         onClick={this.clicked}
       >
         <SessionHeadForList sessionHead={this.props.sessionHead} history={this.props.history} />

@@ -16,6 +16,7 @@ import _ from 'lodash';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
+const TRACK_INDENT_PX = 5;
 
 type Props = { user?: t.User; recorder: t.RecorderState };
 export default class Recorder extends Component<Props> {
@@ -604,6 +605,7 @@ type RangedTrackLayout = {
   start: number;
   end: number;
   track: t.RangedTrack;
+  indent: number;
 };
 // type TrackLayout = {columns: RangedTrackLayoutColumn[]};
 // type RangedTrackLayoutColumn = {};
@@ -627,19 +629,25 @@ class RangedTracksUI extends Component<RangedTracksUIProps> {
     // }
 
     // Single column
-    for (const track of tracks) layouts.push({ start: 0, end: 2, track });
+    for (const [i, track] of tracks.entries()) {
+      let indent = 0;
+      for (const track2 of tracks.slice(0, i)) {
+        if (lib.doClockRangesIntersect(track.clockRange, track2.clockRange)) indent++;
+      }
+      layouts.push({ start: 0, end: 2, track, indent });
+    }
 
     const columnHalfGap = 0.25;
 
     return (
       <div className="ranged-tracks">
-        {layouts.map(({ start, end, track }) => {
+        {layouts.map(({ start, end, track, indent }) => {
           // const leftGap = start === 0 ? 0 : columnHalfGap;
           // const rightGap = end === 2 ? 0 : columnHalfGap;
           // const totalGap = leftGap + rightGap;
           const style = {
-            left: `calc(${start * 50}% + ${columnHalfGap}rem)`,
-            width: `calc(${(end - start) * 50}% - ${columnHalfGap * 2}rem)`,
+            left: `calc(${start * 50}% + ${columnHalfGap}rem + ${indent * TRACK_INDENT_PX}px)`,
+            width: `calc(${(end - start) * 50}% - ${columnHalfGap * 2}rem - ${indent * TRACK_INDENT_PX}px)`,
             top: `${(track.clockRange.start / timelineDuration) * 100}%`,
             bottom: `calc(100% - ${(track.clockRange.end / timelineDuration) * 100}%)`,
             minHeight: `${TRACK_HEIGHT_PX}px`,
