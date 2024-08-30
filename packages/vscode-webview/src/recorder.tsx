@@ -601,12 +601,12 @@ type RangedTracksUIProps = {
   onDragStart: (e: DragEvent, track: t.RangedTrack) => any;
   onDrag: (e: DragEvent, track: t.RangedTrack) => any;
 };
-type RangedTrackLayout = {
-  start: number;
-  end: number;
-  track: t.RangedTrack;
-  indent: number;
-};
+// type RangedTrackLayout = {
+//   start: number;
+//   end: number;
+//   track: t.RangedTrack;
+//   indent: number;
+// };
 // type TrackLayout = {columns: RangedTrackLayoutColumn[]};
 // type RangedTrackLayoutColumn = {};
 // type RangedTrackLayoutColumn = t.RangedTrack[];
@@ -614,7 +614,7 @@ class RangedTracksUI extends Component<RangedTracksUIProps> {
   render() {
     const { tracks, timelineDuration, trackSelection, onClick, onDrag, onDragStart } = this.props;
 
-    let layouts: RangedTrackLayout[] = [];
+    // let layouts: RangedTrackLayout[] = [];
 
     // Two columns
     // for (let i = 0; i < tracks.length; ) {
@@ -629,25 +629,31 @@ class RangedTracksUI extends Component<RangedTracksUIProps> {
     // }
 
     // Single column
-    for (const [i, track] of tracks.entries()) {
-      let indent = 0;
-      for (const track2 of tracks.slice(0, i)) {
-        if (lib.doClockRangesIntersect(track.clockRange, track2.clockRange)) indent++;
-      }
-      layouts.push({ start: 0, end: 2, track, indent });
-    }
+    // for (const [i, track] of tracks.entries()) {
+    //   let indent = 0;
+    //   for (const track2 of tracks.slice(0, i)) {
+    //     if (lib.doClockRangesIntersect(track.clockRange, track2.clockRange)) indent++;
+    //   }
+    //   layouts.push({ start: 0, end: 2, track, indent });
+    // }
 
-    const columnHalfGap = 0.25;
+    // const columnHalfGap = 0.25;
 
     return (
       <div className="ranged-tracks">
-        {layouts.map(({ start, end, track, indent }) => {
-          // const leftGap = start === 0 ? 0 : columnHalfGap;
-          // const rightGap = end === 2 ? 0 : columnHalfGap;
-          // const totalGap = leftGap + rightGap;
+        {tracks.map((track, i) => {
+          let indent = 0;
+          for (const track2 of tracks.slice(0, i)) {
+            if (lib.doClockRangesIntersect(track.clockRange, track2.clockRange)) indent++;
+          }
+
+          const indentPx = indent * TRACK_INDENT_PX;
+
           const style = {
-            left: `calc(${start * 50}% + ${columnHalfGap}rem + ${indent * TRACK_INDENT_PX}px)`,
-            width: `calc(${(end - start) * 50}% - ${columnHalfGap * 2}rem - ${indent * TRACK_INDENT_PX}px)`,
+            // left: `calc(${start * 50}% + ${columnHalfGap}rem + ${indent * TRACK_INDENT_PX}px)`,
+            // width: `calc(${(end - start) * 50}% - ${columnHalfGap * 2}rem - ${indent * TRACK_INDENT_PX}px)`,
+            right: `${indentPx}px`,
+            maxWidth: `calc(50% - ${indentPx})`,
             top: `${(track.clockRange.start / timelineDuration) * 100}%`,
             bottom: `calc(100% - ${(track.clockRange.end / timelineDuration) * 100}%)`,
             minHeight: `${TRACK_HEIGHT_PX}px`,
