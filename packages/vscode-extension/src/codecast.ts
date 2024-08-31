@@ -1,3 +1,4 @@
+import fs from 'fs';
 import * as misc from './misc.js';
 import config from './config.js';
 import Recorder from './recorder.js';
@@ -23,6 +24,7 @@ class Codecast {
   session?: Session;
   featured?: SessionHead[];
   webviewProvider: WebviewProvider;
+  // cachedSessionCoverPhotos: string[] = [];
   test: any = 0;
 
   constructor(public context: Context) {
@@ -57,6 +59,10 @@ class Codecast {
 
     await this.fetchFeatured();
     await this.updateFrontend();
+
+    // this.cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(
+    //   this.context.dataPaths.cachedSessionCoverPhotos,
+    // );
 
     // DEV
     if (config.debug && this.webviewProvider.bus) {
@@ -332,6 +338,9 @@ class Codecast {
             const session = await Session.fromNew(this.context, workspace, head);
 
             if (await this.closeCurrentScreen()) {
+              // We want the files on disk so that we can add the cover photo there too.
+              await session.write();
+
               this.session = session;
               this.recorder = new Recorder(session, true);
               this.setScreen(t.Screen.Recorder);
@@ -450,6 +459,16 @@ class Codecast {
       case 'recorder/updateVideo': {
         assert(this.recorder);
         await this.recorder.updateVideo(req.video);
+        return this.respondWithStore();
+      }
+      case 'recorder/setCoverPhoto': {
+        assert(this.recorder);
+        await this.recorder.setCoverPhoto(req.uri);
+        return this.respondWithStore();
+      }
+      case 'recorder/deleteCoverPhoto': {
+        assert(this.recorder);
+        await this.recorder.deleteCoverPhoto();
         return this.respondWithStore();
       }
       case 'confirmForkFromPlayer': {
@@ -753,8 +772,10 @@ class Codecast {
 
     const dataPaths = paths.dataPaths(user?.username);
     const settings = await storage.readJSON<t.Settings>(this.context.dataPaths.settings, Codecast.makeDefaultSettings);
+    // const cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(dataPaths.cachedSessionCoverPhotos);
 
     this.session = undefined;
+    // this.cachedSessionCoverPhotos = cachedSessionCoverPhotos;
     this.context.user = user;
     this.context.dataPaths = dataPaths;
     this.context.settings = settings;
@@ -785,6 +806,17 @@ class Codecast {
     return this.webviewProvider.postMessage(req);
   }
 
+  // getCachedSessionCoverPhotoWebviewUri(id: string): t.Uri {
+  //   return this.context
+  //     .view!.webview.asWebviewUri(vscode.Uri.file(this.context.dataPaths.cachedSessionCoverPhoto(id)))
+  //     .toString();
+  // }
+
+  // getCachedSessionCoverPhotosWebviewUris(): t.WebviewUris {
+  //   const pairs = this.featured?.map(s => [s.id, this.getCachedSessionCoverPhotoWebviewUri(s.id)]);
+  //   return Object.fromEntries(pairs ?? []);
+  // }
+
   async getStore(): Promise<t.Store> {
     let recorder: t.RecorderState | undefined;
     if (this.screen === t.Screen.Recorder) {
@@ -803,7 +835,8 @@ class Codecast {
         editorTrackFocusTimeline: this.session.body?.editorTrack.focusTimeline,
         audioTracks: this.session.body?.audioTracks,
         videoTracks: this.session.body?.videoTracks,
-        webviewUris: this.session.getWebviewUris(),
+        blobsWebviewUris: this.session.getBlobsWebviewUris(),
+        coverPhotoWebviewUri: this.session.getCoverPhotoWebviewUri(),
       };
     }
 
@@ -820,7 +853,8 @@ class Codecast {
         history: this.context.settings.history[this.session.head.id],
         audioTracks: this.session.body?.audioTracks,
         videoTracks: this.session.body?.videoTracks,
-        webviewUris: this.session.getWebviewUris(),
+        blobsWebviewUris: this.session.getBlobsWebviewUris(),
+        coverPhotoWebviewUri: this.session.getCoverPhotoWebviewUri(),
       };
     }
 
@@ -835,10 +869,20 @@ class Codecast {
       };
       const ids = Object.keys(this.context.settings.history);
       const workspace = _.compact(await Promise.all(ids.map(readHead)));
+
+      const workspaceWebviewUriPairs = workspace.map(s => [s.id, Session.getCoverPhotoWebviewUri(this.context, s.id)]);
+      const featuredWebviewUriPairs =
+        this.featured?.map(s => [s.id, serverApi.getSessionCoverPhotoURLString(s.id)]) ?? [];
+
+      const coverPhotosWebviewUris: t.WebviewUris = Object.fromEntries(
+        _.concat(workspaceWebviewUriPairs, featuredWebviewUriPairs),
+      );
+
       welcome = {
         workspace,
         featured: this.featured || [],
         history: this.context.settings.history,
+        coverPhotosWebviewUris,
       };
     }
 

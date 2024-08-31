@@ -1,10 +1,11 @@
+import { getStore } from './store.js';
 import { types as t, lib } from '@codecast/lib';
 import TextToParagraphs from './text_to_paragraphs.jsx';
 import TimeFromNow from './time_from_now.jsx';
 import WithAvatar from './with_avatar.jsx';
 import { cn } from './misc.js';
 import { h, Fragment, Component } from 'preact';
-import SelectableLi, * as SL from './selectable_li.jsx';
+// import Selectable, * as SL from './selectable_li.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
 
@@ -14,6 +15,7 @@ export type CommonProps = {
 };
 export type ForListProps = CommonProps & {
   history?: t.SessionHistory;
+  coverPhotoUri: string;
 };
 export type ListItemProps = ForListProps & {
   // onOpen: (id: string) => unknown;
@@ -43,58 +45,24 @@ export class SessionHead extends Component<NormalProps> {
   }
 }
 
-export class SessionHeadForList extends Component<ForListProps> {
-  render() {
-    const { className, history, sessionHead: s } = this.props;
-    const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
+// export class SessionHeadForList extends Component<ForListProps> {
+//   render() {
+// }
 
-    return (
-      <WithAvatar className={cn('session-head for-list', className)} username={this.props.sessionHead.author?.username}>
-        <div className="title">{s.title || 'Untitled'}</div>
-        {s.description && (
-          <div className="description">
-            <TextToParagraphs text={s.description} />
-          </div>
-        )}
-        {lastOpenedTimestamp && (
-          <div className="footer">
-            <span className="footer-item timestamp">
-              Last opened <TimeFromNow timestamp={lastOpenedTimestamp} />
-            </span>
-          </div>
-        )}
-        {s.publishTimestamp && (
-          <div className="footer">
-            <span className="footer-item timestamp">
-              Published <TimeFromNow timestamp={s.publishTimestamp} />
-            </span>
-          </div>
-        )}
-        <div className="footer">
-          <span className="footer-item author">{s.author?.username || 'anonymous'}</span>
-          {s.publishTimestamp && (
-            <>
-              <div className="footer-item badge">
-                <span className="codicon codicon-eye va-top m-right_small" />
-                <span className="count">{s.views}</span>
-              </div>
-              <div className="footer-item badge">
-                <span className="codicon codicon-heart-filled va-top m-right_small" />
-                <span className="count">{s.likes}</span>
-              </div>
-            </>
-          )}
-        </div>
-      </WithAvatar>
-    );
-  }
-}
-
+export type Action = { icon: string; title: string; onClick: () => unknown };
 export class SessionHeadListItem extends Component<ListItemProps> {
   clicked = () => postMessage({ type: 'player/open', sessionId: this.props.sessionHead.id });
+  actionClicked = (e: Event, a: Action) => {
+    e.preventDefault();
+    e.stopPropagation();
+    a.onClick?.();
+  };
 
   render() {
-    const actions = _.compact<SL.Action>([
+    const { className, history, sessionHead: s, coverPhotoUri } = this.props;
+    const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
+
+    const actions = _.compact<Action>([
       // {
       //   icon: 'codicon-play',
       //   title: 'Play',
@@ -129,14 +97,67 @@ export class SessionHeadListItem extends Component<ListItemProps> {
       },
     ]);
 
+    // return (
+    //   <SessionHeadForList
+    //     sessionHead={this.props.sessionHead}
+    //     history={this.props.history}
+    //     coverPhotoUri={this.props.coverPhotoUri}
+    //   />
+    // );
+    // }
+
     return (
-      <SelectableLi
-        className={cn('session-head-list-item', this.props.className)}
-        actions={actions}
-        onClick={this.clicked}
-      >
-        <SessionHeadForList sessionHead={this.props.sessionHead} history={this.props.history} />
-      </SelectableLi>
+      <div className={cn('session-head-list-item', className)} onClick={this.clicked} tabIndex={0}>
+        {s.hasCoverPhoto && (
+          <div className="cover-photo-container">
+            <img src={coverPhotoUri} />
+          </div>
+        )}
+        <WithAvatar username={s.author?.username} className="title-and-description" small>
+          <div className="title">{s.title || 'Untitled'}</div>
+          {s.description && (
+            <div className="description">
+              <TextToParagraphs text={s.description} />
+            </div>
+          )}
+          {lastOpenedTimestamp && (
+            <div className="footer">
+              <span className="footer-item timestamp">
+                Last opened <TimeFromNow timestamp={lastOpenedTimestamp} />
+              </span>
+            </div>
+          )}
+          {s.publishTimestamp && (
+            <div className="footer">
+              <span className="footer-item timestamp">
+                Published <TimeFromNow timestamp={s.publishTimestamp} />
+              </span>
+            </div>
+          )}
+          <div className="footer">
+            <span className="footer-item author">{s.author?.username || 'anonymous'}</span>
+            {s.publishTimestamp && (
+              <>
+                <div className="footer-item badge">
+                  <span className="codicon codicon-eye va-top m-right_small" />
+                  <span className="count">{s.views}</span>
+                </div>
+                <div className="footer-item badge">
+                  <span className="codicon codicon-heart-filled va-top m-right_small" />
+                  <span className="count">{s.likes}</span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="actions">
+            {actions.map(a => (
+              <vscode-button appearance="icon" title={a.title} onClick={(e: Event) => this.actionClicked(e, a)}>
+                <span className={`codicon ${a.icon}`} />
+              </vscode-button>
+            ))}
+          </div>
+        </WithAvatar>
+      </div>
     );
   }
 }
@@ -145,6 +166,7 @@ export type SessionHeadListProps = {
   sessionHeads: t.SessionHead[];
   history: t.SessionsHistory;
   className?: string;
+  coverPhotosWebviewUris: t.WebviewUris;
 };
 type SHPair = [t.SessionHead, t.SessionHistory];
 
@@ -156,11 +178,15 @@ export class SessionHeadList extends Component<SessionHeadListProps> {
     pairs = _.orderBy(pairs, iteratee, 'desc');
 
     return (
-      <ul className={cn('unstyled session-head-list', this.props.className)}>
+      <div className={cn('session-head-list', this.props.className)}>
         {pairs.map(([sessionHead, history]) => (
-          <SessionHeadListItem history={history} sessionHead={sessionHead} />
+          <SessionHeadListItem
+            history={history}
+            sessionHead={sessionHead}
+            coverPhotoUri={this.props.coverPhotosWebviewUris[sessionHead.id]}
+          />
         ))}
-      </ul>
+      </div>
     );
   }
 }

@@ -33,6 +33,15 @@ export async function writeJSON(p: t.AbsPath, data: any) {
   await fs.promises.writeFile(p, pretty(data), 'utf8');
 }
 
+// export async function readCachedSessionCoverPhotos(p: t.AbsPath): Promise<string[]> {
+//   try {
+//     return await fs.promises.readdir(p);
+//   } catch (error) {
+//     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+//     return [];
+//   }
+// }
+
 // export class AppStorage {
 //   private constructor(
 //     public storage: Storage,

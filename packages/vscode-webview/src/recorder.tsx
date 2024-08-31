@@ -52,7 +52,7 @@ export default class Recorder extends Component<Props> {
   };
 
   updateResources() {
-    const { audioTracks, videoTracks, webviewUris } = this.props.recorder;
+    const { audioTracks, videoTracks, blobsWebviewUris: webviewUris } = this.props.recorder;
     if (webviewUris) {
       this.mediaManager.updateResources(webviewUris, audioTracks, videoTracks);
     }
@@ -86,6 +86,9 @@ export default class Recorder extends Component<Props> {
 type DetailsViewProps = Props & TabViewProps & { onLoadRecorder: () => any };
 
 class DetailsView extends Component<DetailsViewProps> {
+  state = {
+    coverPhotoKey: 0,
+  };
   titleChanged = async (e: InputEvent) => {
     const changes = { title: (e.target as HTMLInputElement).value };
     await postMessage({ type: 'recorder/update', changes });
@@ -104,17 +107,59 @@ class DetailsView extends Component<DetailsViewProps> {
     await postMessage({ type: 'recorder/publish' });
   };
 
+  pickCoverPhoto = async (e: Event) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const { uris } = await postMessage({
+      type: 'showOpenDialog',
+      options: {
+        title: 'Select cover photo',
+        filters: { Image: ['png', 'jpg', 'jpeg'] },
+      },
+    });
+    if (uris?.length === 1) {
+      await postMessage({ type: 'recorder/setCoverPhoto', uri: uris[0] });
+      this.setState({ coverPhotoKey: this.state.coverPhotoKey + 1 });
+    }
+  };
+
+  deleteCoverPhoto = async (e: Event) => {
+    await postMessage({ type: 'recorder/deleteCoverPhoto' });
+  };
+
   render() {
     const { recorder, id, className, onLoadRecorder } = this.props;
-    const { sessionHead: ss } = recorder;
+    const { coverPhotoKey } = this.state;
+    const { sessionHead: s } = recorder;
 
     return (
       <div id={id} className={className}>
+        <div className={cn('cover-photo-container', s.hasCoverPhoto && 'has-cover-photo')}>
+          {s.hasCoverPhoto ? <img key={coverPhotoKey} src={recorder.coverPhotoWebviewUri} /> : <p>NO COVER PHOTO</p>}
+          <div className="buttons">
+            {s.hasCoverPhoto && (
+              <vscode-button
+                className="delete"
+                appearance="secondary"
+                title="Delete cover photo"
+                onClick={this.deleteCoverPhoto}
+              >
+                Delete cover
+              </vscode-button>
+            )}
+            <vscode-button className="pick" onClick={this.pickCoverPhoto}>
+              {s.hasCoverPhoto ? 'Change cover' : 'Pick cover'}
+            </vscode-button>
+          </div>
+        </div>
+        <div className="subsection">
+          <label className="label"></label>
+        </div>
         <vscode-text-area
           className="title subsection"
           rows={2}
           resize="vertical"
-          value={ss.title}
+          value={s.title}
           onInput={this.titleChanged}
           placeholder="The title of this project"
           autoFocus={!recorder.loaded}
@@ -125,7 +170,7 @@ class DetailsView extends Component<DetailsViewProps> {
           className="description subsection"
           rows={10}
           resize="vertical"
-          value={ss.description}
+          value={s.description}
           onInput={this.descriptionChanged}
           placeholder="What is this project about?"
         >
@@ -254,7 +299,7 @@ class EditorView extends Component<EditorViewProps> {
 
   render() {
     const { id, recorder, className, onRecord, onPlay } = this.props;
-    const { sessionHead: ss } = recorder;
+    const { sessionHead: s } = recorder;
     let primaryAction: MT.PrimaryAction;
 
     if (recorder.recording) {
@@ -310,7 +355,7 @@ class EditorView extends Component<EditorViewProps> {
           primaryAction={primaryAction}
           actions={toolbarActions}
           clock={recorder.clock}
-          duration={ss.duration}
+          duration={s.duration}
         />
         <div className="subsection subsection_spaced guide-video-container fixed-height">
           <video id="guide-video" />
@@ -639,14 +684,18 @@ class RangedTracksUI extends Component<RangedTracksUIProps> {
 
     // const columnHalfGap = 0.25;
 
+    const layouts: { track: t.RangedTrack; indent: number }[] = tracks.map(track => ({ track, indent: 0 }));
+    for (const [i, layout] of layouts.entries()) {
+      for (const layout2 of layouts.slice(0, i)) {
+        if (lib.doClockRangesIntersect(layout.track.clockRange, layout2.track.clockRange)) {
+          layout.indent = Math.max(layout.indent, layout2.indent) + 1;
+        }
+      }
+    }
+
     return (
       <div className="ranged-tracks">
-        {tracks.map((track, i) => {
-          let indent = 0;
-          for (const track2 of tracks.slice(0, i)) {
-            if (lib.doClockRangesIntersect(track.clockRange, track2.clockRange)) indent++;
-          }
-
+        {layouts.map(({ indent, track }, i) => {
           const indentPx = indent * TRACK_INDENT_PX;
 
           const style = {

@@ -7,6 +7,56 @@
     #details-view {
       padding: var(--container-padding-ver) var(--container-padding-hor);
 
+      .cover-photo-container {
+        /* margin: var(--spacing-medium); */
+        margin-bottom: 0;
+        border-radius: 5px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        position: relative;
+        background: var(--background-secondary);
+        height: 150px;
+
+        &.has-cover-photo {
+          background: black;
+        }
+
+        & img {
+          /* min-height: 200px; */
+          height: 200px;
+          object-fit: contain;
+        }
+
+        & p {
+          font-size: 1.2rem;
+          color: var(--text-weak);
+        }
+
+        .buttons {
+          position: absolute;
+          right: var(--spacing-medium);
+          bottom: var(--spacing-medium);
+          display: grid;
+          /* grid-template-columns: auto auto; */
+          grid-auto-flow: column;
+          grid-gap: var(--spacing-small);
+        }
+
+        /* & vscode-button.pick { */
+        /*   position: absolute; */
+        /*   right: var(--spacing-medium); */
+        /*   bottom: var(--spacing-medium); */
+        /* } */
+        /* & vscode-button.delete { */
+        /*   position: absolute; */
+        /*   right: var(--spacing-medium); */
+        /*   top: var(--spacing-medium); */
+        /*   color: white; */
+        /* } */
+      }
+
       & vscode-text-area.title {
         &::part(control) {
           /* margin-top: var(--spacing-large); */

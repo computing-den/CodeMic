@@ -12,7 +12,10 @@ import { v4 as uuid } from 'uuid';
 class Recorder {
   tabId: t.RecorderTabId = 'details-view';
 
-  constructor(public session: Session, public mustScan: boolean) {}
+  constructor(
+    public session: Session,
+    public mustScan: boolean,
+  ) {}
 
   get sessionTracksCtrl(): SessionTracksCtrl | undefined {
     return this.session.ctrls?.sessionTracksCtrl;
@@ -177,6 +180,18 @@ class Recorder {
     assert(this.session.body);
     const track = this.session.body.videoTracks.find(t => t.id === video.id);
     if (track) Object.assign(track, video);
+    this.dirty = true;
+  }
+
+  async setCoverPhoto(uri: t.Uri) {
+    await fs.promises.copyFile(path.getFileUriPath(uri), this.session.sessionDataPaths.coverPhoto);
+    this.session.head.hasCoverPhoto = true;
+    this.dirty = true;
+  }
+
+  async deleteCoverPhoto() {
+    await fs.promises.rm(this.session.sessionDataPaths.coverPhoto, { force: true });
+    this.session.head.hasCoverPhoto = false;
     this.dirty = true;
   }
 

@@ -1,6 +1,7 @@
 import { types as t, path, internalEditorTrackCtrl as ietc, lib, assert } from '@codecast/lib';
 import * as serverApi from '../server_api.js';
 import type { SessionDataPaths } from '../paths.js';
+import config from '../config.js';
 import * as misc from '../misc.js';
 import type { Context, ReadDirOptions, SessionCtrls } from '../types.js';
 import * as storage from '../storage.js';
@@ -25,6 +26,7 @@ export class Session implements t.Session {
   workspace: t.AbsPath;
   head: t.SessionHead;
   loaded = false;
+  inStorage: boolean;
   body?: t.SessionBody;
   ctrls?: SessionCtrls;
 
@@ -32,10 +34,11 @@ export class Session implements t.Session {
   // editorRecorder?: CombinedEditorTrackRecorder;
   // audioCtrls?: AudioCtrl[];
 
-  constructor(context: Context, workspace: t.AbsPath, head: t.SessionHead) {
+  constructor(context: Context, workspace: t.AbsPath, head: t.SessionHead, inStorage: boolean) {
     this.context = context;
     this.workspace = workspace;
     this.head = head;
+    this.inStorage = inStorage;
   }
 
   get sessionDataPaths(): SessionDataPaths {
@@ -61,7 +64,7 @@ export class Session implements t.Session {
   static async fromExisting(context: Context, id: string): Promise<Session | undefined> {
     const workspace = Session.getWorkspace(context, id);
     const head = await Session.headFromExisting(context, id);
-    return head && new Session(context, workspace, head);
+    return head && new Session(context, workspace, head, true);
   }
 
   static async headFromExisting(context: Context, id: string): Promise<SessionHead | undefined> {
@@ -70,11 +73,15 @@ export class Session implements t.Session {
   }
 
   static async fromNew(context: Context, workspace: t.AbsPath, head: t.SessionHead): Promise<Session> {
-    return new Session(context, workspace, head);
+    return new Session(context, workspace, head, false);
   }
 
   static getWorkspace(context: Context, id: string): t.AbsPath {
     return context.settings.history[id]?.workspace ?? context.defaultWorkspacePaths.session(id).root;
+  }
+
+  static getCoverPhotoWebviewUri(context: Context, id: string): t.Uri {
+    return context.view!.webview.asWebviewUri(vscode.Uri.file(context.dataPaths.session(id).coverPhoto)).toString();
   }
 
   static makeNewHead(author?: t.UserSummary): t.SessionHead {
@@ -88,6 +95,7 @@ export class Session implements t.Session {
       likes: 0,
       modificationTimestamp: new Date().toISOString(), // will be overwritten at the end
       toc: [],
+      hasCoverPhoto: false,
     };
   }
 
@@ -202,6 +210,7 @@ export class Session implements t.Session {
       modificationTimestamp: this.head.modificationTimestamp,
       toc: this.head.toc,
       forkedFrom: this.head.id,
+      hasCoverPhoto: this.head.hasCoverPhoto,
     };
 
     // Copy the entire session data, then rewrite the head.
@@ -461,11 +470,13 @@ export class Session implements t.Session {
 
   async writeHead() {
     await storage.writeJSON(this.sessionDataPaths.head, this.head);
+    this.inStorage = true;
   }
 
   async writeBody() {
     assert(this.body, 'writeBody: body is not yet loaded.');
     await storage.writeJSON(this.sessionDataPaths.body, this.body);
+    this.inStorage = true;
   }
 
   async writeHistory(update?: (history: t.SessionHistory) => t.SessionHistory) {
@@ -553,6 +564,9 @@ export class Session implements t.Session {
       });
 
       archive.pipe(output);
+      if (this.head.hasCoverPhoto) {
+        archive.file(this.sessionDataPaths.coverPhoto, { name: path.basename(this.sessionDataPaths.coverPhoto) });
+      }
       archive.file(this.sessionDataPaths.body, { name: path.basename(this.sessionDataPaths.body) });
       archive.directory(this.sessionDataPaths.blobs, path.basename(this.sessionDataPaths.blobs));
       archive.finalize();
@@ -807,10 +821,21 @@ export class Session implements t.Session {
     return this.context.view!.webview.asWebviewUri(vscUri).toString();
   }
 
-  getWebviewUris(): t.WebviewUris | undefined {
+  getCoverPhotoWebviewUri(): string {
+    if (this.inStorage) {
+      return Session.getCoverPhotoWebviewUri(this.context, this.head.id);
+    } else {
+      return serverApi.getSessionCoverPhotoURLString(this.head.id);
+    }
+  }
+
+  getBlobsWebviewUris(): t.WebviewUris | undefined {
     if (this.body) {
       return Object.fromEntries(
-        _.concat(this.body.audioTracks, this.body.videoTracks).map(t => [t.id, this.getTrackFileWebviewUri(t)]),
+        _.concat(
+          this.body.audioTracks.map(t => [t.id, this.getTrackFileWebviewUri(t)]),
+          this.body.videoTracks.map(t => [t.id, this.getTrackFileWebviewUri(t)]),
+        ),
       );
     }
   }

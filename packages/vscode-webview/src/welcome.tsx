@@ -48,8 +48,18 @@ export default class Welcome extends Component<Props> {
             )}
           </Section.Body>
         </Section>
-        <SessionsSection title="WORKSPACE" history={welcome.history} sessionHeads={welcome.workspace} />
-        <SessionsSection title="FEATURED" history={welcome.history} sessionHeads={welcome.featured} />
+        <SessionsSection
+          title="WORKSPACE"
+          history={welcome.history}
+          sessionHeads={welcome.workspace}
+          coverPhotosWebviewUris={welcome.coverPhotosWebviewUris}
+        />
+        <SessionsSection
+          title="FEATURED"
+          history={welcome.history}
+          sessionHeads={welcome.featured}
+          coverPhotosWebviewUris={welcome.coverPhotosWebviewUris}
+        />
       </Screen>
     );
   }
@@ -60,6 +70,7 @@ type SessionsSectionProps = {
   sessionHeads: t.SessionHead[];
   history: t.SessionsHistory;
   bordered?: boolean;
+  coverPhotosWebviewUris: t.WebviewUris;
 };
 
 type SessionAndHistory = { sessionHead: t.SessionHead; history?: t.SessionHistory };
@@ -78,7 +89,11 @@ class SessionsSection extends Component<SessionsSectionProps> {
       <Section className="sessions-section" bordered={this.props.bordered}>
         <Section.Header title={this.props.title} collapsible />
         <Section.Body>
-          <SessionHeadList sessionHeads={this.props.sessionHeads} history={this.props.history} />
+          <SessionHeadList
+            sessionHeads={this.props.sessionHeads}
+            history={this.props.history}
+            coverPhotosWebviewUris={this.props.coverPhotosWebviewUris}
+          />
         </Section.Body>
       </Section>
     );

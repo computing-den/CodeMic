@@ -35,6 +35,9 @@ body.vscode-light {
   --ranged-track-border: #007acc;
   --ranged-track-border-active: #007acc;
 
+  --text-weak: #666;
+  --background-secondary: #e7e7e7;
+
   --editor-track-color: #666;
 
   /* --editor-track-text-change-background: #a1f0dc; */
@@ -53,6 +56,9 @@ body.vscode-dark {
   --ranged-track-background-hover: #135e71;
   --ranged-track-border: #007acc;
   --ranged-track-border-active: #007acc;
+
+  --text-weak: #aaa;
+  --background-secondary: #181818;
 
   --editor-track-color: #aaa;
 

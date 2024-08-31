@@ -1,5 +1,11 @@
 .with-avatar {
   display: flex;
+
+  &.small > .avatar img {
+    width: 30px;
+    height: 30px;
+  }
+
   > .avatar {
     display: flex;
     align-items: flex-start;
@@ -19,8 +25,8 @@
         display: none;
       }
       @media (max-width: 250px) {
-        width: 24px;
-        height: 24px;
+        width: 30px;
+        height: 30px;
         margin-right: var(--spacing-medium);
       }
     }

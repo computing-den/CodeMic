@@ -79,7 +79,7 @@ export default class Player extends Component<Props> {
   // }
 
   updateResources() {
-    const { audioTracks, videoTracks, webviewUris } = this.props.player;
+    const { audioTracks, videoTracks, blobsWebviewUris: webviewUris } = this.props.player;
     if (webviewUris) {
       this.mediaManager.updateResources(webviewUris, audioTracks, videoTracks);
     }
@@ -119,8 +119,8 @@ export default class Player extends Component<Props> {
         title: player.playing
           ? `Fork: create a new project starting at this point`
           : player.clock > 0
-          ? `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`
-          : `Fork: create a new project based on this one`,
+            ? `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`
+            : `Fork: create a new project based on this one`,
         icon: 'codicon-repo-forked',
         onClick: this.fork,
       },

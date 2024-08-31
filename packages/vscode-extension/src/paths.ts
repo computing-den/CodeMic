@@ -16,6 +16,8 @@ export type DataPaths = {
   root: t.AbsPath;
   settings: t.AbsPath;
   sessions: t.AbsPath;
+  // cachedSessionCoverPhotos: t.AbsPath;
+  // cachedSessionCoverPhoto: (id: string) => t.AbsPath;
   session: (id: string) => SessionDataPaths;
 };
 
@@ -26,6 +28,7 @@ export type SessionDataPaths = {
   zip: t.AbsPath;
   blobs: t.AbsPath;
   blob: (sha1: string) => t.AbsPath;
+  coverPhoto: t.AbsPath;
 };
 
 export type DefaultWorkspacePaths = {
@@ -89,6 +92,8 @@ export const dataPaths = _.memoize((username?: string): DataPaths => {
     root,
     settings: path.abs(root, 'settings.json'),
     sessions: path.abs(root, 'sessions'),
+    // cachedSessionCoverPhotos: path.abs(root, 'cached_cover_photos'),
+    // cachedSessionCoverPhoto: id => path.abs(root, 'cached_cover_photos', id),
     session: _.memoize(id => {
       const sessionRoot = path.abs(root, 'sessions', id);
       return {
@@ -98,6 +103,7 @@ export const dataPaths = _.memoize((username?: string): DataPaths => {
         zip: path.abs(sessionRoot, 'body.zip'),
         blobs: path.abs(sessionRoot, 'blobs'),
         blob: _.memoize(sha1 => path.abs(sessionRoot, 'blobs', sha1)),
+        coverPhoto: path.abs(sessionRoot, 'cover_photo'),
       };
     }),
   };

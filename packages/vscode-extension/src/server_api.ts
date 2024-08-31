@@ -75,7 +75,11 @@ function handleAxiosError(req: any, error: Error): never {
   }
 }
 
-function getURLString(pathname: string, paramsObj: Record<string, string | undefined>) {
+export function getSessionCoverPhotoURLString(id: string): string {
+  return getURLString('/session-cover-photo', { id });
+}
+
+function getURLString(pathname: string, paramsObj: Record<string, string | undefined>): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(paramsObj)) {
     if (value !== undefined) params.append(key, value);

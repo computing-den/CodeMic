@@ -10,6 +10,7 @@ import crypto from 'crypto';
 import multer from 'multer';
 import stream from 'stream';
 import { v4 as uuid } from 'uuid';
+import unzipper from 'unzipper';
 
 const upload = multer({
   dest: path.resolve(os.tmpdir(), 'codecast'),
@@ -74,7 +75,8 @@ function initDB() {
       likes INTEGER,
       publish_timestamp TEXT,
       modification_timestamp TEXT,
-      forked_from TEXT
+      forked_from TEXT,
+      has_cover_photo INTEGER
     )`,
   ).run();
 
@@ -131,9 +133,18 @@ function initRoutes() {
     }
   });
 
-  app.get('/session', fillLocals, upload.single('file'), async (req, res, next) => {
+  app.get('/session', fillLocals, async (req, res, next) => {
     try {
       await handleDownloadSession(req, res);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/session-cover-photo', fillLocals, async (req, res, next) => {
+    try {
+      await lib.timeout(3000);
+      await handleDownloadSessionCoverPhoto(req, res);
     } catch (error) {
       next(error);
     }
@@ -296,6 +307,18 @@ async function handlePublishSession(body: any, file: Express.Multer.File, locals
   await fs.promises.mkdir(path.dirname(sessionPath), { recursive: true });
   await fs.promises.copyFile(file.path, sessionPath);
 
+  // Store cover photo
+  if (sessionHead.hasCoverPhoto) {
+    const coverPhotoPath = path.resolve(config.data, 'sessions_cover_photos', sessionHead.id);
+    await fs.promises.mkdir(path.dirname(coverPhotoPath), { recursive: true });
+    const directory = await unzipper.Open.file(sessionPath);
+    const file = directory.files.find(d => d.path === 'cover_photo');
+    if (!file) throw new ServerError('Cover photo not found', 400);
+    await new Promise<void>((resolve, reject) => {
+      file.stream().pipe(fs.createWriteStream(coverPhotoPath)).on('error', reject).on('finish', resolve);
+    });
+  }
+
   const now = new Date().toISOString();
 
   dbSessionHead = {
@@ -309,6 +332,7 @@ async function handlePublishSession(body: any, file: Express.Multer.File, locals
     forked_from: sessionHead.forkedFrom,
     publish_timestamp: dbSessionHead?.publish_timestamp ?? now,
     modification_timestamp: dbSessionHead?.modification_timestamp ?? now,
+    has_cover_photo: sessionHead.hasCoverPhoto ? 1 : 0,
   };
 
   db.prepare(
@@ -324,7 +348,8 @@ async function handlePublishSession(body: any, file: Express.Multer.File, locals
         likes,
         forked_from,
         publish_timestamp,
-        modification_timestamp
+        modification_timestamp,
+        has_cover_photo
       )
       VALUES
       (
@@ -337,7 +362,8 @@ async function handlePublishSession(body: any, file: Express.Multer.File, locals
         :likes,
         :forked_from,
         :publish_timestamp,
-        :modification_timestamp
+        :modification_timestamp,
+        :has_cover_photo
       )`,
   ).run(dbSessionHead);
 
@@ -348,13 +374,24 @@ async function handleDownloadSession(req: express.Request, res: express.Response
   // const { dbUser } = res.locals;
   const { id } = req.query;
   if (!id) throw new ServerError('Missing session id', 400);
+  assertIsId(id);
   const author = db.prepare(`SELECT author FROM session_heads WHERE id = ?`).pluck().get(id) as string;
   if (!author) throw new ServerError('Session not found', 404);
 
-  // sessionPath must be absolute because it'll be used for res.sendFile.
-  const sessionPath = path.resolve(config.data, 'sessions', author, `${id}.zip`);
+  await serveFile(res, path.resolve(config.data, 'sessions', author, `${id}.zip`));
+}
+
+async function handleDownloadSessionCoverPhoto(req: express.Request, res: express.Response) {
+  const { id } = req.query;
+  if (!id) throw new ServerError('Missing session id', 400);
+  assertIsId(id);
+
+  await serveFile(res, path.resolve(config.data, 'sessions_cover_photos', id));
+}
+
+async function serveFile(res: express.Response, p: string) {
   await new Promise((resolve, reject) => {
-    res.sendFile(sessionPath, error => {
+    res.sendFile(p, error => {
       if (error) reject(error);
       else resolve(null);
     });
@@ -385,6 +422,7 @@ function dbSessionHeadsToSessionHeads(dbSessionHeads: t.DBSessionHead[]): t.Sess
       modificationTimestamp: s.modification_timestamp,
       forkedFrom: s.forked_from,
       toc: [],
+      hasCoverPhoto: s.has_cover_photo === 1,
     };
   });
 }
@@ -436,6 +474,10 @@ function createToken(): string {
     .join('');
 }
 
+function assertIsId(id: any): asserts id is string {
+  assert(typeof id === 'string' && !/[^a-z0-9-]/.test(id), `invalid id: ${id}`);
+}
+
 export default function requestLogger(req: express.Request, res: express.Response, next: express.NextFunction) {
   const startTime = Date.now();
 
@@ -461,7 +503,10 @@ export default function requestLogger(req: express.Request, res: express.Respons
 }
 
 class ServerError extends Error {
-  constructor(message: string, public code: number) {
+  constructor(
+    message: string,
+    public code: number,
+  ) {
     super(message);
   }
 }

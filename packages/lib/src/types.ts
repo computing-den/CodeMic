@@ -54,6 +54,8 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/insertVideo'; uri: Uri; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/deleteVideo'; id: string }; response: StoreResponse }
   | { request: { type: 'recorder/updateVideo'; video: Partial<VideoTrack> & { id: string } }; response: StoreResponse }
+  | { request: { type: 'recorder/setCoverPhoto'; uri: Uri }; response: StoreResponse }
+  | { request: { type: 'recorder/deleteCoverPhoto' }; response: StoreResponse }
   // | { request: { type: 'toggleRecorderStudio' }; response: StoreResponse }
   | { request: { type: 'deleteSession'; sessionId: string }; response: StoreResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
@@ -249,6 +251,7 @@ export type WelcomeState = {
   workspace: SessionHead[];
   featured: SessionHead[];
   history: SessionsHistory;
+  coverPhotosWebviewUris: WebviewUris;
 };
 
 export type RecorderState = {
@@ -266,7 +269,8 @@ export type RecorderState = {
   editorTrackFocusTimeline?: EditorTrackFocusTimeline;
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
-  webviewUris?: WebviewUris;
+  blobsWebviewUris?: WebviewUris;
+  coverPhotoWebviewUri: string;
 };
 
 export type RecorderTabId = 'editor-view' | 'details-view';
@@ -287,7 +291,8 @@ export type PlayerState = {
   history?: SessionHistory;
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
-  webviewUris?: WebviewUris;
+  blobsWebviewUris?: WebviewUris;
+  coverPhotoWebviewUri: string;
 };
 
 // export type PlayerUpdate = {
@@ -320,6 +325,7 @@ export type SessionHead = {
   modificationTimestamp: string;
   toc: TocItem[];
   forkedFrom?: string;
+  hasCoverPhoto: boolean;
 };
 
 export type SessionHeadMap = { [key: string]: SessionHead | undefined };
@@ -335,6 +341,7 @@ export type DBSessionHead = {
   publish_timestamp: string;
   modification_timestamp: string;
   forked_from?: string;
+  has_cover_photo: number;
 };
 
 export type SessionBody = {
@@ -399,7 +406,7 @@ export type AudioTrack = RangedTrackFile;
  */
 export type VideoTrack = RangedTrackFile;
 
-export type WebviewUris = { [key: string]: Uri };
+export type WebviewUris = { [key: string]: string };
 
 export type InternalEditorTrackSnapshot = {
   worktree: Worktree;
