@@ -14,7 +14,7 @@
     }
 
     + .session-head-list-item {
-      margin-top: var(--spacing-large);
+      margin-top: var(--spacing-medium);
     }
 
     .cover-photo-container {
@@ -34,8 +34,7 @@
 
     .title-and-description {
       position: relative;
-      /* padding-top: var(--spacing-medium); */
-      padding: var(--spacing-medium) var(--spacing-medium);
+      padding: var(--spacing-large);
 
       .actions {
         background: var(--vscode-list-hoverBackground);

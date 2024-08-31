@@ -17,7 +17,7 @@
       flex-shrink: 0;
       object-fit: cover;
       object-position: center top;
-      margin-right: var(--spacing-large);
+      margin-right: var(--spacing-medium);
       border-radius: 50%;
       border: 1px solid var(--vscode-input-border, var(--dropdown-border));
 
