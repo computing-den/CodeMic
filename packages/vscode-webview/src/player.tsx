@@ -11,6 +11,7 @@ import Screen from './screen.jsx';
 import Section from './section.jsx';
 import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
+import { cn } from './misc.js';
 import _ from 'lodash';
 
 type Props = { user?: t.User; player: t.PlayerState };
@@ -100,7 +101,7 @@ export default class Player extends Component<Props> {
 
   render() {
     const { player, user } = this.props;
-    const { sessionHead: ss } = player;
+    const { sessionHead: s } = player;
 
     let primaryAction: MT.PrimaryAction;
     if (player.playing) {
@@ -182,7 +183,7 @@ export default class Player extends Component<Props> {
 
     return (
       <Screen className="player">
-        {player.loaded && <ProgressBar duration={ss.duration} onSeek={this.seek} clock={player.clock} />}
+        {player.loaded && <ProgressBar duration={s.duration} onSeek={this.seek} clock={player.clock} />}
         <Section className="main-section">
           {/*
           <Section.Header
@@ -192,18 +193,23 @@ export default class Player extends Component<Props> {
           />
             */}
           <Section.Body>
-            <SessionHead className="subsection subsection_spaced" sessionHead={ss} withAuthor />
+            <SessionHead className="subsection subsection_spaced" sessionHead={s} withAuthor />
             <MediaToolbar
               className="subsection subsection_spaced"
               primaryAction={primaryAction}
               actions={toolbarActions}
               clock={player.clock}
-              duration={ss.duration}
+              duration={s.duration}
             />
+            {s.hasCoverPhoto && (
+              <div className="cover-photo-container subsection">
+                <img src={player.coverPhotoWebviewUri} />
+              </div>
+            )}
             <div className="subsection hide-inactive guide-video-container">
               <video id="guide-video" />
             </div>
-            <SessionDescription className="subsection subsection_spaced" sessionHead={ss} />
+            <SessionDescription className="subsection subsection_spaced" sessionHead={s} />
             {/*!player.loaded && (
               <PathField
                 className="subsection"
@@ -225,9 +231,9 @@ export default class Player extends Component<Props> {
               <vscode-option>Files</vscode-option>
               <vscode-option>Entities</vscode-option>
             </vscode-dropdown>
-            {ss.toc.length > 0 && (
+            {s.toc.length > 0 && (
               <div className="subsection toc">
-                {ss.toc.map(item => (
+                {s.toc.map(item => (
                   <div tabIndex={0} className="item" onClick={e => this.tocItemClicked(e, item)}>
                     <div className="title">{item.title}</div>
                     <div className="clock">{lib.formatTimeSeconds(item.clock)}</div>

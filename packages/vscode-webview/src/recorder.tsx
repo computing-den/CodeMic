@@ -87,7 +87,7 @@ type DetailsViewProps = Props & TabViewProps & { onLoadRecorder: () => any };
 
 class DetailsView extends Component<DetailsViewProps> {
   state = {
-    coverPhotoKey: 0,
+    // coverPhotoKey: 0,
   };
   titleChanged = async (e: InputEvent) => {
     const changes = { title: (e.target as HTMLInputElement).value };
@@ -119,7 +119,7 @@ class DetailsView extends Component<DetailsViewProps> {
     });
     if (uris?.length === 1) {
       await postMessage({ type: 'recorder/setCoverPhoto', uri: uris[0] });
-      this.setState({ coverPhotoKey: this.state.coverPhotoKey + 1 });
+      // this.setState({ coverPhotoKey: this.state.coverPhotoKey + 1 });
     }
   };
 
@@ -129,13 +129,13 @@ class DetailsView extends Component<DetailsViewProps> {
 
   render() {
     const { recorder, id, className, onLoadRecorder } = this.props;
-    const { coverPhotoKey } = this.state;
+    // const { coverPhotoKey } = this.state;
     const { sessionHead: s } = recorder;
 
     return (
       <div id={id} className={className}>
         <div className={cn('cover-photo-container', s.hasCoverPhoto && 'has-cover-photo')}>
-          {s.hasCoverPhoto ? <img key={coverPhotoKey} src={recorder.coverPhotoWebviewUri} /> : <p>NO COVER PHOTO</p>}
+          {s.hasCoverPhoto ? <img src={recorder.coverPhotoWebviewUri} /> : <p>NO COVER PHOTO</p>}
           <div className="buttons">
             {s.hasCoverPhoto && (
               <vscode-button

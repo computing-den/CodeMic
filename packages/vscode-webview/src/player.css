@@ -2,7 +2,32 @@
   .main-section .section-body {
     padding: var(--container-padding-ver-small) var(--container-padding-hor) 0 var(--container-padding-hor);
 
+    &:has(video:not([src])),
+    &:has(video[src='']) {
+      .cover-photo-container {
+        display: flex;
+      }
+    }
+
     .media-toolbar {
+    }
+
+    .cover-photo-container {
+      border-radius: 5px;
+      /* display: flex; */
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+      /* background: var(--background-secondary); */
+      background: black;
+      display: none;
+
+      & img {
+        width: 100%;
+        /* height: 200px; */
+        /* object-fit: contain; */
+      }
     }
 
     .session-description {
