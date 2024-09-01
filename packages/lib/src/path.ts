@@ -63,7 +63,7 @@ export function getUntitledUriNameOpt(uri: t.Uri): string | undefined {
 
 export function getUriShortNameOpt(uri: t.Uri): string | undefined {
   const p = getUriPathOpt(uri);
-  return p ? basename(p) : getUntitledUriName(uri);
+  return p ? basename(p) : getUntitledUriNameOpt(uri);
 }
 
 export function parseUri(uri: t.Uri): t.ParsedUri {

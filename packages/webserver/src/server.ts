@@ -76,7 +76,8 @@ function initDB() {
       publish_timestamp TEXT,
       modification_timestamp TEXT,
       forked_from TEXT,
-      has_cover_photo INTEGER
+      has_cover_photo INTEGER,
+      toc TEXT
     )`,
   ).run();
 
@@ -333,6 +334,7 @@ async function handlePublishSession(body: any, file: Express.Multer.File, locals
     publish_timestamp: dbSessionHead?.publish_timestamp ?? now,
     modification_timestamp: dbSessionHead?.modification_timestamp ?? now,
     has_cover_photo: sessionHead.hasCoverPhoto ? 1 : 0,
+    toc: JSON.stringify(sessionHead.toc),
   };
 
   db.prepare(
@@ -349,7 +351,8 @@ async function handlePublishSession(body: any, file: Express.Multer.File, locals
         forked_from,
         publish_timestamp,
         modification_timestamp,
-        has_cover_photo
+        has_cover_photo,
+        toc
       )
       VALUES
       (
@@ -363,7 +366,8 @@ async function handlePublishSession(body: any, file: Express.Multer.File, locals
         :forked_from,
         :publish_timestamp,
         :modification_timestamp,
-        :has_cover_photo
+        :has_cover_photo,
+        :toc
       )`,
   ).run(dbSessionHead);
 
@@ -421,7 +425,7 @@ function dbSessionHeadsToSessionHeads(dbSessionHeads: t.DBSessionHead[]): t.Sess
       publishTimestamp: s.publish_timestamp,
       modificationTimestamp: s.modification_timestamp,
       forkedFrom: s.forked_from,
-      toc: [],
+      toc: JSON.parse(s.toc),
       hasCoverPhoto: s.has_cover_photo === 1,
     };
   });

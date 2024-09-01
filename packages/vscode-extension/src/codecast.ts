@@ -881,6 +881,7 @@ class Codecast {
         clock: this.session.clock ?? 0,
         workspace: this.session.workspace,
         history: this.context.settings.history[this.session.head.id],
+        editorTrackFocusTimeline: this.session.body?.editorTrack.focusTimeline,
         audioTracks: this.session.body?.audioTracks,
         videoTracks: this.session.body?.videoTracks,
         blobsWebviewUris: this.session.getBlobsWebviewUris(),

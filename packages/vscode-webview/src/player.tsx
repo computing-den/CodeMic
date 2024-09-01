@@ -148,7 +148,14 @@ export default class Player extends Component<Props> {
 
     return (
       <Screen className="player">
-        {player.loaded && <ProgressBar duration={s.duration} onSeek={this.seek} clock={player.clock} />}
+        {player.loaded && (
+          <ProgressBar
+            duration={s.duration}
+            onSeek={this.seek}
+            clock={player.clock}
+            editorTrackFocusTimeline={player.editorTrackFocusTimeline}
+          />
+        )}
         <Section className="main-section">
           {/*
           <Section.Header

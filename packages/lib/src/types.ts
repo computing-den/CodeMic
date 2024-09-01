@@ -290,6 +290,7 @@ export type PlayerState = {
   clock: number;
   workspace?: string;
   history?: SessionHistory;
+  editorTrackFocusTimeline?: EditorTrackFocusTimeline;
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
   blobsWebviewUris?: WebviewUris;
@@ -342,6 +343,7 @@ export type DBSessionHead = {
   likes: number;
   publish_timestamp: string;
   modification_timestamp: string;
+  toc: string;
   forked_from?: string;
   has_cover_photo: number;
 };

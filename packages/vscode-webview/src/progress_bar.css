@@ -9,7 +9,8 @@
   &:hover .bar {
     width: calc(var(--progress-bar-full-width) - 4px);
 
-    .shadow {
+    .shadow,
+    .popover {
       opacity: 1;
     }
   }
@@ -32,6 +33,39 @@
       background: #cc000030;
       opacity: 0;
       transition: opacity 0.2s ease-in-out;
+    }
+    .popover {
+      position: absolute;
+      /* top: 0; */
+      right: 10px;
+      background: var(--popover-background);
+      color: var(--popover-foreground);
+      /* box-shadow: 0 0 10px 10px var(--popover-shadow-color); */
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
+      padding: var(--spacing-medium);
+      border-radius: 5px;
+      border: 1px solid var(--popover-border-color);
+
+      /* display: grid; */
+      /* grid-gap: var(--spacing-small); */
+
+      width: 200px;
+
+      * {
+        white-space: nowrap;
+      }
+
+      .row {
+        display: flex;
+        font-weight: bold;
+        justify-content: space-between;
+      }
+      .line-focus {
+        margin-top: var(--spacing-small);
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
     }
     .filled {
       position: absolute;
