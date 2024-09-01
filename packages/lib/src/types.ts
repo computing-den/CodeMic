@@ -191,6 +191,7 @@ export enum Screen {
   Welcome,
   Recorder,
   Player,
+  Loading,
 }
 
 export type Store = {

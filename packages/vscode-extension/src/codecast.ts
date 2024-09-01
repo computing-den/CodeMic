@@ -57,8 +57,8 @@ class Codecast {
     await this.restoreStateAfterRestart();
     await this.updateFrontend();
 
-    await this.fetchFeatured();
-    await this.updateFrontend();
+    await this.updateFeaturedAndUpdateFrontend();
+    // await this.updateFrontend();
 
     // this.cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(
     //   this.context.dataPaths.cachedSessionCoverPhotos,
@@ -145,12 +145,15 @@ class Codecast {
   }
 
   async restoreStateAfterRestart() {
-    const workspaceChange = this.getWorkspaceChangeGlobalState();
-    await this.setWorkspaceChangeGlobalState();
+    try {
+      const workspaceChange = this.getWorkspaceChangeGlobalState();
+      if (!workspaceChange) return;
+      console.log('restoreStateAfterRestart(): ', workspaceChange);
 
-    console.log('restoreStateAfterRestart(): ', workspaceChange);
-    if (workspaceChange) {
       const { screen, sessionId, recorder: recorderRestoreState } = workspaceChange;
+      this.setScreen(t.Screen.Loading);
+
+      await this.setWorkspaceChangeGlobalState();
 
       if (sessionId) {
         const session = await Session.fromExisting(this.context, sessionId);
@@ -168,6 +171,10 @@ class Codecast {
         }
       }
       this.setScreen(screen);
+    } catch (error) {
+      console.error(error);
+      vscode.window.showErrorMessage(`Error: `, (error as Error).message);
+      this.setScreen(t.Screen.Welcome);
     }
   }
 
@@ -206,7 +213,13 @@ class Codecast {
           console.error(error);
           this.account.error = (error as Error).message;
         }
-        if (user) await this.changeUser(user);
+
+        // Don't put the following in the try-catch above because
+        // we want the errors to be handled and shown separately.
+        if (user) {
+          await this.changeUser(user);
+        }
+
         return this.respondWithStore();
       }
       case 'account/login': {
@@ -220,7 +233,13 @@ class Codecast {
           console.error(error);
           if (this.account) this.account.error = (error as Error).message;
         }
-        if (user) await this.changeUser(user);
+
+        // Don't put the following in the try-catch above because
+        // we want the errors to be handled and shown separately.
+        if (user) {
+          await this.changeUser(user);
+        }
+
         return this.respondWithStore();
       }
       case 'account/logout': {
@@ -738,13 +757,19 @@ class Codecast {
     return true;
   }
 
-  async fetchFeatured() {
+  async updateFeatured() {
     try {
       const res = await serverApi.send({ type: 'featured/get' }, this.context.user?.token);
       this.featured = res.sessionHeads;
     } catch (error) {
+      console.error(error);
       vscode.window.showErrorMessage('Failed to fetch featured items:', (error as Error).message);
     }
+  }
+
+  async updateFeaturedAndUpdateFrontend() {
+    await this.updateFeatured();
+    await this.updateFrontend();
   }
 
   // async showOpenSessionDialog(): Promise<t.Uri | undefined> {
@@ -771,7 +796,7 @@ class Codecast {
     // TODO ask user to convert anonymous sessions to the new user.
 
     const dataPaths = paths.dataPaths(user?.username);
-    const settings = await storage.readJSON<t.Settings>(this.context.dataPaths.settings, Codecast.makeDefaultSettings);
+    const settings = await storage.readJSON<t.Settings>(dataPaths.settings, Codecast.makeDefaultSettings);
     // const cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(dataPaths.cachedSessionCoverPhotos);
 
     this.session = undefined;
@@ -780,6 +805,11 @@ class Codecast {
     this.context.dataPaths = dataPaths;
     this.context.settings = settings;
     this.context.extension.globalState.update('user', user);
+
+    // Don't await.
+    this.updateFeaturedAndUpdateFrontend().catch(console.error);
+
+    await this.openWelcome();
   }
 
   async respondWithStore(): Promise<t.BackendResponse> {
@@ -908,13 +938,14 @@ const SCREEN_TITLES = {
   [t.Screen.Welcome]: 'projects',
   [t.Screen.Player]: 'player',
   [t.Screen.Recorder]: 'studio',
+  [t.Screen.Loading]: 'loading',
 };
 
 const COMMENTS: Record<string, t.Comment[]> = {
   '1d87d99d-e0d4-4631-8a0b-b531e47d2a8a': [
     {
       id: 'c1',
-      author: 'retroGamer87',
+      author: 'jason_walker',
       text: 'This brings back so many memories! Love seeing how the old code works.',
       likes: 15,
       dislikes: 0,
@@ -922,7 +953,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c2',
-      author: 'codeMaster23',
+      author: 'marcusstone',
       text: 'Wow, the AI logic was ahead of its time. Great breakdown!',
       likes: 22,
       dislikes: 1,
@@ -930,7 +961,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c3',
-      author: 'nostalgiaDev',
+      author: 'alexturner',
       text: "Never thought I'd be tweaking DOOM's code in 2024. Thanks for this!",
       likes: 18,
       dislikes: 0,
@@ -938,7 +969,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c4',
-      author: 'architecTech',
+      author: 'ashley_taylor',
       text: 'The way you explain the architecture makes it so easy to follow. Awesome content!',
       likes: 25,
       dislikes: 0,
@@ -946,7 +977,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c5',
-      author: 'AIenthusiast',
+      author: 'emily_james',
       text: "I've always wondered how the AI worked in DOOM. Super insightful!",
       likes: 30,
       dislikes: 2,
@@ -954,7 +985,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c6',
-      author: 'codeJunkie',
+      author: 'matthughes',
       text: "Your enthusiasm for the game is infectious. Can't wait to try these tweaks myself!",
       likes: 12,
       dislikes: 0,
@@ -962,7 +993,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c7',
-      author: 'oldSchoolCoder',
+      author: 'ethanross',
       text: 'I didn’t realize how complex the enemy logic was. This is gold!',
       likes: 20,
       dislikes: 1,
@@ -970,7 +1001,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c8',
-      author: 'gameDevLearner',
+      author: 'samuelgreen',
       text: 'Perfect mix of nostalgia and learning. Keep these deep dives coming!',
       likes: 28,
       dislikes: 0,
@@ -978,7 +1009,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c9',
-      author: 'fragmaster',
+      author: 'andrew_clark',
       text: 'Watching this made me want to fire up DOOM again. Great video!',
       likes: 16,
       dislikes: 0,
@@ -986,7 +1017,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c10',
-      author: 'codingSavant',
+      author: 'chrismiller',
       text: 'Can’t believe how well you explained such a complex system. Subscribed for more!',
       likes: 35,
       dislikes: 0,
@@ -997,7 +1028,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
   '6f9e08ff-be59-41ee-a082-803f22f67711': [
     {
       id: 'c11',
-      author: 'openSourceFan',
+      author: 'chrismiller',
       text: 'I had no idea Minetest had such a solid rendering engine. Awesome breakdown!',
       likes: 19,
       dislikes: 0,
@@ -1005,7 +1036,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c12',
-      author: 'renderGuru',
+      author: 'andrew_clark',
       text: 'This is exactly what I was looking for! Great explanation of the OpenGL renderer.',
       likes: 24,
       dislikes: 1,
@@ -1013,7 +1044,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c13',
-      author: 'voxArtist',
+      author: 'emily_james',
       text: 'The design choices here are fascinating. Minetest is truly underrated!',
       likes: 22,
       dislikes: 0,
@@ -1021,7 +1052,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c14',
-      author: 'shaderNerd',
+      author: 'alexturner',
       text: 'Love seeing the OpenGL details. Can you do a deeper dive into the shaders next?',
       likes: 18,
       dislikes: 0,
@@ -1029,7 +1060,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c15',
-      author: 'blockBuilder',
+      author: 'marcusstone',
       text: 'Minetest deserves more attention, especially with such a capable renderer!',
       likes: 26,
       dislikes: 0,
@@ -1037,7 +1068,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c16',
-      author: 'techExplorer',
+      author: 'jason_walker',
       text: 'This video helped me appreciate the rendering process so much more. Thanks!',
       likes: 20,
       dislikes: 1,
@@ -1045,7 +1076,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c17',
-      author: 'gameDevGuy',
+      author: 'ethanross',
       text: 'Breaking down OpenGL in Minetest is no small feat. Thanks for making it accessible!',
       likes: 17,
       dislikes: 0,
@@ -1053,7 +1084,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c18',
-      author: 'voxelFanatic',
+      author: 'marcusstone',
       text: 'I’ve been playing Minetest for years, but never knew how the rendering worked. Awesome!',
       likes: 23,
       dislikes: 0,
@@ -1061,7 +1092,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c19',
-      author: 'graphicTechie',
+      author: 'emily_james',
       text: 'Amazing content! Can’t wait to see more videos on rendering engines.',
       likes: 28,
       dislikes: 0,
@@ -1069,7 +1100,7 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
     {
       id: 'c20',
-      author: 'engineerC++',
+      author: 'matthughes',
       text: 'Great breakdown of the OpenGL renderer! Learned a lot from this.',
       likes: 32,
       dislikes: 0,
@@ -1077,97 +1108,5 @@ const COMMENTS: Record<string, t.Comment[]> = {
     },
   ],
 };
-
-// // TODO delete this and fetch from internet
-// const FEATURED_SESSIONS: t.SessionHeadMap = _.keyBy(
-//   [
-//     {
-//       id: 'fd4659dd-150a-408b-aac3-1bc815a83be9',
-//       title: 'DumDB part 2',
-//       description: 'A small DB easy to use',
-//       author: {
-//         username: 'sean_shirazi',
-//         avatar: 'avatar1.png',
-//         email: 'example@site.com',
-//         joinTimestamp: '2020-01-01T14:22:35.344Z',
-//       },
-//       published: false,
-//       defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
-//       duration: 78,
-//       views: 0,
-//       likes: 0,
-//       modificationTimestamp: '2023-07-08T14:22:35.344Z',
-//       toc: [
-//         { title: 'Intro', clock: 0 },
-//         { title: 'Setting things up', clock: 3 },
-//         { title: 'First function', clock: 8 },
-//         { title: 'Second function', clock: 16 },
-//         { title: 'Another thing here', clock: 100 },
-//         { title: 'More stuff', clock: 200 },
-//         { title: "Here's another topic", clock: 300 },
-//         { title: 'And here is a very long topic that might not fit into a single line', clock: 4000 },
-//         { title: 'Conclusion', clock: 8000 },
-//       ],
-//     },
-//     {
-//       id: '8cd503ae-108a-49e0-b33f-af1320f66a68',
-//       title: 'cThruLisp',
-//       description: 'An interesting take on lisp',
-//       author: {
-//         username: 'sean_shirazi',
-//         avatar: 'avatar2.png',
-//         email: 'example@site.com',
-//         joinTimestamp: '2020-01-01T14:22:35.344Z',
-//       },
-//       published: false,
-//       defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
-//       duration: 4023,
-//       views: 0,
-//       likes: 0,
-//       modificationTimestamp: '2023-08-08T14:22:35.344Z',
-//       toc: [],
-//     },
-//     {
-//       id: '4167cb21-e47d-478c-a741-0e3f6c69079e',
-//       title: 'DumDB part 1',
-//       description: 'A small DB easy to use',
-//       author: {
-//         username: 'sean_shirazi',
-//         avatar: 'https://cdn-icons-png.flaticon.com/512/924/924915.png',
-//         email: 'example@site.com',
-//         joinTimestamp: '2020-01-01T14:22:35.344Z',
-//       },
-//       published: true,
-//       defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
-//       duration: 62,
-//       views: 123,
-//       likes: 11,
-//       publishTimestamp: '2023-02-06T14:22:35.344Z',
-//       modificationTimestamp: '2023-06-06T14:22:35.344Z',
-//       toc: [],
-//     },
-//     {
-//       id: 'fa97abc4-d71d-4ff3-aebf-e5aadf77b3f7',
-//       title: 'Some other project',
-//       description:
-//         'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
-//       author: {
-//         username: 'jane',
-//         avatar: 'avatar2.png',
-//         email: 'example@site.com',
-//         joinTimestamp: '2020-01-01T14:22:35.344Z',
-//       },
-//       published: true,
-//       defaultRoot: '/home/sean/workspace/dumdb' as t.AbsPath,
-//       duration: 662,
-//       views: 100,
-//       likes: 45,
-//       publishTimestamp: '2023-06-06T10:22:35.344Z',
-//       modificationTimestamp: '2023-08-06T10:22:35.344Z',
-//       toc: [],
-//     },
-//   ],
-//   'id',
-// );
 
 export default Codecast;

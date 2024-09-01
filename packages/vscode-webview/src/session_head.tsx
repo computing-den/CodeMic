@@ -68,6 +68,11 @@ export class SessionHeadListItem extends Component<ListItemProps> {
       //   title: 'Play',
       //   onClick: () => postMessage({ type: 'player/open', sessionId: this.props.sessionHead.id }),
       // },
+      !this.props.sessionHead.publishTimestamp && {
+        icon: 'codicon-trash',
+        title: 'Delete',
+        onClick: () => postMessage({ type: 'deleteSession', sessionId: this.props.sessionHead.id }),
+      },
       {
         icon: 'codicon-repo-forked',
         title: 'Fork: create a new project based on this one',
@@ -90,11 +95,6 @@ export class SessionHeadListItem extends Component<ListItemProps> {
           console.log('TODO');
         },
       },
-      !this.props.sessionHead.publishTimestamp && {
-        icon: 'codicon-close',
-        title: 'Delete',
-        onClick: () => postMessage({ type: 'deleteSession', sessionId: this.props.sessionHead.id }),
-      },
     ]);
 
     // return (
@@ -114,20 +114,20 @@ export class SessionHeadListItem extends Component<ListItemProps> {
             <img src={coverPhotoUri} />
           </div>
         )}
-        <WithAvatar username={s.author?.username} className="title-and-description" small>
+        <WithAvatar username={s.author?.username} className="caption" small>
           <div className="title">{s.title || 'Untitled'}</div>
           {/*s.description && (
             <div className="description">
               <TextToParagraphs text={s.description} />
             </div>
             )*/}
-          {lastOpenedTimestamp && (
+          {/*lastOpenedTimestamp && (
             <div className="footer">
               <span className="footer-item timestamp">
                 Last opened <TimeFromNow timestamp={lastOpenedTimestamp} />
               </span>
             </div>
-          )}
+            )*/}
           {s.publishTimestamp && (
             <div className="footer">
               <span className="footer-item timestamp">

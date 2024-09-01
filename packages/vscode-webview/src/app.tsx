@@ -5,6 +5,7 @@ import Account from './account.jsx';
 import Welcome from './welcome.jsx';
 import Recorder from './recorder.jsx';
 import Player from './player.jsx';
+import Loading from './loading.jsx';
 
 import _ from 'lodash';
 
@@ -45,6 +46,7 @@ export default class App extends Component<AppProps> {
     [t.Screen.Welcome]: () => <Welcome user={this.props.store.user} welcome={this.props.store.welcome!} />,
     [t.Screen.Recorder]: () => <Recorder user={this.props.store.user} recorder={this.props.store.recorder!} />,
     [t.Screen.Player]: () => <Player user={this.props.store.user} player={this.props.store.player!} />,
+    [t.Screen.Loading]: () => <Loading />,
   };
 
   render() {

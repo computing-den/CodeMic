@@ -1,0 +1,9 @@
+.loading {
+  text-align: center;
+  p {
+    font-size: 1.5rem;
+    color: var(--text-weak);
+    white-space: nowrap;
+    margin-top: 5rem;
+  }
+}
