@@ -146,41 +146,6 @@ export default class Player extends Component<Props> {
       },
     ];
 
-    const comments: t.Comment[] = [
-      {
-        id: 'z',
-        author: { username: 'addy', email: '', joinTimestamp: '' },
-        creation_timestamp: '2024-08-21T11:28:40.042Z',
-        likes: 11,
-        dislikes: 0,
-        text: 'Infinity loop is missing !',
-      },
-      {
-        id: 'y',
-        author: { username: 'addy', email: '', joinTimestamp: '' },
-        creation_timestamp: '2024-08-21T11:23:40.042Z',
-        text: "now, I won't go too far into this...\nProceeds to present a highly detailed and informative picture for the next 50 minutes.",
-        likes: 8,
-        dislikes: 0,
-      },
-      {
-        id: 'x',
-        author: { username: 'lukas', email: '', joinTimestamp: '' },
-        creation_timestamp: '2024-08-21T11:13:40.042Z',
-        text: 'Great episode!',
-        likes: 3,
-        dislikes: 0,
-      },
-      {
-        id: 'a',
-        author: { username: 'olivia', email: '', joinTimestamp: '' },
-        creation_timestamp: '2024-08-21T10:13:40.042Z',
-        text: 'Thanks for the great content',
-        likes: 0,
-        dislikes: 0,
-      },
-    ];
-
     return (
       <Screen className="player">
         {player.loaded && <ProgressBar duration={s.duration} onSeek={this.seek} clock={player.clock} />}
@@ -247,7 +212,7 @@ export default class Player extends Component<Props> {
           <Section.Header title="COMMENTS" collapsible />
           <Section.Body>
             {user && <CommentInput author={user} />}
-            <CommentList comments={comments} />
+            <CommentList comments={player.comments} />
           </Section.Body>
         </Section>
         {/*

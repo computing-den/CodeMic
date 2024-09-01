@@ -16,13 +16,13 @@ export class Comment extends Component<CommentProps> {
     const { className, comment } = this.props;
 
     return (
-      <WithAvatar className={cn('comment', className)} username={comment.author.username}>
+      <WithAvatar className={cn('comment', className)} username={comment.author}>
         <div className="text">
           <TextToParagraphs text={comment.text} />
         </div>
         <div className="footer">
           <span className="footer-item">
-            {comment.author.username} <TimeFromNow timestamp={comment.creation_timestamp} />
+            {comment.author} <TimeFromNow timestamp={comment.creation_timestamp} />
           </span>
           <div className="footer-item badge">
             <span className="codicon codicon-reply va-top m-right_small" />
@@ -79,17 +79,15 @@ export class Comment extends Component<CommentProps> {
 //   }
 // }
 
-export type CommentListProps = { comments: t.Comment[]; className?: string };
+export type CommentListProps = { comments?: t.Comment[]; className?: string };
 export class CommentList extends Component<CommentListProps> {
   render() {
-    const { comments, className } = this.props;
+    let { comments, className } = this.props;
+
+    comments = _.orderBy(comments, 'creation_timestamp', 'desc');
 
     return (
-      <div className={cn('comment-list', className)}>
-        {comments.map(comment => (
-          <Comment comment={comment} />
-        ))}
-      </div>
+      <div className={cn('comment-list', className)}>{comments?.map(comment => <Comment comment={comment} />)}</div>
     );
   }
 }

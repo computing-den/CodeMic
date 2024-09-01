@@ -293,6 +293,7 @@ export type PlayerState = {
   videoTracks?: VideoTrack[];
   blobsWebviewUris?: WebviewUris;
   coverPhotoWebviewUri: string;
+  comments?: Comment[];
 };
 
 // export type PlayerUpdate = {
@@ -352,7 +353,7 @@ export type SessionBody = {
 
 export type Comment = {
   id: string;
-  author: UserSummary;
+  author: string;
   text: string;
   likes: number;
   dislikes: number;
