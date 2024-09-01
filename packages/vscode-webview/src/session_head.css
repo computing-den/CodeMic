@@ -18,17 +18,31 @@
     }
 
     .cover-photo-container {
-      margin: var(--spacing-medium);
+      margin: var(--spacing-medium) var(--spacing-large);
       margin-bottom: 0;
-      background: black;
       border-radius: 5px;
       display: flex;
       justify-content: center;
       overflow: hidden;
+      /* background: black; */
+      position: relative;
+
+      /* .background { */
+      /*   position: absolute; */
+      /*   top: 0; */
+      /*   left: 0; */
+      /*   right: 0; */
+      /*   bottom: 0; */
+      /*   background-size: cover; */
+      /*   background-position: center; */
+      /*   filter: blur(10px); */
+      /* } */
 
       & img {
-        height: 200px;
-        object-fit: contain;
+        object-fit: cover;
+        z-index: 1;
+        height: 150px;
+        width: 100%;
       }
     }
 

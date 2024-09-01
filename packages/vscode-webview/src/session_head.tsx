@@ -110,16 +110,17 @@ export class SessionHeadListItem extends Component<ListItemProps> {
       <div className={cn('session-head-list-item', className)} onClick={this.clicked} tabIndex={0}>
         {s.hasCoverPhoto && (
           <div className="cover-photo-container">
+            {/*<div className="background" style={{ backgroundImage: `url(${coverPhotoUri})` }} />*/}
             <img src={coverPhotoUri} />
           </div>
         )}
         <WithAvatar username={s.author?.username} className="title-and-description" small>
           <div className="title">{s.title || 'Untitled'}</div>
-          {s.description && (
+          {/*s.description && (
             <div className="description">
               <TextToParagraphs text={s.description} />
             </div>
-          )}
+            )*/}
           {lastOpenedTimestamp && (
             <div className="footer">
               <span className="footer-item timestamp">
