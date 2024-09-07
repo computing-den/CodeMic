@@ -8,19 +8,19 @@
       padding: var(--container-padding-ver) var(--container-padding-hor);
 
       .cover-photo-container {
-        /* margin: var(--spacing-medium); */
+        border: var(--cover-container-border);
+        border-radius: var(--card-border-radius);
         margin-bottom: 0;
-        border-radius: 5px;
         display: flex;
         justify-content: center;
         align-items: center;
         overflow: hidden;
         position: relative;
         background: var(--background-secondary);
-        height: 150px;
+        min-height: 150px;
 
         &.has-cover-photo {
-          background: black;
+          background: #1f1f1f;
         }
 
         & img {
@@ -85,6 +85,45 @@
     #editor-view {
       padding: var(--container-padding-ver) var(--container-padding-hor);
       /* overflow-y: scroll */
+
+      .guide-video-container {
+        border: var(--cover-container-border);
+        overflow: hidden;
+        border-radius: var(--card-border-radius);
+        display: flex;
+        position: relative;
+        background: #1f1f1f;
+        justify-content: center;
+        height: 400px;
+        max-height: 25vh;
+
+        &:has(video:not([src])),
+        &:has(video[src='']) {
+          .empty-content {
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+
+            .codicon {
+              font-size: 6rem;
+              color: #d7d7d7;
+            }
+          }
+        }
+
+        video {
+        }
+
+        .empty-content {
+          display: none;
+        }
+      }
 
       #timeline {
         flex: 1;

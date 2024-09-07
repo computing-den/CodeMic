@@ -45,7 +45,11 @@ export default class Player extends Component<Props> {
   };
 
   getVideoElem = (): HTMLVideoElement => {
-    return document.querySelector('#guide-video')!;
+    return document.getElementById('guide-video') as HTMLVideoElement;
+  };
+
+  getCoverContainerElem = (): HTMLElement => {
+    return document.getElementById('cover-container')!;
   };
 
   tocItemClicked = async (e: Event, item: t.TocItem) => {
@@ -79,6 +83,15 @@ export default class Player extends Component<Props> {
   //   );
   // }
 
+  updateCoverContainerHeight = () => {
+    const container = this.getCoverContainerElem();
+    let height = 0;
+    for (const child of container.children) {
+      height = Math.max(height, child.getBoundingClientRect().height);
+    }
+    container.style.height = `${height}px`;
+  };
+
   updateResources() {
     const { audioTracks, videoTracks, blobsWebviewUris: webviewUris } = this.props.player;
     if (webviewUris) {
@@ -88,15 +101,19 @@ export default class Player extends Component<Props> {
 
   componentDidUpdate() {
     this.updateResources();
+    this.updateCoverContainerHeight();
   }
 
   componentDidMount() {
     setMediaManager(this.mediaManager);
     this.updateResources();
+    this.updateCoverContainerHeight();
+    window.addEventListener('resize', this.updateCoverContainerHeight);
   }
 
   componentWillUnmount() {
     this.mediaManager.close();
+    window.removeEventListener('resize', this.updateCoverContainerHeight);
   }
 
   render() {
@@ -173,12 +190,8 @@ export default class Player extends Component<Props> {
               clock={player.clock}
               duration={s.duration}
             />
-            {s.hasCoverPhoto && (
-              <div className="cover-photo-container subsection">
-                <img src={player.coverPhotoWebviewUri} />
-              </div>
-            )}
-            <div className="subsection hide-inactive guide-video-container">
+            <div id="cover-container" className="cover-container subsection">
+              {s.hasCoverPhoto && <img src={player.coverPhotoWebviewUri} />}
               <video id="guide-video" />
             </div>
             <SessionDescription className="subsection subsection_spaced" sessionHead={s} />

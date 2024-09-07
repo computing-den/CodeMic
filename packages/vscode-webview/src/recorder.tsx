@@ -357,7 +357,7 @@ class EditorView extends Component<EditorViewProps> {
           clock={recorder.clock}
           duration={s.duration}
         />
-        <div className="subsection subsection_spaced guide-video-container fixed-height">
+        <div className="subsection subsection_spaced guide-video-container">
           <video id="guide-video" />
           <div className="empty-content">
             <span className="codicon codicon-device-camera-video" />

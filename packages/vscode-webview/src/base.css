@@ -27,6 +27,7 @@
   --cursor-marker-z-index: 11;
   --track-z-index: 1;
   --active-track-z-index: 2;
+  --cover-container-border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--dropdown-border));
 }
 
 body.vscode-light {
