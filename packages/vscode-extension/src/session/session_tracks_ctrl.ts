@@ -64,7 +64,7 @@ export default class SessionTracksCtrl {
     if (videoTrack) this.ctrls.videoTrackCtrl.loadTrack(videoTrack);
   }
 
-  play() {
+  async play() {
     assert(!this.running);
 
     this.mode.recordingEditor = false;
@@ -74,7 +74,7 @@ export default class SessionTracksCtrl {
       this.seek(0, { noUpdate: true });
     }
 
-    this.ctrls.combinedEditorTrackPlayer.play();
+    await this.ctrls.combinedEditorTrackPlayer.play();
     this.update();
   }
 

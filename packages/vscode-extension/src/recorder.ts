@@ -75,9 +75,9 @@ class Recorder {
     this.saveHistoryOpenClose().catch(console.error);
   }
 
-  play() {
+  async play() {
     assert(this.sessionTracksCtrl);
-    this.sessionTracksCtrl.play();
+    await this.sessionTracksCtrl.play();
     this.saveHistoryOpenClose().catch(console.error);
   }
 

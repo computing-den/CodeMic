@@ -26,8 +26,11 @@ class CombinedEditorTrackPlayer {
     this.session = session;
   }
 
-  play() {
+  async play() {
     if (this.playing) return;
+
+    await this.session.syncInternalEditorTrackToVscodeAndDisk();
+
     this.playing = true;
 
     // ignore user input

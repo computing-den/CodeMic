@@ -37,9 +37,9 @@ class Player {
     this.ctrls.sessionTracksCtrl.onError = this.sessionCtrlErrorHandler.bind(this);
   }
 
-  play() {
+  async play() {
     assert(this.sessionTracksCtrl);
-    this.sessionTracksCtrl.play();
+    await this.sessionTracksCtrl.play();
     this.saveHistoryOpenClose().catch(console.error);
   }
 

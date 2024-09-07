@@ -270,7 +270,7 @@ class CodeCast {
       }
       case 'player/play': {
         assert(this.player);
-        this.player.play();
+        await this.player.play();
         return this.respondWithStore();
       }
       case 'player/pause': {
@@ -400,7 +400,7 @@ class CodeCast {
       }
       case 'recorder/play': {
         assert(this.recorder);
-        this.recorder.play();
+        await this.recorder.play();
         return this.respondWithStore();
       }
       case 'recorder/pause': {
@@ -503,7 +503,7 @@ class CodeCast {
           { title: confirmTitle },
         );
         if (answer?.title != confirmTitle && wasRunning) {
-          this.player!.play();
+          await this.player!.play();
         }
         return { type: 'boolean', value: answer?.title === confirmTitle };
       }
@@ -520,7 +520,7 @@ class CodeCast {
           { title: confirmTitle },
         );
         if (answer?.title != confirmTitle && wasRunning) {
-          this.player!.play();
+          await this.player!.play();
         }
         return { type: 'boolean', value: answer?.title === confirmTitle };
       }
