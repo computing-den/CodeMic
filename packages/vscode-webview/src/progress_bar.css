@@ -50,7 +50,8 @@
       /* display: grid; */
       /* grid-gap: var(--spacing-small); */
 
-      width: 200px;
+      width: 250px;
+      max-width: 95vw;
 
       * {
         white-space: nowrap;

@@ -16,7 +16,7 @@
       "activitybar": [
         {
           "id": "codecast-view-container",
-          "title": "Codecast",
+          "title": "CodeCast",
           "icon": "../vscode-webview/resources/icon.svg"
         }
       ]
@@ -26,14 +26,14 @@
         {
           "type": "webview",
           "id": "codecast-view",
-          "name": "Codecast"
+          "name": "CodeCast"
         }
       ]
     },
     "commands": [
       {
         "command": "codecast.openView",
-        "title": "Codecast"
+        "title": "CodeCast"
       },
       {
         "command": "codecast.openWelcome",
@@ -45,7 +45,7 @@
       },
       {
         "command": "codecast.account",
-        "title": "Codecast account",
+        "title": "CodeCast account",
         "icon": {
           "light": "../vscode-webview/resources/light/account.svg",
           "dark": "../vscode-webview/resources/dark/account.svg"

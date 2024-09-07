@@ -41,7 +41,7 @@ body.vscode-light {
   --editor-track-color: #666;
 
   --popover-border-color: #aaa;
-  --popover-background: #444;
+  --popover-background: #1f1f1f;
   --popover-foreground: #fff;
 
   /* --editor-track-text-change-background: #a1f0dc; */
@@ -66,9 +66,9 @@ body.vscode-dark {
 
   --editor-track-color: #aaa;
 
-  --popover-border-color: #888;
-  --popover-background: #ccc;
-  --popover-foreground: #000;
+  --popover-border-color: #aaa;
+  --popover-background: #1f1f1f;
+  --popover-foreground: #fff;
 
   /* --editor-track-text-change-background: #063b49; */
   /* --editor-track-text-change-background-hover: #135e71; */

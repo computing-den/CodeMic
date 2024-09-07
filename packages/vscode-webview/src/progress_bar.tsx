@@ -85,11 +85,11 @@ export default class ProgressBar extends Component<Props> {
           <div className="popover">
             <div className="row">
               <div className="document-focus">
-                {documentFocusUnderMouse ? path.getUriShortNameOpt(documentFocusUnderMouse.uri) : '<unknown file>'}
+                {documentFocusUnderMouse ? path.getUriShortNameOpt(documentFocusUnderMouse.uri) : '...'}
               </div>
               <div className="clock">{lib.formatTimeSeconds(clockUnderMouse ?? 0)}</div>
             </div>
-            <div className="line-focus">{lineFocusUnderMouse?.text || '<unknown text>'}</div>
+            <div className="line-focus">{lineFocusUnderMouse?.text || '...'}</div>
           </div>
           <div className="filled" style={filledStyle} />
         </div>

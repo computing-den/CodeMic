@@ -85,7 +85,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
         <base href="${resourcesUri}/">
         <link href="${webviewCss}" rel="stylesheet">
         <link href="${codiconCss}" rel="stylesheet">
-				<title>Codecast</title>
+				<title>CodeCast</title>
 			</head>
 			<body>
         <div id="app"></div>

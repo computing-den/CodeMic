@@ -15,7 +15,7 @@ import assert from 'assert';
 import { types as t, lib, path } from '@codecast/lib';
 import { SessionHead } from '@codecast/lib/src/types.js';
 
-class Codecast {
+class CodeCast {
   screen: t.Screen = t.Screen.Welcome;
   account?: t.AccountState;
   recorder?: Recorder;
@@ -85,13 +85,13 @@ class Codecast {
     }
   }
 
-  static async fromExtensionContext(extension: vscode.ExtensionContext): Promise<Codecast> {
+  static async fromExtensionContext(extension: vscode.ExtensionContext): Promise<CodeCast> {
     const user = extension.globalState.get<t.User>('user');
     const dataPaths = paths.dataPaths(user?.username);
-    const settings = await storage.readJSON<t.Settings>(dataPaths.settings, Codecast.makeDefaultSettings);
+    const settings = await storage.readJSON<t.Settings>(dataPaths.settings, CodeCast.makeDefaultSettings);
     const { defaultWorkspacePaths } = paths;
     const context: Context = { extension, user, dataPaths, defaultWorkspacePaths, settings };
-    return new Codecast(context);
+    return new CodeCast(context);
   }
 
   static makeDefaultSettings(): t.Settings {
@@ -796,7 +796,7 @@ class Codecast {
     // TODO ask user to convert anonymous sessions to the new user.
 
     const dataPaths = paths.dataPaths(user?.username);
-    const settings = await storage.readJSON<t.Settings>(dataPaths.settings, Codecast.makeDefaultSettings);
+    const settings = await storage.readJSON<t.Settings>(dataPaths.settings, CodeCast.makeDefaultSettings);
     // const cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(dataPaths.cachedSessionCoverPhotos);
 
     this.session = undefined;
@@ -1110,4 +1110,4 @@ const COMMENTS: Record<string, t.Comment[]> = {
   ],
 };
 
-export default Codecast;
+export default CodeCast;

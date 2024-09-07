@@ -1,12 +1,12 @@
-import Codecast from './codecast.js';
+import CodeCast from './codecast.js';
 import _ from 'lodash';
 import * as vscode from 'vscode';
 
-let codecast: Codecast;
+let codecast: CodeCast;
 
 export async function activate(extensionContext: vscode.ExtensionContext) {
   try {
-    codecast = await Codecast.fromExtensionContext(extensionContext);
+    codecast = await CodeCast.fromExtensionContext(extensionContext);
     // await codecast.restoreStateAfterRestart();
 
     // debug
