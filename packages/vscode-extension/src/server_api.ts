@@ -1,6 +1,6 @@
 import config from './config.js';
 import axios, { AxiosError } from 'axios';
-import { types as t, path } from '@codecast/lib';
+import { types as t, path } from '@codemic/lib';
 import fs from 'fs';
 import FormData from 'form-data'; // native FormData does not support appending streams
 import * as vscode from 'vscode';

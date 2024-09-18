@@ -1,4 +1,4 @@
-import { types as t, path } from '@codecast/lib';
+import { types as t, path } from '@codemic/lib';
 import { basename } from 'path';
 import os from 'os';
 import process from 'process';
@@ -82,7 +82,7 @@ function getBasePaths(name: string) {
   return linux(name);
 }
 
-export const basePaths = getBasePaths('codecast');
+export const basePaths = getBasePaths('codemic');
 
 export const ANONYM = '_'; // minimum valid username is 3 characters
 
@@ -109,7 +109,7 @@ export const dataPaths = _.memoize((username?: string): DataPaths => {
   };
 });
 
-const workspacePath = path.abs(os.homedir(), 'codecast');
+const workspacePath = path.abs(os.homedir(), 'codemic');
 
 export const defaultWorkspacePaths = {
   root: workspacePath,

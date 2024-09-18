@@ -1,4 +1,4 @@
-import { types as t, path } from '@codecast/lib';
+import { types as t, path } from '@codemic/lib';
 import fs from 'fs';
 import _ from 'lodash';
 

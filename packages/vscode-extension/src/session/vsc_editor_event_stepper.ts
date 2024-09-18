@@ -1,4 +1,4 @@
-import { types as t, path, lib, assert, editorEventStepperDispatch } from '@codecast/lib';
+import { types as t, path, lib, assert, editorEventStepperDispatch } from '@codemic/lib';
 import { fileExists } from '../misc.js';
 import Session from './session.js';
 import * as vscode from 'vscode';

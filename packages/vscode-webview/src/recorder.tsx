@@ -1,7 +1,7 @@
 import { produce, type Draft } from 'immer';
 import MediaToolbar, * as MT from './media_toolbar.jsx';
 import { h, Fragment, Component } from 'preact';
-import { types as t, path, lib, assert } from '@codecast/lib';
+import { types as t, path, lib, assert } from '@codemic/lib';
 // import FakeMedia from './fake_media.js';
 import PathField from './path_field.jsx';
 import Tabs, { type TabViewProps } from './tabs.jsx';
@@ -180,7 +180,7 @@ class DetailsView extends Component<DetailsViewProps> {
           className="subsection"
           // value={''}
           // onInput={this.descriptionChanged}
-          placeholder="e.g. https://github.com/computing-den/codecast.git"
+          placeholder="e.g. https://github.com/computing-den/codemic.git"
         >
           Git repository
         </vscode-text-field>
@@ -193,7 +193,7 @@ class DetailsView extends Component<DetailsViewProps> {
           Git commit
         </vscode-text-field>
         <p className="subsection help">
-          Use <code>.codecastignore</code> to ignore paths.
+          Use <code>.codemicignore</code> to ignore paths.
         </p>
         <div className="subsection buttons">
           <vscode-button onClick={this.publish} disabled={!recorder.loaded}>

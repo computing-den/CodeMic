@@ -1,5 +1,5 @@
 import { getStore } from './store.js';
-import { types as t, lib } from '@codecast/lib';
+import { types as t, lib } from '@codemic/lib';
 import TextToParagraphs from './text_to_paragraphs.jsx';
 import TimeFromNow from './time_from_now.jsx';
 import WithAvatar from './with_avatar.jsx';

@@ -1,5 +1,5 @@
 import { h, Fragment, Component } from 'preact';
-import { types as t, lib } from '@codecast/lib';
+import { types as t, lib } from '@codemic/lib';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
 import postMessage from './api.js';
@@ -51,7 +51,7 @@ export default class Account extends Component<Props> {
         <Section className="main-section">
           <Section.Body>
             <div className="heading-subsection subsection">
-              <h1>CodeCast</h1>
+              <h1>CodeMic</h1>
             </div>
             {body}
           </Section.Body>

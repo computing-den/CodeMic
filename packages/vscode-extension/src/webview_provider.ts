@@ -2,11 +2,11 @@ import * as vscode from 'vscode';
 import assert from 'assert';
 import _ from 'lodash';
 import { v4 as uuid } from 'uuid';
-import { types as t, bus as b } from '@codecast/lib';
+import { types as t, bus as b } from '@codemic/lib';
 import { basePaths } from './paths.js';
 
 class WebviewProvider implements vscode.WebviewViewProvider {
-  static readonly viewType = 'codecast-view';
+  static readonly viewType = 'codemic-view';
 
   view?: vscode.WebviewView;
   bus?: b.Bus;
@@ -85,7 +85,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
         <base href="${resourcesUri}/">
         <link href="${webviewCss}" rel="stylesheet">
         <link href="${codiconCss}" rel="stylesheet">
-				<title>CodeCast</title>
+				<title>CodeMic</title>
 			</head>
 			<body>
         <div id="app"></div>

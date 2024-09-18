@@ -1,4 +1,4 @@
-import { types as t, lib } from '@codecast/lib';
+import { types as t, lib } from '@codemic/lib';
 import TimeFromNow from './time_from_now.js';
 import { cn } from './misc.js';
 import TextToParagraphs from './text_to_paragraphs.jsx';

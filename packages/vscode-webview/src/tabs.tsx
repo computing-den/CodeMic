@@ -1,4 +1,4 @@
-import { assert } from '@codecast/lib';
+import { assert } from '@codemic/lib';
 import { h, Fragment, Component, toChildArray, cloneElement, VNode } from 'preact';
 import { cn } from './misc.js';
 import _ from 'lodash';

@@ -381,13 +381,15 @@ export type EditorTrackFocusTimeline = {
   lines: LineFocus[];
 };
 
-export type DocumentFocus = {
-  uri: Uri;
+export type FocusItem = {
   clockRange: ClockRange;
 };
 
-export type LineFocus = {
-  clockRange: ClockRange;
+export type DocumentFocus = FocusItem & {
+  uri: Uri;
+};
+
+export type LineFocus = FocusItem & {
   text: string;
 };
 

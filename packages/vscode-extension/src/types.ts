@@ -1,6 +1,6 @@
 import type { ExtensionContext, WebviewView } from 'vscode';
 import type { DataPaths, DefaultWorkspacePaths } from './paths.js';
-import type { types as t, internalEditorTrackCtrl as ietc } from '@codecast/lib';
+import type { types as t, internalEditorTrackCtrl as ietc } from '@codemic/lib';
 import type SessionTracksCtrl from './session/session_tracks_ctrl.js';
 import type CombinedEditorTrackPlayer from './session/combined_editor_track_player.js';
 import type CombinedEditorTrackRecorder from './session/combined_editor_track_recorder.js';

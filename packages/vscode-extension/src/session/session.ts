@@ -1,4 +1,4 @@
-import { types as t, path, internalEditorTrackCtrl as ietc, lib, assert } from '@codecast/lib';
+import { types as t, path, internalEditorTrackCtrl as ietc, lib, assert } from '@codemic/lib';
 import * as serverApi from '../server_api.js';
 import type { SessionDataPaths } from '../paths.js';
 import config from '../config.js';
@@ -19,7 +19,7 @@ import stream from 'stream';
 import os from 'os';
 import * as vscode from 'vscode';
 import { v4 as uuid } from 'uuid';
-import { SessionHead } from '@codecast/lib/src/types.js';
+import { SessionHead } from '@codemic/lib/src/types.js';
 
 export class Session implements t.Session {
   context: Context;
@@ -176,6 +176,9 @@ export class Session implements t.Session {
     await this.syncInternalEditorTrackToVscodeAndDisk(targetUris);
     await this.saveAllRelevantVscTabs();
 
+    // Close irrelevant tabs.
+    await this.closeIrrelevantVscTabs();
+
     // Loaded.
     this.loaded = true;
   }
@@ -245,7 +248,7 @@ export class Session implements t.Session {
     // }
 
     // Create the worktree and copy files to session directory.
-    // TODO: ignore files in .codecastignore
+    // TODO: ignore files in .codemicignore
     const worktree: t.Worktree = {};
     const paths = await this.readDirRecursively({ includeFiles: true });
     for (const p of paths) {
@@ -339,7 +342,7 @@ export class Session implements t.Session {
 
     // TODO having both directories and files in targetUris and ctrl.worktree can make things
     //      a bit confusing. Especially when it comes to deleting directories when there's
-    //      still a file inside but is supposed to be ignored according to .codecastignore
+    //      still a file inside but is supposed to be ignored according to .codemicignore
     //      I think it's best to keep the directory structure in a separate variable than ctrl.worktree
     //      worktreeFiles: {[key: Uri]: WorktreeFile} vs worktreeDirs: Uri[]
     // assert(_.values(ctrl.worktree).every(item => item.file.type !== 'dir'));
@@ -393,8 +396,10 @@ export class Session implements t.Session {
 
     // for each targetUri
     //   if it doesn't exist in ctrl.worktree, it's already been deleted above, so ignore it
-    //   if there's a textDocument open in vscode, replace its content
+    //   if there's a text editor open in vscode, replace its content
     //   else, mkdir and write to file
+    // NOTE: changing documents with WorkspaceEdit without immediately savig them causes them to be
+    //       opened even if they did not have an associated editor.
     {
       const targetUrisOutsideVsc: t.Uri[] = [];
       const edit = new vscode.WorkspaceEdit();
@@ -404,7 +409,7 @@ export class Session implements t.Session {
         let vscTextDocument: vscode.TextDocument | undefined;
         if (path.isUntitledUri(targetUri)) {
           vscTextDocument = await vscode.workspace.openTextDocument(targetUri);
-        } else {
+        } else if (this.findTabInputTextByUri(targetUri)) {
           vscTextDocument = this.findVscTextDocumentByUri(targetUri);
         }
 
@@ -460,6 +465,19 @@ export class Session implements t.Session {
     for (const uri of uris) {
       const vscTextDocument = this.findVscTextDocumentByVscUri(uri);
       await vscTextDocument?.save();
+    }
+  }
+
+  /**
+   * Will ask for confirmation.
+   */
+  async closeIrrelevantVscTabs() {
+    for (const tabGroup of vscode.window.tabGroups.all) {
+      for (const tab of tabGroup.tabs) {
+        if (tab.input instanceof vscode.TabInputText && !this.shouldRecordVscUri(tab.input.uri)) {
+          await this.closeVscTabInputText(tab);
+        }
+      }
     }
   }
 
@@ -662,6 +680,20 @@ export class Session implements t.Session {
   //   return vscode.workspace.textDocuments.find(d => d.uri.scheme === 'file' && d.uri.path === p);
   // }
 
+  findTabInputTextByUri(uri: t.Uri): vscode.Tab | undefined {
+    return this.findTabInputTextByVscUri(this.uriToVsc(uri));
+  }
+
+  findTabInputTextByVscUri(uri: vscode.Uri): vscode.Tab | undefined {
+    for (const tabGroup of vscode.window.tabGroups.all) {
+      for (const tab of tabGroup.tabs) {
+        if (tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === uri.toString()) {
+          return tab;
+        }
+      }
+    }
+  }
+
   findVscTextDocumentByUri(uri: t.Uri): vscode.TextDocument | undefined {
     return this.findVscTextDocumentByVscUri(this.uriToVsc(uri));
   }
@@ -704,20 +736,33 @@ export class Session implements t.Session {
 
     if (skipConfirmation) {
       const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
-      if (tab.input.uri.scheme === 'untitled') {
-        // for untitled scheme, empty it first, then can close without confirmation
-        const edit = new vscode.WorkspaceEdit();
-        edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), '');
-        await vscode.workspace.applyEdit(edit);
-        // TODO We're gonna skip closing it for now. We must use unnamed untitled document
-        // to prevent vscode from showing the confirmation dialog when the content is empty.
-        // See the TODOs in notes.
-        return;
-      } else if (tab.input.uri.scheme === 'file') {
-        await vscTextDocument.save();
+      // .save() returns false if document was not dirty
+      if (vscTextDocument.isDirty) {
+        if (tab.input.uri.scheme === 'untitled') {
+          // for untitled scheme, empty it first, then can close without confirmation
+          const edit = new vscode.WorkspaceEdit();
+          edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), '');
+          await vscode.workspace.applyEdit(edit);
+          // TODO We're gonna skip closing it for now. We must use unnamed untitled document
+          // to prevent vscode from showing the confirmation dialog when the content is empty.
+          // See the TODOs in notes.
+          return;
+        } else if (tab.input.uri.scheme === 'file') {
+          // Sometimes .save() fails and returns false. No idea why.
+          for (let i = 0; i < 5; i++) {
+            if (await vscTextDocument.save()) break;
+            console.error('closeVscTabInputText Failed to save:', tab.input.uri.toString());
+            await lib.timeout(100 * i + 100);
+          }
+        }
       }
     }
-    await vscode.window.tabGroups.close(tab);
+
+    // Sometimes when save() fails the first time, closing the tab throws this error:
+    // Error: Tab close: Invalid tab not found!
+    // Maybe it automatically closes it? I don't know.
+    const newTab = this.findTabInputTextByVscUri(tab.input.uri);
+    if (newTab) await vscode.window.tabGroups.close(newTab);
   }
 
   makeTextEditorSnapshotFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {
@@ -750,7 +795,7 @@ export class Session implements t.Session {
       `"${this.workspace}" is not empty. Do you want to overwrite it?`,
       {
         modal: true,
-        detail: 'All files in the folder will be overwritten except for those specified in .codecastignore.',
+        detail: 'All files in the folder will be overwritten except for those specified in .codemicignore.',
       },
       { title: overwriteTitle },
       { title: 'Cancel', isCloseAffordance: true },

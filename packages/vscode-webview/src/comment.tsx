@@ -1,4 +1,4 @@
-import { types as t, lib } from '@codecast/lib';
+import { types as t, lib } from '@codemic/lib';
 import TextToParagraphs from './text_to_paragraphs.jsx';
 import TimeFromNow from './time_from_now.jsx';
 import WithAvatar from './with_avatar.jsx';
@@ -87,7 +87,11 @@ export class CommentList extends Component<CommentListProps> {
     comments = _.orderBy(comments, 'creation_timestamp', 'desc');
 
     return (
-      <div className={cn('comment-list', className)}>{comments?.map(comment => <Comment comment={comment} />)}</div>
+      <div className={cn('comment-list', className)}>
+        {comments?.map(comment => (
+          <Comment comment={comment} />
+        ))}
+      </div>
     );
   }
 }

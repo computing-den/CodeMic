@@ -1,5 +1,5 @@
 import { h, Fragment, Component } from 'preact';
-import { types as t, path, lib } from '@codecast/lib';
+import { types as t, path, lib } from '@codemic/lib';
 // import FakeMedia from './fake_media.jsx';
 import ProgressBar from './progress_bar.jsx';
 import PathField from './path_field.jsx';
@@ -137,8 +137,8 @@ export default class Player extends Component<Props> {
         title: player.playing
           ? `Fork: create a new project starting at this point`
           : player.clock > 0
-            ? `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`
-            : `Fork: create a new project based on this one`,
+          ? `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`
+          : `Fork: create a new project based on this one`,
         icon: 'codicon-repo-forked',
         onClick: this.fork,
       },

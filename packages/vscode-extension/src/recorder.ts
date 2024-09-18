@@ -1,4 +1,4 @@
-import { types as t, path } from '@codecast/lib';
+import { types as t, path } from '@codemic/lib';
 import { getMp3Duration, getVideoDuration } from './get_audio_video_duration.js';
 import * as misc from './misc.js';
 import type { SessionCtrls } from './types.js';
@@ -12,10 +12,7 @@ import { v4 as uuid } from 'uuid';
 class Recorder {
   tabId: t.RecorderTabId = 'details-view';
 
-  constructor(
-    public session: Session,
-    public mustScan: boolean,
-  ) {}
+  constructor(public session: Session, public mustScan: boolean) {}
 
   get sessionTracksCtrl(): SessionTracksCtrl | undefined {
     return this.session.ctrls?.sessionTracksCtrl;
@@ -71,7 +68,7 @@ class Recorder {
       await this.sessionTracksCtrl.seek(this.session.head.duration, { noUpdate: false });
       // await new Promise(resolve => setTimeout(resolve, 3000));
     }
-    this.sessionTracksCtrl.record();
+    await this.sessionTracksCtrl.record();
     this.saveHistoryOpenClose().catch(console.error);
   }
 

@@ -3,17 +3,17 @@ import nodePath from 'path';
 import os from 'os';
 import fs from 'fs';
 import * as git from './git';
-import { types as t, path } from '@codecast/lib';
+import { types as t, path } from '@codemic/lib';
 import _ from 'lodash';
 import assert from 'assert';
 import crypto from 'crypto';
 
 // export function getRecordingsPath(): t.AbsPath {
-//   return nodePath.join(os.homedir(), 'codecast', 'recordings') as t.AbsPath;
+//   return nodePath.join(os.homedir(), 'codemic', 'recordings') as t.AbsPath;
 // }
 
 // export function getDefaultRecordingPath(): t.AbsPath {
-//   return nodePath.join(getRecordingsPath(), 'session.codecast') as t.AbsPath;
+//   return nodePath.join(getRecordingsPath(), 'session.codemic') as t.AbsPath;
 // }
 
 export async function getGitAPI(): Promise<git.API> {

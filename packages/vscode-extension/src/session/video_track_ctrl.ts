@@ -1,4 +1,4 @@
-import { types as t, assert, lib } from '@codecast/lib';
+import { types as t, assert, lib } from '@codemic/lib';
 import type Session from './session.js';
 import _ from 'lodash';
 

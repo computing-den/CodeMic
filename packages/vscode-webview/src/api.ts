@@ -1,4 +1,4 @@
-import { types as t, bus as b, lib } from '@codecast/lib';
+import { types as t, bus as b, lib } from '@codemic/lib';
 import { updateStore } from './store.js';
 import type MediaManager from './media_manager.js';
 

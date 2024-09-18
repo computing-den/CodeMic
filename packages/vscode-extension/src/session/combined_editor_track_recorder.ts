@@ -1,4 +1,4 @@
-import { types as t, path, lib, internalEditorTrackCtrl as ietc, assert } from '@codecast/lib';
+import { types as t, path, lib, internalEditorTrackCtrl as ietc, assert } from '@codemic/lib';
 import type Session from './session.js';
 import config from '../config.js';
 import * as vscode from 'vscode';
@@ -29,8 +29,11 @@ class CombinedEditorTrackRecorder {
     this.session = session;
   }
 
-  record() {
+  async record() {
     if (this.recording) return;
+
+    await this.session.syncInternalEditorTrackToVscodeAndDisk();
+
     this.recording = true;
 
     // update focus

@@ -1,5 +1,5 @@
 import { h, Fragment, Component } from 'preact';
-import { types as t, lib } from '@codecast/lib';
+import { types as t, lib } from '@codemic/lib';
 import postMessage from './api.js';
 import Account from './account.jsx';
 import Welcome from './welcome.jsx';

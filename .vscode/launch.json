@@ -15,7 +15,7 @@
       ],
       "preLaunchTask": "${defaultBuildTask}",
       "sourceMaps": true,
-      "outFiles": ["${workspaceRoot}/packages/**/out/*", "!**/node_modules/**/*"]
+      "outFiles": ["${workspaceRoot}/packages/**/out/**/*", "!**/node_modules/**/*"]
       // "resolveSourceMapLocations": [
       //   "${workspaceRoot}/packages/**/out/*",
       //   "!**/node_modules/**"

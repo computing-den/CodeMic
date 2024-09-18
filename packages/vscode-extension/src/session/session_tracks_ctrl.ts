@@ -1,4 +1,4 @@
-import { types as t, path, lib, assert } from '@codecast/lib';
+import { types as t, path, lib, assert } from '@codemic/lib';
 import type { Session } from './session.js';
 import config from '../config.js';
 import type { SessionCtrls } from '../types.js';
@@ -78,7 +78,7 @@ export default class SessionTracksCtrl {
     this.update();
   }
 
-  record() {
+  async record() {
     assert(!this.running);
 
     assert(this.clock === this.session.head.duration);
@@ -86,7 +86,7 @@ export default class SessionTracksCtrl {
     this.mode.recordingEditor = true;
     this.mode.status = SessionTracksCtrlStatus.Running;
 
-    this.ctrls.combinedEditorTrackRecorder.record();
+    await this.ctrls.combinedEditorTrackRecorder.record();
 
     this.update();
   }
@@ -255,7 +255,7 @@ export default class SessionTracksCtrl {
 
   private loadInRangeVideoAndSeekIfDifferent() {
     const videoTrack = this.findInRangeVideoTrack();
-    console.log('loadInRangeVideoAndSeekIfDifferent videoTrack', videoTrack);
+    // console.log('loadInRangeVideoAndSeekIfDifferent videoTrack', videoTrack);
     if (videoTrack && (this.ctrls.videoTrackCtrl.videoTrack !== videoTrack || !this.ctrls.videoTrackCtrl.running)) {
       this.ctrls.videoTrackCtrl.loadTrack(videoTrack);
       this.ctrls.videoTrackCtrl.seek(this.globalClockToTrackLocal(videoTrack));

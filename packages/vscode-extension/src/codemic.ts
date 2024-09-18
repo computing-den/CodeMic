@@ -12,10 +12,10 @@ import * as paths from './paths.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
-import { types as t, lib, path } from '@codecast/lib';
-import { SessionHead } from '@codecast/lib/src/types.js';
+import { types as t, lib, path } from '@codemic/lib';
+import { SessionHead } from '@codemic/lib/src/types.js';
 
-class CodeCast {
+class CodeMic {
   screen: t.Screen = t.Screen.Welcome;
   account?: t.AccountState;
   recorder?: Recorder;
@@ -28,14 +28,12 @@ class CodeCast {
   test: any = 0;
 
   constructor(public context: Context) {
+    context.extension.subscriptions.push(vscode.commands.registerCommand('codemic.openView', this.openView.bind(this)));
     context.extension.subscriptions.push(
-      vscode.commands.registerCommand('codecast.openView', this.openView.bind(this)),
+      vscode.commands.registerCommand('codemic.openWelcome', this.openWelcomeCommand.bind(this)),
     );
     context.extension.subscriptions.push(
-      vscode.commands.registerCommand('codecast.openWelcome', this.openWelcomeCommand.bind(this)),
-    );
-    context.extension.subscriptions.push(
-      vscode.commands.registerCommand('codecast.account', this.openAccountCommand.bind(this)),
+      vscode.commands.registerCommand('codemic.account', this.openAccountCommand.bind(this)),
     );
 
     this.webviewProvider = new WebviewProvider(
@@ -85,13 +83,13 @@ class CodeCast {
     }
   }
 
-  static async fromExtensionContext(extension: vscode.ExtensionContext): Promise<CodeCast> {
+  static async fromExtensionContext(extension: vscode.ExtensionContext): Promise<CodeMic> {
     const user = extension.globalState.get<t.User>('user');
     const dataPaths = paths.dataPaths(user?.username);
-    const settings = await storage.readJSON<t.Settings>(dataPaths.settings, CodeCast.makeDefaultSettings);
+    const settings = await storage.readJSON<t.Settings>(dataPaths.settings, CodeMic.makeDefaultSettings);
     const { defaultWorkspacePaths } = paths;
     const context: Context = { extension, user, dataPaths, defaultWorkspacePaths, settings };
-    return new CodeCast(context);
+    return new CodeMic(context);
   }
 
   static makeDefaultSettings(): t.Settings {
@@ -575,7 +573,7 @@ class CodeCast {
   setScreen(screen: t.Screen) {
     this.screen = screen;
     this.updateViewTitle();
-    vscode.commands.executeCommand('setContext', 'codecast.canOpenWelcome', screen !== t.Screen.Welcome);
+    vscode.commands.executeCommand('setContext', 'codemic.canOpenWelcome', screen !== t.Screen.Welcome);
   }
 
   async openWelcome() {
@@ -776,7 +774,7 @@ class CodeCast {
   //   const uris = await vscode.window.showOpenDialog({
   //     canSelectFiles: true,
   //     canSelectMany: false,
-  //     filters: { CodeCast: ['codecast'] },
+  //     filters: { CodeMic: ['codemic'] },
   //   });
   //   return uris?.[0] && misc.uriFromVsc(uris?.[0]);
   // }
@@ -796,7 +794,7 @@ class CodeCast {
     // TODO ask user to convert anonymous sessions to the new user.
 
     const dataPaths = paths.dataPaths(user?.username);
-    const settings = await storage.readJSON<t.Settings>(dataPaths.settings, CodeCast.makeDefaultSettings);
+    const settings = await storage.readJSON<t.Settings>(dataPaths.settings, CodeMic.makeDefaultSettings);
     // const cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(dataPaths.cachedSessionCoverPhotos);
 
     this.session = undefined;
@@ -1110,4 +1108,4 @@ const COMMENTS: Record<string, t.Comment[]> = {
   ],
 };
 
-export default CodeCast;
+export default CodeMic;

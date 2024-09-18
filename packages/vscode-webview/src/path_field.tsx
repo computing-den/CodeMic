@@ -1,4 +1,4 @@
-import { types as t, lib, path } from '@codecast/lib';
+import { types as t, lib, path } from '@codemic/lib';
 import { cn } from './misc.js';
 import postMessage from './api.js';
 import { h, Fragment, Component } from 'preact';

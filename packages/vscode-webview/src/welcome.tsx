@@ -1,5 +1,5 @@
 import { h, Fragment, Component } from 'preact';
-import { types as t, lib } from '@codecast/lib';
+import { types as t, lib } from '@codemic/lib';
 import { SessionHeadList } from './session_head.jsx';
 import Screen from './screen.jsx';
 // import LoginBanner from './login_banner.jsx';
@@ -43,7 +43,7 @@ export default class Welcome extends Component<Props> {
                 <vscode-link href="#" onClick={this.join}>
                   join
                 </vscode-link>{' '}
-                to publish your own CodeCasts.
+                to publish your own CodeMics.
               </div>
             )}
           </Section.Body>

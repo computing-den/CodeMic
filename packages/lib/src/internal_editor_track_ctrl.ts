@@ -305,13 +305,32 @@ export class InternalEditorTrackCtrl implements t.EditorEventStepper {
   }
 
   /**
-   * Cuts all events whose clock is > clock.
+   * Cuts the sessions at clock.
    * Current clock must be < cut clock.
    */
   cut(clock: number) {
-    const i = this.editorTrack.events.findIndex(e => e.clock > clock);
-    assert(this.eventIndex < i);
-    if (i >= 0) this.editorTrack.events.length = i;
+    // Cut events
+    {
+      const i = this.editorTrack.events.findIndex(e => e.clock > clock);
+      assert(this.eventIndex < i);
+      if (i >= 0) this.editorTrack.events.length = i;
+    }
+
+    // Cut focusTimeline
+    {
+      this.cutFocusItems(this.editorTrack.focusTimeline.documents, clock);
+      this.cutFocusItems(this.editorTrack.focusTimeline.lines, clock);
+    }
+  }
+
+  private cutFocusItems(focusItems: t.FocusItem[], clock: number) {
+    for (const [i, focus] of focusItems.entries()) {
+      if (focus.clockRange.start >= clock) {
+        focusItems.length = i;
+        break;
+      }
+      focus.clockRange.end = Math.min(focus.clockRange.end, clock);
+    }
   }
 
   async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {

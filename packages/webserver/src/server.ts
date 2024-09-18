@@ -4,7 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import _ from 'lodash';
 import config from './config.js';
-import { types as t, assert, lib } from '@codecast/lib';
+import { types as t, assert, lib } from '@codemic/lib';
 import Database from 'better-sqlite3';
 import crypto from 'crypto';
 import multer from 'multer';
@@ -13,7 +13,7 @@ import { v4 as uuid } from 'uuid';
 import unzipper from 'unzipper';
 
 const upload = multer({
-  dest: path.resolve(os.tmpdir(), 'codecast'),
+  dest: path.resolve(os.tmpdir(), 'codemic'),
   limits: {
     fieldNameSize: 1000,
     fieldSize: 100 * 10 ** 6,
@@ -41,7 +41,7 @@ function start() {
 }
 
 function initDB() {
-  const dbPath = path.resolve(config.data, 'codecast.db');
+  const dbPath = path.resolve(config.data, 'codemic.db');
   function dbLog(...args: any[]) {
     console.log('sqlite: ', ...args);
   }
@@ -507,10 +507,7 @@ export default function requestLogger(req: express.Request, res: express.Respons
 }
 
 class ServerError extends Error {
-  constructor(
-    message: string,
-    public code: number,
-  ) {
+  constructor(message: string, public code: number) {
     super(message);
   }
 }

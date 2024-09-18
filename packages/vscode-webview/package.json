@@ -1,11 +1,11 @@
 {
-  "name": "@codecast/vscode-webview",
+  "name": "@codemic/vscode-webview",
   "version": "1.0.0",
   "description": "",
   "scripts": {},
   "type": "module",
   "dependencies": {
-    "@codecast/lib": "^1.0.0",
+    "@codemic/lib": "^1.0.0",
     "@types/lodash": "^4.14.199",
     "@types/uuid": "^9.0.4",
     "@types/vscode": "^1.82.0",

@@ -1,6 +1,6 @@
 {
-  "name": "@codecast/vscode-extension",
-  "displayName": "CodeCast",
+  "name": "@codemic/vscode-extension",
+  "displayName": "CodeMic",
   "description": "",
   "version": "0.0.1",
   "scripts": {},
@@ -15,28 +15,28 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "codecast-view-container",
-          "title": "CodeCast",
+          "id": "codemic-view-container",
+          "title": "CodeMic",
           "icon": "../vscode-webview/resources/icon.svg"
         }
       ]
     },
     "views": {
-      "codecast-view-container": [
+      "codemic-view-container": [
         {
           "type": "webview",
-          "id": "codecast-view",
-          "name": "CodeCast"
+          "id": "codemic-view",
+          "name": "CodeMic"
         }
       ]
     },
     "commands": [
       {
-        "command": "codecast.openView",
-        "title": "CodeCast"
+        "command": "codemic.openView",
+        "title": "CodeMic"
       },
       {
-        "command": "codecast.openWelcome",
+        "command": "codemic.openWelcome",
         "title": "Home",
         "icon": {
           "light": "../vscode-webview/resources/light/home.svg",
@@ -44,8 +44,8 @@
         }
       },
       {
-        "command": "codecast.account",
-        "title": "CodeCast account",
+        "command": "codemic.account",
+        "title": "CodeMic account",
         "icon": {
           "light": "../vscode-webview/resources/light/account.svg",
           "dark": "../vscode-webview/resources/dark/account.svg"
@@ -55,13 +55,13 @@
     "menus": {
       "view/title": [
         {
-          "command": "codecast.openWelcome",
-          "when": "view == codecast-view && codecast.canOpenWelcome",
+          "command": "codemic.openWelcome",
+          "when": "view == codemic-view && codemic.canOpenWelcome",
           "group": "navigation@1"
         },
         {
-          "command": "codecast.account",
-          "when": "view == codecast-view",
+          "command": "codemic.account",
+          "when": "view == codemic-view",
           "group": "navigation@2"
         }
       ]
@@ -76,7 +76,7 @@
     "@vscode/test-electron": "^2.3.4"
   },
   "dependencies": {
-    "@codecast/lib": "^1.0.0",
+    "@codemic/lib": "^1.0.0",
     "@types/archiver": "^6.0.2",
     "@types/uuid": "^9.0.4",
     "archiver": "^6.0.1",

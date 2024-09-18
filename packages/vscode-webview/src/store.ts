@@ -1,5 +1,5 @@
 import { produce } from 'immer';
-import { types as t } from '@codecast/lib';
+import { types as t } from '@codemic/lib';
 
 let store: t.Store;
 

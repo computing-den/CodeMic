@@ -1,4 +1,4 @@
-import { types as t, lib, assert } from '@codecast/lib';
+import { types as t, lib, assert } from '@codemic/lib';
 import postMessage from './api.js';
 import _ from 'lodash';
 
@@ -72,10 +72,7 @@ export class AudioTrackManager {
   node?: MediaElementAudioSourceNode;
   prepared = false;
 
-  constructor(
-    public id: string,
-    src: string,
-  ) {
+  constructor(public id: string, src: string) {
     this.audio = new Audio();
     this.audio.addEventListener('volumechange', this.handleVolumeChange);
     this.audio.addEventListener('timeupdate', this.handleTimeUpdate);

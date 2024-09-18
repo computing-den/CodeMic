@@ -1,4 +1,4 @@
-import { types as t, path, lib, internalEditorTrackCtrl as ietc } from '@codecast/lib';
+import { types as t, path, lib, internalEditorTrackCtrl as ietc } from '@codemic/lib';
 import VscEditorEventStepper from './vsc_editor_event_stepper.js';
 import type Session from './session.js';
 import config from '../config.js';

@@ -1,4 +1,4 @@
-import { types as t, lib, assert } from '@codecast/lib';
+import { types as t, lib, assert } from '@codemic/lib';
 import postMessage from './api.js';
 import _ from 'lodash';
 

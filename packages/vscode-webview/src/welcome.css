@@ -1,6 +1,7 @@
 .welcome {
   .search-section .section-body {
-    padding: 0 var(--container-padding-hor);
+    /* Set 1px top padding so that the focus outline of the search input doesn't overflow. */
+    padding: 1px var(--container-padding-hor) 0 var(--container-padding-hor);
 
     .search-subsection {
       display: flex;

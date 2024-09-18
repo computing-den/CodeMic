@@ -1,5 +1,5 @@
 {
-  "name": "@codecast/webserver",
+  "name": "@codemic/webserver",
   "version": "0.0.1",
   "scripts": {},
   "type": "module",
@@ -14,7 +14,7 @@
     "@types/node": "20.x"
   },
   "dependencies": {
-    "@codecast/lib": "^1.0.0",
+    "@codemic/lib": "^1.0.0",
     "@types/better-sqlite3": "^7.6.8",
     "@types/uuid": "^9.0.4",
     "axios": "^1.6.2",

@@ -1,4 +1,4 @@
-import { types as t, lib, assert } from '@codecast/lib';
+import { types as t, lib, assert } from '@codemic/lib';
 import postMessage from './api.js';
 import AudioManager from './audio_manager.js';
 import VideoManager from './video_manager.js';
