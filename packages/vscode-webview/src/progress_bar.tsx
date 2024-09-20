@@ -8,6 +8,7 @@ export type Props = {
   duration: number;
   clock: number;
   editorTrackFocusTimeline?: t.EditorTrackFocusTimeline;
+  toc: t.TocItem[];
 };
 
 export default class ProgressBar extends Component<Props> {
@@ -77,6 +78,9 @@ export default class ProgressBar extends Component<Props> {
   render() {
     const { clockUnderMouse, documentFocusUnderMouse, lineFocusUnderMouse } = this.state;
     const filledStyle = { height: `${(this.props.clock / this.props.duration) * 100}%` };
+    const tocIndicators = this.props.toc.map(item => ({
+      top: `${(item.clock / this.props.duration) * 100}%`,
+    }));
 
     return (
       <div className={cn('progress-bar', this.props.className)} ref={this.setRef}>
@@ -92,6 +96,9 @@ export default class ProgressBar extends Component<Props> {
         <div className="bar" onClick={this.clicked}>
           <div className="shadow" />
           <div className="filled" style={filledStyle} />
+          {tocIndicators.map(item => (
+            <div className="toc-item" style={item} />
+          ))}
         </div>
       </div>
     );

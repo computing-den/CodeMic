@@ -85,5 +85,14 @@
       background: #cc0000;
       transition: all 0.1s linear;
     }
+    .toc-item {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #181818a1;
+      transition: opacity 0.2s ease-in-out;
+    }
   }
 }

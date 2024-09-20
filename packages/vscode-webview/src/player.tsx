@@ -171,6 +171,7 @@ export default class Player extends Component<Props> {
             onSeek={this.seek}
             clock={player.clock}
             editorTrackFocusTimeline={player.editorTrackFocusTimeline}
+            toc={s.toc}
           />
         )}
         <Section className="main-section">

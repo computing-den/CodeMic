@@ -38,7 +38,7 @@
       background: #1f1f1f;
       display: none;
       transition: height 0.3s ease-out;
-      transition-delay: 1s;
+      transition-delay: 0.4s;
 
       &:has(video[src]:not([src=''])),
       &:has(img) {
