@@ -346,6 +346,12 @@ class EditorView extends Component<EditorViewProps> {
         disabled: recorder.playing || recorder.recording,
         onClick: this.insertVideo,
       },
+      {
+        title: 'Insert image',
+        icon: 'codicon-device-camera',
+        disabled: recorder.playing || recorder.recording,
+        onClick: () => console.log('TODO'),
+      },
     ];
 
     return (
