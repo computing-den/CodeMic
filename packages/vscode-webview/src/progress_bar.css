@@ -1,8 +1,10 @@
 .progress-bar {
   position: fixed;
-  top: calc(22px + var(--container-padding));
+  /* top: calc(22px + var(--container-padding)); */
+  /* bottom: var(--container-padding); */
+  top: 0;
+  bottom: 0;
   right: 0;
-  bottom: var(--container-padding);
   width: var(--progress-bar-hover-width);
   z-index: 1;
 
