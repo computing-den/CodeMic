@@ -40,7 +40,15 @@ export default class ProgressBar extends Component<Props> {
       shadow.style.height = `${p * 100}%`;
 
       const popover = this.ref!.querySelector('.popover') as HTMLElement;
-      popover.style.top = `${p * 100}%`;
+      const popoverRect = popover.getBoundingClientRect();
+      const barRect = this.ref!.getBoundingClientRect();
+      const spaceLeftAtBottom = barRect.height - e.clientY;
+      const popoverMinMargin = 5;
+      if (spaceLeftAtBottom < popoverRect.height + popoverMinMargin) {
+        popover.style.top = `${barRect.height - popoverRect.height - popoverMinMargin}px`;
+      } else {
+        popover.style.top = `${p * 100}%`;
+      }
 
       const documentFocus = this.props.editorTrackFocusTimeline?.documents.find(x =>
         lib.isClockInRange(clock, x.clockRange),

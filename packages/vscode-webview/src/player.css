@@ -85,6 +85,15 @@
         padding: var(--spacing-small);
         cursor: pointer;
 
+        &.active {
+          > .title {
+            font-weight: bold;
+          }
+          > .clock {
+            opacity: 1;
+          }
+        }
+
         &:hover {
           background: var(--vscode-list-hoverBackground);
         }

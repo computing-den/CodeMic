@@ -163,6 +163,8 @@ export default class Player extends Component<Props> {
       },
     ];
 
+    const tocIndex = _.findLastIndex(s.toc, item => item.clock <= player.clock);
+
     return (
       <Screen className="player">
         {player.loaded && (
@@ -207,17 +209,21 @@ export default class Player extends Component<Props> {
               />
               )*/}
             <div className="subsection search">
-              <vscode-text-field placeholder="Search"></vscode-text-field>
               <vscode-dropdown>
                 <vscode-option>Table of contents</vscode-option>
                 <vscode-option>Files</vscode-option>
                 <vscode-option>Entities</vscode-option>
               </vscode-dropdown>
+              <vscode-text-field placeholder="Search"></vscode-text-field>
             </div>
             {s.toc.length > 0 && (
               <div className="subsection toc">
-                {s.toc.map(item => (
-                  <div tabIndex={0} className="item" onClick={e => this.tocItemClicked(e, item)}>
+                {s.toc.map((item, i) => (
+                  <div
+                    tabIndex={0}
+                    className={cn('item', i === tocIndex && player.loaded && 'active')}
+                    onClick={e => this.tocItemClicked(e, item)}
+                  >
                     <div className="title">{item.title}</div>
                     <div className="clock">{lib.formatTimeSeconds(item.clock)}</div>
                   </div>
