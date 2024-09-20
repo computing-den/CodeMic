@@ -59,10 +59,16 @@
 
     .session-description {
     }
-  }
+    /* } */
 
-  .contents-section .section-body {
-    padding: var(--container-padding-ver) var(--container-padding-hor) 0 var(--container-padding-hor);
+    /* .contents-section .section-body { */
+    /*   padding: var(--container-padding-ver) var(--container-padding-hor) 0 var(--container-padding-hor); */
+
+    .search {
+      display: grid;
+      grid-gap: var(--spacing-medium);
+      grid-template-columns: 1fr 1fr;
+    }
 
     .toc {
       border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--dropdown-border));

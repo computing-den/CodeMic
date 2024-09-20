@@ -3,9 +3,6 @@
   "version": "0.0.1",
   "scripts": {},
   "type": "module",
-  "imports": {
-    "#config.json": "./config.json"
-  },
   "devDependencies": {
     "@types/body-parser": "^1.19.5",
     "@types/express": "^4.17.21",

@@ -79,18 +79,18 @@ export default class ProgressBar extends Component<Props> {
     const filledStyle = { height: `${(this.props.clock / this.props.duration) * 100}%` };
 
     return (
-      <div className={cn('progress-bar', this.props.className)} ref={this.setRef} onClick={this.clicked}>
-        <div className="bar">
-          <div className="shadow" />
-          <div className="popover">
-            <div className="row">
-              <div className="document-focus">
-                {documentFocusUnderMouse ? path.getUriShortNameOpt(documentFocusUnderMouse.uri) : '...'}
-              </div>
-              <div className="clock">{lib.formatTimeSeconds(clockUnderMouse ?? 0)}</div>
+      <div className={cn('progress-bar', this.props.className)} ref={this.setRef}>
+        <div className="popover">
+          <div className="row">
+            <div className="document-focus">
+              {documentFocusUnderMouse ? path.getUriShortNameOpt(documentFocusUnderMouse.uri) : '...'}
             </div>
-            <div className="line-focus">{lineFocusUnderMouse?.text || '...'}</div>
+            <div className="clock">{lib.formatTimeSeconds(clockUnderMouse ?? 0)}</div>
           </div>
+          <div className="line-focus">{lineFocusUnderMouse?.text || '...'}</div>
+        </div>
+        <div className="bar" onClick={this.clicked}>
+          <div className="shadow" />
           <div className="filled" style={filledStyle} />
         </div>
       </div>

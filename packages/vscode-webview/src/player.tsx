@@ -205,17 +205,14 @@ export default class Player extends Component<Props> {
                 autoFocus
               />
               )*/}
-          </Section.Body>
-        </Section>
-        <Section className="contents-section">
-          <Section.Header title="CONTENTS" collapsible />
-          <Section.Body>
-            <vscode-text-field className="subsection" placeholder="Search"></vscode-text-field>
-            <vscode-dropdown className="subsection">
-              <vscode-option>Table of contents</vscode-option>
-              <vscode-option>Files</vscode-option>
-              <vscode-option>Entities</vscode-option>
-            </vscode-dropdown>
+            <div className="subsection search">
+              <vscode-text-field placeholder="Search"></vscode-text-field>
+              <vscode-dropdown>
+                <vscode-option>Table of contents</vscode-option>
+                <vscode-option>Files</vscode-option>
+                <vscode-option>Entities</vscode-option>
+              </vscode-dropdown>
+            </div>
             {s.toc.length > 0 && (
               <div className="subsection toc">
                 {s.toc.map(item => (
