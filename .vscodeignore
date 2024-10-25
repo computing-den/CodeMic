@@ -1,0 +1,17 @@
+# This file contains all the files/directories that should
+# be ignored (i.e. not included) in the final packaged extension.
+
+.vscode/**
+out/**
+src/**
+esbuild.mjs
+.git/**
+scripts/**
+node_modules/**
+
+**/.gitignore
+**/.ignore
+**/tsconfig.json
+**/tsconfig.tsbuildinfo
+**/*.map
+**/*.ts

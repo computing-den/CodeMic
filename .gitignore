@@ -1,8 +1,9 @@
-node_modules
+/.vscode
+/node_modules
+/out
+/dist
+/config.json
+/private
+*.tsbuildinfo
 .emacs.desktop.lock
 .emacs.desktop
-/packages/*/out
-*.tsbuildinfo
-.server.pid
-/packages/*/config.json
-/private

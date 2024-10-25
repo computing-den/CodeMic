@@ -1,10 +1,29 @@
 {
-  "files": [],
-  "references": [
-    { "path": "packages/vscode-extension" },
-    { "path": "packages/vscode-webview" },
-    { "path": "packages/webserver" },
-    { "path": "packages/webclient" },
-    { "path": "packages/lib" }
-  ]
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "out",
+    "lib": ["es2020", "dom", "dom.iterable"],
+    "module": "commonjs",
+    "target": "es2020",
+    "declaration": true,
+    "sourceMap": true,
+    "strict": true /* enable all strict type-checking options */,
+    "moduleResolution": "node",
+    "noFallthroughCasesInSwitch": true /* Report errors for fallthrough cases in switch statement. */,
+    "esModuleInterop": true,
+    "incremental": true, // default is true when composite: true
+    "composite": true,
+    "useDefineForClassFields": true,
+    "allowJs": false,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "noUnusedParameters": false,
+    "noUnusedLocals": false,
+    "isolatedModules": true,
+    "noEmit": true, // because esbuild will emit the output (in bundle form)
+    "jsx": "preserve",
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "Fragment"
+  }
 }

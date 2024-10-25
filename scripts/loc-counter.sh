@@ -2,4 +2,4 @@
 
 # run from inside repo's root directory
 
-find ./packages/*/src | cloc --list-file=- --by-file
+find ./src | cloc --list-file=- --by-file

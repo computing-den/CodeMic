@@ -1,27 +1,116 @@
 {
-  "name": "CodeMic",
+  "name": "codemic-vscode",
+  "displayName": "CodeMic",
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "start": "npm run build && code --extensionDevelopmentPath=$PWD/packages/vscode-extension",
-    "server": "npm run build && npm run kill:server && node --enable-source-maps packages/webserver/out/server.js",
-    "dev:server": "npm run build && npm run kill:server && node --enable-source-maps --inspect=9230 packages/webserver/out/server.js",
-    "kill:server": "node  kill-server.mjs",
-    "build": "npm run build:tsc && npm run build:webview && npm run build:webclient",
-    "build:tsc": "tsc --build",
-    "watch:tsc": "tsc --build --watch --pretty false",
-    "build:webview": "cd packages/vscode-webview && node esbuild.mjs",
-    "build:webclient": "cd packages/webclient && node esbuild.mjs",
-    "clean": "rm -rf packages/*/out && rm -rf packages/*/tsconfig.tsbuildinfo"
+    "compile": "tsc && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.mjs --watch",
+    "watch:tsc": "tsc --watch",
+    "vscode:prepublish": "npm run package",
+    "bundle": "tsc && node esbuild.mjs --production",
+    "package": "npm run bundle && vsce package",
+    "ls": "vsce ls"
   },
-  "workspaces": [
-    "packages/vscode-extension",
-    "packages/vscode-webview",
-    "packages/webserver",
-    "packages/webclient",
-    "packages/lib"
+  "files": [
+    "dist",
+    "resources",
+    "config.json"
   ],
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codemic-view-container",
+          "title": "CodeMic",
+          "icon": "./resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codemic-view-container": [
+        {
+          "type": "webview",
+          "id": "codemic-view",
+          "name": "CodeMic"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "codemic.openView",
+        "title": "CodeMic"
+      },
+      {
+        "command": "codemic.openWelcome",
+        "title": "Home",
+        "icon": {
+          "light": "./resources/light/home.svg",
+          "dark": "./resources/dark/home.svg"
+        }
+      },
+      {
+        "command": "codemic.account",
+        "title": "CodeMic account",
+        "icon": {
+          "light": "./resources/light/account.svg",
+          "dark": "./resources/dark/account.svg"
+        }
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "codemic.openWelcome",
+          "when": "view == codemic-view && codemic.canOpenWelcome",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codemic.account",
+          "when": "view == codemic-view",
+          "group": "navigation@2"
+        }
+      ]
+    }
+  },
   "devDependencies": {
-    "typescript": "^5.2.2"
+    "@types/archiver": "^6.0.2",
+    "@types/axios": "^0.14.4",
+    "@types/lodash": "^4.14.199",
+    "@types/node": "20.x",
+    "@types/node-fetch": "^2.6.9",
+    "@types/unzipper": "^0.10.9",
+    "@types/uuid": "^9.0.4",
+    "@types/vscode": "^1.82.0",
+    "@types/vscode-webview": "^1.57.2",
+    "@vscode/codicons": "^0.0.36",
+    "@vscode/test-electron": "^2.3.4",
+    "esbuild": "^0.19.3",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.2.2",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "@vscode/webview-ui-toolkit": "^1.2.2",
+    "archiver": "^6.0.1",
+    "axios": "^1.7.7",
+    "form-data": "^4.0.0",
+    "ignore": "^5.2.4",
+    "immer": "^10.0.2",
+    "lodash": "^4.17.21",
+    "moment": "^2.29.4",
+    "node-fetch": "^2.7.0",
+    "preact": "^10.17.1",
+    "unzipper": "^0.10.14",
+    "uuid": "^9.0.1"
   }
 }

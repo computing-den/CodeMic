@@ -10,12 +10,12 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-extension"
+        "--extensionDevelopmentPath=${workspaceFolder}"
         //"--load-extension=/home/sean/.config/google-chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.28.0_0"
       ],
       "preLaunchTask": "${defaultBuildTask}",
       "sourceMaps": true,
-      "outFiles": ["${workspaceRoot}/packages/**/out/**/*", "!**/node_modules/**/*"]
+      "outFiles": ["${workspaceFolder}/dist/**/*"]
       // "resolveSourceMapLocations": [
       //   "${workspaceRoot}/packages/**/out/*",
       //   "!**/node_modules/**"
@@ -26,11 +26,12 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-extension",
-        "--extensionTestsPath=${workspaceFolder}/packages/vscode-extension/out/test/suite/index"
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--extensionTestsPath=${workspaceFolder}/dist/test"
       ],
       "preLaunchTask": "${defaultBuildTask}",
-      "sourceMaps": true
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/**/*"]
     }
   ]
 }
