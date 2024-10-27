@@ -1,6 +1,6 @@
 import * as t from '../../lib/types.js';
 import * as path from '../../lib/path.js';
-import * as ietc from './internal_workspace.js';
+import * as iw from './internal_workspace.js';
 import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import * as serverApi from '../server_api.js';
@@ -257,7 +257,7 @@ export class Session implements t.Session {
         const sha1 = await misc.computeSHA1(data);
         worktree[uri] = { type: 'local', sha1 };
         await this.writeBlob(sha1, data);
-        textEditors.push(ietc.makeTextEditorSnapshot(uri));
+        textEditors.push(iw.makeTextEditorSnapshot(uri));
       } else if (vscUri.scheme === 'file') {
         if (!(await misc.fileExists(path.abs(vscUri.path)))) {
           // File is deleted but the text editor is still there. Ignore it.
@@ -269,7 +269,7 @@ export class Session implements t.Session {
         if (vscTextEditor) {
           textEditors.push(this.makeTextEditorSnapshotFromVsc(vscTextEditor));
         } else {
-          textEditors.push(ietc.makeTextEditorSnapshot(uri));
+          textEditors.push(iw.makeTextEditorSnapshot(uri));
         }
       }
     }
@@ -597,15 +597,15 @@ export class Session implements t.Session {
   }
 
   selectionFromVsc(selection: vscode.Selection): t.Selection {
-    return ietc.makeSelection(this.positionFromVsc(selection.anchor), this.positionFromVsc(selection.active));
+    return iw.makeSelection(this.positionFromVsc(selection.anchor), this.positionFromVsc(selection.active));
   }
 
   rangeFromVsc(range: vscode.Range): t.Range {
-    return ietc.makeRange(this.positionFromVsc(range.start), this.positionFromVsc(range.end));
+    return iw.makeRange(this.positionFromVsc(range.start), this.positionFromVsc(range.end));
   }
 
   positionFromVsc(position: vscode.Position): t.Position {
-    return ietc.makePosition(position.line, position.character);
+    return iw.makePosition(position.line, position.character);
   }
 
   selectionsToVsc(selections: t.Selection[]): vscode.Selection[] {
@@ -629,7 +629,7 @@ export class Session implements t.Session {
   }
 
   contentChangeFromVsc(contentChange: vscode.TextDocumentContentChangeEvent): t.ContentChange {
-    return ietc.makeContentChange(contentChange.text, this.rangeFromVsc(contentChange.range));
+    return iw.makeContentChange(contentChange.text, this.rangeFromVsc(contentChange.range));
   }
 
   getVscTextDocumentRange(document: vscode.TextDocument): vscode.Range {
@@ -695,8 +695,8 @@ export class Session implements t.Session {
     return textEditors.find(x => x.document.uri.toString() === uriStr);
   }
 
-  textDocumentFromVsc(vscTextDocument: vscode.TextDocument, uri: t.Uri): ietc.TextDocument {
-    return new ietc.TextDocument(
+  textDocumentFromVsc(vscTextDocument: vscode.TextDocument, uri: t.Uri): iw.TextDocument {
+    return new iw.TextDocument(
       uri,
       _.times(vscTextDocument.lineCount, i => vscTextDocument.lineAt(i).text),
       this.eolFromVsc(vscTextDocument.eol),
@@ -749,7 +749,7 @@ export class Session implements t.Session {
   }
 
   makeTextEditorSnapshotFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {
-    return ietc.makeTextEditorSnapshot(
+    return iw.makeTextEditorSnapshot(
       this.uriFromVsc(vscTextEditor.document.uri),
       this.selectionsFromVsc(vscTextEditor.selections),
       this.rangeFromVsc(vscTextEditor.visibleRanges[0]),

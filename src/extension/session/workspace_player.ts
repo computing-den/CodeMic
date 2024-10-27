@@ -1,6 +1,6 @@
 import * as t from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
-import * as ietc from './internal_workspace.js';
+import InternalWorkspace from './internal_workspace.js';
 import VscWorkspaceStepper from './vsc_workspace_stepper.js';
 import type Session from './session.js';
 import config from '../config.js';
@@ -17,7 +17,7 @@ class WorkspacePlayer {
   private disposables: vscode.Disposable[] = [];
   private updateQueue = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
-  get internalCtrl(): ietc.InternalWorkspace {
+  get internalCtrl(): InternalWorkspace {
     return this.session.runtime!.internalWorkspace;
   }
 
