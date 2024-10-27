@@ -4,9 +4,10 @@ import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
 import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
 import type Session from './session.js';
-import { InternalWorkspace, TextDocument } from './internal_workspace.js';
+import InternalWorkspace from './internal_workspace.js';
+import InternalTextDocument from './internal_text_document.js';
 
-// Not every TextDocument may be attached to a TextEditor. At least not until the
+// Not every InternalTextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
 class InternalWorkspaceStepper implements t.WorkspaceStepper {
   constructor(public session: Session) {}
@@ -48,7 +49,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
         } else {
           text = new TextDecoder().decode(await this.internalWorkspace.getContentByUri(e.uri));
         }
-        textDocument = TextDocument.fromText(e.uri, text, e.eol);
+        textDocument = InternalTextDocument.fromText(e.uri, text, e.eol);
         this.internalWorkspace.insertTextDocument(textDocument); // Will insert into worktree if necessary.
       }
     } else {
@@ -68,7 +69,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     if (direction === t.Direction.Forwards) {
       this.internalWorkspace.closeAndRemoveTextDocumentByUri(e.uri);
     } else {
-      this.internalWorkspace.insertTextDocument(TextDocument.fromText(e.uri, e.revText, e.revEol));
+      this.internalWorkspace.insertTextDocument(InternalTextDocument.fromText(e.uri, e.revText, e.revEol));
     }
   }
 

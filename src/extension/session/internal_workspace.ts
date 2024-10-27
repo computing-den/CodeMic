@@ -4,19 +4,37 @@ import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
 import Session from './session.js';
 import InternalWorkspaceStepper from './internal_workspace_stepper.js';
+import InternalTextEditor from './internal_text_editor.js';
+import InternalTextDocument from './internal_text_document.js';
 
-// Not every TextDocument may be attached to a TextEditor. At least not until the
+/**
+ * If a document has been loaded into memory, then the latest content is in the document field and
+ * it should always be retrieved from there.
+ * Otherwise, its uri refers to the base file stored on disk.
+ */
+type LiveWorktreeItem = { file: t.File; document?: t.InternalDocument; editor?: t.InternalEditor };
+type LiveWorktree = Map<t.Uri, LiveWorktreeItem>;
+
+function makeLiveWorktree(worktree: t.Worktree): LiveWorktree {
+  const map = new Map<t.Uri, LiveWorktreeItem>();
+  for (const [key, file] of Object.entries(worktree)) {
+    map.set(key, { file });
+  }
+  return map;
+}
+
+// Not every InternalTextDocument may be attached to a InternalTextEditor. At least not until the
 // TextEditor is opened.
-export class InternalWorkspace {
+export default class InternalWorkspace {
   // These fields change with the clock/eventIndex
   // TODO sync the entire worktree structure including directories.
-  // If a TextDocument is in this.textDocuments, it is also in this.worktree.
-  // If a TextEditor is in this.textEditors, it is also in this.worktree.
+  // If a InternalTextDocument is in this.textDocuments, it is also in this.worktree.
+  // If a InternalTextEditor is in this.textEditors, it is also in this.worktree.
   eventIndex: number;
   worktree: LiveWorktree;
-  textDocuments: TextDocument[];
-  textEditors: TextEditor[];
-  activeTextEditor?: TextEditor;
+  textDocuments: InternalTextDocument[];
+  textEditors: InternalTextEditor[];
+  activeTextEditor?: InternalTextEditor;
   stepper: InternalWorkspaceStepper;
 
   private constructor(public session: Session) {
@@ -79,58 +97,62 @@ export class InternalWorkspace {
     throw new Error(`getContentByUri ${uri} type "${item.file}" not supported`);
   }
 
-  findTextDocumentByUri(uri: t.Uri): TextDocument | undefined {
+  findTextDocumentByUri(uri: t.Uri): InternalTextDocument | undefined {
     const textDocument = this.worktree.get(uri)?.document;
-    return textDocument instanceof TextDocument ? textDocument : undefined;
+    return textDocument instanceof InternalTextDocument ? textDocument : undefined;
   }
 
-  findTextEditorByUri(uri: t.Uri): TextEditor | undefined {
+  findTextEditorByUri(uri: t.Uri): InternalTextEditor | undefined {
     const textEditor = this.worktree.get(uri)?.editor;
-    return textEditor instanceof TextEditor ? textEditor : undefined;
+    return textEditor instanceof InternalTextEditor ? textEditor : undefined;
   }
 
-  getTextDocumentByUri(uri: t.Uri): TextDocument {
+  getTextDocumentByUri(uri: t.Uri): InternalTextDocument {
     const textDocument = this.findTextDocumentByUri(uri);
     assert(textDocument);
     return textDocument;
   }
 
-  getTextEditorByUri(uri: t.Uri): TextEditor {
+  getTextEditorByUri(uri: t.Uri): InternalTextEditor {
     const textEditor = this.findTextEditorByUri(uri);
     assert(textEditor);
     return textEditor;
   }
 
-  async openTextDocumentByUri(uri: t.Uri): Promise<TextDocument> {
+  async openTextDocumentByUri(uri: t.Uri): Promise<InternalTextDocument> {
     const worktreeItem = this.worktree.get(uri);
     if (!worktreeItem) throw new Error(`file not found ${uri}`);
 
     if (worktreeItem.document) {
-      if (!(worktreeItem.document instanceof TextDocument)) {
+      if (!(worktreeItem.document instanceof InternalTextDocument)) {
         throw new Error(`file is not a text document ${uri}`);
       }
       return worktreeItem.document;
     }
 
     const text = new TextDecoder().decode(await this.session.readFile(worktreeItem.file));
-    const textDocument = TextDocument.fromText(uri, text, this.editorTrack.defaultEol);
+    const textDocument = InternalTextDocument.fromText(uri, text, this.editorTrack.defaultEol);
     this.insertTextDocument(textDocument);
     return textDocument;
   }
 
-  insertTextDocument(textDocument: TextDocument) {
+  insertTextDocument(textDocument: InternalTextDocument) {
     const item = this.worktree.get(textDocument.uri) ?? { file: { type: 'empty' } };
     item.document = textDocument;
     this.worktree.set(textDocument.uri, item);
     this.textDocuments.push(textDocument);
   }
 
-  async openTextEditorByUri(uri: t.Uri, selections?: t.Selection[], visibleRange?: t.Range): Promise<TextEditor> {
+  async openTextEditorByUri(
+    uri: t.Uri,
+    selections?: t.Selection[],
+    visibleRange?: t.Range,
+  ): Promise<InternalTextEditor> {
     const worktreeItem = this.worktree.get(uri);
     if (!worktreeItem) throw new Error(`file not found ${uri}`);
 
     if (worktreeItem.editor) {
-      if (!(worktreeItem.editor instanceof TextEditor)) {
+      if (!(worktreeItem.editor instanceof InternalTextEditor)) {
         throw new Error(`file is not a text document ${uri}`);
       }
       if (selections && visibleRange) {
@@ -139,12 +161,12 @@ export class InternalWorkspace {
       return worktreeItem.editor;
     }
 
-    const textEditor = new TextEditor(await this.openTextDocumentByUri(uri), selections, visibleRange);
+    const textEditor = new InternalTextEditor(await this.openTextDocumentByUri(uri), selections, visibleRange);
     this.insertTextEditor(textEditor);
     return textEditor;
   }
 
-  insertTextEditor(textEditor: TextEditor) {
+  insertTextEditor(textEditor: InternalTextEditor) {
     const item = this.worktree.get(textEditor.document.uri) ?? {
       file: { type: 'empty' },
       document: textEditor.document,
@@ -332,282 +354,3 @@ export class InternalWorkspace {
     }
   }
 }
-
-/**
- * If a document has been loaded into memory, then the latest content is in the document field and
- * it should always be retrieved from there.
- * Otherwise, its uri refers to the base file stored on disk.
- */
-type LiveWorktreeItem = { file: t.File; document?: Document; editor?: Editor };
-type LiveWorktree = Map<t.Uri, LiveWorktreeItem>;
-
-function makeLiveWorktree(worktree: t.Worktree): LiveWorktree {
-  const map = new Map<t.Uri, LiveWorktreeItem>();
-  for (const [key, file] of Object.entries(worktree)) {
-    map.set(key, { file });
-  }
-  return map;
-}
-
-export interface Document {
-  getContent(): Uint8Array;
-}
-
-export class TextDocument implements Document {
-  constructor(public uri: t.Uri, public lines: string[], public eol: t.EndOfLine) {}
-
-  static fromText(uri: t.Uri, text: string, defaultEol: t.EndOfLine): TextDocument {
-    const eol = (text.match(/\r?\n/)?.[0] as t.EndOfLine) || defaultEol;
-    const lines = text.split(/\r?\n/);
-    return new TextDocument(uri, lines, eol);
-  }
-
-  getContent(): Uint8Array {
-    return new TextEncoder().encode(this.getText());
-  }
-
-  getText(range?: t.Range): string {
-    if (range) {
-      assert(this.isRangeValid(range), 'TextDocument getText: invalid range');
-      if (range.start.line === range.end.line) {
-        return this.lines[range.start.line].slice(range.start.character, range.end.character);
-      } else {
-        let text = this.lines[range.start.line].slice(range.start.character);
-        for (let i = range.start.line + 1; i < range.end.line; i++) {
-          text += this.eol + this.lines[i];
-        }
-        text += this.eol + this.lines[range.end.line].slice(0, range.end.character);
-        return text;
-      }
-    } else {
-      return this.lines.map(x => x).join(this.eol);
-    }
-  }
-
-  isRangeValid(range: t.Range): boolean {
-    return (
-      range.start.line >= 0 &&
-      range.start.character >= 0 &&
-      range.end.line < this.lines.length &&
-      range.end.character <= this.lines[range.end.line].length
-    );
-  }
-
-  /**
-   * Must be in increasing order and without overlaps.
-   * We calculate in increasing order instead of doing it in reverse because it makes calculating
-   * the line and character shifts for the reverse content changes easier.
-   */
-  applyContentChanges(contentChanges: t.ContentChange[], calcReverse: true): t.ContentChange[];
-  applyContentChanges(contentChanges: t.ContentChange[], calcReverse: false): undefined;
-  applyContentChanges(contentChanges: t.ContentChange[], calcReverse: boolean) {
-    const { lines } = this;
-    let revContentChanges: t.ContentChange[] | undefined;
-    let totalLineShift: number = 0;
-    let lastLineShifted = 0;
-    let lastLineCharShift = 0;
-    if (calcReverse) {
-      revContentChanges = [];
-    }
-
-    for (let { range, text } of contentChanges) {
-      const origRange = range;
-
-      // Apply shifts.
-      range = copyRange(range);
-      range.start.line += totalLineShift;
-      range.start.character += lastLineShifted === range.start.line ? lastLineCharShift : 0;
-      range.end.line += totalLineShift;
-      range.end.character += lastLineShifted === range.end.line ? lastLineCharShift : 0;
-
-      const newLines = text.split(/\r?\n/);
-
-      // Calculate reverse text.
-      let revText: string | undefined;
-      if (calcReverse) revText = this.getText(range);
-
-      // Prepend [0, range.start.character] of the first old line to the first new line.
-      const firstLinePrefix = lines[range.start.line].slice(0, range.start.character);
-      newLines[0] = firstLinePrefix + newLines[0];
-
-      // Append [range.end.character, END] of the last old line to the last new line.
-      const lastLineSuffix = lines[range.end.line].slice(range.end.character);
-      newLines[newLines.length - 1] += lastLineSuffix;
-
-      const rangeLineCount = range.end.line - range.start.line + 1;
-      const extraLineCount = newLines.length - rangeLineCount;
-
-      // Insert or delete extra lines.
-      if (extraLineCount > 0) {
-        const extraLines = _.times(extraLineCount, () => '');
-        lines.splice(range.start.line, 0, ...extraLines);
-      } else if (extraLineCount < 0) {
-        lines.splice(range.start.line, -extraLineCount);
-      }
-
-      // Replace lines.
-      for (let i = 0; i < newLines.length; i++) {
-        lines[i + range.start.line] = newLines[i];
-      }
-
-      // Calculate final position.
-      const finalPosition = {
-        line: range.end.line + extraLineCount,
-        character: newLines[newLines.length - 1].length - lastLineSuffix.length,
-      };
-
-      // Insert into revContentChanges.
-      if (revContentChanges) {
-        // Calculate reverse range
-        const revRange = { start: range.start, end: finalPosition };
-        revContentChanges!.push({ range: revRange, text: revText! });
-      }
-
-      // Calculate shifts for next loop iteration.
-      lastLineShifted = finalPosition.line;
-      lastLineCharShift = finalPosition.character - origRange.end.character;
-      totalLineShift += extraLineCount;
-    }
-
-    return revContentChanges;
-  }
-
-  getRange(): t.Range {
-    if (!this.lines.length) return makeRangeN(0, 0, 0, 0);
-    return makeRangeN(0, 0, this.lines.length - 1, this.lines[this.lines.length - 1].length);
-  }
-}
-
-export interface Editor {
-  document: Document;
-}
-
-/**
- * The document will be the same for the entire lifetime of this text editor.
- */
-export class TextEditor implements Editor {
-  constructor(
-    public document: TextDocument,
-    public selections: t.Selection[] = [makeSelectionN(0, 0, 0, 0)],
-    public visibleRange: t.Range = makeRangeN(0, 0, 1, 0),
-  ) {}
-
-  select(selections: t.Selection[], visibleRange: t.Range) {
-    this.selections = selections;
-    this.visibleRange = visibleRange;
-  }
-
-  scroll(visibleRange: t.Range) {
-    this.visibleRange = visibleRange;
-  }
-}
-
-export function isPositionBefore(a: t.Position, b: t.Position): boolean {
-  return a.line < b.line || (a.line === b.line && a.character < b.character);
-}
-
-export function isPositionAfter(a: t.Position, b: t.Position): boolean {
-  return a.line > b.line || (a.line === b.line && a.character > b.character);
-}
-
-export function isPositionEqual(a: t.Position, b: t.Position): boolean {
-  return a.line === b.line && a.character === b.character;
-}
-
-export function isRangeNonOverlapping(a: t.Range, b: t.Range): boolean {
-  return (
-    isPositionBefore(a.end, b.start) ||
-    isPositionEqual(a.end, b.start) ||
-    isPositionAfter(a.start, b.end) ||
-    isPositionEqual(a.start, b.end)
-  );
-}
-
-export function isRangeOverlapping(a: t.Range, b: t.Range): boolean {
-  return !isRangeNonOverlapping(a, b);
-}
-
-export function compareContentChanges(a: t.ContentChange, b: t.ContentChange): number {
-  return compareRange(a.range, b.range);
-}
-
-export function compareRange(a: t.Range, b: t.Range): number {
-  const lineDelta = a.start.line - b.start.line;
-  if (lineDelta !== 0) return lineDelta;
-
-  return a.start.character - b.start.character;
-}
-
-export function copyRange(range: t.Range): t.Range {
-  return makeRange(copyPosition(range.start), copyPosition(range.end));
-}
-
-export function makePosition(line: number, character: number): t.Position {
-  return { line, character };
-}
-
-export function copyPosition(position: t.Position): t.Position {
-  return { line: position.line, character: position.character };
-}
-
-export function makeRange(start: t.Position, end: t.Position): t.Range {
-  return { start, end };
-}
-
-export function makeRangeN(startLine: number, startCharacter: number, endLine: number, endCharacter: number): t.Range {
-  return { start: makePosition(startLine, startCharacter), end: makePosition(endLine, endCharacter) };
-}
-
-export function getRangeLineCount(range: t.Range): number {
-  return range.end.line - range.start.line;
-}
-
-export function makeSelection(anchor: t.Position, active: t.Position): t.Selection {
-  return { anchor, active };
-}
-
-export function makeSelectionN(
-  anchorLine: number,
-  anchorCharacter: number,
-  activeLine: number,
-  activeCharacter: number,
-): t.Selection {
-  return { anchor: makePosition(anchorLine, anchorCharacter), active: makePosition(activeLine, activeCharacter) };
-}
-
-export function getSelectionStart(selection: t.Selection): t.Position {
-  return isPositionBefore(selection.anchor, selection.active) ? selection.anchor : selection.active;
-}
-
-export function getSelectionEnd(selection: t.Selection): t.Position {
-  return isPositionAfter(selection.anchor, selection.active) ? selection.anchor : selection.active;
-}
-
-export function makeContentChange(text: string, range: t.Range): t.ContentChange {
-  return { text, range };
-}
-
-// export function makeEmptySnapshot(): t.InternalEditorTrackSnapshot {
-//   return {
-//     worktree: {},
-//     textEditors: [],
-//   };
-// }
-
-// export function makeEmptyEditorTrackJSON(defaultEol: t.EndOfLine): t.InternalWorkspace {
-//   return {
-//     events: [],
-//     defaultEol,
-//     initSnapshot: makeEmptySnapshot(),
-//   };
-// }
-
-export function makeTextEditorSnapshot(
-  uri: t.Uri,
-  selections: t.Selection[] = [makeSelectionN(0, 0, 0, 0)],
-  visibleRange: t.Range = makeRangeN(0, 0, 1, 0),
-): t.TextEditor {
-  return { uri, selections, visibleRange };
-}
-
-export default InternalWorkspace;

@@ -530,6 +530,14 @@ export type Selection = {
   active: Position;
 };
 
+export interface InternalEditor {
+  document: InternalDocument;
+}
+
+export interface InternalDocument {
+  getContent(): Uint8Array;
+}
+
 export type Worktree = { [key: Uri]: File };
 
 export type File = EmptyFile | LocalFile | GitFile;

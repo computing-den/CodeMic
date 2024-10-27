@@ -1,7 +1,9 @@
 import * as t from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
-import * as iw from './internal_workspace.js';
+import * as ih from './internal_helpers.js';
 import InternalWorkspace from './internal_workspace.js';
+import InternalTextEditor from './internal_text_editor.js';
+import InternalTextDocument from './internal_text_document.js';
 import assert from '../../lib/assert.js';
 import type Session from './session.js';
 import config from '../config.js';
@@ -170,7 +172,7 @@ class WorkspaceRecorder {
   private getCurrentLine(): number | undefined {
     const { activeTextEditor } = this.internalWorkspace;
     const selection = activeTextEditor?.selections[0];
-    return selection && iw.getSelectionStart(selection).line;
+    return selection && ih.getSelectionStart(selection).line;
   }
 
   // private pushLineFocus() {
@@ -217,14 +219,14 @@ class WorkspaceRecorder {
       let irContentChanges = this.session.contentChangesFromVsc(vscContentChanges);
 
       // Order content changes.
-      irContentChanges.sort(iw.compareContentChanges);
+      irContentChanges.sort(ih.compareContentChanges);
 
       // Validate ranges and make sure there are no overlaps.
       for (const [i, cc] of irContentChanges.entries()) {
         assert(irTextDocument.isRangeValid(cc.range), 'textChange: invalid range');
         if (i > 0) {
           assert(
-            iw.isRangeNonOverlapping(irContentChanges[i - 1].range, cc.range),
+            ih.isRangeNonOverlapping(irContentChanges[i - 1].range, cc.range),
             'textChange: got content changes with overlapping ranges',
           );
         }
@@ -454,7 +456,7 @@ class WorkspaceRecorder {
    *
    * Assumes a valid uri which has already been approved by this.session.shouldRecordVscUri().
    */
-  private async openTextDocumentByUri(vscTextDocument: vscode.TextDocument, uri: t.Uri): Promise<iw.TextDocument> {
+  private async openTextDocumentByUri(vscTextDocument: vscode.TextDocument, uri: t.Uri): Promise<InternalTextDocument> {
     const isInWorktree = this.internalWorkspace.doesUriExist(uri);
     let irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
 
@@ -496,13 +498,13 @@ class WorkspaceRecorder {
    * It does not push a showTextEditor event but it might open the text document.
    * Then, it will create or update the internal text editor.
    */
-  private async openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri): Promise<iw.TextEditor> {
+  private async openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri): Promise<InternalTextEditor> {
     const selections = this.session.selectionsFromVsc(vscTextEditor.selections);
     const visibleRange = this.session.rangeFromVsc(vscTextEditor.visibleRanges[0]);
     const textDocument = await this.openTextDocumentByUri(vscTextEditor.document, uri);
     let textEditor = this.internalWorkspace.findTextEditorByUri(textDocument.uri);
     if (!textEditor) {
-      textEditor = new iw.TextEditor(textDocument, selections, visibleRange);
+      textEditor = new InternalTextEditor(textDocument, selections, visibleRange);
       this.internalWorkspace.insertTextEditor(textEditor);
     } else {
       textEditor.select(selections, visibleRange);
