@@ -24,8 +24,8 @@ class WorkspaceRecorder {
   // private lastPosition?: t.Position;
   private lastLine: number | undefined;
 
-  get internalCtrl(): ietc.InternalEditorTrackCtrl {
-    return this.session.ctrls!.internalEditorTrackCtrl;
+  get internalWorkspace(): ietc.InternalWorkspace {
+    return this.session.ctrls!.internalWorkspace;
   }
 
   constructor(session: Session) {
@@ -35,7 +35,7 @@ class WorkspaceRecorder {
   async record() {
     if (this.recording) return;
 
-    await this.session.syncInternalEditorTrackToVscodeAndDisk();
+    await this.session.syncInternalWorkspaceToVscodeAndDisk();
 
     this.recording = true;
 
@@ -127,7 +127,7 @@ class WorkspaceRecorder {
 
   private updateFocus() {
     const { documents, lines } = this.session.body!.editorTrack.focusTimeline;
-    const { activeTextEditor } = this.internalCtrl;
+    const { activeTextEditor } = this.internalWorkspace;
     const activeUri = activeTextEditor?.document.uri;
     const lastDocumentFocus = documents.at(-1);
     const lastLineFocus = lines.at(-1);
@@ -162,12 +162,12 @@ class WorkspaceRecorder {
   private getCurrentLineText(): string | undefined {
     const line = this.getCurrentLine();
     if (line !== undefined) {
-      return this.internalCtrl.activeTextEditor?.document.lines[line];
+      return this.internalWorkspace.activeTextEditor?.document.lines[line];
     }
   }
 
   private getCurrentLine(): number | undefined {
-    const { activeTextEditor } = this.internalCtrl;
+    const { activeTextEditor } = this.internalWorkspace;
     const selection = activeTextEditor?.selections[0];
     return selection && ietc.getSelectionStart(selection).line;
   }
@@ -205,7 +205,7 @@ class WorkspaceRecorder {
     // Here, we assume that it is possible to get a textChange without a text editor
     // because vscode's event itself does not provide a text editor.
 
-    const irTextDocument = this.internalCtrl.findTextDocumentByUri(uri);
+    const irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
     if (irTextDocument) {
       let debugInitIrText: string | undefined;
       if (config.debug) {
@@ -247,14 +247,14 @@ class WorkspaceRecorder {
         );
 
         const debugNextIrText = irTextDocument.getText();
-        await this.internalCtrl.applyTextChangeEvent(irTextChangeEvent, t.Direction.Backwards);
+        await this.internalWorkspace.stepper.applyTextChangeEvent(irTextChangeEvent, t.Direction.Backwards);
         const debugReInitIrText = irTextDocument.getText();
         assert(
           debugInitIrText === debugReInitIrText,
           "textChange: text doesn't match what it was after applying changes in reverse",
         );
 
-        await this.internalCtrl.applyTextChangeEvent(irTextChangeEvent, t.Direction.Forwards);
+        await this.internalWorkspace.stepper.applyTextChangeEvent(irTextChangeEvent, t.Direction.Forwards);
         assert(
           debugNextIrText === irTextDocument.getText(),
           "textChange: text doesn't match what it was after applying changes again",
@@ -284,8 +284,8 @@ class WorkspaceRecorder {
     if (!this.session.shouldRecordVscUri(vscTextDocument.uri)) return;
 
     const uri = this.session.uriFromVsc(vscTextDocument.uri);
-    let irTextDocument = this.internalCtrl.findTextDocumentByUri(uri);
-    const irTextEditor = this.internalCtrl.findTextEditorByUri(uri);
+    let irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
+    const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
 
     if (!irTextDocument) return;
 
@@ -293,7 +293,7 @@ class WorkspaceRecorder {
 
     const revSelections = irTextEditor?.selections;
     const revVisibleRange = irTextEditor?.visibleRange;
-    this.internalCtrl.closeTextEditorByUri(uri);
+    this.internalWorkspace.closeTextEditorByUri(uri);
     this.pushEvent({
       type: 'closeTextEditor',
       clock: this.clock,
@@ -305,7 +305,7 @@ class WorkspaceRecorder {
     // No reason to remove/close the text document if it's not an untitled.
     if (vscTextDocument.uri.scheme === 'untitled') {
       const revText = irTextDocument.getText();
-      this.internalCtrl.closeAndRemoveTextDocumentByUri(uri);
+      this.internalWorkspace.closeAndRemoveTextDocumentByUri(uri);
       this.pushEvent({
         type: 'closeTextDocument',
         clock: this.clock,
@@ -323,14 +323,14 @@ class WorkspaceRecorder {
     const uri = this.session.uriFromVsc(vscTextEditor.document.uri);
     logAcceptedEvent(`accepted showTextEditor for ${uri}`);
 
-    const revUri = this.internalCtrl.activeTextEditor?.document.uri;
-    const revSelections = this.internalCtrl.activeTextEditor?.selections;
-    const revVisibleRange = this.internalCtrl.activeTextEditor?.visibleRange;
+    const revUri = this.internalWorkspace.activeTextEditor?.document.uri;
+    const revSelections = this.internalWorkspace.activeTextEditor?.selections;
+    const revVisibleRange = this.internalWorkspace.activeTextEditor?.visibleRange;
 
     // Possibly inserts an openTextDocument or textChange event if the document wasn't found in internal editorTrack or
     // its contents were different.
     const irTextEditor = await this.openTextEditorHelper(vscTextEditor, uri);
-    this.internalCtrl.activeTextEditor = irTextEditor;
+    this.internalWorkspace.activeTextEditor = irTextEditor;
 
     this.pushEvent({
       type: 'showTextEditor',
@@ -353,7 +353,7 @@ class WorkspaceRecorder {
       `accepted select for ${uri} visibleRange: ${vscTextEditor.visibleRanges[0].start.line}:${vscTextEditor.visibleRanges[0].end.line}`,
     );
 
-    const irTextEditor = this.internalCtrl.findTextEditorByUri(uri);
+    const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
 
     if (!irTextEditor) {
       this.showTextEditor(vscTextEditor); // Will insert selection too.
@@ -397,7 +397,7 @@ class WorkspaceRecorder {
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
     const uri = this.session.uriFromVsc(vscTextEditor.document.uri);
-    const irTextEditor = this.internalCtrl.findTextEditorByUri(uri);
+    const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
     if (!irTextEditor) {
       this.showTextEditor(vscTextEditor); // Will insert selection.
       return;
@@ -454,14 +454,14 @@ class WorkspaceRecorder {
    * Assumes a valid uri which has already been approved by this.session.shouldRecordVscUri().
    */
   private async openTextDocumentByUri(vscTextDocument: vscode.TextDocument, uri: t.Uri): Promise<ietc.TextDocument> {
-    const isInWorktree = this.internalCtrl.doesUriExist(uri);
-    let irTextDocument = this.internalCtrl.findTextDocumentByUri(uri);
+    const isInWorktree = this.internalWorkspace.doesUriExist(uri);
+    let irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
 
     let irText: string | undefined;
     const vscText = vscTextDocument.getText();
 
     if (isInWorktree) {
-      irText = new TextDecoder().decode(await this.internalCtrl.getContentByUri(uri));
+      irText = new TextDecoder().decode(await this.internalWorkspace.getContentByUri(uri));
     }
 
     if (irTextDocument && irText !== vscText) {
@@ -477,7 +477,7 @@ class WorkspaceRecorder {
       });
     } else if (!irTextDocument) {
       irTextDocument = this.session.textDocumentFromVsc(vscTextDocument, uri);
-      this.internalCtrl.insertTextDocument(irTextDocument); // will insert into worktree as well
+      this.internalWorkspace.insertTextDocument(irTextDocument); // will insert into worktree as well
       this.pushEvent({
         type: 'openTextDocument',
         clock: this.clock,
@@ -499,10 +499,10 @@ class WorkspaceRecorder {
     const selections = this.session.selectionsFromVsc(vscTextEditor.selections);
     const visibleRange = this.session.rangeFromVsc(vscTextEditor.visibleRanges[0]);
     const textDocument = await this.openTextDocumentByUri(vscTextEditor.document, uri);
-    let textEditor = this.internalCtrl.findTextEditorByUri(textDocument.uri);
+    let textEditor = this.internalWorkspace.findTextEditorByUri(textDocument.uri);
     if (!textEditor) {
       textEditor = new ietc.TextEditor(textDocument, selections, visibleRange);
-      this.internalCtrl.insertTextEditor(textEditor);
+      this.internalWorkspace.insertTextEditor(textEditor);
     } else {
       textEditor.select(selections, visibleRange);
     }

@@ -24,7 +24,7 @@ export type Context = {
 
 export type SessionCtrls = {
   sessionRuntime: SessionRuntime;
-  internalEditorTrackCtrl: ietc.InternalEditorTrackCtrl;
+  internalWorkspace: ietc.InternalWorkspace;
   audioTrackCtrls: AudioTrackCtrl[];
   videoTrackCtrl: VideoTrackCtrl;
   workspacePlayer: WorkspacePlayer;

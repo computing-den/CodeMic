@@ -9,7 +9,7 @@ export type Props = {
   onSeek: (clock: number) => unknown;
   duration: number;
   clock: number;
-  editorTrackFocusTimeline?: t.EditorTrackFocusTimeline;
+  workspaceFocusTimeline?: t.WorkspaceFocusTimeline;
   toc: t.TocItem[];
 };
 
@@ -52,10 +52,10 @@ export default class ProgressBar extends Component<Props> {
         popover.style.top = `${p * 100}%`;
       }
 
-      const documentFocus = this.props.editorTrackFocusTimeline?.documents.find(x =>
+      const documentFocus = this.props.workspaceFocusTimeline?.documents.find(x =>
         lib.isClockInRange(clock, x.clockRange),
       );
-      const lineFocus = this.props.editorTrackFocusTimeline?.lines.find(x => lib.isClockInRange(clock, x.clockRange));
+      const lineFocus = this.props.workspaceFocusTimeline?.lines.find(x => lib.isClockInRange(clock, x.clockRange));
 
       this.setState({ clockUnderMouse: clock, documentFocusUnderMouse: documentFocus, lineFocusUnderMouse: lineFocus });
     }

@@ -16,8 +16,8 @@ class WorkspacePlayer {
   private disposables: vscode.Disposable[] = [];
   private updateQueue = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
-  get internalCtrl(): ietc.InternalEditorTrackCtrl {
-    return this.session.ctrls!.internalEditorTrackCtrl;
+  get internalCtrl(): ietc.InternalWorkspace {
+    return this.session.ctrls!.internalWorkspace;
   }
 
   get vscWorkspaceStepper(): VscWorkspaceStepper {
@@ -31,7 +31,7 @@ class WorkspacePlayer {
   async play() {
     if (this.playing) return;
 
-    await this.session.syncInternalEditorTrackToVscodeAndDisk();
+    await this.session.syncInternalWorkspaceToVscodeAndDisk();
 
     this.playing = true;
 
@@ -67,7 +67,7 @@ class WorkspacePlayer {
   }
 
   /**
-   * Assumes that the editor track is modified externally.
+   * Assumes that the internal workspace was modified externally.
    */
   setClock(clock: number) {
     assert(this.updateQueue.length === 0, 'WorkspacePlayer setClock requires updateQueue to be empty');
@@ -96,7 +96,7 @@ class WorkspacePlayer {
       // Update by seeking the internal this.internalCtrl first, then syncing the this.internalCtrl to vscode and disk
       const uriSet: t.UriSet = {};
       await this.internalCtrl.seek(seekData, uriSet);
-      await this.session.syncInternalEditorTrackToVscodeAndDisk(Object.keys(uriSet));
+      await this.session.syncInternalWorkspaceToVscodeAndDisk(Object.keys(uriSet));
     } else {
       if (config.logTrackPlayerUpdateStep) {
         console.log('updateImmediately: applying one at a time', seekData);

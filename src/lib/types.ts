@@ -255,7 +255,7 @@ export type RecorderState = {
   sessionHead: SessionHead;
   workspace?: string;
   history?: SessionHistory;
-  editorTrackFocusTimeline?: EditorTrackFocusTimeline;
+  workspaceFocusTimeline?: WorkspaceFocusTimeline;
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
   blobsWebviewUris?: WebviewUris;
@@ -278,7 +278,7 @@ export type PlayerState = {
   clock: number;
   workspace?: string;
   history?: SessionHistory;
-  editorTrackFocusTimeline?: EditorTrackFocusTimeline;
+  workspaceFocusTimeline?: WorkspaceFocusTimeline;
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
   blobsWebviewUris?: WebviewUris;
@@ -322,7 +322,7 @@ export type SessionHead = {
 export type SessionHeadMap = { [key: string]: SessionHead | undefined };
 
 export type SessionBody = {
-  editorTrack: InternalEditorTrack;
+  editorTrack: InternalWorkspace;
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
 };
@@ -342,14 +342,14 @@ export type ClockRange = {
   end: number;
 };
 
-export type InternalEditorTrack = {
+export type InternalWorkspace = {
   initSnapshot: InternalEditorTrackSnapshot;
   events: EditorEvent[];
   defaultEol: EndOfLine;
-  focusTimeline: EditorTrackFocusTimeline;
+  focusTimeline: WorkspaceFocusTimeline;
 };
 
-export type EditorTrackFocusTimeline = {
+export type WorkspaceFocusTimeline = {
   documents: DocumentFocus[];
   lines: LineFocus[];
 };

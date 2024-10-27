@@ -2,11 +2,12 @@ import _ from 'lodash';
 import * as t from '../../lib/types.js';
 import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
-import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
+import Session from './session.js';
+import InternalWorkspaceStepper from './internal_workspace_stepper.js';
 
 // Not every TextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
-export class InternalEditorTrackCtrl implements t.WorkspaceStepper {
+export class InternalWorkspace {
   // These fields change with the clock/eventIndex
   // TODO sync the entire worktree structure including directories.
   // If a TextDocument is in this.textDocuments, it is also in this.worktree.
@@ -16,20 +17,22 @@ export class InternalEditorTrackCtrl implements t.WorkspaceStepper {
   textDocuments: TextDocument[];
   textEditors: TextEditor[];
   activeTextEditor?: TextEditor;
+  stepper: InternalWorkspaceStepper;
 
-  private constructor(public session: t.Session) {
+  private constructor(public session: Session) {
     this.eventIndex = -1;
     this.worktree = new Map();
     this.textDocuments = [];
     this.textEditors = [];
+    this.stepper = new InternalWorkspaceStepper(session);
   }
 
-  get editorTrack(): t.InternalEditorTrack {
+  get editorTrack(): t.InternalWorkspace {
     return this.session.body!.editorTrack;
   }
 
-  static async fromSession(session: t.Session): Promise<InternalEditorTrackCtrl> {
-    const track = new InternalEditorTrackCtrl(session);
+  static async fromSession(session: Session): Promise<InternalWorkspace> {
+    const track = new InternalWorkspace(session);
     await track.restoreInitSnapshot();
     return track;
   }
@@ -288,14 +291,10 @@ export class InternalEditorTrackCtrl implements t.WorkspaceStepper {
     this.finalizeSeek(seekData);
   }
 
-  async applyEditorEvent(e: t.EditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    await workspaceStepperDispatch(this, e, direction, uriSet);
-  }
-
   async applySeekStep(seekData: t.SeekData, stepIndex: number, uriSet?: t.UriSet) {
     const event = seekData.events[stepIndex];
     assert(event, 'applySeekStep: out of bound event index');
-    await this.applyEditorEvent(seekData.events[stepIndex], seekData.direction, uriSet);
+    await this.stepper.applyEditorEvent(seekData.events[stepIndex], seekData.direction, uriSet);
     const sign = seekData.direction === t.Direction.Forwards ? 1 : -1;
     this.eventIndex += sign * (stepIndex + 1);
   }
@@ -331,104 +330,6 @@ export class InternalEditorTrackCtrl implements t.WorkspaceStepper {
       }
       focus.clockRange.end = Math.min(focus.clockRange.end, clock);
     }
-  }
-
-  async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    if (uriSet) uriSet[e.uri] = true;
-    const textDocument = await this.openTextDocumentByUri(e.uri);
-    if (direction === t.Direction.Forwards) {
-      textDocument.applyContentChanges(e.contentChanges, false);
-    } else {
-      textDocument.applyContentChanges(e.revContentChanges, false);
-    }
-  }
-
-  async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    // The document may or may not exist in the worktree.
-    // The content must be matched if e.text is given.
-
-    if (uriSet) uriSet[e.uri] = true;
-
-    if (direction === t.Direction.Forwards) {
-      let textDocument = this.findTextDocumentByUri(e.uri);
-      if (textDocument && e.text !== undefined && e.text !== textDocument.getText()) {
-        textDocument.applyContentChanges([{ range: textDocument.getRange(), text: e.text }], false);
-      } else if (!textDocument) {
-        let text: string;
-        if (e.text !== undefined) {
-          text = e.text;
-        } else if (path.isUntitledUri(e.uri)) {
-          text = '';
-        } else {
-          text = new TextDecoder().decode(await this.getContentByUri(e.uri));
-        }
-        textDocument = TextDocument.fromText(e.uri, text, e.eol);
-        this.insertTextDocument(textDocument); // Will insert into worktree if necessary.
-      }
-    } else {
-      if (e.isInWorktree) {
-        this.closeTextEditorByUri(e.uri);
-      } else {
-        this.closeAndRemoveTextDocumentByUri(e.uri);
-      }
-    }
-  }
-
-  async applyCloseTextDocumentEvent(e: t.CloseTextDocumentEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    if (uriSet) uriSet[e.uri] = true;
-
-    assert(path.isUntitledUri(e.uri), 'Must only record closeTextDocument for untitled URIs');
-
-    if (direction === t.Direction.Forwards) {
-      this.closeAndRemoveTextDocumentByUri(e.uri);
-    } else {
-      this.insertTextDocument(TextDocument.fromText(e.uri, e.revText, e.revEol));
-    }
-  }
-
-  async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    if (direction === t.Direction.Forwards) {
-      if (uriSet) uriSet[e.uri] = true;
-      this.activeTextEditor = await this.openTextEditorByUri(e.uri, e.selections, e.visibleRange);
-    } else if (e.revUri) {
-      if (uriSet) uriSet[e.revUri] = true;
-      this.activeTextEditor = await this.openTextEditorByUri(e.revUri, e.revSelections, e.revVisibleRange);
-    }
-  }
-
-  async applyCloseTextEditorEvent(e: t.CloseTextEditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    if (uriSet) uriSet[e.uri] = true;
-
-    if (direction === t.Direction.Forwards) {
-      this.closeTextEditorByUri(e.uri);
-    } else {
-      await this.openTextEditorByUri(e.uri, e.revSelections, e.revVisibleRange);
-    }
-  }
-
-  async applySelectEvent(e: t.SelectEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    if (uriSet) uriSet[e.uri] = true;
-    const textEditor = await this.openTextEditorByUri(e.uri);
-    if (direction === t.Direction.Forwards) {
-      textEditor.select(e.selections, e.visibleRange);
-    } else {
-      textEditor.select(e.revSelections, e.revVisibleRange);
-    }
-  }
-
-  async applyScrollEvent(e: t.ScrollEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    if (uriSet) uriSet[e.uri] = true;
-    const textEditor = await this.openTextEditorByUri(e.uri);
-    if (direction === t.Direction.Forwards) {
-      textEditor.scroll(e.visibleRange);
-    } else {
-      textEditor.scroll(e.revVisibleRange);
-    }
-  }
-
-  async applySaveEvent(e: t.SaveEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    if (uriSet) uriSet[e.uri] = true;
-    // nothing
   }
 }
 
@@ -693,7 +594,7 @@ export function makeContentChange(text: string, range: t.Range): t.ContentChange
 //   };
 // }
 
-// export function makeEmptyEditorTrackJSON(defaultEol: t.EndOfLine): t.InternalEditorTrack {
+// export function makeEmptyEditorTrackJSON(defaultEol: t.EndOfLine): t.InternalWorkspace {
 //   return {
 //     events: [],
 //     defaultEol,
@@ -708,3 +609,5 @@ export function makeTextEditorSnapshot(
 ): t.TextEditor {
   return { uri, selections, visibleRange };
 }
+
+export default InternalWorkspace;

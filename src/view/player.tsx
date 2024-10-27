@@ -138,8 +138,8 @@ export default class Player extends Component<Props> {
         title: player.playing
           ? `Fork: create a new project starting at this point`
           : player.clock > 0
-            ? `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`
-            : `Fork: create a new project based on this one`,
+          ? `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`
+          : `Fork: create a new project based on this one`,
         icon: 'codicon-repo-forked',
         onClick: this.fork,
       },
@@ -173,7 +173,7 @@ export default class Player extends Component<Props> {
             duration={s.duration}
             onSeek={this.seek}
             clock={player.clock}
-            editorTrackFocusTimeline={player.editorTrackFocusTimeline}
+            workspaceFocusTimeline={player.workspaceFocusTimeline}
             toc={s.toc}
           />
         )}

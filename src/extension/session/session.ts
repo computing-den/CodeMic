@@ -157,7 +157,7 @@ export class Session implements t.Session {
     // Cut to cutClock.
     if (options?.cutClock !== undefined) {
       // We don't need to cut audio because playback ends when it reaches session's duration.
-      this.ctrls.internalEditorTrackCtrl.cut(options.cutClock);
+      this.ctrls.internalWorkspace.cut(options.cutClock);
       // for (const c of this.ctrls.audioTrackCtrls) c.cut(options.cutClock);
       this.head.duration = options.cutClock;
     }
@@ -166,13 +166,13 @@ export class Session implements t.Session {
     let targetUris: t.Uri[] | undefined;
     if (options?.seekClock) {
       const uriSet: t.UriSet = {};
-      const seekData = this.ctrls.internalEditorTrackCtrl.getSeekData(options.seekClock);
-      await this.ctrls.internalEditorTrackCtrl.seek(seekData, uriSet);
+      const seekData = this.ctrls.internalWorkspace.getSeekData(options.seekClock);
+      await this.ctrls.internalWorkspace.seek(seekData, uriSet);
       targetUris = Object.keys(uriSet);
     }
 
     // Sync and save.
-    await this.syncInternalEditorTrackToVscodeAndDisk(targetUris);
+    await this.syncInternalWorkspaceToVscodeAndDisk(targetUris);
     await this.saveAllRelevantVscTabs();
 
     // Close irrelevant tabs.
@@ -193,7 +193,7 @@ export class Session implements t.Session {
     await fs.promises.mkdir(this.workspace, { recursive: true });
 
     this.body.editorTrack.initSnapshot = await this.makeSnapshotFromDirAndVsc();
-    await this.ctrls.internalEditorTrackCtrl.restoreInitSnapshot();
+    await this.ctrls.internalWorkspace.restoreInitSnapshot();
 
     this.loaded = true;
   }
@@ -227,7 +227,7 @@ export class Session implements t.Session {
     assert(this.body);
     assert(!this.ctrls);
     this.ctrls = {
-      internalEditorTrackCtrl: await ietc.InternalEditorTrackCtrl.fromSession(this),
+      internalWorkspace: await ietc.InternalWorkspace.fromSession(this),
       audioTrackCtrls: this.body.audioTracks.map(audioTrack => new AudioTrackCtrl(this, audioTrack)),
       videoTrackCtrl: new VideoTrackCtrl(this),
       // videoTrackCtrl: new VideoTrackCtrl(this),
@@ -334,9 +334,9 @@ export class Session implements t.Session {
     return res;
   }
 
-  async syncInternalEditorTrackToVscodeAndDisk(targetUris?: t.Uri[]) {
+  async syncInternalWorkspaceToVscodeAndDisk(targetUris?: t.Uri[]) {
     // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
-    const ctrl = this.ctrls?.internalEditorTrackCtrl;
+    const ctrl = this.ctrls?.internalWorkspace;
     assert(ctrl);
 
     // TODO having both directories and files in targetUris and ctrl.worktree can make things

@@ -65,7 +65,7 @@ class Recorder {
     assert(this.sessionRuntime);
     if (this.sessionRuntime.clock !== this.session.head.duration) {
       // await this.session.ctrls!.workspacePlayer.seek(this.session.head.duration);
-      // this.session.ctrls?.internalEditorTrackCtrl.
+      // this.session.ctrls?.internalWorkspace.
       await this.sessionRuntime.seek(this.session.head.duration, { noUpdate: false });
       // await new Promise(resolve => setTimeout(resolve, 3000));
     }

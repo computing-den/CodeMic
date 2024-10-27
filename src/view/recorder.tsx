@@ -609,7 +609,7 @@ class Timeline extends Component<TimelineProps, TimelineState> {
       <div id="timeline" className="subsection">
         <div className="timeline-body">
           <EditorTrackUI
-            editorTrackFocusTimeline={recorder.editorTrackFocusTimeline}
+            workspaceFocusTimeline={recorder.workspaceFocusTimeline}
             timelineDuration={timelineDuration}
             timelineHeightPx={timelineHeightPx}
           />
@@ -762,15 +762,15 @@ class RangedTracksUI extends Component<RangedTracksUIProps> {
 type EditorTrackUIProps = {
   timelineDuration: number;
   timelineHeightPx: number;
-  editorTrackFocusTimeline?: t.EditorTrackFocusTimeline;
+  workspaceFocusTimeline?: t.WorkspaceFocusTimeline;
 };
 class EditorTrackUI extends Component<EditorTrackUIProps> {
   render() {
-    const { timelineDuration, timelineHeightPx, editorTrackFocusTimeline } = this.props;
+    const { timelineDuration, timelineHeightPx, workspaceFocusTimeline } = this.props;
 
     // const lineFocusItems:t.LineFocus [] = [];
-    // if (editorTrackFocusTimeline) {
-    //   const { documents, lines } = editorTrackFocusTimeline;
+    // if (workspaceFocusTimeline) {
+    //   const { documents, lines } = workspaceFocusTimeline;
     //   const durationOfOneLine = (TRACK_HEIGHT_PX * timelineDuration) / timelineHeightPx;
 
     //   // Cut duration of document focus items to durationOfOneLine.
@@ -795,7 +795,7 @@ class EditorTrackUI extends Component<EditorTrackUIProps> {
     // Skip lines that may cut into the previous line.
     const lineFocusTimeline: (t.LineFocus & { offsetPx?: number })[] = [];
     const heightOf1Sec = timelineHeightPx / timelineDuration;
-    for (const lineFocus of editorTrackFocusTimeline?.lines || []) {
+    for (const lineFocus of workspaceFocusTimeline?.lines || []) {
       const lastLineFocus = lineFocusTimeline.at(-1);
       if (!lastLineFocus) {
         lineFocusTimeline.push(lineFocus);
@@ -831,7 +831,7 @@ class EditorTrackUI extends Component<EditorTrackUIProps> {
 
     return (
       <div className="editor-track">
-        {editorTrackFocusTimeline?.documents?.map(documentFocus => {
+        {workspaceFocusTimeline?.documents?.map(documentFocus => {
           const style = {
             top: `${(documentFocus.clockRange.start / timelineDuration) * 100}%`,
             bottom: `calc(100% - ${(documentFocus.clockRange.end / timelineDuration) * 100}%)`,
