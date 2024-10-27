@@ -7,22 +7,22 @@ import type { SessionCtrls } from '../types.js';
 import AudioTrackCtrl from './audio_track_ctrl.js';
 import _ from 'lodash';
 
-export enum SessionTracksCtrlStatus {
+export enum SessionRuntimeStatus {
   Init,
   Error,
   Running,
   Paused,
 }
 
-export type SessionTracksCtrlMode = {
-  status: SessionTracksCtrlStatus;
+export type SessionRuntimeMode = {
+  status: SessionRuntimeStatus;
   recordingEditor: boolean;
 };
 
-export default class SessionTracksCtrl {
+export default class SessionRuntime {
   clock = 0;
-  mode: SessionTracksCtrlMode = {
-    status: SessionTracksCtrlStatus.Init,
+  mode: SessionRuntimeMode = {
+    status: SessionRuntimeStatus.Init,
     recordingEditor: false,
   };
 
@@ -35,7 +35,7 @@ export default class SessionTracksCtrl {
   private timeoutTimestamp = 0;
 
   get running(): boolean {
-    return this.mode.status === SessionTracksCtrlStatus.Running;
+    return this.mode.status === SessionRuntimeStatus.Running;
   }
 
   get ctrls(): SessionCtrls {
@@ -53,9 +53,9 @@ export default class SessionTracksCtrl {
   init() {
     for (const c of this.ctrls.audioTrackCtrls) this.initAudioCtrl(c);
     this.initVideoCtrl();
-    this.ctrls.combinedEditorTrackPlayer.onError = this.gotError.bind(this);
-    this.ctrls.combinedEditorTrackRecorder.onChange = this.combinedEditorTrackRecorderChangeHandler.bind(this);
-    this.ctrls.combinedEditorTrackRecorder.onError = this.gotError.bind(this);
+    this.ctrls.workspacePlayer.onError = this.gotError.bind(this);
+    this.ctrls.workspaceRecorder.onChange = this.workspaceRecorderChangeHandler.bind(this);
+    this.ctrls.workspaceRecorder.onError = this.gotError.bind(this);
   }
 
   load() {
@@ -70,13 +70,13 @@ export default class SessionTracksCtrl {
     assert(!this.running);
 
     this.mode.recordingEditor = false;
-    this.mode.status = SessionTracksCtrlStatus.Running;
+    this.mode.status = SessionRuntimeStatus.Running;
 
     if (this.isAlmostAtTheEnd()) {
       this.seek(0, { noUpdate: true });
     }
 
-    await this.ctrls.combinedEditorTrackPlayer.play();
+    await this.ctrls.workspacePlayer.play();
     this.update();
   }
 
@@ -86,16 +86,16 @@ export default class SessionTracksCtrl {
     assert(this.clock === this.session.head.duration);
 
     this.mode.recordingEditor = true;
-    this.mode.status = SessionTracksCtrlStatus.Running;
+    this.mode.status = SessionRuntimeStatus.Running;
 
-    await this.ctrls.combinedEditorTrackRecorder.record();
+    await this.ctrls.workspaceRecorder.record();
 
     this.update();
   }
 
   pause() {
     this.clearTimeout();
-    this.mode.status = SessionTracksCtrlStatus.Paused;
+    this.mode.status = SessionRuntimeStatus.Paused;
     this.pauseAudios();
     this.pauseVideo();
     this.pauseEditor();
@@ -132,7 +132,7 @@ export default class SessionTracksCtrl {
   deleteAudio(id: string) {
     const i = this.ctrls.audioTrackCtrls.findIndex(c => c.audioTrack.id === id);
     if (i === -1) {
-      console.error(`SessionTracksCtrl deleteAudio did not find audio track with id ${id}`);
+      console.error(`SessionRuntime deleteAudio did not find audio track with id ${id}`);
       return;
     }
 
@@ -187,20 +187,20 @@ export default class SessionTracksCtrl {
   }
 
   private async seekEditor() {
-    this.ctrls.combinedEditorTrackRecorder.setClock(this.clock);
+    this.ctrls.workspaceRecorder.setClock(this.clock);
 
     if (this.mode.recordingEditor) {
-      this.ctrls.combinedEditorTrackPlayer.setClock(this.clock);
+      this.ctrls.workspacePlayer.setClock(this.clock);
     } else {
-      await this.ctrls.combinedEditorTrackPlayer.seek(this.clock);
+      await this.ctrls.workspacePlayer.seek(this.clock);
     }
   }
 
   private pauseEditor() {
     if (this.mode.recordingEditor) {
-      this.ctrls.combinedEditorTrackRecorder.pause();
+      this.ctrls.workspaceRecorder.pause();
     } else {
-      this.ctrls.combinedEditorTrackPlayer.pause();
+      this.ctrls.workspacePlayer.pause();
     }
   }
 
@@ -295,7 +295,7 @@ export default class SessionTracksCtrl {
     return lib.clockToLocal(this.clock, t.clockRange);
   }
 
-  private combinedEditorTrackRecorderChangeHandler() {
+  private workspaceRecorderChangeHandler() {
     this.onChange?.();
     this.onChangeOrProgress?.();
   }
@@ -311,9 +311,9 @@ export default class SessionTracksCtrl {
     this.clock += (timeAtUpdate - this.timeoutTimestamp) / 1000;
 
     if (this.mode.recordingEditor) {
-      if (config.logSessionTracksCtrlUpdateStep) {
+      if (config.logSessionRuntimeUpdateStep) {
         console.log(
-          `SessionTracksCtrl duration ${this.session.head.duration} -> ${Math.max(
+          `SessionRuntime duration ${this.session.head.duration} -> ${Math.max(
             this.session.head.duration,
             this.clock,
           )}`,
@@ -348,7 +348,7 @@ export default class SessionTracksCtrl {
 
   private gotError(error: Error) {
     this.pause();
-    this.mode.status = SessionTracksCtrlStatus.Error;
+    this.mode.status = SessionRuntimeStatus.Error;
     this.onError?.(error);
   }
 }

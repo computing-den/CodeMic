@@ -1,7 +1,7 @@
-import * as t from './types';
+import * as t from '../../lib/types';
 
-export default function editorEventStepperDispatch(
-  stepper: t.EditorEventStepper,
+export default function workspaceStepperDispatch(
+  stepper: t.WorkspaceStepper,
   e: t.EditorEvent,
   direction: t.Direction,
   uriSet?: t.UriSet,

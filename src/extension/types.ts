@@ -1,13 +1,13 @@
 import type { ExtensionContext, WebviewView } from 'vscode';
 import type { DataPaths, DefaultWorkspacePaths } from './paths.js';
 import * as t from '../lib/types.js';
-import * as ietc from '../lib/internal_editor_track_ctrl.js';
-import type SessionTracksCtrl from './session/session_tracks_ctrl.js';
-import type CombinedEditorTrackPlayer from './session/combined_editor_track_player.js';
-import type CombinedEditorTrackRecorder from './session/combined_editor_track_recorder.js';
+import * as ietc from './session/internal_workspace.js';
+import type SessionRuntime from './session/session_runtime.js';
+import type WorkspacePlayer from './session/workspace_player.js';
+import type WorkspaceRecorder from './session/workspace_recorder.js';
 import type AudioTrackCtrl from './session/audio_track_ctrl.js';
 import type VideoTrackCtrl from './session/video_track_ctrl.js';
-import type VscEditorEventStepper from './session/vsc_editor_event_stepper.js';
+import type VscWorkspaceStepper from './session/vsc_workspace_stepper.js';
 import _ from 'lodash';
 
 export type Context = {
@@ -23,13 +23,13 @@ export type Context = {
 };
 
 export type SessionCtrls = {
-  sessionTracksCtrl: SessionTracksCtrl;
+  sessionRuntime: SessionRuntime;
   internalEditorTrackCtrl: ietc.InternalEditorTrackCtrl;
   audioTrackCtrls: AudioTrackCtrl[];
   videoTrackCtrl: VideoTrackCtrl;
-  combinedEditorTrackPlayer: CombinedEditorTrackPlayer;
-  combinedEditorTrackRecorder: CombinedEditorTrackRecorder;
-  vscEditorEventStepper: VscEditorEventStepper;
+  workspacePlayer: WorkspacePlayer;
+  workspaceRecorder: WorkspaceRecorder;
+  vscWorkspaceStepper: VscWorkspaceStepper;
 };
 
 export type RecorderRestoreState = {

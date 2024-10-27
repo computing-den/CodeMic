@@ -1,6 +1,6 @@
 import * as t from '../../lib/types.js';
 import * as path from '../../lib/path.js';
-import * as ietc from '../../lib/internal_editor_track_ctrl.js';
+import * as ietc from './internal_workspace.js';
 import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import * as serverApi from '../server_api.js';
@@ -9,12 +9,12 @@ import config from '../config.js';
 import * as misc from '../misc.js';
 import type { Context, ReadDirOptions, SessionCtrls } from '../types.js';
 import * as storage from '../storage.js';
-import SessionTracksCtrl from './session_tracks_ctrl.js';
-import CombinedEditorTrackPlayer from './combined_editor_track_player.js';
-import CombinedEditorTrackRecorder from './combined_editor_track_recorder.js';
+import SessionRuntime from './session_runtime.js';
+import WorkspacePlayer from './workspace_player.js';
+import WorkspaceRecorder from './workspace_recorder.js';
 import AudioTrackCtrl from './audio_track_ctrl.js';
 import VideoTrackCtrl from './video_track_ctrl.js';
-import VscEditorEventStepper from './vsc_editor_event_stepper.js';
+import VscWorkspaceStepper from './vsc_workspace_stepper.js';
 import fs from 'fs';
 import _ from 'lodash';
 import archiver from 'archiver';
@@ -33,10 +33,6 @@ export class Session implements t.Session {
   body?: t.SessionBody;
   ctrls?: SessionCtrls;
 
-  // editorPlayer?: CombinedEditorTrackPlayer;
-  // editorRecorder?: CombinedEditorTrackRecorder;
-  // audioCtrls?: AudioCtrl[];
-
   constructor(context: Context, workspace: t.AbsPath, head: t.SessionHead, inStorage: boolean) {
     this.context = context;
     this.workspace = workspace;
@@ -49,19 +45,19 @@ export class Session implements t.Session {
   }
 
   get clock(): number | undefined {
-    return this.ctrls?.sessionTracksCtrl.clock;
+    return this.ctrls?.sessionRuntime.clock;
   }
 
   get running(): boolean {
-    return Boolean(this.ctrls?.sessionTracksCtrl.running);
+    return Boolean(this.ctrls?.sessionRuntime.running);
   }
 
   get recording(): boolean {
-    return Boolean(this.running && this.ctrls?.sessionTracksCtrl.mode.recordingEditor);
+    return Boolean(this.running && this.ctrls?.sessionRuntime.mode.recordingEditor);
   }
 
   get playing(): boolean {
-    return Boolean(this.running && !this.ctrls?.sessionTracksCtrl.mode.recordingEditor);
+    return Boolean(this.running && !this.ctrls?.sessionRuntime.mode.recordingEditor);
   }
 
   static async fromExisting(context: Context, id: string): Promise<Session | undefined> {
@@ -235,12 +231,12 @@ export class Session implements t.Session {
       audioTrackCtrls: this.body.audioTracks.map(audioTrack => new AudioTrackCtrl(this, audioTrack)),
       videoTrackCtrl: new VideoTrackCtrl(this),
       // videoTrackCtrl: new VideoTrackCtrl(this),
-      combinedEditorTrackPlayer: new CombinedEditorTrackPlayer(this),
-      combinedEditorTrackRecorder: new CombinedEditorTrackRecorder(this),
-      vscEditorEventStepper: new VscEditorEventStepper(this),
-      sessionTracksCtrl: new SessionTracksCtrl(this),
+      workspacePlayer: new WorkspacePlayer(this),
+      workspaceRecorder: new WorkspaceRecorder(this),
+      vscWorkspaceStepper: new VscWorkspaceStepper(this),
+      sessionRuntime: new SessionRuntime(this),
     };
-    this.ctrls.sessionTracksCtrl.init();
+    this.ctrls.sessionRuntime.init();
   }
 
   async makeSnapshotFromDirAndVsc(): Promise<t.InternalEditorTrackSnapshot> {

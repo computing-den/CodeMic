@@ -542,12 +542,12 @@ class CodeMic {
       }
       case 'audio': {
         assert(this.session?.ctrls);
-        this.session.ctrls.sessionTracksCtrl.handleFrontendAudioEvent(req.event);
+        this.session.ctrls.sessionRuntime.handleFrontendAudioEvent(req.event);
         return this.respondWithStore();
       }
       case 'video': {
         assert(this.session?.ctrls);
-        this.session.ctrls.sessionTracksCtrl.handleFrontendVideoEvent(req.event);
+        this.session.ctrls.sessionRuntime.handleFrontendVideoEvent(req.event);
         return this.respondWithStore();
       }
       case 'test': {

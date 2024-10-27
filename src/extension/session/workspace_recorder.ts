@@ -1,6 +1,6 @@
 import * as t from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
-import * as ietc from '../../lib/internal_editor_track_ctrl.js';
+import * as ietc from './internal_workspace.js';
 import assert from '../../lib/assert.js';
 import type Session from './session.js';
 import config from '../config.js';
@@ -10,7 +10,7 @@ import _ from 'lodash';
 
 const SCROLL_LINES_TRIGGER = 2;
 
-class CombinedEditorTrackRecorder {
+class WorkspaceRecorder {
   recording = false;
   onChange?: () => any;
   onError?: (error: Error) => any;
@@ -539,4 +539,4 @@ function logAcceptedEvent(str: string) {
   if (config.logRecorderAcceptedVscEvents) console.log(str);
 }
 
-export default CombinedEditorTrackRecorder;
+export default WorkspaceRecorder;

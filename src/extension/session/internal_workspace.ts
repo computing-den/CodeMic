@@ -1,12 +1,12 @@
 import _ from 'lodash';
-import * as t from './types.js';
-import editorEventStepperDispatch from './editor_event_stepper_dispatch.js';
-import * as path from './path.js';
-import assert from './assert.js';
+import * as t from '../../lib/types.js';
+import * as path from '../../lib/path.js';
+import assert from '../../lib/assert.js';
+import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
 
 // Not every TextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
-export class InternalEditorTrackCtrl implements t.EditorEventStepper {
+export class InternalEditorTrackCtrl implements t.WorkspaceStepper {
   // These fields change with the clock/eventIndex
   // TODO sync the entire worktree structure including directories.
   // If a TextDocument is in this.textDocuments, it is also in this.worktree.
@@ -289,7 +289,7 @@ export class InternalEditorTrackCtrl implements t.EditorEventStepper {
   }
 
   async applyEditorEvent(e: t.EditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    await editorEventStepperDispatch(this, e, direction, uriSet);
+    await workspaceStepperDispatch(this, e, direction, uriSet);
   }
 
   async applySeekStep(seekData: t.SeekData, stepIndex: number, uriSet?: t.UriSet) {
@@ -453,11 +453,7 @@ export interface Document {
 }
 
 export class TextDocument implements Document {
-  constructor(
-    public uri: t.Uri,
-    public lines: string[],
-    public eol: t.EndOfLine,
-  ) {}
+  constructor(public uri: t.Uri, public lines: string[], public eol: t.EndOfLine) {}
 
   static fromText(uri: t.Uri, text: string, defaultEol: t.EndOfLine): TextDocument {
     const eol = (text.match(/\r?\n/)?.[0] as t.EndOfLine) || defaultEol;

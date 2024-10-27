@@ -224,16 +224,6 @@ export type UserSummary = {
   joinTimestamp: string;
 };
 
-export type DBUser = {
-  username: string;
-  hash: string;
-  email: string;
-  token: string;
-  // avatar?: string;
-  join_timestamp: string;
-  token_timestamp: string;
-};
-
 export type Credentials = {
   username: string;
   password: string;
@@ -264,9 +254,7 @@ export type RecorderState = {
   clock: number;
   sessionHead: SessionHead;
   workspace?: string;
-  // fork?: { clock: number };
   history?: SessionHistory;
-  // editorTrack?: InternalEditorTrack;
   editorTrackFocusTimeline?: EditorTrackFocusTimeline;
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
@@ -332,21 +320,6 @@ export type SessionHead = {
 };
 
 export type SessionHeadMap = { [key: string]: SessionHead | undefined };
-
-export type DBSessionHead = {
-  id: string;
-  title: string;
-  description: string;
-  author: string;
-  duration: number;
-  views: number;
-  likes: number;
-  publish_timestamp: string;
-  modification_timestamp: string;
-  toc: string;
-  forked_from?: string;
-  has_cover_photo: number;
-};
 
 export type SessionBody = {
   editorTrack: InternalEditorTrack;
@@ -438,7 +411,7 @@ export interface Session {
   copyToBlob(src: AbsPath, sha1: string): Promise<void>;
 }
 
-export interface EditorEventStepper {
+export interface WorkspaceStepper {
   applyEditorEvent(e: EditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyTextChangeEvent(e: TextChangeEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyOpenTextDocumentEvent(e: OpenTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;

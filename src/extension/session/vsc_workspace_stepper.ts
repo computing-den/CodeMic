@@ -1,17 +1,17 @@
 import * as t from '../../lib/types.js';
 import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
-import editorEventStepperDispatch from '../../lib/editor_event_stepper_dispatch.js';
+import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
 import { fileExists } from '../misc.js';
 import Session from './session.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 
-class VscEditorEventStepper implements t.EditorEventStepper {
+class VscWorkspaceStepper implements t.WorkspaceStepper {
   constructor(public session: Session) {}
 
   async applyEditorEvent(e: t.EditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    await editorEventStepperDispatch(this, e, direction, uriSet);
+    await workspaceStepperDispatch(this, e, direction, uriSet);
   }
 
   async applySeekStep(seekData: t.SeekData, stepIndex: number) {
@@ -154,4 +154,4 @@ class VscEditorEventStepper implements t.EditorEventStepper {
   }
 }
 
-export default VscEditorEventStepper;
+export default VscWorkspaceStepper;

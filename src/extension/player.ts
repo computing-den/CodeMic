@@ -1,6 +1,6 @@
 import type { SessionCtrls } from './types.js';
 import type Session from './session/session.js';
-import type SessionTracksCtrl from './session/session_tracks_ctrl.js';
+import type SessionRuntime from './session/session_runtime.js';
 import _ from 'lodash';
 import assert from 'assert';
 
@@ -15,8 +15,8 @@ class Player {
     return this.session.ctrls;
   }
 
-  get sessionTracksCtrl(): SessionTracksCtrl | undefined {
-    return this.ctrls?.sessionTracksCtrl;
+  get sessionRuntime(): SessionRuntime | undefined {
+    return this.ctrls?.sessionRuntime;
   }
 
   async sessionCtrlChangeOrProgressHandler() {
@@ -33,29 +33,29 @@ class Player {
     // TODO continue from last position left off
     await this.session.load();
     assert(this.ctrls);
-    this.ctrls.sessionTracksCtrl.onChangeOrProgress = this.sessionCtrlChangeOrProgressHandler.bind(this);
-    this.ctrls.sessionTracksCtrl.onError = this.sessionCtrlErrorHandler.bind(this);
+    this.ctrls.sessionRuntime.onChangeOrProgress = this.sessionCtrlChangeOrProgressHandler.bind(this);
+    this.ctrls.sessionRuntime.onError = this.sessionCtrlErrorHandler.bind(this);
   }
 
   async play() {
-    assert(this.sessionTracksCtrl);
-    await this.sessionTracksCtrl.play();
+    assert(this.sessionRuntime);
+    await this.sessionRuntime.play();
     this.saveHistoryOpenClose().catch(console.error);
   }
 
   pause() {
-    assert(this.sessionTracksCtrl);
-    this.sessionTracksCtrl.pause();
+    assert(this.sessionRuntime);
+    this.sessionRuntime.pause();
     this.saveHistoryClock().catch(console.error);
   }
 
   seek(clock: number) {
-    assert(this.sessionTracksCtrl);
-    this.sessionTracksCtrl.seek(clock);
+    assert(this.sessionRuntime);
+    this.sessionRuntime.seek(clock);
   }
 
   dispose() {
-    // this.sessionTracksCtrl.dispose();
+    // this.sessionRuntime.dispose();
   }
 
   private async saveHistoryClock(options?: WriteOptions) {

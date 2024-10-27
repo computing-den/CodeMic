@@ -1,14 +1,14 @@
 import * as t from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
-import * as ietc from '../../lib/internal_editor_track_ctrl.js';
-import VscEditorEventStepper from './vsc_editor_event_stepper.js';
+import * as ietc from './internal_workspace.js';
+import VscWorkspaceStepper from './vsc_workspace_stepper.js';
 import type Session from './session.js';
 import config from '../config.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
 
-class CombinedEditorTrackPlayer {
+class WorkspacePlayer {
   playing = false;
   onError?: (error: Error) => any;
 
@@ -20,8 +20,8 @@ class CombinedEditorTrackPlayer {
     return this.session.ctrls!.internalEditorTrackCtrl;
   }
 
-  get vscEditorEventStepper(): VscEditorEventStepper {
-    return this.session.ctrls!.vscEditorEventStepper;
+  get vscWorkspaceStepper(): VscWorkspaceStepper {
+    return this.session.ctrls!.vscWorkspaceStepper;
   }
 
   constructor(session: Session) {
@@ -70,7 +70,7 @@ class CombinedEditorTrackPlayer {
    * Assumes that the editor track is modified externally.
    */
   setClock(clock: number) {
-    assert(this.updateQueue.length === 0, 'CombinedEditorTrackPlayer setClock requires updateQueue to be empty');
+    assert(this.updateQueue.length === 0, 'WorkspacePlayer setClock requires updateQueue to be empty');
     const seekData = this.internalCtrl.getSeekData(clock);
     this.internalCtrl.finalizeSeek(seekData);
   }
@@ -104,10 +104,10 @@ class CombinedEditorTrackPlayer {
       // Apply updates one at a time
       for (let i = 0; i < seekData.events.length; i++) {
         await this.internalCtrl.applySeekStep(seekData, i);
-        await this.vscEditorEventStepper.applySeekStep(seekData, i);
+        await this.vscWorkspaceStepper.applySeekStep(seekData, i);
       }
       this.internalCtrl.finalizeSeek(seekData);
-      this.vscEditorEventStepper.finalizeSeek(seekData);
+      this.vscWorkspaceStepper.finalizeSeek(seekData);
     }
   }
 
@@ -116,4 +116,4 @@ class CombinedEditorTrackPlayer {
   };
 }
 
-export default CombinedEditorTrackPlayer;
+export default WorkspacePlayer;
