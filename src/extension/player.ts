@@ -1,4 +1,3 @@
-import type { SessionCtrls } from './types.js';
 import type Session from './session/session.js';
 import type SessionRuntime from './session/session_runtime.js';
 import _ from 'lodash';
@@ -8,23 +7,19 @@ type WriteOptions = { ifDirtyForLong: boolean };
 
 class Player {
   constructor(public session: Session) {
-    // assert(session.ctrls);
+    // assert(session.runtime);
   }
 
-  get ctrls(): SessionCtrls | undefined {
-    return this.session.ctrls;
+  get runtime(): SessionRuntime | undefined {
+    return this.session.runtime;
   }
 
-  get sessionRuntime(): SessionRuntime | undefined {
-    return this.ctrls?.sessionRuntime;
-  }
-
-  async sessionCtrlChangeOrProgressHandler() {
+  async runtimeChangeOrProgressHandler() {
     this.session.context.updateFrontend?.();
     await this.saveHistoryClock({ ifDirtyForLong: true });
   }
 
-  sessionCtrlErrorHandler(error: Error) {
+  runtimeErrorHandler(error: Error) {
     // TODO show error to user
     console.error(error);
   }
@@ -32,30 +27,30 @@ class Player {
   async load() {
     // TODO continue from last position left off
     await this.session.load();
-    assert(this.ctrls);
-    this.ctrls.sessionRuntime.onChangeOrProgress = this.sessionCtrlChangeOrProgressHandler.bind(this);
-    this.ctrls.sessionRuntime.onError = this.sessionCtrlErrorHandler.bind(this);
+    assert(this.runtime);
+    this.runtime.onChangeOrProgress = this.runtimeChangeOrProgressHandler.bind(this);
+    this.runtime.onError = this.runtimeErrorHandler.bind(this);
   }
 
   async play() {
-    assert(this.sessionRuntime);
-    await this.sessionRuntime.play();
+    assert(this.runtime);
+    await this.runtime.play();
     this.saveHistoryOpenClose().catch(console.error);
   }
 
   pause() {
-    assert(this.sessionRuntime);
-    this.sessionRuntime.pause();
+    assert(this.runtime);
+    this.runtime.pause();
     this.saveHistoryClock().catch(console.error);
   }
 
   seek(clock: number) {
-    assert(this.sessionRuntime);
-    this.sessionRuntime.seek(clock);
+    assert(this.runtime);
+    this.runtime.seek(clock);
   }
 
   dispose() {
-    // this.sessionRuntime.dispose();
+    // this.runtime.dispose();
   }
 
   private async saveHistoryClock(options?: WriteOptions) {

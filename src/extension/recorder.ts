@@ -2,7 +2,6 @@ import * as t from '../lib/types.js';
 import * as path from '../lib/path.js';
 import { getMp3Duration, getVideoDuration } from './get_audio_video_duration.js';
 import * as misc from './misc.js';
-import type { SessionCtrls } from './types.js';
 import type Session from './session/session.js';
 import type SessionRuntime from './session/session_runtime.js';
 import _ from 'lodash';
@@ -15,8 +14,8 @@ class Recorder {
 
   constructor(public session: Session, public mustScan: boolean) {}
 
-  get sessionRuntime(): SessionRuntime | undefined {
-    return this.session.ctrls?.sessionRuntime;
+  get runtime(): SessionRuntime | undefined {
+    return this.session.runtime;
   }
 
   dirty: boolean = false;
@@ -38,69 +37,68 @@ class Recorder {
       await this.session.load(options);
     }
     await this.save(); // session may have changed due to options.cutClock and must be saved.
-    this.initSessionRuntimesHandlers();
+    this.initRuntimesHandlers();
   }
 
-  initSessionRuntimesHandlers() {
-    assert(this.sessionRuntime);
-    this.sessionRuntime.onChangeOrProgress = this.sessionCtrlChangeOrProgressHandler.bind(this);
-    this.sessionRuntime.onChange = this.sessionCtrlChangeHandler.bind(this);
-    this.sessionRuntime.onError = this.sessionCtrlErrorHandler.bind(this);
+  initRuntimesHandlers() {
+    assert(this.runtime);
+    this.runtime.onChangeOrProgress = this.runtimeChangeOrProgressHandler.bind(this);
+    this.runtime.onChange = this.runtimeChangeHandler.bind(this);
+    this.runtime.onError = this.runtimeErrorHandler.bind(this);
   }
 
-  sessionCtrlChangeOrProgressHandler() {
+  runtimeChangeOrProgressHandler() {
     this.session.context.updateFrontend?.();
   }
 
-  sessionCtrlChangeHandler() {
+  runtimeChangeHandler() {
     this.dirty = true;
   }
 
-  sessionCtrlErrorHandler(error: Error) {
+  runtimeErrorHandler(error: Error) {
     // TODO show error to user
     console.error(error);
   }
 
   async record() {
-    assert(this.sessionRuntime);
-    if (this.sessionRuntime.clock !== this.session.head.duration) {
-      // await this.session.ctrls!.workspacePlayer.seek(this.session.head.duration);
-      // this.session.ctrls?.internalWorkspace.
-      await this.sessionRuntime.seek(this.session.head.duration, { noUpdate: false });
+    assert(this.runtime);
+    if (this.runtime.clock !== this.session.head.duration) {
+      // await this.session.runtime!.workspacePlayer.seek(this.session.head.duration);
+      await this.runtime.seek(this.session.head.duration, { noUpdate: false });
       // await new Promise(resolve => setTimeout(resolve, 3000));
     }
-    await this.sessionRuntime.record();
+    await this.runtime.record();
     this.saveHistoryOpenClose().catch(console.error);
   }
 
   async play() {
-    assert(this.sessionRuntime);
-    await this.sessionRuntime.play();
+    assert(this.runtime);
+    await this.runtime.play();
     this.saveHistoryOpenClose().catch(console.error);
   }
 
   pause() {
-    assert(this.sessionRuntime);
-    this.sessionRuntime.pause();
+    assert(this.runtime);
+    this.runtime.pause();
   }
 
   seek(clock: number) {
-    assert(this.sessionRuntime);
-    this.sessionRuntime.seek(clock);
+    assert(this.runtime);
+    this.runtime.seek(clock);
   }
 
   dispose() {
-    // this.sessionRuntime.dispose();
+    // this.runtime.dispose();
   }
 
   isSessionEmpty(): boolean {
-    return this.session.body?.editorTrack.events.length === 0 && this.session.ctrls?.audioTrackCtrls.length === 0;
+    return this.session.body?.editorTrack.events.length === 0 && this.session.runtime?.audioTrackCtrls.length === 0;
   }
 
   updateState(changes: t.RecorderUpdate) {
     if (changes.title !== undefined) this.session.head.title = changes.title;
     if (changes.description !== undefined) this.session.head.description = changes.description;
-    // if (changes.clock !== undefined) this.sessionHead.duration = this.sessionRuntime.clock = changes.clock;
+    // if (changes.clock !== undefined) this.sessionHead.duration = this.runtime.clock = changes.clock;
     if (changes.workspace !== undefined)
       throw new Error('Recorder.updateState cannot change workspace after initialization');
     if (changes.duration) this.session.head.duration = changes.duration;
@@ -119,7 +117,7 @@ class Recorder {
   }
 
   async insertAudio(uri: t.Uri, clock: number) {
-    assert(this.sessionRuntime);
+    assert(this.runtime);
     const absPath = path.getFileUriPath(uri);
     const data = await fs.promises.readFile(absPath);
     const duration = getMp3Duration(data);
@@ -132,14 +130,14 @@ class Recorder {
       file: { type: 'local', sha1: sha1 },
       title: path.basename(absPath, { omitExt: true }),
     };
-    this.sessionRuntime.insertAudioAndLoad(audioTrack);
+    this.runtime.insertAudioAndLoad(audioTrack);
 
     this.dirty = true;
   }
 
   async deleteAudio(id: string) {
-    assert(this.sessionRuntime);
-    this.sessionRuntime.deleteAudio(id);
+    assert(this.runtime);
+    this.runtime.deleteAudio(id);
     this.dirty = true;
   }
 
@@ -151,7 +149,7 @@ class Recorder {
   }
 
   async insertVideo(uri: t.Uri, clock: number) {
-    assert(this.sessionRuntime);
+    assert(this.runtime);
     const absPath = path.getFileUriPath(uri);
     const data = await fs.promises.readFile(absPath);
     const duration = getVideoDuration(data);
@@ -164,13 +162,13 @@ class Recorder {
       file: { type: 'local', sha1: sha1 },
       title: path.basename(absPath, { omitExt: true }),
     };
-    this.sessionRuntime.insertVideoAndLoad(videoTrack);
+    this.runtime.insertVideoAndLoad(videoTrack);
     this.dirty = true;
   }
 
   async deleteVideo(id: string) {
-    assert(this.sessionRuntime);
-    this.sessionRuntime.deleteVideo(id);
+    assert(this.runtime);
+    this.runtime.deleteVideo(id);
     this.dirty = true;
   }
 

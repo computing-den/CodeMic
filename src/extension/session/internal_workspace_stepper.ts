@@ -12,7 +12,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
   constructor(public session: Session) {}
 
   get internalWorkspace(): InternalWorkspace {
-    return this.session.ctrls!.internalWorkspace;
+    return this.session.runtime!.internalWorkspace;
   }
 
   async applyEditorEvent(e: t.EditorEvent, direction: t.Direction, uriSet?: t.UriSet) {

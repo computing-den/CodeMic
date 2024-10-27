@@ -3,8 +3,11 @@ import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import type { Session } from './session.js';
 import config from '../config.js';
-import type { SessionCtrls } from '../types.js';
 import AudioTrackCtrl from './audio_track_ctrl.js';
+import VideoTrackCtrl from './video_track_ctrl.js';
+import InternalWorkspace from './internal_workspace.js';
+import WorkspacePlayer from './workspace_player.js';
+import WorkspaceRecorder from './workspace_recorder.js';
 import _ from 'lodash';
 
 export enum SessionRuntimeStatus {
@@ -26,44 +29,56 @@ export default class SessionRuntime {
     recordingEditor: false,
   };
 
+  session: Session;
+  internalWorkspace: InternalWorkspace;
+  audioTrackCtrls: AudioTrackCtrl[];
+  videoTrackCtrl: VideoTrackCtrl;
+  workspacePlayer: WorkspacePlayer;
+  workspaceRecorder: WorkspaceRecorder;
+
   onChangeOrProgress?: () => any;
   onChange?: () => any;
   onError?: (error: Error) => any;
 
-  private session: Session;
   private timeout: any;
   private timeoutTimestamp = 0;
 
-  get running(): boolean {
-    return this.mode.status === SessionRuntimeStatus.Running;
+  constructor(internalWorkspace: InternalWorkspace) {
+    this.session = internalWorkspace.session;
+    this.internalWorkspace = internalWorkspace;
+    this.audioTrackCtrls = this.session.body!.audioTracks.map(
+      audioTrack => new AudioTrackCtrl(this.session, audioTrack),
+    );
+    this.videoTrackCtrl = new VideoTrackCtrl(this.session);
+    this.workspacePlayer = new WorkspacePlayer(this.session);
+    this.workspaceRecorder = new WorkspaceRecorder(this.session);
+
+    for (const c of this.audioTrackCtrls) this.initAudioCtrl(c);
+    this.initVideoCtrl();
+    this.workspacePlayer.onError = this.gotError.bind(this);
+    this.workspaceRecorder.onChange = this.workspaceRecorderChangeHandler.bind(this);
+    this.workspaceRecorder.onError = this.gotError.bind(this);
   }
 
-  get ctrls(): SessionCtrls {
-    return this.session.ctrls!;
+  get running(): boolean {
+    return this.mode.status === SessionRuntimeStatus.Running;
   }
 
   get videoTracks(): t.VideoTrack[] {
     return this.session.body!.videoTracks;
   }
 
-  constructor(session: Session) {
-    this.session = session;
-  }
-
-  init() {
-    for (const c of this.ctrls.audioTrackCtrls) this.initAudioCtrl(c);
-    this.initVideoCtrl();
-    this.ctrls.workspacePlayer.onError = this.gotError.bind(this);
-    this.ctrls.workspaceRecorder.onChange = this.workspaceRecorderChangeHandler.bind(this);
-    this.ctrls.workspaceRecorder.onError = this.gotError.bind(this);
+  static async fromSession(session: Session): Promise<SessionRuntime> {
+    const internalWorkspace = await InternalWorkspace.fromSession(session);
+    return new SessionRuntime(internalWorkspace);
   }
 
   load() {
     // Load media tracks so that they're ready to play when they come into range.
-    for (const c of this.ctrls.audioTrackCtrls) c.load();
+    for (const c of this.audioTrackCtrls) c.load();
 
     const videoTrack = this.findInRangeVideoTrack();
-    if (videoTrack) this.ctrls.videoTrackCtrl.loadTrack(videoTrack);
+    if (videoTrack) this.videoTrackCtrl.loadTrack(videoTrack);
   }
 
   async play() {
@@ -76,7 +91,7 @@ export default class SessionRuntime {
       this.seek(0, { noUpdate: true });
     }
 
-    await this.ctrls.workspacePlayer.play();
+    await this.workspacePlayer.play();
     this.update();
   }
 
@@ -88,7 +103,7 @@ export default class SessionRuntime {
     this.mode.recordingEditor = true;
     this.mode.status = SessionRuntimeStatus.Running;
 
-    await this.ctrls.workspaceRecorder.record();
+    await this.workspaceRecorder.record();
 
     this.update();
   }
@@ -124,13 +139,13 @@ export default class SessionRuntime {
     const audioTrackCtrl = new AudioTrackCtrl(this.session, audioTrack);
     this.session.head.duration = Math.max(this.session.head.duration, audioTrack.clockRange.end);
     this.session.body!.audioTracks.push(audioTrack);
-    this.ctrls.audioTrackCtrls.push(audioTrackCtrl);
+    this.audioTrackCtrls.push(audioTrackCtrl);
     this.initAudioCtrl(audioTrackCtrl);
     this.onChange?.();
   }
 
   deleteAudio(id: string) {
-    const i = this.ctrls.audioTrackCtrls.findIndex(c => c.audioTrack.id === id);
+    const i = this.audioTrackCtrls.findIndex(c => c.audioTrack.id === id);
     if (i === -1) {
       console.error(`SessionRuntime deleteAudio did not find audio track with id ${id}`);
       return;
@@ -141,8 +156,8 @@ export default class SessionRuntime {
       this.session.body!.audioTracks.splice(j, 1);
     }
 
-    this.ctrls.audioTrackCtrls[i].pause();
-    this.ctrls.audioTrackCtrls.splice(i, 1);
+    this.audioTrackCtrls[i].pause();
+    this.audioTrackCtrls.splice(i, 1);
     this.onChange?.();
   }
 
@@ -150,7 +165,7 @@ export default class SessionRuntime {
     // const videoTrackCtrl = new VideoTrackCtrl(this.session, videoTrack);
     this.session.head.duration = Math.max(this.session.head.duration, videoTrack.clockRange.end);
     this.session.body!.videoTracks.push(videoTrack);
-    // this.ctrls.videoTrackCtrl.insert(videoTrackCtrl);
+    // this.videoTrackCtrl.insert(videoTrackCtrl);
     this.initVideoCtrl();
     this.onChange?.();
   }
@@ -161,12 +176,12 @@ export default class SessionRuntime {
       this.session.body!.videoTracks.splice(j, 1);
     }
 
-    this.ctrls.videoTrackCtrl.pause();
+    this.videoTrackCtrl.pause();
     this.onChange?.();
   }
 
   handleFrontendAudioEvent(e: t.FrontendMediaEvent) {
-    const audioCtrl = this.ctrls.audioTrackCtrls.find(a => a.audioTrack.id === e.id);
+    const audioCtrl = this.audioTrackCtrls.find(a => a.audioTrack.id === e.id);
     if (audioCtrl) {
       audioCtrl.handleAudioEvent(e);
     } else {
@@ -175,7 +190,7 @@ export default class SessionRuntime {
   }
 
   handleFrontendVideoEvent(e: t.FrontendMediaEvent) {
-    this.ctrls.videoTrackCtrl.handleVideoEvent(e);
+    this.videoTrackCtrl.handleVideoEvent(e);
   }
 
   private initAudioCtrl(c: AudioTrackCtrl) {
@@ -183,35 +198,35 @@ export default class SessionRuntime {
   }
 
   private initVideoCtrl() {
-    this.ctrls.videoTrackCtrl.onError = this.gotError.bind(this);
+    this.videoTrackCtrl.onError = this.gotError.bind(this);
   }
 
   private async seekEditor() {
-    this.ctrls.workspaceRecorder.setClock(this.clock);
+    this.workspaceRecorder.setClock(this.clock);
 
     if (this.mode.recordingEditor) {
-      this.ctrls.workspacePlayer.setClock(this.clock);
+      this.workspacePlayer.setClock(this.clock);
     } else {
-      await this.ctrls.workspacePlayer.seek(this.clock);
+      await this.workspacePlayer.seek(this.clock);
     }
   }
 
   private pauseEditor() {
     if (this.mode.recordingEditor) {
-      this.ctrls.workspaceRecorder.pause();
+      this.workspaceRecorder.pause();
     } else {
-      this.ctrls.workspacePlayer.pause();
+      this.workspacePlayer.pause();
     }
   }
 
   private seekInRangeAudios() {
-    for (const c of this.ctrls.audioTrackCtrls) {
+    for (const c of this.audioTrackCtrls) {
       if (this.isTrackInRange(c.audioTrack)) this.seekAudio(c);
     }
   }
 
   private seekInRangeAudiosThatAreNotRunning() {
-    for (const c of this.ctrls.audioTrackCtrls) {
+    for (const c of this.audioTrackCtrls) {
       if (!c.running && this.isTrackInRange(c.audioTrack)) this.seekAudio(c);
     }
   }
@@ -221,46 +236,46 @@ export default class SessionRuntime {
   }
 
   private playInRangeAudios() {
-    for (const c of this.ctrls.audioTrackCtrls) {
+    for (const c of this.audioTrackCtrls) {
       if (!c.running && this.isTrackInRange(c.audioTrack)) c.play();
     }
   }
 
   private pauseAudios() {
-    for (const c of this.ctrls.audioTrackCtrls) {
+    for (const c of this.audioTrackCtrls) {
       if (c.running) c.pause();
     }
   }
 
   private pauseOutOfRangeAudios() {
-    for (const c of this.ctrls.audioTrackCtrls) {
+    for (const c of this.audioTrackCtrls) {
       if (c.running && !this.isTrackInRange(c.audioTrack)) c.pause();
     }
   }
 
   private stopOutOfRangeVideo() {
-    const c = this.ctrls.videoTrackCtrl;
+    const c = this.videoTrackCtrl;
     if (c.videoTrack && !this.isTrackInRange(c.videoTrack)) c.stop();
   }
 
   private pauseVideo() {
-    this.ctrls.videoTrackCtrl.pause();
+    this.videoTrackCtrl.pause();
   }
 
   private loadInRangeVideoAndSeek() {
     const videoTrack = this.findInRangeVideoTrack();
     if (videoTrack) {
-      this.ctrls.videoTrackCtrl.loadTrack(videoTrack);
-      this.ctrls.videoTrackCtrl.seek(this.globalClockToTrackLocal(videoTrack));
+      this.videoTrackCtrl.loadTrack(videoTrack);
+      this.videoTrackCtrl.seek(this.globalClockToTrackLocal(videoTrack));
     }
   }
 
   private loadInRangeVideoAndSeekIfDifferent() {
     const videoTrack = this.findInRangeVideoTrack();
     // console.log('loadInRangeVideoAndSeekIfDifferent videoTrack', videoTrack);
-    if (videoTrack && (this.ctrls.videoTrackCtrl.videoTrack !== videoTrack || !this.ctrls.videoTrackCtrl.running)) {
-      this.ctrls.videoTrackCtrl.loadTrack(videoTrack);
-      this.ctrls.videoTrackCtrl.seek(this.globalClockToTrackLocal(videoTrack));
+    if (videoTrack && (this.videoTrackCtrl.videoTrack !== videoTrack || !this.videoTrackCtrl.running)) {
+      this.videoTrackCtrl.loadTrack(videoTrack);
+      this.videoTrackCtrl.seek(this.globalClockToTrackLocal(videoTrack));
     }
   }
 
@@ -270,11 +285,11 @@ export default class SessionRuntime {
 
   private playInRangeVideo() {
     if (
-      !this.ctrls.videoTrackCtrl.running &&
-      this.ctrls.videoTrackCtrl.videoTrack &&
-      this.isTrackInRange(this.ctrls.videoTrackCtrl.videoTrack)
+      !this.videoTrackCtrl.running &&
+      this.videoTrackCtrl.videoTrack &&
+      this.isTrackInRange(this.videoTrackCtrl.videoTrack)
     ) {
-      this.ctrls.videoTrackCtrl.play();
+      this.videoTrackCtrl.play();
     }
   }
 

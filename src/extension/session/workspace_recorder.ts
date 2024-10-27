@@ -25,7 +25,7 @@ class WorkspaceRecorder {
   private lastLine: number | undefined;
 
   get internalWorkspace(): ietc.InternalWorkspace {
-    return this.session.ctrls!.internalWorkspace;
+    return this.session.runtime!.internalWorkspace;
   }
 
   constructor(session: Session) {

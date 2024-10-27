@@ -5,16 +5,10 @@ import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import * as serverApi from '../server_api.js';
 import type { SessionDataPaths } from '../paths.js';
-import config from '../config.js';
 import * as misc from '../misc.js';
-import type { Context, ReadDirOptions, SessionCtrls } from '../types.js';
+import type { Context, ReadDirOptions } from '../types.js';
 import * as storage from '../storage.js';
 import SessionRuntime from './session_runtime.js';
-import WorkspacePlayer from './workspace_player.js';
-import WorkspaceRecorder from './workspace_recorder.js';
-import AudioTrackCtrl from './audio_track_ctrl.js';
-import VideoTrackCtrl from './video_track_ctrl.js';
-import VscWorkspaceStepper from './vsc_workspace_stepper.js';
 import fs from 'fs';
 import _ from 'lodash';
 import archiver from 'archiver';
@@ -31,7 +25,7 @@ export class Session implements t.Session {
   loaded = false;
   inStorage: boolean;
   body?: t.SessionBody;
-  ctrls?: SessionCtrls;
+  runtime?: SessionRuntime;
 
   constructor(context: Context, workspace: t.AbsPath, head: t.SessionHead, inStorage: boolean) {
     this.context = context;
@@ -45,19 +39,19 @@ export class Session implements t.Session {
   }
 
   get clock(): number | undefined {
-    return this.ctrls?.sessionRuntime.clock;
+    return this.runtime?.clock;
   }
 
   get running(): boolean {
-    return Boolean(this.ctrls?.sessionRuntime.running);
+    return Boolean(this.runtime?.running);
   }
 
   get recording(): boolean {
-    return Boolean(this.running && this.ctrls?.sessionRuntime.mode.recordingEditor);
+    return Boolean(this.running && this.runtime?.mode.recordingEditor);
   }
 
   get playing(): boolean {
-    return Boolean(this.running && !this.ctrls?.sessionRuntime.mode.recordingEditor);
+    return Boolean(this.running && !this.runtime?.mode.recordingEditor);
   }
 
   static async fromExisting(context: Context, id: string): Promise<Session | undefined> {
@@ -146,8 +140,8 @@ export class Session implements t.Session {
     await fs.promises.mkdir(this.workspace, { recursive: true });
 
     // Initialize track controllers.
-    await this.initTrackCtrls();
-    assert(this.ctrls);
+    await this.initRuntime();
+    assert(this.runtime);
 
     // Make sure cut and seek clocks are valid.
     if (options?.cutClock && options?.seekClock) {
@@ -157,8 +151,8 @@ export class Session implements t.Session {
     // Cut to cutClock.
     if (options?.cutClock !== undefined) {
       // We don't need to cut audio because playback ends when it reaches session's duration.
-      this.ctrls.internalWorkspace.cut(options.cutClock);
-      // for (const c of this.ctrls.audioTrackCtrls) c.cut(options.cutClock);
+      this.runtime.internalWorkspace.cut(options.cutClock);
+      // for (const c of this.runtime.audioTrackCtrls) c.cut(options.cutClock);
       this.head.duration = options.cutClock;
     }
 
@@ -166,8 +160,8 @@ export class Session implements t.Session {
     let targetUris: t.Uri[] | undefined;
     if (options?.seekClock) {
       const uriSet: t.UriSet = {};
-      const seekData = this.ctrls.internalWorkspace.getSeekData(options.seekClock);
-      await this.ctrls.internalWorkspace.seek(seekData, uriSet);
+      const seekData = this.runtime.internalWorkspace.getSeekData(options.seekClock);
+      await this.runtime.internalWorkspace.seek(seekData, uriSet);
       targetUris = Object.keys(uriSet);
     }
 
@@ -186,14 +180,14 @@ export class Session implements t.Session {
     assert(!this.loaded);
 
     this.body = Session.makeBody();
-    await this.initTrackCtrls();
-    assert(this.ctrls);
+    await this.initRuntime();
+    assert(this.runtime);
 
     // Make sure workspace path exists.
     await fs.promises.mkdir(this.workspace, { recursive: true });
 
     this.body.editorTrack.initSnapshot = await this.makeSnapshotFromDirAndVsc();
-    await this.ctrls.internalWorkspace.restoreInitSnapshot();
+    await this.runtime.internalWorkspace.restoreInitSnapshot();
 
     this.loaded = true;
   }
@@ -223,20 +217,10 @@ export class Session implements t.Session {
     return forkHead;
   }
 
-  async initTrackCtrls() {
+  async initRuntime() {
     assert(this.body);
-    assert(!this.ctrls);
-    this.ctrls = {
-      internalWorkspace: await ietc.InternalWorkspace.fromSession(this),
-      audioTrackCtrls: this.body.audioTracks.map(audioTrack => new AudioTrackCtrl(this, audioTrack)),
-      videoTrackCtrl: new VideoTrackCtrl(this),
-      // videoTrackCtrl: new VideoTrackCtrl(this),
-      workspacePlayer: new WorkspacePlayer(this),
-      workspaceRecorder: new WorkspaceRecorder(this),
-      vscWorkspaceStepper: new VscWorkspaceStepper(this),
-      sessionRuntime: new SessionRuntime(this),
-    };
-    this.ctrls.sessionRuntime.init();
+    assert(!this.runtime);
+    this.runtime = await SessionRuntime.fromSession(this);
   }
 
   async makeSnapshotFromDirAndVsc(): Promise<t.InternalEditorTrackSnapshot> {
@@ -336,7 +320,7 @@ export class Session implements t.Session {
 
   async syncInternalWorkspaceToVscodeAndDisk(targetUris?: t.Uri[]) {
     // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
-    const ctrl = this.ctrls?.internalWorkspace;
+    const ctrl = this.runtime?.internalWorkspace;
     assert(ctrl);
 
     // TODO having both directories and files in targetUris and ctrl.worktree can make things

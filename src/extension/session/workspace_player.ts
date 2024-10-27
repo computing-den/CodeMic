@@ -13,19 +13,17 @@ class WorkspacePlayer {
   onError?: (error: Error) => any;
 
   private session: Session;
+  private vscWorkspaceStepper: VscWorkspaceStepper;
   private disposables: vscode.Disposable[] = [];
   private updateQueue = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
   get internalCtrl(): ietc.InternalWorkspace {
-    return this.session.ctrls!.internalWorkspace;
-  }
-
-  get vscWorkspaceStepper(): VscWorkspaceStepper {
-    return this.session.ctrls!.vscWorkspaceStepper;
+    return this.session.runtime!.internalWorkspace;
   }
 
   constructor(session: Session) {
     this.session = session;
+    this.vscWorkspaceStepper = new VscWorkspaceStepper(session);
   }
 
   async play() {

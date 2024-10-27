@@ -541,13 +541,13 @@ class CodeMic {
         return this.respondWithStore();
       }
       case 'audio': {
-        assert(this.session?.ctrls);
-        this.session.ctrls.sessionRuntime.handleFrontendAudioEvent(req.event);
+        assert(this.session?.runtime);
+        this.session.runtime.handleFrontendAudioEvent(req.event);
         return this.respondWithStore();
       }
       case 'video': {
-        assert(this.session?.ctrls);
-        this.session.ctrls.sessionRuntime.handleFrontendVideoEvent(req.event);
+        assert(this.session?.runtime);
+        this.session.runtime.handleFrontendVideoEvent(req.event);
         return this.respondWithStore();
       }
       case 'test': {
