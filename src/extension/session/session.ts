@@ -1,3 +1,4 @@
+import { deserializeSessionBody, serializeSessionBody } from './serialization.js';
 import * as t from '../../lib/types.js';
 import { Range, Selection, Position, ContentChange } from '../../lib/types.js';
 import * as path from '../../lib/path.js';
@@ -489,7 +490,7 @@ export class Session implements t.Session {
 
   async writeBody() {
     assert(this.body, 'writeBody: body is not yet loaded.');
-    await storage.writeJSON(this.sessionDataPaths.body, this.body);
+    await storage.writeJSON(this.sessionDataPaths.body, serializeSessionBody(this.body));
     this.inStorage = true;
   }
 
@@ -504,114 +505,8 @@ export class Session implements t.Session {
 
   async readBody(options?: { download: boolean }) {
     if (options?.download) await this.download({ skipIfExists: true });
-    const json = await storage.readJSON<t.SessionBody>(this.sessionDataPaths.body);
-
-    this.body = {
-      audioTracks: json.audioTracks,
-      videoTracks: json.videoTracks,
-      editorTrack: {
-        defaultEol: json.editorTrack.defaultEol,
-        focusTimeline: json.editorTrack.focusTimeline,
-        initSnapshot: {
-          worktree: json.editorTrack.initSnapshot.worktree,
-          activeTextEditorUri: json.editorTrack.initSnapshot.activeTextEditorUri,
-          textEditors: json.editorTrack.initSnapshot.textEditors.map(x => ({
-            selections: x.selections.map(
-              s =>
-                new Selection(
-                  new Position(s.anchor.line, s.anchor.character),
-                  new Position(s.active.line, s.active.character),
-                ),
-            ),
-            uri: x.uri,
-            visibleRange: new Range(x.visibleRange.start, x.visibleRange.end),
-          })),
-        },
-        events: json.editorTrack.events.map(e => {
-          switch (e.type) {
-            case 'textChange':
-              return {
-                ...e,
-                contentChanges: e.contentChanges.map(
-                  cc => new ContentChange(cc.text, new Range(cc.range.start, cc.range.end)),
-                ),
-                revContentChanges: e.revContentChanges.map(
-                  cc => new ContentChange(cc.text, new Range(cc.range.start, cc.range.end)),
-                ),
-              };
-            case 'openTextDocument':
-            case 'closeTextDocument':
-              return e;
-            case 'showTextEditor':
-              return {
-                ...e,
-                selections: e.selections.map(
-                  s =>
-                    new Selection(
-                      new Position(s.anchor.line, s.anchor.character),
-                      new Position(s.active.line, s.active.character),
-                    ),
-                ),
-                visibleRange: new Range(e.visibleRange.start, e.visibleRange.end),
-                revSelections:
-                  e.revSelections &&
-                  e.revSelections.map(
-                    s =>
-                      new Selection(
-                        new Position(s.anchor.line, s.anchor.character),
-                        new Position(s.active.line, s.active.character),
-                      ),
-                  ),
-                revVisibleRange: e.revVisibleRange && new Range(e.revVisibleRange.start, e.revVisibleRange.end),
-              };
-            case 'closeTextEditor':
-              return {
-                ...e,
-                revSelections:
-                  e.revSelections &&
-                  e.revSelections.map(
-                    s =>
-                      new Selection(
-                        new Position(s.anchor.line, s.anchor.character),
-                        new Position(s.active.line, s.active.character),
-                      ),
-                  ),
-                revVisibleRange: e.revVisibleRange && new Range(e.revVisibleRange.start, e.revVisibleRange.end),
-              };
-            case 'select':
-              return {
-                ...e,
-                selections: e.selections.map(
-                  s =>
-                    new Selection(
-                      new Position(s.anchor.line, s.anchor.character),
-                      new Position(s.active.line, s.active.character),
-                    ),
-                ),
-                visibleRange: new Range(e.visibleRange.start, e.visibleRange.end),
-                revSelections:
-                  e.revSelections &&
-                  e.revSelections.map(
-                    s =>
-                      new Selection(
-                        new Position(s.anchor.line, s.anchor.character),
-                        new Position(s.active.line, s.active.character),
-                      ),
-                  ),
-                revVisibleRange: e.revVisibleRange && new Range(e.revVisibleRange.start, e.revVisibleRange.end),
-              };
-            case 'scroll':
-              return {
-                ...e,
-                visibleRange: new Range(e.visibleRange.start, e.visibleRange.end),
-                revVisibleRange: e.revVisibleRange && new Range(e.revVisibleRange.start, e.revVisibleRange.end),
-              };
-            case 'save':
-              return e;
-          }
-        }),
-      },
-    };
+    const json = await storage.readJSON<t.SessionBodyCompact>(this.sessionDataPaths.body);
+    this.body = deserializeSessionBody(json);
   }
 
   async download(options?: { skipIfExists: boolean }) {

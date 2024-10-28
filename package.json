@@ -107,6 +107,7 @@
     "form-data": "^4.0.0",
     "ignore": "^5.2.4",
     "immer": "^10.0.2",
+    "json-stringify-pretty-compact": "^4.0.0",
     "lodash": "^4.17.21",
     "moment": "^2.29.4",
     "node-fetch": "^2.7.0",

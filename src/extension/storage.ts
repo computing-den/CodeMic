@@ -2,6 +2,7 @@ import * as t from '../lib/types.js';
 import * as path from '../lib/path.js';
 import fs from 'fs';
 import _ from 'lodash';
+import stringify from 'json-stringify-pretty-compact';
 
 // export class Storage {
 //   private constructor(public user?: t.User) {}
@@ -31,7 +32,7 @@ export async function readJSONOptional<T>(p: t.AbsPath): Promise<T | undefined> 
 
 export async function writeJSON(p: t.AbsPath, data: any) {
   await fs.promises.mkdir(path.dirname(p), { recursive: true });
-  await fs.promises.writeFile(p, pretty(data), 'utf8');
+  await fs.promises.writeFile(p, stringify(data, { maxLength: 100, indent: 2 }), 'utf8');
 }
 
 // export async function readCachedSessionCoverPhotos(p: t.AbsPath): Promise<string[]> {
@@ -190,6 +191,6 @@ export async function writeJSON(p: t.AbsPath, data: any) {
 //   }
 // }
 
-function pretty(json: any): string {
-  return JSON.stringify(json, null, 2);
-}
+// function pretty(json: any): string {
+//   return JSON.stringify(json, null, 2);
+// }

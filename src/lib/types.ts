@@ -328,6 +328,12 @@ export type SessionBody = {
   videoTracks: VideoTrack[];
 };
 
+export type SessionBodyCompact = {
+  editorTrack: InternalWorkspaceCompact;
+  audioTracks: AudioTrack[];
+  videoTracks: VideoTrack[];
+};
+
 export type Comment = {
   id: string;
   author: string;
@@ -346,6 +352,13 @@ export type ClockRange = {
 export type InternalWorkspace = {
   initSnapshot: InternalEditorTrackSnapshot;
   events: EditorEvent[];
+  defaultEol: EndOfLine;
+  focusTimeline: WorkspaceFocusTimeline;
+};
+
+export type InternalWorkspaceCompact = {
+  initSnapshot: InternalEditorTrackSnapshot;
+  events: EditorEventCompact[];
   defaultEol: EndOfLine;
   focusTimeline: WorkspaceFocusTimeline;
 };
@@ -503,6 +516,90 @@ export type SaveEvent = {
   clock: number;
   uri: Uri;
 };
+
+export type EditorEventCompact =
+  | TextChangeEventCompact
+  | OpenTextDocumentEventCompact
+  | CloseTextDocumentEventCompact
+  | ShowTextEditorEventCompact
+  | CloseTextEditorEventCompact
+  | SelectEventCompact
+  | ScrollEventCompact
+  | SaveEventCompact;
+
+export type TextChangeEventCompact = {
+  t: 1;
+  c: number;
+  u: Uri;
+  cc: ContentChangeCompact[];
+  rcc: ContentChangeCompact[];
+};
+
+export type OpenTextDocumentEventCompact = {
+  t: 2;
+  c: number;
+  u: Uri;
+  x?: string;
+  e: EndOfLine;
+  i: boolean;
+};
+
+export type CloseTextDocumentEventCompact = {
+  t: 3;
+  c: number;
+  u: Uri;
+  rt: string;
+  re: EndOfLine;
+};
+
+export type ShowTextEditorEventCompact = {
+  t: 4;
+  c: number;
+  u: Uri;
+  s: readonly SelectionCompact[];
+  v: RangeCompact;
+  ru?: Uri;
+  rs?: readonly SelectionCompact[];
+  rv?: RangeCompact;
+  // revSelections: Selection[];
+};
+
+export type CloseTextEditorEventCompact = {
+  t: 5;
+  c: number;
+  u: Uri;
+  rs?: readonly SelectionCompact[];
+  rv?: RangeCompact;
+};
+
+export type SelectEventCompact = {
+  t: 6;
+  c: number;
+  u: Uri;
+  s: readonly SelectionCompact[];
+  v: RangeCompact;
+  rs: readonly SelectionCompact[];
+  rv: RangeCompact;
+};
+
+export type ScrollEventCompact = {
+  t: 7;
+  c: number;
+  u: Uri;
+  v: RangeCompact;
+  rv: RangeCompact;
+};
+
+export type SaveEventCompact = {
+  t: 8;
+  c: number;
+  u: Uri;
+};
+
+export type PositionCompact = [number, number];
+export type RangeCompact = [number, number, number, number];
+export type SelectionCompact = [number, number, number, number];
+export type ContentChangeCompact = { t: string; r: [number, number, number, number] };
 
 export enum Direction {
   Forwards,
