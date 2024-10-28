@@ -1,7 +1,9 @@
 import * as esbuild from 'esbuild';
+import fs from 'fs';
 
 const watch = process.argv.includes('--watch');
 const production = process.argv.includes('--production');
+const metafile = process.argv.includes('--metafile');
 
 /**
  * @type {import('esbuild').Plugin}
@@ -37,6 +39,7 @@ const common = {
   sourcemap,
   logLevel: 'silent', // silent the default logger
   plugins: [esbuildProblemMatcherPlugin],
+  metafile,
 };
 
 const viewJs = await esbuild.context({
@@ -69,9 +72,15 @@ if (watch) {
   await viewCss.watch();
   await extensionJs.watch();
 } else {
-  await viewJs.rebuild();
-  await viewCss.rebuild();
-  await extensionJs.rebuild();
+  const viewJsRes = await viewJs.rebuild();
+  const viewCssRes = await viewCss.rebuild();
+  const extensionJsRes = await extensionJs.rebuild();
+
+  if (metafile) {
+    fs.writeFileSync('dist/webview.js.json', JSON.stringify(viewJsRes.metafile));
+    fs.writeFileSync('dist/webview.css.json', JSON.stringify(viewCssRes.metafile));
+    fs.writeFileSync('dist/extension.js.json', JSON.stringify(extensionJsRes.metafile));
+  }
 
   await viewJs.dispose();
   await viewCss.dispose();

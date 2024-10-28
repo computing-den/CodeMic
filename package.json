@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "compile": "tsc && node esbuild.js",
+    "compile": "tsc && node esbuild.mjs",
+    "compile:metafile": "tsc && node esbuild.mjs --metafile",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.mjs --watch",
     "watch:tsc": "tsc --watch",
