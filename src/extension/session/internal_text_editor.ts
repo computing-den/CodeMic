@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
 import TextDocument from './internal_text_document.js';
-import { makeSelectionN, makeRangeN } from './internal_helpers.js';
+import { Range, Selection, Position } from 'vscode';
 
 /**
  * The document will be the same for the entire lifetime of this text editor.
@@ -9,16 +9,16 @@ import { makeSelectionN, makeRangeN } from './internal_helpers.js';
 export default class InternalTextEditor implements t.InternalEditor {
   constructor(
     public document: TextDocument,
-    public selections: t.Selection[] = [makeSelectionN(0, 0, 0, 0)],
-    public visibleRange: t.Range = makeRangeN(0, 0, 1, 0),
+    public selections: readonly Selection[] = [new Selection(0, 0, 0, 0)],
+    public visibleRange: Range = new Range(0, 0, 1, 0),
   ) {}
 
-  select(selections: t.Selection[], visibleRange: t.Range) {
+  select(selections: readonly Selection[], visibleRange: Range) {
     this.selections = selections;
     this.visibleRange = visibleRange;
   }
 
-  scroll(visibleRange: t.Range) {
+  scroll(visibleRange: Range) {
     this.visibleRange = visibleRange;
   }
 }

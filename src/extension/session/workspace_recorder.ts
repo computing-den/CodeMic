@@ -1,13 +1,13 @@
 import * as t from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
-import * as ih from './internal_helpers.js';
+import ContentChange from '../content_change.js';
 import InternalWorkspace from './internal_workspace.js';
 import InternalTextEditor from './internal_text_editor.js';
 import InternalTextDocument from './internal_text_document.js';
 import assert from '../../lib/assert.js';
 import type Session from './session.js';
 import config from '../config.js';
-import * as vscode from 'vscode';
+import vscode, { Range, Selection, Position } from 'vscode';
 
 import _ from 'lodash';
 
@@ -22,9 +22,9 @@ class WorkspaceRecorder {
   private clock = 0;
   private disposables: vscode.Disposable[] = [];
   private scrolling: boolean = false;
-  private scrollStartRange?: t.Range;
+  private scrollStartRange?: Range;
   // private lastUri?: t.Uri;
-  // private lastPosition?: t.Position;
+  // private lastPosition?: Position;
   private lastLine: number | undefined;
 
   get internalWorkspace(): InternalWorkspace {
@@ -171,8 +171,7 @@ class WorkspaceRecorder {
 
   private getCurrentLine(): number | undefined {
     const { activeTextEditor } = this.internalWorkspace;
-    const selection = activeTextEditor?.selections[0];
-    return selection && ih.getSelectionStart(selection).line;
+    return activeTextEditor?.selections[0]?.start.line;
   }
 
   // private pushLineFocus() {
@@ -216,17 +215,18 @@ class WorkspaceRecorder {
       }
 
       // Read https://github.com/microsoft/vscode/issues/11487 about contentChanges array.
-      let irContentChanges = this.session.contentChangesFromVsc(vscContentChanges);
+      let irContentChanges = vscContentChanges.map(c => new ContentChange(c.text, c.range));
 
       // Order content changes.
-      irContentChanges.sort(ih.compareContentChanges);
+      irContentChanges.sort((a, b) => a.range.start.compareTo(b.range.start));
 
       // Validate ranges and make sure there are no overlaps.
       for (const [i, cc] of irContentChanges.entries()) {
         assert(irTextDocument.isRangeValid(cc.range), 'textChange: invalid range');
         if (i > 0) {
           assert(
-            ih.isRangeNonOverlapping(irContentChanges[i - 1].range, cc.range),
+            cc.range.start.isAfterOrEqual(irContentChanges[i - 1].range.end),
+            // ih.isRangeNonOverlapping(irContentChanges[i - 1].range, cc.range),
             'textChange: got content changes with overlapping ranges',
           );
         }
@@ -347,7 +347,7 @@ class WorkspaceRecorder {
     });
   }
 
-  private select(vscTextEditor: vscode.TextEditor, selections: readonly vscode.Selection[]) {
+  private select(vscTextEditor: vscode.TextEditor, selections: readonly Selection[]) {
     logRawEvent(`event: select ${vscTextEditor.document.uri} ${JSON.stringify(selections)}`);
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
@@ -365,10 +365,7 @@ class WorkspaceRecorder {
 
     const revSelections = irTextEditor.selections;
     const revVisibleRanges = irTextEditor.visibleRange;
-    irTextEditor.select(
-      this.session.selectionsFromVsc(selections),
-      this.session.rangeFromVsc(vscTextEditor.visibleRanges[0]),
-    );
+    irTextEditor.select(selections, vscTextEditor.visibleRanges[0]);
 
     this.pushEvent({
       type: 'select',
@@ -395,7 +392,7 @@ class WorkspaceRecorder {
     });
   }
 
-  private scroll(vscTextEditor: vscode.TextEditor, visibleRanges: readonly vscode.Range[]) {
+  private scroll(vscTextEditor: vscode.TextEditor, visibleRanges: readonly Range[]) {
     logRawEvent(`event: scroll ${vscTextEditor.document.uri} ${JSON.stringify(visibleRanges)}`);
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
@@ -406,7 +403,7 @@ class WorkspaceRecorder {
       return;
     }
 
-    const visibleRange = this.session.rangeFromVsc(visibleRanges[0]);
+    const visibleRange = visibleRanges[0];
 
     if (!this.scrolling) {
       this.scrollStartRange ??= visibleRange;
@@ -499,8 +496,8 @@ class WorkspaceRecorder {
    * Then, it will create or update the internal text editor.
    */
   private async openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri): Promise<InternalTextEditor> {
-    const selections = this.session.selectionsFromVsc(vscTextEditor.selections);
-    const visibleRange = this.session.rangeFromVsc(vscTextEditor.visibleRanges[0]);
+    const selections = vscTextEditor.selections;
+    const visibleRange = vscTextEditor.visibleRanges[0];
     const textDocument = await this.openTextDocumentByUri(vscTextEditor.document, uri);
     let textEditor = this.internalWorkspace.findTextEditorByUri(textDocument.uri);
     if (!textEditor) {

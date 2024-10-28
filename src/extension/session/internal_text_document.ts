@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
 import assert from '../../lib/assert.js';
-import { copyRange, makeRangeN } from './internal_helpers.js';
+import vscode, { Range, Selection, Position } from 'vscode';
 
 export default class InternalTextDocument implements t.InternalDocument {
   constructor(public uri: t.Uri, public lines: string[], public eol: t.EndOfLine) {}
@@ -16,7 +16,7 @@ export default class InternalTextDocument implements t.InternalDocument {
     return new TextEncoder().encode(this.getText());
   }
 
-  getText(range?: t.Range): string {
+  getText(range?: Range): string {
     if (range) {
       assert(this.isRangeValid(range), 'InternalTextDocument getText: invalid range');
       if (range.start.line === range.end.line) {
@@ -34,7 +34,7 @@ export default class InternalTextDocument implements t.InternalDocument {
     }
   }
 
-  isRangeValid(range: t.Range): boolean {
+  isRangeValid(range: Range): boolean {
     return (
       range.start.line >= 0 &&
       range.start.character >= 0 &&
@@ -64,11 +64,13 @@ export default class InternalTextDocument implements t.InternalDocument {
       const origRange = range;
 
       // Apply shifts.
-      range = copyRange(range);
-      range.start.line += totalLineShift;
-      range.start.character += lastLineShifted === range.start.line ? lastLineCharShift : 0;
-      range.end.line += totalLineShift;
-      range.end.character += lastLineShifted === range.end.line ? lastLineCharShift : 0;
+      {
+        const startLine = range.start.line + totalLineShift;
+        const startChar = range.start.character + (lastLineShifted === startLine ? lastLineCharShift : 0);
+        const endLine = range.end.line + totalLineShift;
+        const endChar = range.end.character + (lastLineShifted === endLine ? lastLineCharShift : 0);
+        range = new Range(startLine, startChar, endLine, endChar);
+      }
 
       const newLines = text.split(/\r?\n/);
 
@@ -101,15 +103,15 @@ export default class InternalTextDocument implements t.InternalDocument {
       }
 
       // Calculate final position.
-      const finalPosition = {
-        line: range.end.line + extraLineCount,
-        character: newLines[newLines.length - 1].length - lastLineSuffix.length,
-      };
+      const finalPosition = new Position(
+        range.end.line + extraLineCount,
+        newLines[newLines.length - 1].length - lastLineSuffix.length,
+      );
 
       // Insert into revContentChanges.
       if (revContentChanges) {
         // Calculate reverse range
-        const revRange = { start: range.start, end: finalPosition };
+        const revRange = new Range(range.start, finalPosition);
         revContentChanges!.push({ range: revRange, text: revText! });
       }
 
@@ -122,8 +124,8 @@ export default class InternalTextDocument implements t.InternalDocument {
     return revContentChanges;
   }
 
-  getRange(): t.Range {
-    if (!this.lines.length) return makeRangeN(0, 0, 0, 0);
-    return makeRangeN(0, 0, this.lines.length - 1, this.lines[this.lines.length - 1].length);
+  getRange(): Range {
+    if (!this.lines.length) return new Range(0, 0, 0, 0);
+    return new Range(0, 0, this.lines.length - 1, this.lines[this.lines.length - 1].length);
   }
 }

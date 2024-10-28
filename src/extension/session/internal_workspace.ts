@@ -6,6 +6,7 @@ import Session from './session.js';
 import InternalWorkspaceStepper from './internal_workspace_stepper.js';
 import InternalTextEditor from './internal_text_editor.js';
 import InternalTextDocument from './internal_text_document.js';
+import { Range, Selection, Position } from 'vscode';
 
 /**
  * If a document has been loaded into memory, then the latest content is in the document field and
@@ -145,8 +146,8 @@ export default class InternalWorkspace {
 
   async openTextEditorByUri(
     uri: t.Uri,
-    selections?: t.Selection[],
-    visibleRange?: t.Range,
+    selections?: readonly Selection[],
+    visibleRange?: Range,
   ): Promise<InternalTextEditor> {
     const worktreeItem = this.worktree.get(uri);
     if (!worktreeItem) throw new Error(`file not found ${uri}`);
@@ -317,12 +318,12 @@ export default class InternalWorkspace {
     const event = seekData.events[stepIndex];
     assert(event, 'applySeekStep: out of bound event index');
     await this.stepper.applyEditorEvent(seekData.events[stepIndex], seekData.direction, uriSet);
-    const sign = seekData.direction === t.Direction.Forwards ? 1 : -1;
-    this.eventIndex += sign * (stepIndex + 1);
+    this.eventIndex += seekData.direction === t.Direction.Forwards ? 1 : -1;
   }
 
   finalizeSeek(seekData: t.SeekData) {
-    this.eventIndex = seekData.i;
+    assert(this.eventIndex === seekData.i, 'finalizeSeek: somehow eventIndex got out of sync');
+    // this.eventIndex = seekData.i;
   }
 
   /**

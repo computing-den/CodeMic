@@ -1,3 +1,5 @@
+import vscode, { Range, Selection, Position } from 'vscode';
+
 // Type branding is a hack. The __brand__ property doesn't actually exist at runtime.
 export type Path = RelPath | AbsPath;
 export type RelPath = string & { readonly __brand__: 'rel' };
@@ -462,10 +464,10 @@ export type ShowTextEditorEvent = {
   type: 'showTextEditor';
   clock: number;
   uri: Uri;
-  selections: Selection[];
+  selections: readonly Selection[];
   visibleRange: Range;
   revUri?: Uri;
-  revSelections?: Selection[];
+  revSelections?: readonly Selection[];
   revVisibleRange?: Range;
   // revSelections: Selection[];
 };
@@ -474,7 +476,7 @@ export type CloseTextEditorEvent = {
   type: 'closeTextEditor';
   clock: number;
   uri: Uri;
-  revSelections?: Selection[];
+  revSelections?: readonly Selection[];
   revVisibleRange?: Range;
   // revSelections: Selection[];
 };
@@ -483,9 +485,9 @@ export type SelectEvent = {
   type: 'select';
   clock: number;
   uri: Uri;
-  selections: Selection[];
+  selections: readonly Selection[];
   visibleRange: Range;
-  revSelections: Selection[];
+  revSelections: readonly Selection[];
   revVisibleRange: Range;
 };
 
@@ -510,25 +512,25 @@ export enum Direction {
 
 export type UriSet = { [key: Uri]: true | undefined };
 
-export type ContentChange = {
-  range: Range;
+export interface ContentChange {
+  range: vscode.Range;
   text: string;
-};
+}
 
-export type Position = {
-  line: number;
-  character: number;
-};
+// export type Position = {
+//   line: number;
+//   character: number;
+// };
 
-export type Range = {
-  start: Position;
-  end: Position;
-};
+// export type Range = {
+//   start: Position;
+//   end: Position;
+// };
 
-export type Selection = {
-  anchor: Position;
-  active: Position;
-};
+// export type Selection = {
+//   anchor: Position;
+//   active: Position;
+// };
 
 export interface InternalEditor {
   document: InternalDocument;
@@ -559,7 +561,7 @@ export type GitFile = {
 
 export type TextEditor = {
   uri: Uri;
-  selections: Selection[];
+  selections: readonly Selection[];
   visibleRange: Range;
   // = [{ anchor: { line: 0, character: 0 }, active: { line: 0, character: 0 } }],
   // = { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },

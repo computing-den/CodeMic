@@ -1,6 +1,6 @@
+import ContentChange from '../content_change.js';
 import * as t from '../../lib/types.js';
 import * as path from '../../lib/path.js';
-import * as ih from './internal_helpers.js';
 import InternalTextDocument from './internal_text_document.js';
 import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
@@ -16,7 +16,7 @@ import archiver from 'archiver';
 import unzipper from 'unzipper';
 import stream from 'stream';
 import os from 'os';
-import * as vscode from 'vscode';
+import vscode, { Range, Selection, Position } from 'vscode';
 import { v4 as uuid } from 'uuid';
 
 export class Session implements t.Session {
@@ -258,7 +258,7 @@ export class Session implements t.Session {
         const sha1 = await misc.computeSHA1(data);
         worktree[uri] = { type: 'local', sha1 };
         await this.writeBlob(sha1, data);
-        textEditors.push(ih.makeTextEditorSnapshot(uri));
+        textEditors.push({ uri, selections: [new Selection(0, 0, 0, 0)], visibleRange: new Range(0, 0, 1, 0) });
       } else if (vscUri.scheme === 'file') {
         if (!(await misc.fileExists(path.abs(vscUri.path)))) {
           // File is deleted but the text editor is still there. Ignore it.
@@ -268,9 +268,17 @@ export class Session implements t.Session {
         // We can only set selection and visible range if we have the vscTextEditor
         const vscTextEditor = this.findVscTextEditorByVscUri(vscode.window.visibleTextEditors, vscUri);
         if (vscTextEditor) {
-          textEditors.push(this.makeTextEditorSnapshotFromVsc(vscTextEditor));
+          textEditors.push({
+            uri: this.uriFromVsc(vscTextEditor.document.uri),
+            selections: vscTextEditor.selections,
+            visibleRange: vscTextEditor.visibleRanges[0],
+          });
         } else {
-          textEditors.push(ih.makeTextEditorSnapshot(uri));
+          textEditors.push({
+            uri,
+            selections: [new Selection(0, 0, 0, 0)],
+            visibleRange: new Range(0, 0, 1, 0),
+          });
         }
       }
     }
@@ -425,7 +433,7 @@ export class Session implements t.Session {
           await vscode.window.showTextDocument(vscUri, {
             preview: false,
             preserveFocus: true,
-            selection: this.selectionToVsc(textEditor.selections[0]),
+            selection: textEditor.selections[0],
             viewColumn: vscode.ViewColumn.One,
           });
         }
@@ -438,7 +446,7 @@ export class Session implements t.Session {
       await vscode.window.showTextDocument(vscUri, {
         preview: false,
         preserveFocus: false,
-        selection: this.selectionToVsc(ctrl.activeTextEditor.selections[0]),
+        selection: ctrl.activeTextEditor.selections[0],
         viewColumn: vscode.ViewColumn.One,
       });
     }
@@ -492,7 +500,90 @@ export class Session implements t.Session {
 
   async readBody(options?: { download: boolean }) {
     if (options?.download) await this.download({ skipIfExists: true });
-    this.body = await storage.readJSON<t.SessionBody>(this.sessionDataPaths.body);
+    const json = await storage.readJSON<t.SessionBody>(this.sessionDataPaths.body);
+
+    this.body = {
+      audioTracks: json.audioTracks,
+      videoTracks: json.videoTracks,
+      editorTrack: {
+        defaultEol: json.editorTrack.defaultEol,
+        focusTimeline: json.editorTrack.focusTimeline,
+        initSnapshot: {
+          worktree: json.editorTrack.initSnapshot.worktree,
+          activeTextEditorUri: json.editorTrack.initSnapshot.activeTextEditorUri,
+          textEditors: json.editorTrack.initSnapshot.textEditors.map(x => ({
+            selections: x.selections.map(
+              s => new Selection(s.anchor.line, s.anchor.character, s.active.line, s.active.character),
+            ),
+            uri: x.uri,
+            visibleRange: new Range(x.visibleRange.start, x.visibleRange.end),
+          })),
+        },
+        events: json.editorTrack.events.map(e => {
+          switch (e.type) {
+            case 'textChange':
+              return {
+                ...e,
+                contentChanges: e.contentChanges.map(
+                  cc => new ContentChange(cc.text, new Range(cc.range.start, cc.range.end)),
+                ),
+                revContentChanges: e.revContentChanges.map(
+                  cc => new ContentChange(cc.text, new Range(cc.range.start, cc.range.end)),
+                ),
+              };
+            case 'openTextDocument':
+            case 'closeTextDocument':
+              return e;
+            case 'showTextEditor':
+              return {
+                ...e,
+                selections: e.selections.map(
+                  s => new Selection(s.anchor.line, s.anchor.character, s.active.line, s.active.character),
+                ),
+                visibleRange: new Range(e.visibleRange.start, e.visibleRange.end),
+                revSelections:
+                  e.revSelections &&
+                  e.revSelections.map(
+                    s => new Selection(s.anchor.line, s.anchor.character, s.active.line, s.active.character),
+                  ),
+                revVisibleRange: e.revVisibleRange && new Range(e.revVisibleRange.start, e.revVisibleRange.end),
+              };
+            case 'closeTextEditor':
+              return {
+                ...e,
+                revSelections:
+                  e.revSelections &&
+                  e.revSelections.map(
+                    s => new Selection(s.anchor.line, s.anchor.character, s.active.line, s.active.character),
+                  ),
+                revVisibleRange: e.revVisibleRange && new Range(e.revVisibleRange.start, e.revVisibleRange.end),
+              };
+            case 'select':
+              return {
+                ...e,
+                selections: e.selections.map(
+                  s => new Selection(s.anchor.line, s.anchor.character, s.active.line, s.active.character),
+                ),
+                visibleRange: new Range(e.visibleRange.start, e.visibleRange.end),
+                revSelections:
+                  e.revSelections &&
+                  e.revSelections.map(
+                    s => new Selection(s.anchor.line, s.anchor.character, s.active.line, s.active.character),
+                  ),
+                revVisibleRange: e.revVisibleRange && new Range(e.revVisibleRange.start, e.revVisibleRange.end),
+              };
+            case 'scroll':
+              return {
+                ...e,
+                visibleRange: new Range(e.visibleRange.start, e.visibleRange.end),
+                revVisibleRange: e.revVisibleRange && new Range(e.revVisibleRange.start, e.revVisibleRange.end),
+              };
+            case 'save':
+              return e;
+          }
+        }),
+      },
+    };
   }
 
   async download(options?: { skipIfExists: boolean }) {
@@ -593,48 +684,8 @@ export class Session implements t.Session {
     }
   }
 
-  selectionsFromVsc(selections: readonly vscode.Selection[]): t.Selection[] {
-    return selections.map(s => this.selectionFromVsc(s));
-  }
-
-  selectionFromVsc(selection: vscode.Selection): t.Selection {
-    return ih.makeSelection(this.positionFromVsc(selection.anchor), this.positionFromVsc(selection.active));
-  }
-
-  rangeFromVsc(range: vscode.Range): t.Range {
-    return ih.makeRange(this.positionFromVsc(range.start), this.positionFromVsc(range.end));
-  }
-
-  positionFromVsc(position: vscode.Position): t.Position {
-    return ih.makePosition(position.line, position.character);
-  }
-
-  selectionsToVsc(selections: t.Selection[]): vscode.Selection[] {
-    return selections.map(s => this.selectionToVsc(s));
-  }
-
-  selectionToVsc(selection: t.Selection): vscode.Selection {
-    return new vscode.Selection(this.positionToVsc(selection.anchor), this.positionToVsc(selection.active));
-  }
-
-  rangeToVsc(range: t.Range): vscode.Range {
-    return new vscode.Range(this.positionToVsc(range.start), this.positionToVsc(range.end));
-  }
-
-  positionToVsc(position: t.Position): vscode.Position {
-    return new vscode.Position(position.line, position.character);
-  }
-
-  contentChangesFromVsc(contentChanges: readonly vscode.TextDocumentContentChangeEvent[]): t.ContentChange[] {
-    return contentChanges.map(cc => this.contentChangeFromVsc(cc));
-  }
-
-  contentChangeFromVsc(contentChange: vscode.TextDocumentContentChangeEvent): t.ContentChange {
-    return ih.makeContentChange(contentChange.text, this.rangeFromVsc(contentChange.range));
-  }
-
-  getVscTextDocumentRange(document: vscode.TextDocument): vscode.Range {
-    return document.validateRange(new vscode.Range(0, 0, document.lineCount, 0));
+  getVscTextDocumentRange(document: vscode.TextDocument): Range {
+    return document.validateRange(new Range(0, 0, document.lineCount, 0));
   }
 
   uriFromVsc(vscUri: vscode.Uri): t.Uri {
@@ -749,13 +800,13 @@ export class Session implements t.Session {
     if (newTab) await vscode.window.tabGroups.close(newTab);
   }
 
-  makeTextEditorSnapshotFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {
-    return ih.makeTextEditorSnapshot(
-      this.uriFromVsc(vscTextEditor.document.uri),
-      this.selectionsFromVsc(vscTextEditor.selections),
-      this.rangeFromVsc(vscTextEditor.visibleRanges[0]),
-    );
-  }
+  // makeTextEditorSnapshotFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {
+  //   return ih.makeTextEditorSnapshot(
+  //     this.uriFromVsc(vscTextEditor.document.uri),
+  //     this.selectionsFromVsc(vscTextEditor.selections),
+  //     this.rangeFromVsc(vscTextEditor.visibleRanges[0]),
+  //   );
+  // }
 
   getRelevantTabUris(): t.Uri[] {
     return this.getRelevantTabVscUris().map(this.uriFromVsc.bind(this));
