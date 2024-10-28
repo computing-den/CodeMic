@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
+import { Range, Selection, Position } from '../../lib/types.js';
 import assert from '../../lib/assert.js';
-import vscode, { Range, Selection, Position } from 'vscode';
 
 export default class InternalTextDocument implements t.InternalDocument {
   constructor(public uri: t.Uri, public lines: string[], public eol: t.EndOfLine) {}
@@ -69,7 +69,7 @@ export default class InternalTextDocument implements t.InternalDocument {
         const startChar = range.start.character + (lastLineShifted === startLine ? lastLineCharShift : 0);
         const endLine = range.end.line + totalLineShift;
         const endChar = range.end.character + (lastLineShifted === endLine ? lastLineCharShift : 0);
-        range = new Range(startLine, startChar, endLine, endChar);
+        range = new Range(new Position(startLine, startChar), new Position(endLine, endChar));
       }
 
       const newLines = text.split(/\r?\n/);
@@ -125,7 +125,7 @@ export default class InternalTextDocument implements t.InternalDocument {
   }
 
   getRange(): Range {
-    if (!this.lines.length) return new Range(0, 0, 0, 0);
-    return new Range(0, 0, this.lines.length - 1, this.lines[this.lines.length - 1].length);
+    if (!this.lines.length) return new Range(new Position(0, 0), new Position(0, 0));
+    return new Range(new Position(0, 0), new Position(this.lines.length - 1, this.lines[this.lines.length - 1].length));
   }
 }

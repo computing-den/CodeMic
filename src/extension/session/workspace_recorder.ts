@@ -1,13 +1,13 @@
 import * as t from '../../lib/types.js';
+import { Range, Selection, Position, ContentChange } from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
-import ContentChange from '../content_change.js';
 import InternalWorkspace from './internal_workspace.js';
 import InternalTextEditor from './internal_text_editor.js';
 import InternalTextDocument from './internal_text_document.js';
 import assert from '../../lib/assert.js';
 import type Session from './session.js';
 import config from '../config.js';
-import vscode, { Range, Selection, Position } from 'vscode';
+import vscode from 'vscode';
 
 import _ from 'lodash';
 

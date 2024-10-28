@@ -785,9 +785,10 @@ class CodeMic {
   }
 
   async deactivate() {
-    if (this.session) {
-      await this.session.write();
-    }
+    this.closeCurrentScreen();
+    // if (this.session) {
+    // await this.session.write();
+    // }
     // await this.db.write();
   }
 

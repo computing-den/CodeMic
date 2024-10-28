@@ -1,9 +1,10 @@
-import * as vscode from 'vscode';
+import vscode from 'vscode';
 import nodePath from 'path';
 import os from 'os';
 import fs from 'fs';
 import * as git from './git';
 import * as t from '../lib/types.js';
+import { Position, Range, Selection } from '../lib/types.js';
 import * as path from '../lib/path.js';
 import _ from 'lodash';
 import assert from 'assert';
@@ -60,4 +61,36 @@ export function getDefaultVscWorkspace(): t.AbsPath | undefined {
   // probably because it doesn't cause a vscode restart.
   const uri = vscode.workspace.workspaceFolders?.[0]?.uri;
   return uri?.scheme === 'file' ? path.abs(uri.path) : undefined;
+}
+
+export function toVscPosition(position: Position): vscode.Position {
+  return new vscode.Position(position.line, position.character);
+}
+
+export function fromVscPosition(vscodePosition: vscode.Position): Position {
+  return new Position(vscodePosition.line, vscodePosition.character);
+}
+
+export function toVscRange(range: Range): vscode.Range {
+  return new vscode.Range(toVscPosition(range.start), toVscPosition(range.end));
+}
+
+export function fromVscRange(vscRange: vscode.Range): Range {
+  return new Range(fromVscPosition(vscRange.start), fromVscPosition(vscRange.end));
+}
+
+export function toVscSelection(selection: Selection): vscode.Selection {
+  return new vscode.Selection(toVscPosition(selection.anchor), toVscPosition(selection.active));
+}
+
+export function fromVscSelection(vscSelection: vscode.Selection): Selection {
+  return new Selection(fromVscPosition(vscSelection.anchor), fromVscPosition(vscSelection.active));
+}
+
+export function toVscSelections(selections: readonly Selection[]): readonly vscode.Selection[] {
+  return selections.map(toVscSelection);
+}
+
+export function fromVscSelections(vscSelections: readonly vscode.Selection[]): readonly Selection[] {
+  return vscSelections.map(fromVscSelection);
 }

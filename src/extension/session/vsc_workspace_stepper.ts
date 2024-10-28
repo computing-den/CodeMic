@@ -2,7 +2,7 @@ import * as t from '../../lib/types.js';
 import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
 import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
-import { fileExists } from '../misc.js';
+import * as misc from '../misc.js';
 import Session from './session.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
@@ -30,11 +30,11 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     const edit = new vscode.WorkspaceEdit();
     if (direction === t.Direction.Forwards) {
       for (const cc of e.contentChanges) {
-        edit.replace(vscUri, cc.range, cc.text);
+        edit.replace(vscUri, misc.toVscRange(cc.range), cc.text);
       }
     } else {
       for (const cc of e.revContentChanges) {
-        edit.replace(vscUri, cc.range, cc.text);
+        edit.replace(vscUri, misc.toVscRange(cc.range), cc.text);
       }
     }
     await vscode.workspace.applyEdit(edit);
@@ -65,7 +65,11 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
       if (e.text !== undefined) {
         // We use WorkspaceEdit here because we don't necessarily want to open the text editor yet.
         const edit = new vscode.WorkspaceEdit();
-        edit.replace(vscTextDocument.uri, this.session.getVscTextDocumentRange(vscTextDocument), e.text);
+        edit.replace(
+          vscTextDocument.uri,
+          misc.toVscRange(this.session.getVscTextDocumentRange(vscTextDocument)),
+          e.text,
+        );
         await vscode.workspace.applyEdit(edit);
       }
     } else {
@@ -81,7 +85,11 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     } else {
       const vscTextDocument = await vscode.workspace.openTextDocument(this.session.uriToVsc(e.uri));
       const edit = new vscode.WorkspaceEdit();
-      edit.replace(vscTextDocument.uri, this.session.getVscTextDocumentRange(vscTextDocument), e.revText);
+      edit.replace(
+        vscTextDocument.uri,
+        misc.toVscRange(this.session.getVscTextDocumentRange(vscTextDocument)),
+        e.revText,
+      );
       await vscode.workspace.applyEdit(edit);
     }
   }
@@ -92,14 +100,14 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
         preview: false,
         preserveFocus: false,
       });
-      vscTextEditor.selections = e.selections;
+      vscTextEditor.selections = misc.toVscSelections(e.selections);
       await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
     } else if (e.revUri) {
       const vscTextEditor = await vscode.window.showTextDocument(this.session.uriToVsc(e.revUri), {
         preview: false,
         preserveFocus: false,
       });
-      vscTextEditor.selections = e.revSelections!;
+      vscTextEditor.selections = misc.toVscSelections(e.revSelections!);
       await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange!.start.line, at: 'top' });
     }
   }
@@ -113,7 +121,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
         preserveFocus: false,
       });
       if (e.revSelections) {
-        vscTextEditor.selections = e.revSelections;
+        vscTextEditor.selections = misc.toVscSelections(e.revSelections);
       }
       if (e.revVisibleRange) {
         await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
@@ -128,10 +136,10 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     });
 
     if (direction === t.Direction.Forwards) {
-      vscTextEditor.selections = e.selections;
+      vscTextEditor.selections = misc.toVscSelections(e.selections);
       await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
     } else {
-      vscTextEditor.selections = e.revSelections;
+      vscTextEditor.selections = misc.toVscSelections(e.revSelections);
       await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
     }
   }

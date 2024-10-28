@@ -1,12 +1,12 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
+import { Range, Selection, Position } from '../../lib/types.js';
 import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
 import Session from './session.js';
 import InternalWorkspaceStepper from './internal_workspace_stepper.js';
 import InternalTextEditor from './internal_text_editor.js';
 import InternalTextDocument from './internal_text_document.js';
-import { Range, Selection, Position } from 'vscode';
 
 /**
  * If a document has been loaded into memory, then the latest content is in the document field and

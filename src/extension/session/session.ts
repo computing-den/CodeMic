@@ -1,5 +1,5 @@
-import ContentChange from '../content_change.js';
 import * as t from '../../lib/types.js';
+import { Range, Selection, Position, ContentChange } from '../../lib/types.js';
 import * as path from '../../lib/path.js';
 import InternalTextDocument from './internal_text_document.js';
 import * as lib from '../../lib/lib.js';
@@ -16,7 +16,7 @@ import archiver from 'archiver';
 import unzipper from 'unzipper';
 import stream from 'stream';
 import os from 'os';
-import vscode, { Range, Selection, Position } from 'vscode';
+import vscode from 'vscode';
 import { v4 as uuid } from 'uuid';
 
 export class Session implements t.Session {
@@ -258,7 +258,11 @@ export class Session implements t.Session {
         const sha1 = await misc.computeSHA1(data);
         worktree[uri] = { type: 'local', sha1 };
         await this.writeBlob(sha1, data);
-        textEditors.push({ uri, selections: [new Selection(0, 0, 0, 0)], visibleRange: new Range(0, 0, 1, 0) });
+        textEditors.push({
+          uri,
+          selections: [new Selection(new Position(0, 0), new Position(0, 0))],
+          visibleRange: new Range(new Position(0, 0), new Position(1, 0)),
+        });
       } else if (vscUri.scheme === 'file') {
         if (!(await misc.fileExists(path.abs(vscUri.path)))) {
           // File is deleted but the text editor is still there. Ignore it.
@@ -276,8 +280,8 @@ export class Session implements t.Session {
         } else {
           textEditors.push({
             uri,
-            selections: [new Selection(0, 0, 0, 0)],
-            visibleRange: new Range(0, 0, 1, 0),
+            selections: [new Selection(new Position(0, 0), new Position(0, 0))],
+            visibleRange: new Range(new Position(0, 0), new Position(1, 0)),
           });
         }
       }
@@ -407,7 +411,7 @@ export class Session implements t.Session {
 
         if (vscTextDocument) {
           const text = new TextDecoder().decode(await ctrl.getContentByUri(targetUri));
-          edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), text);
+          edit.replace(vscTextDocument.uri, misc.toVscRange(this.getVscTextDocumentRange(vscTextDocument)), text);
         } else {
           targetUrisOutsideVsc.push(targetUri);
         }
@@ -433,7 +437,7 @@ export class Session implements t.Session {
           await vscode.window.showTextDocument(vscUri, {
             preview: false,
             preserveFocus: true,
-            selection: textEditor.selections[0],
+            selection: misc.toVscSelection(textEditor.selections[0]),
             viewColumn: vscode.ViewColumn.One,
           });
         }
@@ -446,7 +450,7 @@ export class Session implements t.Session {
       await vscode.window.showTextDocument(vscUri, {
         preview: false,
         preserveFocus: false,
-        selection: ctrl.activeTextEditor.selections[0],
+        selection: misc.toVscSelection(ctrl.activeTextEditor.selections[0]),
         viewColumn: vscode.ViewColumn.One,
       });
     }
@@ -513,7 +517,11 @@ export class Session implements t.Session {
           activeTextEditorUri: json.editorTrack.initSnapshot.activeTextEditorUri,
           textEditors: json.editorTrack.initSnapshot.textEditors.map(x => ({
             selections: x.selections.map(
-              s => new Selection(s.anchor.line, s.anchor.character, s.active.line, s.active.character),
+              s =>
+                new Selection(
+                  new Position(s.anchor.line, s.anchor.character),
+                  new Position(s.active.line, s.active.character),
+                ),
             ),
             uri: x.uri,
             visibleRange: new Range(x.visibleRange.start, x.visibleRange.end),
@@ -538,13 +546,21 @@ export class Session implements t.Session {
               return {
                 ...e,
                 selections: e.selections.map(
-                  s => new Selection(s.anchor.line, s.anchor.character, s.active.line, s.active.character),
+                  s =>
+                    new Selection(
+                      new Position(s.anchor.line, s.anchor.character),
+                      new Position(s.active.line, s.active.character),
+                    ),
                 ),
                 visibleRange: new Range(e.visibleRange.start, e.visibleRange.end),
                 revSelections:
                   e.revSelections &&
                   e.revSelections.map(
-                    s => new Selection(s.anchor.line, s.anchor.character, s.active.line, s.active.character),
+                    s =>
+                      new Selection(
+                        new Position(s.anchor.line, s.anchor.character),
+                        new Position(s.active.line, s.active.character),
+                      ),
                   ),
                 revVisibleRange: e.revVisibleRange && new Range(e.revVisibleRange.start, e.revVisibleRange.end),
               };
@@ -554,7 +570,11 @@ export class Session implements t.Session {
                 revSelections:
                   e.revSelections &&
                   e.revSelections.map(
-                    s => new Selection(s.anchor.line, s.anchor.character, s.active.line, s.active.character),
+                    s =>
+                      new Selection(
+                        new Position(s.anchor.line, s.anchor.character),
+                        new Position(s.active.line, s.active.character),
+                      ),
                   ),
                 revVisibleRange: e.revVisibleRange && new Range(e.revVisibleRange.start, e.revVisibleRange.end),
               };
@@ -562,13 +582,21 @@ export class Session implements t.Session {
               return {
                 ...e,
                 selections: e.selections.map(
-                  s => new Selection(s.anchor.line, s.anchor.character, s.active.line, s.active.character),
+                  s =>
+                    new Selection(
+                      new Position(s.anchor.line, s.anchor.character),
+                      new Position(s.active.line, s.active.character),
+                    ),
                 ),
                 visibleRange: new Range(e.visibleRange.start, e.visibleRange.end),
                 revSelections:
                   e.revSelections &&
                   e.revSelections.map(
-                    s => new Selection(s.anchor.line, s.anchor.character, s.active.line, s.active.character),
+                    s =>
+                      new Selection(
+                        new Position(s.anchor.line, s.anchor.character),
+                        new Position(s.active.line, s.active.character),
+                      ),
                   ),
                 revVisibleRange: e.revVisibleRange && new Range(e.revVisibleRange.start, e.revVisibleRange.end),
               };
@@ -685,7 +713,7 @@ export class Session implements t.Session {
   }
 
   getVscTextDocumentRange(document: vscode.TextDocument): Range {
-    return document.validateRange(new Range(0, 0, document.lineCount, 0));
+    return misc.fromVscRange(document.validateRange(new vscode.Range(0, 0, document.lineCount, 0)));
   }
 
   uriFromVsc(vscUri: vscode.Uri): t.Uri {
@@ -776,7 +804,7 @@ export class Session implements t.Session {
         if (tab.input.uri.scheme === 'untitled') {
           // for untitled scheme, empty it first, then can close without confirmation
           const edit = new vscode.WorkspaceEdit();
-          edit.replace(vscTextDocument.uri, this.getVscTextDocumentRange(vscTextDocument), '');
+          edit.replace(vscTextDocument.uri, misc.toVscRange(this.getVscTextDocumentRange(vscTextDocument)), '');
           await vscode.workspace.applyEdit(edit);
           // TODO We're gonna skip closing it for now. We must use unnamed untitled document
           // to prevent vscode from showing the confirmation dialog when the content is empty.

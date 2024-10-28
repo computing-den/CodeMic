@@ -1,5 +1,4 @@
-import vscode, { Range, Selection, Position } from 'vscode';
-
+import assert from './assert.js';
 // Type branding is a hack. The __brand__ property doesn't actually exist at runtime.
 export type Path = RelPath | AbsPath;
 export type RelPath = string & { readonly __brand__: 'rel' };
@@ -512,11 +511,6 @@ export enum Direction {
 
 export type UriSet = { [key: Uri]: true | undefined };
 
-export interface ContentChange {
-  range: vscode.Range;
-  text: string;
-}
-
 // export type Position = {
 //   line: number;
 //   character: number;
@@ -587,3 +581,57 @@ export type SeekData = { events: EditorEvent[]; direction: Direction; i: number;
 
 export type Vec2 = [number, number];
 export type Rect = { top: number; right: number; bottom: number; left: number };
+
+export class Position {
+  constructor(public line: number, public character: number) {
+    assert(line >= 0, 'Position line must be >= 0');
+    assert(character >= 0, 'Position character must be >= 0');
+  }
+
+  isEqual(other: Position): boolean {
+    return this.line === other.line && this.character === other.character;
+  }
+
+  compareTo(other: Position): number {
+    if (this.line < other.line) return -1;
+    if (this.line > other.line) return 1;
+    if (this.character < other.character) return -1;
+    if (this.character > other.character) return 1;
+    return 0;
+  }
+
+  isAfter(other: Position): boolean {
+    return this.compareTo(other) > 0;
+  }
+
+  isAfterOrEqual(other: Position): boolean {
+    return this.compareTo(other) >= 0;
+  }
+
+  isBefore(other: Position): boolean {
+    return this.compareTo(other) < 0;
+  }
+
+  isBeforeOrEqual(other: Position): boolean {
+    return this.compareTo(other) <= 0;
+  }
+}
+
+export class Range {
+  constructor(public start: Position, public end: Position) {}
+}
+
+export class Selection {
+  constructor(public anchor: Position, public active: Position) {}
+
+  get start(): Position {
+    return this.anchor.isBeforeOrEqual(this.active) ? this.anchor : this.active;
+  }
+  get end(): Position {
+    return this.anchor.isAfter(this.active) ? this.anchor : this.active;
+  }
+}
+
+export class ContentChange {
+  constructor(public text: string, public range: Range) {}
+}
