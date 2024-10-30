@@ -322,8 +322,8 @@ export default class InternalWorkspace {
   }
 
   finalizeSeek(seekData: t.SeekData) {
-    assert(this.eventIndex === seekData.i, 'finalizeSeek: somehow eventIndex got out of sync');
-    // this.eventIndex = seekData.i;
+    // assert(this.eventIndex === seekData.i, 'finalizeSeek: somehow eventIndex got out of sync');
+    this.eventIndex = seekData.i;
   }
 
   /**

@@ -1,4 +1,3 @@
-import fs from 'fs';
 import * as misc from './misc.js';
 import config from './config.js';
 import Recorder from './recorder.js';
@@ -15,6 +14,7 @@ import assert from 'assert';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import * as path from '../lib/path.js';
+import EventContainer, { EventIndex } from './session/event_container.js';
 
 class CodeMic {
   screen: t.Screen = t.Screen.Welcome;
@@ -53,6 +53,11 @@ class CodeMic {
   }
 
   async onStartUp() {
+    // @ts-ignore
+    globalThis.EventContainer = EventContainer;
+    // @ts-ignore
+    globalThis.EventIndex = EventIndex;
+
     await this.restoreStateAfterRestart();
     await this.updateFrontend();
 

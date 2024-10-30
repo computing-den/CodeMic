@@ -163,3 +163,16 @@ export function userToUserSummary(user: t.User): t.UserSummary {
 //   const bools = await Promise.all(collection.map(cb));
 //   return collection.filter((x, i) => bools[i]);
 // }
+
+/**
+ * Use this instead of splice to support large number of inserts without hitting the stack limit.
+ */
+export function insertIntoArray<T>(array: T[], newItems: T[], at: number) {
+  array.length += newItems.length;
+  array.copyWithin(at + newItems.length, at);
+  for (let i = 0; i < newItems.length; i++) {
+    array[at + i] = newItems[i];
+  }
+}
+
+// export function getOrSetMap<T,U>(map: Map<T,U>, key: T, make: () => U):
