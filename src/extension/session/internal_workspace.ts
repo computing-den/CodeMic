@@ -3,7 +3,7 @@ import * as t from '../../lib/types.js';
 import { Range, Selection, Position } from '../../lib/types.js';
 import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
-import EventContainer, { EventIndex } from '../../lib/event_container.js';
+import EventContainer from '../../lib/event_container.js';
 import Session from './session.js';
 import InternalWorkspaceStepper from './internal_workspace_stepper.js';
 import InternalTextEditor from './internal_text_editor.js';
@@ -20,7 +20,7 @@ import InternalTextDocument from './internal_text_document.js';
 type LiveWorktree = Map<t.Uri, LiveWorktreeItem>;
 type LiveWorktreeItem = { file: t.File; document?: t.InternalDocument; editor?: t.InternalEditor };
 
-export type SeekStep = t.EditorEventWithUri & { newEventIndex: EventIndex };
+export type SeekStep = t.EditorEventWithUri & { newEventIndex: number };
 export type SeekData = { steps: SeekStep[]; direction: t.Direction };
 
 // Not every InternalTextDocument may be attached to a InternalTextEditor. At least not until the
@@ -30,7 +30,7 @@ export default class InternalWorkspace {
   // If a InternalTextDocument is in this.textDocuments, it is also in this.worktree.
   // If a InternalTextEditor is in this.textEditors, it is also in this.worktree.
   // eventIndex represents the index of the last event that was executed. That is, the effects of that event are visible.
-  eventIndex: EventIndex;
+  eventIndex: number;
   worktree: LiveWorktree;
   textDocuments: InternalTextDocument[];
   textEditors: InternalTextEditor[];
@@ -42,7 +42,7 @@ export default class InternalWorkspace {
   focusTimeline: t.WorkspaceFocusTimeline;
 
   constructor(public session: Session, json: t.InternalWorkspaceJSON) {
-    this.eventIndex = EventIndex.minusOne();
+    this.eventIndex = -1;
     this.worktree = new Map();
     this.textDocuments = [];
     this.textEditors = [];
@@ -63,7 +63,7 @@ export default class InternalWorkspace {
   // }
 
   async restoreInitState() {
-    assert(this.eventIndex.isMinusOne(), 'calling restoreInitState on an already initialized internal workspace');
+    assert(this.eventIndex === -1, 'calling restoreInitState on an already initialized internal workspace');
     this.textDocuments = [];
     this.textEditors = [];
 
@@ -216,17 +216,13 @@ export default class InternalWorkspace {
     let direction = t.Direction.Forwards;
     const steps: SeekStep[] = [];
 
-    if (this.eventIndex.isBefore(end)) {
+    if (this.eventIndex < end) {
       // Go forward
-      const from = this.eventContainer.nextIndex(this.eventIndex);
-      if (!from.isMinusOne()) {
-        this.eventContainer.forEachExc(from, end, (e, i) => steps.push({ ...e, newEventIndex: i }));
-      }
-    } else if (this.eventIndex.isAfter(end)) {
+      const from = this.eventIndex + 1;
+      this.eventContainer.forEachExc(from, end, (e, i) => steps.push({ ...e, newEventIndex: i }));
+    } else if (this.eventIndex > end) {
       // Go backward
-      this.eventContainer.forEachInc(this.eventIndex, end, (e, i) =>
-        steps.push({ ...e, newEventIndex: this.eventContainer.prevIndex(i) }),
-      );
+      this.eventContainer.forEachExc(this.eventIndex, end - 1, (e, i) => steps.push({ ...e, newEventIndex: i - 1 }));
       direction = t.Direction.Backwards;
     }
 

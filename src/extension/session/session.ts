@@ -150,7 +150,7 @@ export class Session {
       const uriSet: t.UriSet = new Set();
       const seekData = this.runtime.internalWorkspace.getSeekData(options.seekClock);
       await this.runtime.internalWorkspace.seek(seekData, uriSet);
-      targetUris = Object.keys(uriSet);
+      targetUris = Array.from(uriSet);
     }
 
     // Sync and save.

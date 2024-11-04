@@ -201,6 +201,5 @@ function deserializeSelection(r: t.SelectionCompact): t.Selection {
 }
 
 function deserializeClock(clock: number): number {
-  return clock;
-  // return clock / 1000;
+  return clock / 1000;
 }

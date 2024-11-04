@@ -11,57 +11,6 @@
  * event has not been applied.
  * If current clock is c, then all events whose clock is <= c have already been applied.
  *
- * The following is a quick test and benchmark and the timing on my machine is in the order of 10s of ms.
- * TODO move this to an actual test.
- * {
- *   function timeIt(title, f) {
- *     console.log(`----- ${title} -----`);
- *     let start = performance.now();
- *     f();
- *     console.log(`*** TIME: ${performance.now() - start}ms ***` )
- *   }
- *
- *   let ec = new globalThis.EventContainer
- *   console.log('------ iterating empty container')
- *
- *   console.log(ec.firstIndex(), ec.lastIndex());
- *
- *   timeIt('filling the container', () => {
- *
- *     const uris = [];
- *     for (let u = 0; u<1000; u++) {
- *       uris.push('test/test2/' + u);
- *     }
- *
- *     const duration = 3600 * 24;
- *
- *     // insert initial state
- *     for (const u of uris) {
- *       ec.insert(u, [{clock: 0}])
- *     }
- *
- *     for (let t = 0, uri; t < duration; t++) {
- *       if (t % (5 * 60) === 0) {
- *         uri = uris[ Math.floor(Math.random() * uris.length) ];
- *         console.log('filling uri: ', uri)
- *       }
- *       ec.insert(uri, [{clock: t}]);
- *     }
- *   })
- *
- *   {
- *     let res = [];
- *     timeIt('------ iterating', () => {
- *       for (let i = ec.lastIndex(); i; i = ec.prevIndex(i)) {
- *         res.push([i, ec.at(i)])
- *       }
- *     })
- *
- *     console.log('RES length: ', res.length);
- *     console.log('RES', ec);
- *   }
- * }
- *
  */
 
 import { EditorEvent, EditorEventWithUri, Uri, InternalEditorTracksJSON } from './types.js';
@@ -71,11 +20,15 @@ import _ from 'lodash';
 
 const BUCKET_CLOCK_INTERVAL = 1 * 60;
 
-export type Iteratee = (value: EditorEventWithUri, i: EventIndex) => any;
+export type Iteratee = (value: EditorEventWithUri, i: number) => any;
+
+/** [index of bucket, index in bucket] */
+type Position = [number, number];
 
 export default class EventContainer {
   private tracks: Map<Uri, EditorEvent[]> = new Map();
   private buckets: EditorEventWithUri[][] = [];
+  private size = 0;
 
   constructor(tracks: InternalEditorTracksJSON) {
     for (const [uri, events] of Object.entries(tracks)) {
@@ -87,6 +40,7 @@ export default class EventContainer {
   insert(uri: Uri, events: EditorEvent[]) {
     this.insertIntoTrack(uri, events);
     this.insertIntoBucket(uri, events);
+    this.size + events.length;
   }
 
   delete() {
@@ -97,115 +51,117 @@ export default class EventContainer {
     return this.tracks.get(uri) ?? [];
   }
 
-  firstIndex(): EventIndex {
-    return this.nextIndex(EventIndex.minusOne());
-  }
-
-  lastIndex(): EventIndex {
-    return this.prevIndex(new EventIndex(this.buckets.length - 1, this.buckets[this.buckets.length - 1]?.length ?? 0));
+  getSize(): number {
+    return this.size;
   }
 
   isEmpty(): boolean {
-    return this.lastIndex().isMinusOne();
+    return this.size === 0;
   }
 
-  forEachInc(from: EventIndex, to: EventIndex, f: Iteratee) {
-    assert(!from.isMinusOne() && !to.isMinusOne());
+  forEachExc(from: number, to: number, f: Iteratee) {
+    assert(from >= 0);
 
-    if (from.isBeforeOrEqual(to)) {
-      for (let i = from; !i.isMinusOne() && i.isBeforeOrEqual(to); i = this.nextIndex(i)) {
-        if (f(this.at(i)!, i) === false) break;
+    let count = Math.abs(to - from);
+    let pos = this.posOfIndex(from);
+
+    if (from <= to) {
+      for (let i = 0; i < count && pos; i++, pos = this.nextPos(pos)) {
+        if (f(this.atPos(pos)!, from + i) === false) break;
       }
     } else {
-      for (let i = from; !i.isMinusOne() && i.isAfterOrEqual(to); i = this.prevIndex(i)) {
-        if (f(this.at(i)!, i) === false) break;
+      for (let i = 0; i < count && pos; i++, pos = this.prevPos(pos)) {
+        if (f(this.atPos(pos)!, from - i) === false) break;
       }
     }
   }
 
-  forEachExc(from: EventIndex, to: EventIndex, f: Iteratee) {
-    assert(!from.isMinusOne() && !to.isMinusOne());
-
-    if (from.isBeforeOrEqual(to)) {
-      for (let i = from; !i.isMinusOne() && i.isBefore(to); i = this.nextIndex(i)) {
-        if (f(this.at(i)!, i) === false) break;
-      }
-    } else {
-      for (let i = from; !i.isMinusOne() && i.isAfter(to); i = this.prevIndex(i)) {
-        if (f(this.at(i)!, i) === false) break;
-      }
-    }
+  at(i: number): EditorEventWithUri | undefined {
+    const pos = this.posOfIndex(i);
+    return pos && this.atPos(pos);
   }
 
-  isInRange(i: EventIndex): boolean {
-    return (
-      i.bucketIndex >= 0 &&
-      i.bucketIndex < this.buckets.length &&
-      i.eventIndexInBucket >= 0 &&
-      i.eventIndexInBucket < this.buckets[i.bucketIndex].length
-    );
+  getIndexAfterClock(clock: number): number {
+    return this.indexOfPos(this.getInsertPosAfterClock(clock));
   }
 
-  at(i: EventIndex): EditorEventWithUri | undefined {
-    return this.buckets[i.bucketIndex]?.[i.eventIndexInBucket];
-  }
-
-  /**
-   * Once it reaches the end, it returns EventIndex.minusOne()
-   */
-  nextIndex(i: EventIndex): EventIndex {
-    for (
-      i = new EventIndex(i.bucketIndex, i.eventIndexInBucket + 1);
-      i.bucketIndex < this.buckets.length;
-      i = new EventIndex(i.bucketIndex + 1, 0)
-    ) {
-      if (i.eventIndexInBucket < this.buckets[i.bucketIndex].length) return i;
-    }
-    return EventIndex.minusOne();
-  }
-
-  /**
-   * Once it reaches the beginning, it'll return EventIndex.minusOne()
-   */
-  prevIndex(i: EventIndex): EventIndex {
-    for (
-      i = new EventIndex(i.bucketIndex, i.eventIndexInBucket - 1);
-      i.bucketIndex >= 0;
-      i = new EventIndex(i.bucketIndex - 1, (this.buckets[i.bucketIndex - 1]?.length ?? 0) - 1)
-    ) {
-      if (i.eventIndexInBucket >= 0) return i;
-    }
-    return EventIndex.minusOne();
-  }
-
-  /**
-   * If we have these events in bucket 0: {clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5},
-   * getIndexAfterClock(2)   => new EventIndex(0, 3)
-   * getIndexAfterClock(2.5) => new EventIndex(0, 3)
-   * getIndexAfterClock(5)   => new EventIndex(0, 6)
-   */
-  getIndexAfterClock(clock: number): EventIndex {
-    assert(clock >= 0);
-    const i = this.getBucketIndex(clock);
-    const j = lastSortedIndex(this.buckets[i] ?? [], clock);
-    return new EventIndex(i, j);
-  }
-
-  /**
-   * If we have these events in bucket 1: {clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5},
-   * getIndexBeforeClock(2)   => new EventIndex(0, 2)
-   * getIndexBeforeClock(2.5) => new EventIndex(0, 3)
-   * getIndexBeforeClock(5)   => new EventIndex(0, 5)
-   */
-  getIndexBeforeClock(clock: number): EventIndex {
-    assert(clock >= 0);
-    const i = this.getBucketIndex(clock);
-    const j = sortedIndex(this.buckets[i] ?? [], clock);
-    return new EventIndex(i, j);
+  getIndexBeforeClock(clock: number): number {
+    return this.indexOfPos(this.getInsertPosBeforeClock(clock));
   }
 
   toJSON(): InternalEditorTracksJSON {
     return Object.fromEntries(this.tracks);
+  }
+
+  private atPos(pos: Position): EditorEventWithUri | undefined {
+    return this.buckets[pos[0]]?.[pos[1]];
+  }
+
+  private posOfIndex(target: number): Position | undefined {
+    // target:       13
+    // buckets:      xxxxx xxxxxxxx xxxxxxxxxxxxxxxxxxxx
+    // bucket sizes: 5     8        20
+    // indices:      0     5        13
+
+    for (let i = 0, acc = 0; i < this.buckets.length; i++) {
+      const bucket = this.buckets[i];
+      if (target < acc + bucket.length) return [i, target - acc];
+      acc += bucket.length;
+    }
+  }
+
+  /**
+   * Position does not have to be valid. It may be past the size of a bucket or buckets.
+   */
+  private indexOfPos(pos: Position): number {
+    let acc = 0;
+    for (let i = 0; i < pos[0]; i++) {
+      acc += this.buckets[i]?.length ?? 0;
+    }
+
+    return acc + pos[1];
+  }
+
+  private nextPos(pos: Position): Position | undefined {
+    for (let i = pos[0], j = pos[1] + 1; i < this.buckets.length; i = i + 1, j = 0) {
+      if (j < this.buckets[i].length) return [i, j];
+    }
+  }
+
+  private prevPos(pos: Position): Position | undefined {
+    for (let i = pos[0], j = pos[1] - 1; i >= 0; i--, j = (this.buckets[i]?.length ?? 0) - 1) {
+      if (j >= 0) return [i, j];
+    }
+  }
+
+  /**
+   * The returned position is not necessarily valid. It may be one past the end of the bucket or
+   * pointing to a non-existing bucket. It is where an event with that clock should be inserted.
+   * If we have these events in bucket 0: {clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5},
+   * getInsertPosAfterClock(2)   => [0, 3]
+   * getInsertPosAfterClock(2.5) => [0, 3]
+   * getInsertPosAfterClock(5)   => [0, 6]
+   */
+  private getInsertPosAfterClock(clock: number): Position {
+    assert(clock >= 0);
+    const i = this.getBucketIndex(clock);
+    const j = lastSortedIndex(this.buckets[i] ?? [], clock);
+    return [i, j];
+  }
+
+  /**
+   * The returned position is not necessarily valid. It may be one past the end of the bucket or
+   * pointing to a non-existing bucket. It is where an event with that clock should be inserted.
+   * If we have these events in bucket 0: {clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5},
+   * getInsertPosBeforeClock(2)   => [0, 2]
+   * getInsertPosBeforeClock(2.5) => [0, 3]
+   * getInsertPosBeforeClock(5)   => [0, 5]
+   */
+  private getInsertPosBeforeClock(clock: number): Position {
+    assert(clock >= 0);
+    const i = this.getBucketIndex(clock);
+    const j = sortedIndex(this.buckets[i] ?? [], clock);
+    return [i, j];
   }
 
   private getBucketIndex(clock: number): number {
@@ -234,62 +190,10 @@ export default class EventContainer {
 
   private insertIntoBucket(uri: Uri, events: EditorEvent[]) {
     for (const event of events) {
-      const i = this.getIndexAfterClock(event.clock);
-      this.ensureBucketAt(i.bucketIndex);
-      this.buckets[i.bucketIndex].splice(i.eventIndexInBucket, 0, { event, uri });
+      const [i, j] = this.getInsertPosAfterClock(event.clock);
+      this.ensureBucketAt(i);
+      this.buckets[i].splice(j, 0, { event, uri });
     }
-  }
-}
-
-export class EventIndex {
-  constructor(public readonly bucketIndex: number, public readonly eventIndexInBucket: number) {}
-
-  /**
-   * Represents the state where no event has been applied yet and it is `new EventIndex(0, -1)`.
-   */
-  static minusOne(): EventIndex {
-    return new EventIndex(0, -1);
-  }
-
-  isMinusOne(): boolean {
-    return this.eventIndexInBucket === -1;
-  }
-
-  isBefore(i: EventIndex): boolean {
-    // assert(this.isValid());
-    return (
-      this.bucketIndex < i.bucketIndex ||
-      (this.bucketIndex === i.bucketIndex && this.eventIndexInBucket < i.eventIndexInBucket)
-    );
-  }
-
-  isAfter(i: EventIndex): boolean {
-    // assert(this.isValid());
-    return (
-      this.bucketIndex > i.bucketIndex ||
-      (this.bucketIndex === i.bucketIndex && this.eventIndexInBucket > i.eventIndexInBucket)
-    );
-  }
-
-  isBeforeOrEqual(i: EventIndex): boolean {
-    // assert(this.isValid());
-    return (
-      this.bucketIndex < i.bucketIndex ||
-      (this.bucketIndex === i.bucketIndex && this.eventIndexInBucket <= i.eventIndexInBucket)
-    );
-  }
-
-  isAfterOrEqual(i: EventIndex): boolean {
-    // assert(this.isValid());
-    return (
-      this.bucketIndex > i.bucketIndex ||
-      (this.bucketIndex === i.bucketIndex && this.eventIndexInBucket >= i.eventIndexInBucket)
-    );
-  }
-
-  isEqual(i: EventIndex): boolean {
-    // assert(this.isValid());
-    return this.bucketIndex === i.bucketIndex && this.eventIndexInBucket === i.eventIndexInBucket;
   }
 }
 

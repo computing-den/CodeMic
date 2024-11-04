@@ -8,6 +8,8 @@ import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
 
+const STEP_COUNT_THRESHOLD = 10;
+
 class WorkspacePlayer {
   playing = false;
   onError?: (error: Error) => any;
@@ -17,7 +19,7 @@ class WorkspacePlayer {
   private disposables: vscode.Disposable[] = [];
   private updateQueue = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
-  get internalCtrl(): InternalWorkspace {
+  get internalWorkspace(): InternalWorkspace {
     return this.session.runtime!.internalWorkspace;
   }
 
@@ -69,8 +71,8 @@ class WorkspacePlayer {
    */
   setClock(clock: number) {
     assert(this.updateQueue.length === 0, 'WorkspacePlayer setClock requires updateQueue to be empty');
-    const seekData = this.internalCtrl.getSeekData(clock);
-    this.internalCtrl.finalizeSeek(seekData);
+    const seekData = this.internalWorkspace.getSeekData(clock);
+    this.internalWorkspace.finalizeSeek(seekData);
   }
 
   private dispose() {
@@ -85,26 +87,26 @@ class WorkspacePlayer {
   }
 
   private async updateImmediately(clock: number) {
-    const seekData = this.internalCtrl.getSeekData(clock);
+    const seekData = this.internalWorkspace.getSeekData(clock);
 
-    if (seekData.steps.length > 10) {
+    if (seekData.steps.length > STEP_COUNT_THRESHOLD) {
       if (config.logTrackPlayerUpdateStep) {
         console.log('updateImmediately: applying wholesale', seekData);
       }
-      // Update by seeking the internal this.internalCtrl first, then syncing the this.internalCtrl to vscode and disk
+      // Update by seeking the internal this.internalWorkspace first, then syncing the this.internalWorkspace to vscode and disk
       const uriSet: t.UriSet = new Set();
-      await this.internalCtrl.seek(seekData, uriSet);
-      await this.session.syncInternalWorkspaceToVscodeAndDisk(Object.keys(uriSet));
+      await this.internalWorkspace.seek(seekData, uriSet);
+      await this.session.syncInternalWorkspaceToVscodeAndDisk(Array.from(uriSet));
     } else {
       if (config.logTrackPlayerUpdateStep) {
         console.log('updateImmediately: applying one at a time', seekData);
       }
       // Apply updates one at a time
       for (const step of seekData.steps) {
-        await this.internalCtrl.applySeekStep(step, seekData.direction);
+        await this.internalWorkspace.applySeekStep(step, seekData.direction);
         await this.vscWorkspaceStepper.applySeekStep(step, seekData.direction);
       }
-      this.internalCtrl.finalizeSeek(seekData);
+      this.internalWorkspace.finalizeSeek(seekData);
       this.vscWorkspaceStepper.finalizeSeek(seekData);
     }
   }
