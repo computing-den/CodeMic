@@ -4,7 +4,7 @@ import * as lib from '../../lib/lib.js';
 import type Session from './session.js';
 import _ from 'lodash';
 
-export default class AudioTrackCtrl {
+export default class AudioTrackPlayer {
   audioTrack: t.AudioTrack;
   running = false;
   onError?: (error: Error) => any;
@@ -21,7 +21,7 @@ export default class AudioTrackCtrl {
   }
 
   load() {
-    assert(this.audioTrack.file.type === 'local', 'AudioTrackCtrl: only supports local files');
+    assert(this.audioTrack.file.type === 'local', 'AudioTrackPlayer: only supports local files');
     if (!this.loading && !this.loaded) {
       this.loading = true;
       // this.postAudioMessage({

@@ -140,7 +140,7 @@ export class Session {
     if (options?.cutClock !== undefined) {
       // We don't need to cut audio because playback ends when it reaches session's duration.
       this.runtime.internalWorkspace.cut(options.cutClock);
-      // for (const c of this.runtime.audioTrackCtrls) c.cut(options.cutClock);
+      // for (const c of this.runtime.audioTrackPlayers) c.cut(options.cutClock);
       this.head.duration = options.cutClock;
     }
 
@@ -850,7 +850,7 @@ export class Session {
     if (this.runtime) {
       return Object.fromEntries(
         _.concat(
-          this.runtime.audioTrackCtrls.map(c => [c.audioTrack.id, this.getTrackFileWebviewUri(c.audioTrack)]),
+          this.runtime.audioTrackPlayers.map(c => [c.audioTrack.id, this.getTrackFileWebviewUri(c.audioTrack)]),
           this.runtime.videoTracks.map(t => [t.id, this.getTrackFileWebviewUri(t)]),
         ),
       );

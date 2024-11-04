@@ -4,8 +4,8 @@ import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import type { Session } from './session.js';
 import config from '../config.js';
-import AudioTrackCtrl from './audio_track_ctrl.js';
-import VideoTrackCtrl from './video_track_ctrl.js';
+import AudioTrackPlayer from './audio_track_player.js';
+import VideoTrackPlayer from './video_track_player.js';
 import InternalWorkspace from './internal_workspace.js';
 import WorkspacePlayer from './workspace_player.js';
 import WorkspaceRecorder from './workspace_recorder.js';
@@ -32,8 +32,8 @@ export default class SessionRuntime {
 
   session: Session;
   internalWorkspace: InternalWorkspace;
-  audioTrackCtrls: AudioTrackCtrl[];
-  videoTrackCtrl: VideoTrackCtrl;
+  audioTrackPlayers: AudioTrackPlayer[];
+  videoTrackPlayer: VideoTrackPlayer;
   videoTracks: t.VideoTrack[];
   workspacePlayer: WorkspacePlayer;
   workspaceRecorder: WorkspaceRecorder;
@@ -58,14 +58,14 @@ export default class SessionRuntime {
 
     this.session = session;
     this.internalWorkspace = new InternalWorkspace(session, bodyJSON.internalWorkspace);
-    this.audioTrackCtrls = bodyJSON.audioTracks.map(audioTrack => new AudioTrackCtrl(this.session, audioTrack));
+    this.audioTrackPlayers = bodyJSON.audioTracks.map(audioTrack => new AudioTrackPlayer(this.session, audioTrack));
     this.videoTracks = bodyJSON.videoTracks;
-    this.videoTrackCtrl = new VideoTrackCtrl(this.session);
+    this.videoTrackPlayer = new VideoTrackPlayer(this.session);
     this.workspacePlayer = new WorkspacePlayer(this.session);
     this.workspaceRecorder = new WorkspaceRecorder(this.session);
 
-    for (const c of this.audioTrackCtrls) this.initAudioCtrl(c);
-    this.initVideoCtrl();
+    for (const c of this.audioTrackPlayers) this.initAudioPlayer(c);
+    this.initVideoPlayer();
     this.workspacePlayer.onError = this.gotError.bind(this);
     this.workspaceRecorder.onChange = this.workspaceRecorderChangeHandler.bind(this);
     this.workspaceRecorder.onError = this.gotError.bind(this);
@@ -82,10 +82,10 @@ export default class SessionRuntime {
 
   load() {
     // Load media tracks so that they're ready to play when they come into range.
-    for (const c of this.audioTrackCtrls) c.load();
+    for (const c of this.audioTrackPlayers) c.load();
 
     const videoTrack = this.findInRangeVideoTrack();
-    if (videoTrack) this.videoTrackCtrl.loadTrack(videoTrack);
+    if (videoTrack) this.videoTrackPlayer.loadTrack(videoTrack);
   }
 
   async play() {
@@ -143,31 +143,31 @@ export default class SessionRuntime {
   }
 
   insertAudioAndLoad(audioTrack: t.AudioTrack) {
-    const audioTrackCtrl = new AudioTrackCtrl(this.session, audioTrack);
+    const audioTrackPlayer = new AudioTrackPlayer(this.session, audioTrack);
     this.session.head.duration = Math.max(this.session.head.duration, audioTrack.clockRange.end);
-    this.audioTrackCtrls.push(audioTrackCtrl);
-    this.initAudioCtrl(audioTrackCtrl);
+    this.audioTrackPlayers.push(audioTrackPlayer);
+    this.initAudioPlayer(audioTrackPlayer);
     this.onChange?.();
   }
 
   deleteAudio(id: string) {
-    const i = this.audioTrackCtrls.findIndex(c => c.audioTrack.id === id);
+    const i = this.audioTrackPlayers.findIndex(c => c.audioTrack.id === id);
     if (i === -1) {
       console.error(`SessionRuntime deleteAudio did not find audio track with id ${id}`);
       return;
     }
 
-    this.audioTrackCtrls[i].pause();
-    this.audioTrackCtrls.splice(i, 1);
+    this.audioTrackPlayers[i].pause();
+    this.audioTrackPlayers.splice(i, 1);
     this.onChange?.();
   }
 
   insertVideoAndLoad(videoTrack: t.VideoTrack) {
-    // const videoTrackCtrl = new VideoTrackCtrl(this.session, videoTrack);
+    // const videoTrackPlayer = new VideoTrackPlayer(this.session, videoTrack);
     this.session.head.duration = Math.max(this.session.head.duration, videoTrack.clockRange.end);
     this.videoTracks.push(videoTrack);
-    // this.videoTrackCtrl.insert(videoTrackCtrl);
-    this.initVideoCtrl();
+    // this.videoTrackPlayer.insert(videoTrackPlayer);
+    this.initVideoPlayer();
     this.onChange?.();
   }
 
@@ -177,37 +177,37 @@ export default class SessionRuntime {
       this.videoTracks.splice(j, 1);
     }
 
-    this.videoTrackCtrl.pause();
+    this.videoTrackPlayer.pause();
     this.onChange?.();
   }
 
   handleFrontendAudioEvent(e: t.FrontendMediaEvent) {
-    const audioCtrl = this.audioTrackCtrls.find(a => a.audioTrack.id === e.id);
-    if (audioCtrl) {
-      audioCtrl.handleAudioEvent(e);
+    const audioPlayer = this.audioTrackPlayers.find(a => a.audioTrack.id === e.id);
+    if (audioPlayer) {
+      audioPlayer.handleAudioEvent(e);
     } else {
       console.error(`handleFrontendAudioEvent audio track player with id ${e.id} not found`);
     }
   }
 
   handleFrontendVideoEvent(e: t.FrontendMediaEvent) {
-    this.videoTrackCtrl.handleVideoEvent(e);
+    this.videoTrackPlayer.handleVideoEvent(e);
   }
 
   toJSON(): t.SessionBodyJSON {
     return {
-      audioTracks: this.audioTrackCtrls.map(c => c.audioTrack),
+      audioTracks: this.audioTrackPlayers.map(c => c.audioTrack),
       videoTracks: this.videoTracks,
       internalWorkspace: this.internalWorkspace.toJSON(),
     };
   }
 
-  private initAudioCtrl(c: AudioTrackCtrl) {
+  private initAudioPlayer(c: AudioTrackPlayer) {
     c.onError = this.gotError.bind(this);
   }
 
-  private initVideoCtrl() {
-    this.videoTrackCtrl.onError = this.gotError.bind(this);
+  private initVideoPlayer() {
+    this.videoTrackPlayer.onError = this.gotError.bind(this);
   }
 
   private async seekEditor() {
@@ -229,62 +229,62 @@ export default class SessionRuntime {
   }
 
   private seekInRangeAudios() {
-    for (const c of this.audioTrackCtrls) {
+    for (const c of this.audioTrackPlayers) {
       if (this.isTrackInRange(c.audioTrack)) this.seekAudio(c);
     }
   }
 
   private seekInRangeAudiosThatAreNotRunning() {
-    for (const c of this.audioTrackCtrls) {
+    for (const c of this.audioTrackPlayers) {
       if (!c.running && this.isTrackInRange(c.audioTrack)) this.seekAudio(c);
     }
   }
 
-  private seekAudio(c: AudioTrackCtrl) {
+  private seekAudio(c: AudioTrackPlayer) {
     c.seek(this.globalClockToTrackLocal(c.audioTrack));
   }
 
   private playInRangeAudios() {
-    for (const c of this.audioTrackCtrls) {
+    for (const c of this.audioTrackPlayers) {
       if (!c.running && this.isTrackInRange(c.audioTrack)) c.play();
     }
   }
 
   private pauseAudios() {
-    for (const c of this.audioTrackCtrls) {
+    for (const c of this.audioTrackPlayers) {
       if (c.running) c.pause();
     }
   }
 
   private pauseOutOfRangeAudios() {
-    for (const c of this.audioTrackCtrls) {
+    for (const c of this.audioTrackPlayers) {
       if (c.running && !this.isTrackInRange(c.audioTrack)) c.pause();
     }
   }
 
   private stopOutOfRangeVideo() {
-    const c = this.videoTrackCtrl;
+    const c = this.videoTrackPlayer;
     if (c.videoTrack && !this.isTrackInRange(c.videoTrack)) c.stop();
   }
 
   private pauseVideo() {
-    this.videoTrackCtrl.pause();
+    this.videoTrackPlayer.pause();
   }
 
   private loadInRangeVideoAndSeek() {
     const videoTrack = this.findInRangeVideoTrack();
     if (videoTrack) {
-      this.videoTrackCtrl.loadTrack(videoTrack);
-      this.videoTrackCtrl.seek(this.globalClockToTrackLocal(videoTrack));
+      this.videoTrackPlayer.loadTrack(videoTrack);
+      this.videoTrackPlayer.seek(this.globalClockToTrackLocal(videoTrack));
     }
   }
 
   private loadInRangeVideoAndSeekIfDifferent() {
     const videoTrack = this.findInRangeVideoTrack();
     // console.log('loadInRangeVideoAndSeekIfDifferent videoTrack', videoTrack);
-    if (videoTrack && (this.videoTrackCtrl.videoTrack !== videoTrack || !this.videoTrackCtrl.running)) {
-      this.videoTrackCtrl.loadTrack(videoTrack);
-      this.videoTrackCtrl.seek(this.globalClockToTrackLocal(videoTrack));
+    if (videoTrack && (this.videoTrackPlayer.videoTrack !== videoTrack || !this.videoTrackPlayer.running)) {
+      this.videoTrackPlayer.loadTrack(videoTrack);
+      this.videoTrackPlayer.seek(this.globalClockToTrackLocal(videoTrack));
     }
   }
 
@@ -294,11 +294,11 @@ export default class SessionRuntime {
 
   private playInRangeVideo() {
     if (
-      !this.videoTrackCtrl.running &&
-      this.videoTrackCtrl.videoTrack &&
-      this.isTrackInRange(this.videoTrackCtrl.videoTrack)
+      !this.videoTrackPlayer.running &&
+      this.videoTrackPlayer.videoTrack &&
+      this.isTrackInRange(this.videoTrackPlayer.videoTrack)
     ) {
-      this.videoTrackCtrl.play();
+      this.videoTrackPlayer.play();
     }
   }
 

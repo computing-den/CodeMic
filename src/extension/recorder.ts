@@ -94,7 +94,7 @@ class Recorder {
   isSessionEmpty(): boolean {
     return Boolean(
       this.session.runtime?.internalWorkspace.eventContainer.isEmpty() &&
-        this.session.runtime?.audioTrackCtrls.length === 0,
+        this.session.runtime?.audioTrackPlayers.length === 0,
     );
   }
 
@@ -146,8 +146,8 @@ class Recorder {
 
   async updateAudio(audio: Partial<t.AudioTrack>) {
     assert(this.session.runtime);
-    const trackCtrl = this.session.runtime.audioTrackCtrls.find(c => c.audioTrack.id === audio.id);
-    if (trackCtrl) Object.assign(trackCtrl.audioTrack, audio);
+    const trackPlayer = this.session.runtime.audioTrackPlayers.find(c => c.audioTrack.id === audio.id);
+    if (trackPlayer) Object.assign(trackPlayer.audioTrack, audio);
     this.dirty = true;
   }
 

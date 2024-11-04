@@ -3,7 +3,7 @@ import * as lib from '../../lib/lib.js';
 import type Session from './session.js';
 import _ from 'lodash';
 
-export default class VideoTrackCtrl {
+export default class VideoTrackPlayer {
   videoTrack: t.VideoTrack | undefined;
   running = false;
   onError?: (error: Error) => any;
@@ -19,16 +19,16 @@ export default class VideoTrackCtrl {
   }
 
   // load() {
-  //   console.log('VideoTrackCtrl load', this.loading, this.loaded);
+  //   console.log('VideoTrackPlayers load', this.loading, this.loaded);
   //   if (!this.loading && !this.loaded) {
   //     this.loading = true;
   //   }
   // }
 
   loadTrack(videoTrack: t.VideoTrack) {
-    console.log('VideoTrackCtrl loadTrack');
+    console.log('VideoTrackPlayers loadTrack');
     if (this.videoTrack?.id !== videoTrack.id) {
-      console.log('VideoTrackCtrl loadTrack accepted');
+      console.log('VideoTrackPlayers loadTrack accepted');
       this.loaded = false;
       this.loading = true;
       this.videoTrack = videoTrack;
@@ -37,7 +37,7 @@ export default class VideoTrackCtrl {
   }
 
   play() {
-    console.log('VideoTrackCtrl play', this.loaded);
+    console.log('VideoTrackPlayers play', this.loaded);
     this.running = true;
     if (this.loaded) {
       this.session.context.postVideoMessage?.({ type: 'video/play' }).catch(this.gotError);
@@ -45,7 +45,7 @@ export default class VideoTrackCtrl {
   }
 
   pause() {
-    console.log('VideoTrackCtrl pause', this.loaded);
+    console.log('VideoTrackPlayers pause', this.loaded);
     this.running = false;
     if (this.loaded) {
       this.session.context.postVideoMessage?.({ type: 'video/pause' }).catch(this.gotError);
@@ -53,7 +53,7 @@ export default class VideoTrackCtrl {
   }
 
   stop() {
-    console.log('VideoTrackCtrl stop', this.loaded);
+    console.log('VideoTrackPlayers stop', this.loaded);
     this.running = false;
     if (this.loaded) {
       this.session.context.postVideoMessage?.({ type: 'video/stop' }).catch(this.gotError);
@@ -62,7 +62,7 @@ export default class VideoTrackCtrl {
   }
 
   seek(clock: number) {
-    console.log('VideoTrackCtrl seek', this.loaded, clock);
+    console.log('VideoTrackPlayers seek', this.loaded, clock);
     this.clock = clock;
     if (!this.loaded) {
       this.seekAfterLoad = true;
