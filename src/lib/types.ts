@@ -337,6 +337,8 @@ export type ClockRange = {
   end: number;
 };
 
+export type ClockRangeCompact = [number, number];
+
 // export type InternalWorkspace = {
 //   initSnapshot: InternalEditorTrackSnapshot;
 //   events: EditorEvent[];
@@ -364,7 +366,7 @@ export type InternalWorkspaceJSON = {
 
 export type InternalWorkspaceCompact = {
   editorTracks: InternalEditorTracksCompact;
-  focusTimeline: WorkspaceFocusTimeline;
+  focusTimeline: WorkspaceFocusTimelineCompact;
   defaultEol: EndOfLine;
 };
 
@@ -374,6 +376,11 @@ export type InternalEditorTracksCompact = Record<Uri, EditorEventCompact[]>;
 export type WorkspaceFocusTimeline = {
   documents: DocumentFocus[];
   lines: LineFocus[];
+};
+
+export type WorkspaceFocusTimelineCompact = {
+  documents: DocumentFocusCompact[];
+  lines: LineFocusCompact[];
 };
 
 export type FocusItem = {
@@ -386,6 +393,18 @@ export type DocumentFocus = FocusItem & {
 
 export type LineFocus = FocusItem & {
   text: string;
+};
+
+export type FocusItemCompact = {
+  cr: ClockRangeCompact;
+};
+
+export type DocumentFocusCompact = FocusItemCompact & {
+  u: Uri;
+};
+
+export type LineFocusCompact = FocusItemCompact & {
+  t: string;
 };
 
 export type RangedTrack = {

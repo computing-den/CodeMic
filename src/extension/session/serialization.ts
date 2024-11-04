@@ -8,7 +8,10 @@ export function serializeSessionBodyJSON(body: t.SessionBodyJSON): t.SessionBody
     internalWorkspace: {
       editorTracks: _.mapValues(body.internalWorkspace.editorTracks, t => t.map(serializeEditorEvent)),
       defaultEol: body.internalWorkspace.defaultEol,
-      focusTimeline: body.internalWorkspace.focusTimeline,
+      focusTimeline: {
+        documents: body.internalWorkspace.focusTimeline.documents.map(serializeDocumentFocus),
+        lines: body.internalWorkspace.focusTimeline.lines.map(serializeLineFocus),
+      },
     },
   };
 }
@@ -105,6 +108,24 @@ function serializeClock(clock: number): number {
   return Math.floor(clock * 1000);
 }
 
+function serializeClockRange(cr: t.ClockRange): t.ClockRangeCompact {
+  return [serializeClock(cr.start), serializeClock(cr.end)];
+}
+
+function serializeDocumentFocus(focus: t.DocumentFocus): t.DocumentFocusCompact {
+  return {
+    cr: serializeClockRange(focus.clockRange),
+    u: focus.uri,
+  };
+}
+
+function serializeLineFocus(focus: t.LineFocus): t.LineFocusCompact {
+  return {
+    cr: serializeClockRange(focus.clockRange),
+    t: focus.text,
+  };
+}
+
 export function deserializeSessionBody(compact: t.SessionBodyCompact): t.SessionBodyJSON {
   return {
     audioTracks: compact.audioTracks,
@@ -112,7 +133,10 @@ export function deserializeSessionBody(compact: t.SessionBodyCompact): t.Session
     internalWorkspace: {
       editorTracks: _.mapValues(compact.internalWorkspace.editorTracks, t => t.map(deserializeEditorEvent)),
       defaultEol: compact.internalWorkspace.defaultEol,
-      focusTimeline: compact.internalWorkspace.focusTimeline,
+      focusTimeline: {
+        documents: compact.internalWorkspace.focusTimeline.documents.map(deserializeDocumentFocus),
+        lines: compact.internalWorkspace.focusTimeline.lines.map(deserializeLineFocus),
+      },
     },
   };
 }
@@ -202,4 +226,22 @@ function deserializeSelection(r: t.SelectionCompact): t.Selection {
 
 function deserializeClock(clock: number): number {
   return clock / 1000;
+}
+
+function deserializeClockRange(cr: t.ClockRangeCompact): t.ClockRange {
+  return { start: deserializeClock(cr[0]), end: deserializeClock(cr[1]) };
+}
+
+function deserializeDocumentFocus(focus: t.DocumentFocusCompact): t.DocumentFocus {
+  return {
+    clockRange: deserializeClockRange(focus.cr),
+    uri: focus.u,
+  };
+}
+
+function deserializeLineFocus(focus: t.LineFocusCompact): t.LineFocus {
+  return {
+    clockRange: deserializeClockRange(focus.cr),
+    text: focus.t,
+  };
 }
