@@ -1,6 +1,6 @@
-import { deserializeSessionBody, serializeSessionBody } from './serialization.js';
+import { deserializeSessionBody, serializeSessionBodyJSON } from './serialization.js';
 import * as t from '../../lib/types.js';
-import { Range, Selection, Position, ContentChange } from '../../lib/types.js';
+import { Range, Selection, Position } from '../../lib/types.js';
 import * as path from '../../lib/path.js';
 import InternalTextDocument from './internal_text_document.js';
 import * as lib from '../../lib/lib.js';
@@ -11,22 +11,27 @@ import * as misc from '../misc.js';
 import type { Context, ReadDirOptions } from '../types.js';
 import * as storage from '../storage.js';
 import SessionRuntime from './session_runtime.js';
+import InternalWorkspace from './internal_workspace.js';
 import fs from 'fs';
 import _ from 'lodash';
 import archiver from 'archiver';
 import unzipper from 'unzipper';
 import stream from 'stream';
-import os from 'os';
 import vscode from 'vscode';
 import { v4 as uuid } from 'uuid';
 
-export class Session implements t.Session {
+// export type SessionBody = {
+//   internalWorkspace: InternalWorkspace;
+//   audioTracks: t.AudioTrack[];
+//   videoTracks: t.VideoTrack[];
+// };
+
+export class Session {
   context: Context;
   workspace: t.AbsPath;
   head: t.SessionHead;
   loaded = false;
   inStorage: boolean;
-  body?: t.SessionBody;
   runtime?: SessionRuntime;
 
   constructor(context: Context, workspace: t.AbsPath, head: t.SessionHead, inStorage: boolean) {
@@ -113,37 +118,18 @@ export class Session implements t.Session {
   //   };
   // }
 
-  static makeBody(): t.SessionBody {
-    return {
-      editorTrack: {
-        events: [],
-        defaultEol: os.EOL as t.EndOfLine,
-        initSnapshot: {
-          worktree: {},
-          textEditors: [],
-        },
-        focusTimeline: {
-          documents: [],
-          lines: [],
-        },
-      },
-      audioTracks: [],
-      videoTracks: [],
-    };
-  }
-
   async load(options?: { seekClock?: number; cutClock?: number }) {
     assert(!this.loaded);
 
     // Read or download body.
-    await this.readBody({ download: true });
+    const bodyJSON = await this.readBody({ download: true });
 
     // Create workspace directory..
     await fs.promises.mkdir(this.workspace, { recursive: true });
 
-    // Initialize track controllers.
-    await this.initRuntime();
-    assert(this.runtime);
+    // Initialize runtime.
+    this.runtime = new SessionRuntime(this, bodyJSON);
+    this.runtime.internalWorkspace.restoreInitState();
 
     // Make sure cut and seek clocks are valid.
     if (options?.cutClock && options?.seekClock) {
@@ -161,7 +147,7 @@ export class Session implements t.Session {
     // Seek to seekClock.
     let targetUris: t.Uri[] | undefined;
     if (options?.seekClock) {
-      const uriSet: t.UriSet = {};
+      const uriSet: t.UriSet = new Set();
       const seekData = this.runtime.internalWorkspace.getSeekData(options.seekClock);
       await this.runtime.internalWorkspace.seek(seekData, uriSet);
       targetUris = Object.keys(uriSet);
@@ -181,15 +167,13 @@ export class Session implements t.Session {
   async scan() {
     assert(!this.loaded);
 
-    this.body = Session.makeBody();
-    await this.initRuntime();
-    assert(this.runtime);
-
     // Make sure workspace path exists.
     await fs.promises.mkdir(this.workspace, { recursive: true });
 
-    this.body.editorTrack.initSnapshot = await this.makeSnapshotFromDirAndVsc();
-    await this.runtime.internalWorkspace.restoreInitSnapshot();
+    // Take a snapshot of working directory and vscode and initalize internal workspace.
+    this.runtime = new SessionRuntime(this);
+    await this.scanDirAndVsc();
+    await this.runtime.internalWorkspace.restoreInitState();
 
     this.loaded = true;
   }
@@ -219,13 +203,17 @@ export class Session implements t.Session {
     return forkHead;
   }
 
-  async initRuntime() {
-    assert(this.body);
-    assert(!this.runtime);
-    this.runtime = await SessionRuntime.fromSession(this);
-  }
+  // async initRuntime() {
+  //   assert(this.body);
+  //   assert(!this.runtime);
+  //   this.runtime = await SessionRuntime.fromSession(this);
+  // }
 
-  async makeSnapshotFromDirAndVsc(): Promise<t.InternalEditorTrackSnapshot> {
+  async scanDirAndVsc() {
+    assert(this.runtime);
+    assert(this.runtime.internalWorkspace.eventContainer.isEmpty(), 'scanDirAndVsc: scanning a non-empty session');
+    const events: t.EditorEventWithUri[] = [];
+
     // for (const vscTextDocument of vscode.workspace.textDocuments) {
     //   if (vscTextDocument.dirty) {
     //     throw new Error('Checkpoint.fromWorkspace: there are unsaved files in the current workspace.');
@@ -234,14 +222,14 @@ export class Session implements t.Session {
 
     // Create the worktree and copy files to session directory.
     // TODO: ignore files in .codemicignore
-    const worktree: t.Worktree = {};
+    // const worktree: t.Worktree = {};
     const paths = await this.readDirRecursively({ includeFiles: true });
     for (const p of paths) {
       const uri = path.workspaceUriFromRelPath(p);
       const data = await fs.promises.readFile(path.join(this.workspace, p));
       const sha1 = await misc.computeSHA1(data);
-      worktree[uri] = { type: 'local', sha1 };
       await this.copyToBlob(path.join(this.workspace, p), sha1);
+      events.push({ uri, event: { type: 'init', clock: 0, file: { type: 'local', sha1 } } });
     }
 
     // Walk through the relevant tabs and take snapshots of the text editors.
@@ -257,12 +245,16 @@ export class Session implements t.Session {
 
         const data = new TextEncoder().encode(vscTextDocument.getText());
         const sha1 = await misc.computeSHA1(data);
-        worktree[uri] = { type: 'local', sha1 };
         await this.writeBlob(sha1, data);
-        textEditors.push({
+        events.push({ uri, event: { type: 'init', clock: 0, file: { type: 'local', sha1 } } });
+        events.push({
           uri,
-          selections: [new Selection(new Position(0, 0), new Position(0, 0))],
-          visibleRange: new Range(new Position(0, 0), new Position(1, 0)),
+          event: {
+            type: 'showTextEditor',
+            clock: 0,
+            selections: [new Selection(new Position(0, 0), new Position(0, 0))],
+            visibleRange: new Range(new Position(0, 0), new Position(1, 0)),
+          },
         });
       } else if (vscUri.scheme === 'file') {
         if (!(await misc.fileExists(path.abs(vscUri.path)))) {
@@ -295,7 +287,26 @@ export class Session implements t.Session {
       activeTextEditorUri = this.uriFromVsc(activeTextEditorVscUri);
     }
 
-    return { worktree, textEditors, activeTextEditorUri };
+    // Insert showTextEditor for activeTextEditorUri only if it's not the same as the
+    // last showTextEditor already inserted
+    const lastShowTextEditor = _.findLast(events, e => e.event.type === 'showTextEditor');
+    if (activeTextEditorUri && (!lastShowTextEditor || lastShowTextEditor.uri !== activeTextEditorUri)) {
+      events.push({
+        uri: activeTextEditorUri,
+        event: {
+          type: 'showTextEditor',
+          clock: 0,
+          selections: [new Selection(new Position(0, 0), new Position(0, 0))],
+          visibleRange: new Range(new Position(0, 0), new Position(1, 0)),
+        },
+      });
+    }
+
+    // Insert into event container.
+    const ec = this.runtime.internalWorkspace.eventContainer;
+    for (const e of events) {
+      ec.insert(e.uri, [e.event]);
+    }
   }
 
   /**
@@ -480,7 +491,7 @@ export class Session implements t.Session {
 
   async write() {
     await this.writeHead();
-    if (this.body) await this.writeBody();
+    if (this.runtime) await this.writeBody();
   }
 
   async writeHead() {
@@ -489,8 +500,8 @@ export class Session implements t.Session {
   }
 
   async writeBody() {
-    assert(this.body, 'writeBody: body is not yet loaded.');
-    await storage.writeJSON(this.sessionDataPaths.body, serializeSessionBody(this.body));
+    assert(this.runtime, 'writeBody: body is not yet loaded.');
+    await storage.writeJSON(this.sessionDataPaths.body, serializeSessionBodyJSON(this.runtime.toJSON()));
     this.inStorage = true;
   }
 
@@ -503,10 +514,10 @@ export class Session implements t.Session {
     await storage.writeJSON(this.context.dataPaths.settings, settings);
   }
 
-  async readBody(options?: { download: boolean }) {
+  async readBody(options?: { download: boolean }): Promise<t.SessionBodyJSON> {
     if (options?.download) await this.download({ skipIfExists: true });
-    const json = await storage.readJSON<t.SessionBodyCompact>(this.sessionDataPaths.body);
-    this.body = deserializeSessionBody(json);
+    const compact = await storage.readJSON<t.SessionBodyCompact>(this.sessionDataPaths.body);
+    return deserializeSessionBody(compact);
   }
 
   async download(options?: { skipIfExists: boolean }) {
@@ -833,11 +844,11 @@ export class Session implements t.Session {
   }
 
   getBlobsWebviewUris(): t.WebviewUris | undefined {
-    if (this.body) {
+    if (this.runtime) {
       return Object.fromEntries(
         _.concat(
-          this.body.audioTracks.map(t => [t.id, this.getTrackFileWebviewUri(t)]),
-          this.body.videoTracks.map(t => [t.id, this.getTrackFileWebviewUri(t)]),
+          this.runtime.audioTrackCtrls.map(c => [c.audioTrack.id, this.getTrackFileWebviewUri(c.audioTrack)]),
+          this.runtime.videoTracks.map(t => [t.id, this.getTrackFileWebviewUri(t)]),
         ),
       );
     }

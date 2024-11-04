@@ -3,25 +3,28 @@ import * as t from '../../lib/types';
 export default function workspaceStepperDispatch(
   stepper: t.WorkspaceStepper,
   e: t.EditorEvent,
+  uri: t.Uri,
   direction: t.Direction,
   uriSet?: t.UriSet,
 ): Promise<void> {
   switch (e.type) {
+    case 'init':
+      return stepper.applyInitEvent(e, uri, direction, uriSet);
     case 'textChange':
-      return stepper.applyTextChangeEvent(e, direction, uriSet);
+      return stepper.applyTextChangeEvent(e, uri, direction, uriSet);
     case 'openTextDocument':
-      return stepper.applyOpenTextDocumentEvent(e, direction, uriSet);
+      return stepper.applyOpenTextDocumentEvent(e, uri, direction, uriSet);
     case 'closeTextDocument':
-      return stepper.applyCloseTextDocumentEvent(e, direction, uriSet);
+      return stepper.applyCloseTextDocumentEvent(e, uri, direction, uriSet);
     case 'showTextEditor':
-      return stepper.applyShowTextEditorEvent(e, direction, uriSet);
+      return stepper.applyShowTextEditorEvent(e, uri, direction, uriSet);
     case 'closeTextEditor':
-      return stepper.applyCloseTextEditorEvent(e, direction, uriSet);
+      return stepper.applyCloseTextEditorEvent(e, uri, direction, uriSet);
     case 'select':
-      return stepper.applySelectEvent(e, direction, uriSet);
+      return stepper.applySelectEvent(e, uri, direction, uriSet);
     case 'scroll':
-      return stepper.applyScrollEvent(e, direction, uriSet);
+      return stepper.applyScrollEvent(e, uri, direction, uriSet);
     case 'save':
-      return stepper.applySaveEvent(e, direction, uriSet);
+      return stepper.applySaveEvent(e, uri, direction, uriSet);
   }
 }

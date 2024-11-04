@@ -3,72 +3,72 @@ import * as t from '../../lib/types.js';
 import { Range, Selection, Position } from '../../lib/types.js';
 import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
+import EventContainer, { EventIndex } from '../../lib/event_container.js';
 import Session from './session.js';
 import InternalWorkspaceStepper from './internal_workspace_stepper.js';
 import InternalTextEditor from './internal_text_editor.js';
 import InternalTextDocument from './internal_text_document.js';
 
 /**
+ * LiveWorktree is supposed to hold the entire workspace directory at a particular clock: every
+ * file and directory and where to find their contents: dir, file with open TextDocument, or a
+ * blob to be read from disk.
  * If a document has been loaded into memory, then the latest content is in the document field and
  * it should always be retrieved from there.
  * Otherwise, its uri refers to the base file stored on disk.
  */
-type LiveWorktreeItem = { file: t.File; document?: t.InternalDocument; editor?: t.InternalEditor };
 type LiveWorktree = Map<t.Uri, LiveWorktreeItem>;
+type LiveWorktreeItem = { file: t.File; document?: t.InternalDocument; editor?: t.InternalEditor };
 
-function makeLiveWorktree(worktree: t.Worktree): LiveWorktree {
-  const map = new Map<t.Uri, LiveWorktreeItem>();
-  for (const [key, file] of Object.entries(worktree)) {
-    map.set(key, { file });
-  }
-  return map;
-}
+export type SeekStep = t.EditorEventWithUri & { newEventIndex: EventIndex };
+export type SeekData = { steps: SeekStep[]; direction: t.Direction };
 
 // Not every InternalTextDocument may be attached to a InternalTextEditor. At least not until the
 // TextEditor is opened.
 export default class InternalWorkspace {
   // These fields change with the clock/eventIndex
-  // TODO sync the entire worktree structure including directories.
   // If a InternalTextDocument is in this.textDocuments, it is also in this.worktree.
   // If a InternalTextEditor is in this.textEditors, it is also in this.worktree.
-  eventIndex: number;
+  // eventIndex represents the index of the last event that was executed. That is, the effects of that event are visible.
+  eventIndex: EventIndex;
   worktree: LiveWorktree;
   textDocuments: InternalTextDocument[];
   textEditors: InternalTextEditor[];
   activeTextEditor?: InternalTextEditor;
   stepper: InternalWorkspaceStepper;
+  eventContainer: EventContainer;
 
-  private constructor(public session: Session) {
-    this.eventIndex = -1;
+  defaultEol: t.EndOfLine;
+  focusTimeline: t.WorkspaceFocusTimeline;
+
+  constructor(public session: Session, json: t.InternalWorkspaceJSON) {
+    this.eventIndex = EventIndex.minusOne();
     this.worktree = new Map();
     this.textDocuments = [];
     this.textEditors = [];
     this.stepper = new InternalWorkspaceStepper(session);
+    this.eventContainer = new EventContainer(json.editorTracks);
+    this.defaultEol = json.defaultEol;
+    this.focusTimeline = json.focusTimeline;
   }
 
-  get editorTrack(): t.InternalWorkspace {
-    return this.session.body!.editorTrack;
-  }
+  // get editorTrack(): t.InternalWorkspace {
+  //   return this.session.body!.editorTrack;
+  // }
 
-  static async fromSession(session: Session): Promise<InternalWorkspace> {
-    const track = new InternalWorkspace(session);
-    await track.restoreInitSnapshot();
-    return track;
-  }
+  // static async fromSession(session: Session, editorTracks: t.InternalEditorTracksJSON): Promise<InternalWorkspace> {
+  //   const track = new InternalWorkspace(session);
+  //   // await track.restoreInitSnapshot();
+  //   return track;
+  // }
 
-  async restoreInitSnapshot() {
-    this.eventIndex = -1;
-    this.worktree = makeLiveWorktree(this.editorTrack.initSnapshot.worktree);
+  async restoreInitState() {
+    assert(this.eventIndex.isMinusOne(), 'calling restoreInitState on an already initialized internal workspace');
     this.textDocuments = [];
     this.textEditors = [];
 
-    for (const textEditor of this.editorTrack.initSnapshot.textEditors) {
-      await this.openTextEditorByUri(textEditor.uri, textEditor.selections, textEditor.visibleRange);
-    }
-
-    if (this.editorTrack.initSnapshot.activeTextEditorUri) {
-      this.activeTextEditor = this.findTextEditorByUri(this.editorTrack.initSnapshot.activeTextEditorUri);
-    }
+    // Apply all events whose clock is 0.
+    this.seek(this.getSeekData(0));
   }
 
   doesUriExist(uri: t.Uri): boolean {
@@ -132,7 +132,7 @@ export default class InternalWorkspace {
     }
 
     const text = new TextDecoder().decode(await this.session.readFile(worktreeItem.file));
-    const textDocument = InternalTextDocument.fromText(uri, text, this.editorTrack.defaultEol);
+    const textDocument = InternalTextDocument.fromText(uri, text, this.defaultEol);
     this.insertTextDocument(textDocument);
     return textDocument;
   }
@@ -197,133 +197,73 @@ export default class InternalWorkspace {
     }
   }
 
-  /**
-   * Returns 0 for i === -1. Otherwise, i must be in range.
-   */
-  clockAt(i: number): number {
-    return i < 0 ? 0 : this.eventAt(i).clock;
-  }
+  // /**
+  //  * Returns 0 for i === -1. Otherwise, i must be in range.
+  //  */
+  // clockAt(i: number): number {
+  //   return i < 0 ? 0 : this.eventAt(i).clock;
+  // }
 
-  private eventAt(i: number): t.EditorEvent {
-    assert(i >= 0 && i < this.editorTrack.events.length, 'out of bound event index');
-    return this.editorTrack.events[i];
-  }
+  // private eventAt(i: number): t.EditorEvent {
+  //   assert(i >= 0 && i < this.editorTrack.events.length, 'out of bound event index');
+  //   return this.editorTrack.events[i];
+  // }
 
-  getSeekData(toClock: number): t.SeekData {
+  getSeekData(toClock: number): SeekData {
     // FORWARD
 
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                   ^
-    // i:                    ^
-    // apply:                   ^
-    // new i:                   ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                          ^
-    // i:                       ^
-    // apply:                      ^  ^
-    // new i:                         ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                            ^
-    // i:                                ^
-    // apply:
-    // new i:                            ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                             ^
-    // i:                                ^
-    // apply:
-    // new i:                            ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                                     ^
-    // i:                                         ^
-    // apply:
-    // new i:                                     ^
-
-    // BACKWARD
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                                   ^
-    // i:                                         ^
-    // apply reverse:                             ^
-    // new i:                                  ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                                  ^
-    // i:                                      ^
-    // apply reverse:
-    // new i:                                  ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                            ^
-    // i:                                      ^
-    // apply reverse:                       ^  ^
-    // new i:                            ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                   ^
-    // i:                             ^
-    // apply reverse:              ^  ^
-    // new i:                   ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                   ^
-    // i:                          ^
-    // apply reverse:              ^
-    // new i:                   ^
-
-    // events/clock:        -1  0  1  2  3  4  5  6
-    // clock:                   ^
-    // i:                       ^
-    // apply reverse:
-    // new i:                   ^
-
-    const events = [];
-    const n = this.editorTrack.events.length;
+    const end = this.eventContainer.getIndexAfterClock(toClock);
     let direction = t.Direction.Forwards;
-    let i = this.eventIndex;
-    if (i < 0 || toClock > this.clockAt(i)) {
-      // go forwards
-      for (let j = i + 1; j < n && toClock >= this.clockAt(j); j++) {
-        events.push(this.eventAt(j));
-        i = j;
+    const steps: SeekStep[] = [];
+
+    if (this.eventIndex.isBefore(end)) {
+      // Go forward
+      const from = this.eventContainer.nextIndex(this.eventIndex);
+      if (!from.isMinusOne()) {
+        this.eventContainer.forEachExc(from, end, (e, i) => steps.push({ ...e, newEventIndex: i }));
       }
-    } else if (toClock < this.clockAt(i)) {
-      // go backwards
+    } else if (this.eventIndex.isAfter(end)) {
+      // Go backward
+      this.eventContainer.forEachInc(this.eventIndex, end, (e, i) =>
+        steps.push({ ...e, newEventIndex: this.eventContainer.prevIndex(i) }),
+      );
       direction = t.Direction.Backwards;
-      for (; i >= 0 && toClock <= this.clockAt(i); i--) {
-        events.push(this.eventAt(i));
-      }
     }
 
-    const clock = Math.max(0, toClock);
-    return { events, direction, i, clock };
+    return { steps, direction };
 
-    // const clock = Math.max(0, Math.min(this.clockRange.end, toClock));
-    // const stop = clock === this.clockRange.end;
+    // if (i < 0 || toClock > this.clockAt(i)) {
+    //   // go forwards
+    //   for (let j = i + 1; j < n && toClock >= this.clockAt(j); j++) {
+    //     events.push(this.eventAt(j));
+    //     i = j;
+    //   }
+    // } else if (toClock < this.clockAt(i)) {
+    //   // go backwards
+    //   direction = t.Direction.Backwards;
+    //   for (; i >= 0 && toClock <= this.clockAt(i); i--) {
+    //     events.push(this.eventAt(i));
+    //   }
+    // }
 
-    // return { events, direction, i, clock, stop };
+    // const clock = Math.max(0, toClock);
+    // return { events, direction, i, clock };
   }
 
-  async seek(seekData: t.SeekData, uriSet?: t.UriSet) {
-    for (let i = 0; i < seekData.events.length; i++) {
-      await this.applySeekStep(seekData, i, uriSet);
+  async seek(seekData: SeekData, uriSet?: t.UriSet) {
+    for (const step of seekData.steps) {
+      await this.applySeekStep(step, seekData.direction, uriSet);
     }
     this.finalizeSeek(seekData);
   }
 
-  async applySeekStep(seekData: t.SeekData, stepIndex: number, uriSet?: t.UriSet) {
-    const event = seekData.events[stepIndex];
-    assert(event, 'applySeekStep: out of bound event index');
-    await this.stepper.applyEditorEvent(seekData.events[stepIndex], seekData.direction, uriSet);
-    this.eventIndex += seekData.direction === t.Direction.Forwards ? 1 : -1;
+  async applySeekStep(step: SeekStep, direction: t.Direction, uriSet?: t.UriSet) {
+    await this.stepper.applyEditorEvent(step.event, step.uri, direction, uriSet);
+    this.eventIndex = step.newEventIndex;
   }
 
-  finalizeSeek(seekData: t.SeekData) {
-    // assert(this.eventIndex === seekData.i, 'finalizeSeek: somehow eventIndex got out of sync');
-    this.eventIndex = seekData.i;
+  finalizeSeek(seekData: SeekData) {
+    this.eventIndex = seekData.steps.at(-1)?.newEventIndex ?? this.eventIndex;
   }
 
   /**
@@ -331,27 +271,44 @@ export default class InternalWorkspace {
    * Current clock must be < cut clock.
    */
   cut(clock: number) {
-    // Cut events
-    {
-      const i = this.editorTrack.events.findIndex(e => e.clock > clock);
-      assert(this.eventIndex < i);
-      if (i >= 0) this.editorTrack.events.length = i;
-    }
+    throw new Error('TODO');
+    // // Cut events
+    // {
+    //   const i = this.editorTrack.events.findIndex(e => e.clock > clock);
+    //   assert(this.eventIndex < i);
+    //   if (i >= 0) this.editorTrack.events.length = i;
+    // }
 
-    // Cut focusTimeline
-    {
-      this.cutFocusItems(this.editorTrack.focusTimeline.documents, clock);
-      this.cutFocusItems(this.editorTrack.focusTimeline.lines, clock);
-    }
+    // // Cut focusTimeline
+    // {
+    //   this.cutFocusItems(this.editorTrack.focusTimeline.documents, clock);
+    //   this.cutFocusItems(this.editorTrack.focusTimeline.lines, clock);
+    // }
   }
 
-  private cutFocusItems(focusItems: t.FocusItem[], clock: number) {
-    for (const [i, focus] of focusItems.entries()) {
-      if (focus.clockRange.start >= clock) {
-        focusItems.length = i;
-        break;
-      }
-      focus.clockRange.end = Math.min(focus.clockRange.end, clock);
-    }
+  toJSON(): t.InternalWorkspaceJSON {
+    return {
+      defaultEol: this.defaultEol,
+      focusTimeline: this.focusTimeline,
+      editorTracks: this.eventContainer.toJSON(),
+    };
   }
+
+  // private cutFocusItems(focusItems: t.FocusItem[], clock: number) {
+  //   for (const [i, focus] of focusItems.entries()) {
+  //     if (focus.clockRange.start >= clock) {
+  //       focusItems.length = i;
+  //       break;
+  //     }
+  //     focus.clockRange.end = Math.min(focus.clockRange.end, clock);
+  //   }
+  // }
+
+  // private makeInitLiveWorktree(): LiveWorktree {
+  //   const map = new Map<t.Uri, LiveWorktreeItem>();
+  //   for (const [key, file] of Object.entries(worktree)) {
+  //     map.set(key, { file });
+  //   }
+  //   return map;
+  // }
 }

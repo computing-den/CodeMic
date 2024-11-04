@@ -322,18 +322,6 @@ export type SessionHead = {
 
 export type SessionHeadMap = { [key: string]: SessionHead | undefined };
 
-export type SessionBody = {
-  editorTrack: InternalWorkspace;
-  audioTracks: AudioTrack[];
-  videoTracks: VideoTrack[];
-};
-
-export type SessionBodyCompact = {
-  editorTrack: InternalWorkspaceCompact;
-  audioTracks: AudioTrack[];
-  videoTracks: VideoTrack[];
-};
-
 export type Comment = {
   id: string;
   author: string;
@@ -349,19 +337,39 @@ export type ClockRange = {
   end: number;
 };
 
-export type InternalWorkspace = {
-  initSnapshot: InternalEditorTrackSnapshot;
-  events: EditorEvent[];
-  defaultEol: EndOfLine;
+// export type InternalWorkspace = {
+//   initSnapshot: InternalEditorTrackSnapshot;
+//   events: EditorEvent[];
+//   defaultEol: EndOfLine;
+//   focusTimeline: WorkspaceFocusTimeline;
+// };
+
+export type SessionBodyJSON = {
+  audioTracks: AudioTrack[];
+  videoTracks: VideoTrack[];
+  internalWorkspace: InternalWorkspaceJSON;
+};
+
+export type SessionBodyCompact = {
+  audioTracks: AudioTrack[];
+  videoTracks: VideoTrack[];
+  internalWorkspace: InternalWorkspaceCompact;
+};
+
+export type InternalWorkspaceJSON = {
+  editorTracks: InternalEditorTracksJSON;
   focusTimeline: WorkspaceFocusTimeline;
+  defaultEol: EndOfLine;
 };
 
 export type InternalWorkspaceCompact = {
-  initSnapshot: InternalEditorTrackSnapshot;
-  events: EditorEventCompact[];
-  defaultEol: EndOfLine;
+  editorTracks: InternalEditorTracksCompact;
   focusTimeline: WorkspaceFocusTimeline;
+  defaultEol: EndOfLine;
 };
+
+export type InternalEditorTracksJSON = Record<Uri, EditorEvent[]>;
+export type InternalEditorTracksCompact = Record<Uri, EditorEventCompact[]>;
 
 export type WorkspaceFocusTimeline = {
   documents: DocumentFocus[];
@@ -401,11 +409,11 @@ export type VideoTrack = RangedTrackFile;
 
 export type WebviewUris = { [key: string]: string };
 
-export type InternalEditorTrackSnapshot = {
-  worktree: Worktree;
-  textEditors: TextEditor[];
-  activeTextEditorUri?: Uri;
-};
+// export type InternalEditorTrackSnapshot = {
+//   worktree: Worktree;
+//   textEditors: TextEditor[];
+//   activeTextEditorUri?: Uri;
+// };
 
 export type OpenDialogOptions = {
   canSelectFiles?: boolean;
@@ -416,28 +424,35 @@ export type OpenDialogOptions = {
   title?: string;
 };
 
-export interface Session {
-  workspace: AbsPath;
-  head: SessionHead;
-  body?: SessionBody;
-  loaded: boolean;
-  readFile(file: File): Promise<Uint8Array>;
-  copyToBlob(src: AbsPath, sha1: string): Promise<void>;
-}
+// export interface Session {
+//   workspace: AbsPath;
+//   head: SessionHead;
+//   body?: SessionBody;
+//   loaded: boolean;
+//   readFile(file: File): Promise<Uint8Array>;
+//   copyToBlob(src: AbsPath, sha1: string): Promise<void>;
+// }
 
 export interface WorkspaceStepper {
-  applyEditorEvent(e: EditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyTextChangeEvent(e: TextChangeEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyOpenTextDocumentEvent(e: OpenTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyCloseTextDocumentEvent(e: CloseTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyShowTextEditorEvent(e: ShowTextEditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyCloseTextEditorEvent(e: CloseTextEditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applySelectEvent(e: SelectEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyScrollEvent(e: ScrollEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applySaveEvent(e: SaveEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyEditorEvent(e: EditorEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyInitEvent(e: InitEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyTextChangeEvent(e: TextChangeEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyOpenTextDocumentEvent(e: OpenTextDocumentEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyCloseTextDocumentEvent(
+    e: CloseTextDocumentEvent,
+    uri: Uri,
+    direction: Direction,
+    uriSet?: UriSet,
+  ): Promise<void>;
+  applyShowTextEditorEvent(e: ShowTextEditorEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyCloseTextEditorEvent(e: CloseTextEditorEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applySelectEvent(e: SelectEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyScrollEvent(e: ScrollEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applySaveEvent(e: SaveEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
 }
 
 export type EditorEvent =
+  | InitEvent
   | TextChangeEvent
   | OpenTextDocumentEvent
   | CloseTextDocumentEvent
@@ -447,10 +462,17 @@ export type EditorEvent =
   | ScrollEvent
   | SaveEvent;
 
+export type EditorEventWithUri = { event: EditorEvent; uri: Uri };
+
+export type InitEvent = {
+  type: 'init';
+  clock: number;
+  file: File;
+};
+
 export type TextChangeEvent = {
   type: 'textChange';
   clock: number;
-  uri: Uri;
   contentChanges: ContentChange[];
   revContentChanges: ContentChange[];
 };
@@ -458,7 +480,6 @@ export type TextChangeEvent = {
 export type OpenTextDocumentEvent = {
   type: 'openTextDocument';
   clock: number;
-  uri: Uri;
   text?: string;
   eol: EndOfLine;
   isInWorktree: boolean;
@@ -467,7 +488,6 @@ export type OpenTextDocumentEvent = {
 export type CloseTextDocumentEvent = {
   type: 'closeTextDocument';
   clock: number;
-  uri: Uri;
   revText: string;
   revEol: EndOfLine;
 };
@@ -475,7 +495,6 @@ export type CloseTextDocumentEvent = {
 export type ShowTextEditorEvent = {
   type: 'showTextEditor';
   clock: number;
-  uri: Uri;
   selections: readonly Selection[];
   visibleRange: Range;
   revUri?: Uri;
@@ -487,7 +506,6 @@ export type ShowTextEditorEvent = {
 export type CloseTextEditorEvent = {
   type: 'closeTextEditor';
   clock: number;
-  uri: Uri;
   revSelections?: readonly Selection[];
   revVisibleRange?: Range;
   // revSelections: Selection[];
@@ -496,7 +514,6 @@ export type CloseTextEditorEvent = {
 export type SelectEvent = {
   type: 'select';
   clock: number;
-  uri: Uri;
   selections: readonly Selection[];
   visibleRange: Range;
   revSelections: readonly Selection[];
@@ -506,7 +523,6 @@ export type SelectEvent = {
 export type ScrollEvent = {
   type: 'scroll';
   clock: number;
-  uri: Uri;
   visibleRange: Range;
   revVisibleRange: Range;
 };
@@ -514,10 +530,10 @@ export type ScrollEvent = {
 export type SaveEvent = {
   type: 'save';
   clock: number;
-  uri: Uri;
 };
 
 export type EditorEventCompact =
+  | InitEventCompact
   | TextChangeEventCompact
   | OpenTextDocumentEventCompact
   | CloseTextDocumentEventCompact
@@ -527,10 +543,15 @@ export type EditorEventCompact =
   | ScrollEventCompact
   | SaveEventCompact;
 
+export type InitEventCompact = {
+  t: 0;
+  c: number;
+  f: File;
+};
+
 export type TextChangeEventCompact = {
   t: 1;
   c: number;
-  u: Uri;
   cc: ContentChangeCompact[];
   rcc: ContentChangeCompact[];
 };
@@ -538,7 +559,6 @@ export type TextChangeEventCompact = {
 export type OpenTextDocumentEventCompact = {
   t: 2;
   c: number;
-  u: Uri;
   x?: string;
   e: EndOfLine;
   i: boolean;
@@ -547,7 +567,6 @@ export type OpenTextDocumentEventCompact = {
 export type CloseTextDocumentEventCompact = {
   t: 3;
   c: number;
-  u: Uri;
   rt: string;
   re: EndOfLine;
 };
@@ -555,7 +574,6 @@ export type CloseTextDocumentEventCompact = {
 export type ShowTextEditorEventCompact = {
   t: 4;
   c: number;
-  u: Uri;
   s: readonly SelectionCompact[];
   v: RangeCompact;
   ru?: Uri;
@@ -567,7 +585,6 @@ export type ShowTextEditorEventCompact = {
 export type CloseTextEditorEventCompact = {
   t: 5;
   c: number;
-  u: Uri;
   rs?: readonly SelectionCompact[];
   rv?: RangeCompact;
 };
@@ -575,7 +592,6 @@ export type CloseTextEditorEventCompact = {
 export type SelectEventCompact = {
   t: 6;
   c: number;
-  u: Uri;
   s: readonly SelectionCompact[];
   v: RangeCompact;
   rs: readonly SelectionCompact[];
@@ -585,7 +601,6 @@ export type SelectEventCompact = {
 export type ScrollEventCompact = {
   t: 7;
   c: number;
-  u: Uri;
   v: RangeCompact;
   rv: RangeCompact;
 };
@@ -593,7 +608,6 @@ export type ScrollEventCompact = {
 export type SaveEventCompact = {
   t: 8;
   c: number;
-  u: Uri;
 };
 
 export type PositionCompact = [number, number];
@@ -606,7 +620,7 @@ export enum Direction {
   Backwards,
 }
 
-export type UriSet = { [key: Uri]: true | undefined };
+export type UriSet = Set<Uri>;
 
 // export type Position = {
 //   line: number;
@@ -631,13 +645,12 @@ export interface InternalDocument {
   getContent(): Uint8Array;
 }
 
-export type Worktree = { [key: Uri]: File };
+// export type Worktree = { [key: Uri]: File };
 
-export type File = EmptyFile | LocalFile | GitFile;
-// export type DirFile = {
-//   type: 'dir';
-//   mimetype: 'text/directory';
-// };
+export type File = DirFile | EmptyFile | LocalFile | GitFile;
+export type DirFile = {
+  type: 'dir';
+};
 export type EmptyFile = {
   type: 'empty';
 };
@@ -673,8 +686,6 @@ export type SessionHistory = {
   lastWatchedClock?: number;
   workspace: AbsPath;
 };
-
-export type SeekData = { events: EditorEvent[]; direction: Direction; i: number; clock: number };
 
 export type Vec2 = [number, number];
 export type Rect = { top: number; right: number; bottom: number; left: number };

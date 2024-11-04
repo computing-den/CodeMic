@@ -4,29 +4,35 @@ import assert from '../../lib/assert.js';
 import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
 import * as misc from '../misc.js';
 import Session from './session.js';
+import type { SeekStep, SeekData } from './internal_workspace.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 
 class VscWorkspaceStepper implements t.WorkspaceStepper {
   constructor(public session: Session) {}
 
-  async applyEditorEvent(e: t.EditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    await workspaceStepperDispatch(this, e, direction, uriSet);
+  async applyEditorEvent(e: t.EditorEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+    await workspaceStepperDispatch(this, e, uri, direction, uriSet);
   }
 
-  async applySeekStep(seekData: t.SeekData, stepIndex: number) {
-    await this.applyEditorEvent(seekData.events[stepIndex], seekData.direction);
+  async applySeekStep(step: SeekStep, direction: t.Direction, uriSet?: t.UriSet) {
+    await this.applyEditorEvent(step.event, step.uri, direction, uriSet);
+    // this.eventIndex = step.newEventIndex;
   }
 
-  finalizeSeek(seekData: t.SeekData) {
+  finalizeSeek(seekData: SeekData) {
+    // this.eventIndex = seekData.steps.at(-1)?.newEventIndex ?? this.eventIndex;
+  }
+
+  async applyInitEvent(e: t.InitEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
     // nothing
   }
 
-  async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction) {
+  async applyTextChangeEvent(e: t.TextChangeEvent, uri: t.Uri, direction: t.Direction) {
     // We use WorkspaceEdit here because we don't necessarily want to focus on the text editor yet.
     // There will be a separate select event after this if the editor had focus during recording.
 
-    const vscUri = this.session.uriToVsc(e.uri);
+    const vscUri = this.session.uriToVsc(uri);
     const edit = new vscode.WorkspaceEdit();
     if (direction === t.Direction.Forwards) {
       for (const cc of e.contentChanges) {
@@ -44,17 +50,17 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
    * 'openTextDocument' event always has the text field since if the document was already in checkpoint, no
    * 'openTextDocument' event would be generated at all.
    */
-  async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, direction: t.Direction) {
+  async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, uri: t.Uri, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
-      const vscUri = this.session.uriToVsc(e.uri);
+      const vscUri = this.session.uriToVsc(uri);
 
       // Open vsc document.
-      let vscTextDocument = this.session.findVscTextDocumentByUri(e.uri);
+      let vscTextDocument = this.session.findVscTextDocumentByUri(uri);
 
       // If file doesn't exist, create it and open it and we're done.
       // vscode.workspace.openTextDocument() will throw if file doesn't exist.
       if (!vscTextDocument && vscUri.scheme === 'file') {
-        await this.session.writeFileIfNotExists(e.uri, e.text || '');
+        await this.session.writeFileIfNotExists(uri, e.text || '');
         await vscode.workspace.openTextDocument(vscUri);
         return;
       }
@@ -73,17 +79,17 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
         await vscode.workspace.applyEdit(edit);
       }
     } else {
-      await this.session.closeVscTextEditorByUri(e.uri, true);
+      await this.session.closeVscTextEditorByUri(uri, true);
     }
   }
 
-  async applyCloseTextDocumentEvent(e: t.CloseTextDocumentEvent, direction: t.Direction) {
-    assert(path.isUntitledUri(e.uri), 'Must only record closeTextDocument for untitled URIs');
+  async applyCloseTextDocumentEvent(e: t.CloseTextDocumentEvent, uri: t.Uri, direction: t.Direction) {
+    assert(path.isUntitledUri(uri), 'Must only record closeTextDocument for untitled URIs');
 
     if (direction === t.Direction.Forwards) {
-      await this.session.closeVscTextEditorByUri(e.uri, true);
+      await this.session.closeVscTextEditorByUri(uri, true);
     } else {
-      const vscTextDocument = await vscode.workspace.openTextDocument(this.session.uriToVsc(e.uri));
+      const vscTextDocument = await vscode.workspace.openTextDocument(this.session.uriToVsc(uri));
       const edit = new vscode.WorkspaceEdit();
       edit.replace(
         vscTextDocument.uri,
@@ -94,9 +100,9 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction) {
+  async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, uri: t.Uri, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
-      const vscTextEditor = await vscode.window.showTextDocument(this.session.uriToVsc(e.uri), {
+      const vscTextEditor = await vscode.window.showTextDocument(this.session.uriToVsc(uri), {
         preview: false,
         preserveFocus: false,
       });
@@ -112,11 +118,11 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyCloseTextEditorEvent(e: t.CloseTextEditorEvent, direction: t.Direction) {
+  async applyCloseTextEditorEvent(e: t.CloseTextEditorEvent, uri: t.Uri, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
-      await this.session.closeVscTextEditorByUri(e.uri, true);
+      await this.session.closeVscTextEditorByUri(uri, true);
     } else {
-      const vscTextEditor = await vscode.window.showTextDocument(this.session.uriToVsc(e.uri), {
+      const vscTextEditor = await vscode.window.showTextDocument(this.session.uriToVsc(uri), {
         preview: false,
         preserveFocus: false,
       });
@@ -129,8 +135,8 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applySelectEvent(e: t.SelectEvent, direction: t.Direction) {
-    const vscTextEditor = await vscode.window.showTextDocument(this.session.uriToVsc(e.uri), {
+  async applySelectEvent(e: t.SelectEvent, uri: t.Uri, direction: t.Direction) {
+    const vscTextEditor = await vscode.window.showTextDocument(this.session.uriToVsc(uri), {
       preview: false,
       preserveFocus: false,
     });
@@ -144,8 +150,8 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyScrollEvent(e: t.ScrollEvent, direction: t.Direction) {
-    await vscode.window.showTextDocument(this.session.uriToVsc(e.uri), { preview: false, preserveFocus: false });
+  async applyScrollEvent(e: t.ScrollEvent, uri: t.Uri, direction: t.Direction) {
+    await vscode.window.showTextDocument(this.session.uriToVsc(uri), { preview: false, preserveFocus: false });
 
     if (direction === t.Direction.Forwards) {
       await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
@@ -154,10 +160,10 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applySaveEvent(e: t.SaveEvent, direction: t.Direction) {
-    const vscTextDocument = await vscode.workspace.openTextDocument(this.session.uriToVsc(e.uri));
+  async applySaveEvent(e: t.SaveEvent, uri: t.Uri, direction: t.Direction) {
+    const vscTextDocument = await vscode.workspace.openTextDocument(this.session.uriToVsc(uri));
     if (!(await vscTextDocument.save())) {
-      throw new Error(`Could not save ${e.uri}`);
+      throw new Error(`Could not save ${uri}`);
     }
   }
 }

@@ -1,3 +1,4 @@
+import os from 'os';
 import * as t from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
@@ -33,6 +34,7 @@ export default class SessionRuntime {
   internalWorkspace: InternalWorkspace;
   audioTrackCtrls: AudioTrackCtrl[];
   videoTrackCtrl: VideoTrackCtrl;
+  videoTracks: t.VideoTrack[];
   workspacePlayer: WorkspacePlayer;
   workspaceRecorder: WorkspaceRecorder;
 
@@ -43,12 +45,21 @@ export default class SessionRuntime {
   private timeout: any;
   private timeoutTimestamp = 0;
 
-  constructor(internalWorkspace: InternalWorkspace) {
-    this.session = internalWorkspace.session;
-    this.internalWorkspace = internalWorkspace;
-    this.audioTrackCtrls = this.session.body!.audioTracks.map(
-      audioTrack => new AudioTrackCtrl(this.session, audioTrack),
-    );
+  constructor(session: Session, bodyJSON?: t.SessionBodyJSON) {
+    bodyJSON ??= {
+      audioTracks: [],
+      videoTracks: [],
+      internalWorkspace: {
+        editorTracks: {},
+        focusTimeline: { documents: [], lines: [] },
+        defaultEol: os.EOL as t.EndOfLine,
+      },
+    };
+
+    this.session = session;
+    this.internalWorkspace = new InternalWorkspace(session, bodyJSON.internalWorkspace);
+    this.audioTrackCtrls = bodyJSON.audioTracks.map(audioTrack => new AudioTrackCtrl(this.session, audioTrack));
+    this.videoTracks = bodyJSON.videoTracks;
     this.videoTrackCtrl = new VideoTrackCtrl(this.session);
     this.workspacePlayer = new WorkspacePlayer(this.session);
     this.workspaceRecorder = new WorkspaceRecorder(this.session);
@@ -64,14 +75,10 @@ export default class SessionRuntime {
     return this.mode.status === SessionRuntimeStatus.Running;
   }
 
-  get videoTracks(): t.VideoTrack[] {
-    return this.session.body!.videoTracks;
-  }
-
-  static async fromSession(session: Session): Promise<SessionRuntime> {
-    const internalWorkspace = await InternalWorkspace.fromSession(session);
-    return new SessionRuntime(internalWorkspace);
-  }
+  // static async fromSession(session: Session): Promise<SessionRuntime> {
+  //   const internalWorkspace = await InternalWorkspace.fromSession(session);
+  //   return new SessionRuntime(internalWorkspace);
+  // }
 
   load() {
     // Load media tracks so that they're ready to play when they come into range.
@@ -138,7 +145,6 @@ export default class SessionRuntime {
   insertAudioAndLoad(audioTrack: t.AudioTrack) {
     const audioTrackCtrl = new AudioTrackCtrl(this.session, audioTrack);
     this.session.head.duration = Math.max(this.session.head.duration, audioTrack.clockRange.end);
-    this.session.body!.audioTracks.push(audioTrack);
     this.audioTrackCtrls.push(audioTrackCtrl);
     this.initAudioCtrl(audioTrackCtrl);
     this.onChange?.();
@@ -151,11 +157,6 @@ export default class SessionRuntime {
       return;
     }
 
-    const j = this.session.body!.audioTracks.findIndex(t => t.id === id);
-    if (j !== -1) {
-      this.session.body!.audioTracks.splice(j, 1);
-    }
-
     this.audioTrackCtrls[i].pause();
     this.audioTrackCtrls.splice(i, 1);
     this.onChange?.();
@@ -164,16 +165,16 @@ export default class SessionRuntime {
   insertVideoAndLoad(videoTrack: t.VideoTrack) {
     // const videoTrackCtrl = new VideoTrackCtrl(this.session, videoTrack);
     this.session.head.duration = Math.max(this.session.head.duration, videoTrack.clockRange.end);
-    this.session.body!.videoTracks.push(videoTrack);
+    this.videoTracks.push(videoTrack);
     // this.videoTrackCtrl.insert(videoTrackCtrl);
     this.initVideoCtrl();
     this.onChange?.();
   }
 
   deleteVideo(id: string) {
-    const j = this.session.body!.videoTracks.findIndex(t => t.id === id);
+    const j = this.videoTracks.findIndex(t => t.id === id);
     if (j !== -1) {
-      this.session.body!.videoTracks.splice(j, 1);
+      this.videoTracks.splice(j, 1);
     }
 
     this.videoTrackCtrl.pause();
@@ -191,6 +192,14 @@ export default class SessionRuntime {
 
   handleFrontendVideoEvent(e: t.FrontendMediaEvent) {
     this.videoTrackCtrl.handleVideoEvent(e);
+  }
+
+  toJSON(): t.SessionBodyJSON {
+    return {
+      audioTracks: this.audioTrackCtrls.map(c => c.audioTrack),
+      videoTracks: this.videoTracks,
+      internalWorkspace: this.internalWorkspace.toJSON(),
+    };
   }
 
   private initAudioCtrl(c: AudioTrackCtrl) {

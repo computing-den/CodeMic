@@ -129,7 +129,7 @@ class WorkspaceRecorder {
   }
 
   private updateFocus() {
-    const { documents, lines } = this.session.body!.editorTrack.focusTimeline;
+    const { documents, lines } = this.session.runtime!.internalWorkspace.focusTimeline;
     const { activeTextEditor } = this.internalWorkspace;
     const activeUri = activeTextEditor?.document.uri;
     const lastDocumentFocus = documents.at(-1);
@@ -179,7 +179,7 @@ class WorkspaceRecorder {
   // }
 
   private popLastLineFocusIfTrivial() {
-    const { lines } = this.session.body!.editorTrack.focusTimeline;
+    const { lines } = this.session.runtime!.internalWorkspace.focusTimeline;
     const lastLineFocus = lines.at(-1);
     // const last2LineFocus = lines.at(-1);
     if (!lastLineFocus) return;
@@ -237,11 +237,10 @@ class WorkspaceRecorder {
       const irTextChangeEvent: t.EditorEvent = {
         type: 'textChange',
         clock: this.clock,
-        uri: irTextDocument.uri,
         contentChanges: irContentChanges,
         revContentChanges: irRevContentChanges,
       };
-      this.pushEvent(irTextChangeEvent);
+      this.insertEvent(irTextChangeEvent, uri);
 
       if (config.debug) {
         assert(
@@ -250,14 +249,14 @@ class WorkspaceRecorder {
         );
 
         const debugNextIrText = irTextDocument.getText();
-        await this.internalWorkspace.stepper.applyTextChangeEvent(irTextChangeEvent, t.Direction.Backwards);
+        await this.internalWorkspace.stepper.applyTextChangeEvent(irTextChangeEvent, uri, t.Direction.Backwards);
         const debugReInitIrText = irTextDocument.getText();
         assert(
           debugInitIrText === debugReInitIrText,
           "textChange: text doesn't match what it was after applying changes in reverse",
         );
 
-        await this.internalWorkspace.stepper.applyTextChangeEvent(irTextChangeEvent, t.Direction.Forwards);
+        await this.internalWorkspace.stepper.applyTextChangeEvent(irTextChangeEvent, uri, t.Direction.Forwards);
         assert(
           debugNextIrText === irTextDocument.getText(),
           "textChange: text doesn't match what it was after applying changes again",
@@ -297,25 +296,29 @@ class WorkspaceRecorder {
     const revSelections = irTextEditor?.selections;
     const revVisibleRange = irTextEditor?.visibleRange;
     this.internalWorkspace.closeTextEditorByUri(uri);
-    this.pushEvent({
-      type: 'closeTextEditor',
-      clock: this.clock,
+    this.insertEvent(
+      {
+        type: 'closeTextEditor',
+        clock: this.clock,
+        revSelections,
+        revVisibleRange,
+      },
       uri,
-      revSelections,
-      revVisibleRange,
-    });
+    );
 
     // No reason to remove/close the text document if it's not an untitled.
     if (vscTextDocument.uri.scheme === 'untitled') {
       const revText = irTextDocument.getText();
       this.internalWorkspace.closeAndRemoveTextDocumentByUri(uri);
-      this.pushEvent({
-        type: 'closeTextDocument',
-        clock: this.clock,
+      this.insertEvent(
+        {
+          type: 'closeTextDocument',
+          clock: this.clock,
+          revText,
+          revEol: irTextDocument.eol,
+        },
         uri,
-        revText,
-        revEol: irTextDocument.eol,
-      });
+      );
     }
   }
 
@@ -335,16 +338,18 @@ class WorkspaceRecorder {
     const irTextEditor = await this.openTextEditorHelper(vscTextEditor, uri);
     this.internalWorkspace.activeTextEditor = irTextEditor;
 
-    this.pushEvent({
-      type: 'showTextEditor',
-      clock: this.clock,
+    this.insertEvent(
+      {
+        type: 'showTextEditor',
+        clock: this.clock,
+        selections: irTextEditor.selections,
+        visibleRange: irTextEditor.visibleRange,
+        revUri,
+        revSelections,
+        revVisibleRange,
+      },
       uri,
-      selections: irTextEditor.selections,
-      visibleRange: irTextEditor.visibleRange,
-      revUri,
-      revSelections,
-      revVisibleRange,
-    });
+    );
   }
 
   private select(vscTextEditor: vscode.TextEditor, selections: readonly Selection[]) {
@@ -367,15 +372,17 @@ class WorkspaceRecorder {
     const revVisibleRanges = irTextEditor.visibleRange;
     irTextEditor.select(selections, vscTextEditor.visibleRanges[0]);
 
-    this.pushEvent({
-      type: 'select',
-      clock: this.clock,
+    this.insertEvent(
+      {
+        type: 'select',
+        clock: this.clock,
+        selections: irTextEditor.selections,
+        visibleRange: irTextEditor.visibleRange,
+        revSelections,
+        revVisibleRange: revVisibleRanges,
+      },
       uri,
-      selections: irTextEditor.selections,
-      visibleRange: irTextEditor.visibleRange,
-      revSelections,
-      revVisibleRange: revVisibleRanges,
-    });
+    );
   }
 
   private saveTextDocument(vscTextDocument: vscode.TextDocument) {
@@ -385,11 +392,13 @@ class WorkspaceRecorder {
     const uri = this.session.uriFromVsc(vscTextDocument.uri);
     logAcceptedEvent(`accepted save for ${uri}`);
 
-    this.pushEvent({
-      type: 'save',
-      clock: this.clock,
+    this.insertEvent(
+      {
+        type: 'save',
+        clock: this.clock,
+      },
       uri,
-    });
+    );
   }
 
   private scroll(vscTextEditor: vscode.TextEditor, visibleRanges: readonly Range[]) {
@@ -420,22 +429,24 @@ class WorkspaceRecorder {
     const revVisibleRange = irTextEditor.visibleRange;
     irTextEditor.scroll(visibleRange);
 
-    this.pushEvent({
-      type: 'scroll',
-      clock: this.clock,
+    this.insertEvent(
+      {
+        type: 'scroll',
+        clock: this.clock,
+        visibleRange,
+        revVisibleRange,
+      },
       uri,
-      visibleRange,
-      revVisibleRange,
-    });
+    );
   }
 
-  private pushEvent(e: t.EditorEvent) {
+  private insertEvent(e: t.EditorEvent, uri: t.Uri) {
     if (e.type !== 'scroll') {
       this.scrolling = false;
       this.scrollStartRange = undefined;
     }
 
-    this.session.body!.editorTrack.events.push(e);
+    this.session.runtime!.internalWorkspace.eventContainer.insert(uri, [e]);
     // this.simplifyEvents();
     this.onChange?.();
   }
@@ -468,24 +479,28 @@ class WorkspaceRecorder {
       const irRange = irTextDocument.getRange();
       const irContentChanges = [{ range: irRange, text: vscText }];
       const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
-      this.pushEvent({
-        type: 'textChange',
-        clock: this.clock,
+      this.insertEvent(
+        {
+          type: 'textChange',
+          clock: this.clock,
+          contentChanges: irContentChanges,
+          revContentChanges: irRevContentChanges,
+        },
         uri,
-        contentChanges: irContentChanges,
-        revContentChanges: irRevContentChanges,
-      });
+      );
     } else if (!irTextDocument) {
       irTextDocument = this.session.textDocumentFromVsc(vscTextDocument, uri);
       this.internalWorkspace.insertTextDocument(irTextDocument); // will insert into worktree as well
-      this.pushEvent({
-        type: 'openTextDocument',
-        clock: this.clock,
-        text: irText === vscText ? undefined : vscText,
+      this.insertEvent(
+        {
+          type: 'openTextDocument',
+          clock: this.clock,
+          text: irText === vscText ? undefined : vscText,
+          eol: irTextDocument.eol,
+          isInWorktree,
+        },
         uri,
-        eol: irTextDocument.eol,
-        isInWorktree,
-      });
+      );
     }
 
     return irTextDocument;

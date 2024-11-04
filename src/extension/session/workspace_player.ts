@@ -87,12 +87,12 @@ class WorkspacePlayer {
   private async updateImmediately(clock: number) {
     const seekData = this.internalCtrl.getSeekData(clock);
 
-    if (seekData.events.length > 10) {
+    if (seekData.steps.length > 10) {
       if (config.logTrackPlayerUpdateStep) {
         console.log('updateImmediately: applying wholesale', seekData);
       }
       // Update by seeking the internal this.internalCtrl first, then syncing the this.internalCtrl to vscode and disk
-      const uriSet: t.UriSet = {};
+      const uriSet: t.UriSet = new Set();
       await this.internalCtrl.seek(seekData, uriSet);
       await this.session.syncInternalWorkspaceToVscodeAndDisk(Object.keys(uriSet));
     } else {
@@ -100,9 +100,9 @@ class WorkspacePlayer {
         console.log('updateImmediately: applying one at a time', seekData);
       }
       // Apply updates one at a time
-      for (let i = 0; i < seekData.events.length; i++) {
-        await this.internalCtrl.applySeekStep(seekData, i);
-        await this.vscWorkspaceStepper.applySeekStep(seekData, i);
+      for (const step of seekData.steps) {
+        await this.internalCtrl.applySeekStep(step, seekData.direction);
+        await this.vscWorkspaceStepper.applySeekStep(step, seekData.direction);
       }
       this.internalCtrl.finalizeSeek(seekData);
       this.vscWorkspaceStepper.finalizeSeek(seekData);

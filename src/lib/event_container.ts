@@ -64,18 +64,24 @@
  *
  */
 
-import { EditorEvent, Uri } from '../../lib/types.js';
-import * as lib from '../../lib/lib.js';
-import assert from '../../lib/assert.js';
+import { EditorEvent, EditorEventWithUri, Uri, InternalEditorTracksJSON } from './types.js';
+import * as lib from './lib.js';
+import assert from './assert.js';
 import _ from 'lodash';
 
-export type EditorEventWithUri = { event: EditorEvent; uri: Uri };
-
 const BUCKET_CLOCK_INTERVAL = 1 * 60;
+
+export type Iteratee = (value: EditorEventWithUri, i: EventIndex) => any;
 
 export default class EventContainer {
   private tracks: Map<Uri, EditorEvent[]> = new Map();
   private buckets: EditorEventWithUri[][] = [];
+
+  constructor(tracks: InternalEditorTracksJSON) {
+    for (const [uri, events] of Object.entries(tracks)) {
+      this.insert(uri, events);
+    }
+  }
 
   // Events must be sorted.
   insert(uri: Uri, events: EditorEvent[]) {
@@ -91,12 +97,44 @@ export default class EventContainer {
     return this.tracks.get(uri) ?? [];
   }
 
-  firstIndex(): EventIndex | undefined {
-    return this.nextIndex(new EventIndex(0, -1));
+  firstIndex(): EventIndex {
+    return this.nextIndex(EventIndex.minusOne());
   }
 
-  lastIndex(): EventIndex | undefined {
+  lastIndex(): EventIndex {
     return this.prevIndex(new EventIndex(this.buckets.length - 1, this.buckets[this.buckets.length - 1]?.length ?? 0));
+  }
+
+  isEmpty(): boolean {
+    return this.lastIndex().isMinusOne();
+  }
+
+  forEachInc(from: EventIndex, to: EventIndex, f: Iteratee) {
+    assert(!from.isMinusOne() && !to.isMinusOne());
+
+    if (from.isBeforeOrEqual(to)) {
+      for (let i = from; !i.isMinusOne() && i.isBeforeOrEqual(to); i = this.nextIndex(i)) {
+        if (f(this.at(i)!, i) === false) break;
+      }
+    } else {
+      for (let i = from; !i.isMinusOne() && i.isAfterOrEqual(to); i = this.prevIndex(i)) {
+        if (f(this.at(i)!, i) === false) break;
+      }
+    }
+  }
+
+  forEachExc(from: EventIndex, to: EventIndex, f: Iteratee) {
+    assert(!from.isMinusOne() && !to.isMinusOne());
+
+    if (from.isBeforeOrEqual(to)) {
+      for (let i = from; !i.isMinusOne() && i.isBefore(to); i = this.nextIndex(i)) {
+        if (f(this.at(i)!, i) === false) break;
+      }
+    } else {
+      for (let i = from; !i.isMinusOne() && i.isAfter(to); i = this.prevIndex(i)) {
+        if (f(this.at(i)!, i) === false) break;
+      }
+    }
   }
 
   isInRange(i: EventIndex): boolean {
@@ -109,13 +147,13 @@ export default class EventContainer {
   }
 
   at(i: EventIndex): EditorEventWithUri | undefined {
-    if (this.isInRange(i)) return this.buckets[i.bucketIndex][i.eventIndexInBucket];
+    return this.buckets[i.bucketIndex]?.[i.eventIndexInBucket];
   }
 
   /**
-   * Once it reaches the end, it'll return EventIndex.invalid()
+   * Once it reaches the end, it returns EventIndex.minusOne()
    */
-  nextIndex(i: EventIndex): EventIndex | undefined {
+  nextIndex(i: EventIndex): EventIndex {
     for (
       i = new EventIndex(i.bucketIndex, i.eventIndexInBucket + 1);
       i.bucketIndex < this.buckets.length;
@@ -123,12 +161,13 @@ export default class EventContainer {
     ) {
       if (i.eventIndexInBucket < this.buckets[i.bucketIndex].length) return i;
     }
+    return EventIndex.minusOne();
   }
 
   /**
-   * Once it reaches the beginning, it'll return EventIndex.invalid()
+   * Once it reaches the beginning, it'll return EventIndex.minusOne()
    */
-  prevIndex(i: EventIndex): EventIndex | undefined {
+  prevIndex(i: EventIndex): EventIndex {
     for (
       i = new EventIndex(i.bucketIndex, i.eventIndexInBucket - 1);
       i.bucketIndex >= 0;
@@ -136,6 +175,7 @@ export default class EventContainer {
     ) {
       if (i.eventIndexInBucket >= 0) return i;
     }
+    return EventIndex.minusOne();
   }
 
   /**
@@ -162,6 +202,10 @@ export default class EventContainer {
     const i = this.getBucketIndex(clock);
     const j = sortedIndex(this.buckets[i] ?? [], clock);
     return new EventIndex(i, j);
+  }
+
+  toJSON(): InternalEditorTracksJSON {
+    return Object.fromEntries(this.tracks);
   }
 
   private getBucketIndex(clock: number): number {
@@ -200,16 +244,16 @@ export default class EventContainer {
 export class EventIndex {
   constructor(public readonly bucketIndex: number, public readonly eventIndexInBucket: number) {}
 
-  // /**
-  //  * Invalid index represents the state where no event has been applied yet and it is `new EventIndex(0, -1)`.
-  //  */
-  // static invalid(): EventIndex {
-  //   return new EventIndex(0, -1);
-  // }
+  /**
+   * Represents the state where no event has been applied yet and it is `new EventIndex(0, -1)`.
+   */
+  static minusOne(): EventIndex {
+    return new EventIndex(0, -1);
+  }
 
-  // isValid(): boolean {
-  //   return this.eventIndexInBucket >= 0;
-  // }
+  isMinusOne(): boolean {
+    return this.eventIndexInBucket === -1;
+  }
 
   isBefore(i: EventIndex): boolean {
     // assert(this.isValid());

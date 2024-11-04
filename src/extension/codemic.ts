@@ -14,7 +14,7 @@ import assert from 'assert';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import * as path from '../lib/path.js';
-import EventContainer, { EventIndex } from './session/event_container.js';
+import EventContainer, { EventIndex } from '../lib/event_container.js';
 
 class CodeMic {
   screen: t.Screen = t.Screen.Welcome;
@@ -867,9 +867,9 @@ class CodeMic {
         clock: this.session.clock ?? 0,
         workspace: this.session.workspace,
         history: this.context.settings.history[this.session.head.id],
-        workspaceFocusTimeline: this.session.body?.editorTrack.focusTimeline,
-        audioTracks: this.session.body?.audioTracks,
-        videoTracks: this.session.body?.videoTracks,
+        workspaceFocusTimeline: this.session.runtime?.internalWorkspace.focusTimeline,
+        audioTracks: this.session.runtime?.audioTrackCtrls.map(c => c.audioTrack),
+        videoTracks: this.session.runtime?.videoTracks,
         blobsWebviewUris: this.session.getBlobsWebviewUris(),
         coverPhotoWebviewUri: this.session.getCoverPhotoWebviewUri(),
       };
@@ -886,9 +886,9 @@ class CodeMic {
         clock: this.session.clock ?? 0,
         workspace: this.session.workspace,
         history: this.context.settings.history[this.session.head.id],
-        workspaceFocusTimeline: this.session.body?.editorTrack.focusTimeline,
-        audioTracks: this.session.body?.audioTracks,
-        videoTracks: this.session.body?.videoTracks,
+        workspaceFocusTimeline: this.session.runtime?.internalWorkspace.focusTimeline,
+        audioTracks: this.session.runtime?.audioTrackCtrls.map(c => c.audioTrack),
+        videoTracks: this.session.runtime?.videoTracks,
         blobsWebviewUris: this.session.getBlobsWebviewUris(),
         coverPhotoWebviewUri: this.session.getCoverPhotoWebviewUri(),
         comments: COMMENTS[this.session.head.id],

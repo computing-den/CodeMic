@@ -92,7 +92,10 @@ class Recorder {
   }
 
   isSessionEmpty(): boolean {
-    return this.session.body?.editorTrack.events.length === 0 && this.session.runtime?.audioTrackCtrls.length === 0;
+    return Boolean(
+      this.session.runtime?.internalWorkspace.eventContainer.isEmpty() &&
+        this.session.runtime?.audioTrackCtrls.length === 0,
+    );
   }
 
   updateState(changes: t.RecorderUpdate) {
@@ -142,9 +145,9 @@ class Recorder {
   }
 
   async updateAudio(audio: Partial<t.AudioTrack>) {
-    assert(this.session.body);
-    const track = this.session.body.audioTracks.find(t => t.id === audio.id);
-    if (track) Object.assign(track, audio);
+    assert(this.session.runtime);
+    const trackCtrl = this.session.runtime.audioTrackCtrls.find(c => c.audioTrack.id === audio.id);
+    if (trackCtrl) Object.assign(trackCtrl.audioTrack, audio);
     this.dirty = true;
   }
 
@@ -173,8 +176,8 @@ class Recorder {
   }
 
   async updateVideo(video: Partial<t.VideoTrack>) {
-    assert(this.session.body);
-    const track = this.session.body.videoTracks.find(t => t.id === video.id);
+    assert(this.session.runtime);
+    const track = this.session.runtime.videoTracks.find(t => t.id === video.id);
     if (track) Object.assign(track, video);
     this.dirty = true;
   }
