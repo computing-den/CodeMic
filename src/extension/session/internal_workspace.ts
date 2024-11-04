@@ -79,6 +79,10 @@ export default class InternalWorkspace {
     return Array.from(this.worktree.keys());
   }
 
+  isDirUri(uri: t.Uri): boolean {
+    return Boolean(this.worktree.get(uri)?.file.type === 'dir');
+  }
+
   async getContentByUri(uri: t.Uri): Promise<Uint8Array> {
     const item = this.worktree.get(uri);
     assert(item);

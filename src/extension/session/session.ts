@@ -222,14 +222,17 @@ export class Session {
 
     // Create the worktree and copy files to session directory.
     // TODO: ignore files in .codemicignore
-    // const worktree: t.Worktree = {};
-    const paths = await this.readDirRecursively({ includeFiles: true });
-    for (const p of paths) {
+    const pathsWithStats = await this.readDirRecursively({ includeFiles: true, includeDirs: true });
+    for (const [p, stat] of pathsWithStats) {
       const uri = path.workspaceUriFromRelPath(p);
-      const data = await fs.promises.readFile(path.join(this.workspace, p));
-      const sha1 = await misc.computeSHA1(data);
-      await this.copyToBlob(path.join(this.workspace, p), sha1);
-      events.push({ uri, event: { type: 'init', clock: 0, file: { type: 'local', sha1 } } });
+      if (stat.isDirectory()) {
+        events.push({ uri, event: { type: 'init', clock: 0, file: { type: 'dir' } } });
+      } else {
+        const data = await fs.promises.readFile(path.join(this.workspace, p));
+        const sha1 = await misc.computeSHA1(data);
+        await this.copyToBlob(path.join(this.workspace, p), sha1);
+        events.push({ uri, event: { type: 'init', clock: 0, file: { type: 'local', sha1 } } });
+      }
     }
 
     // Walk through the relevant tabs and take snapshots of the text editors.
@@ -310,14 +313,14 @@ export class Session {
   }
 
   /**
-   * Returns a sorted list of all files.
+   * Returns a sorted list of all files and directories.
    * The returned items do NOT start with "/".
    */
   async readDirRecursively(
     options: ReadDirOptions,
     rel: t.RelPath = path.CUR_DIR,
-    res: t.RelPath[] = [],
-  ): Promise<t.RelPath[]> {
+    res: [t.RelPath, fs.Stats][] = [],
+  ): Promise<[t.RelPath, fs.Stats][]> {
     let filenames: t.RelPath[] = [];
     try {
       filenames = (await fs.promises.readdir(path.join(this.workspace, rel))) as t.RelPath[];
@@ -333,11 +336,14 @@ export class Session {
       const stat = await fs.promises.stat(childFull);
 
       if (stat.isDirectory()) {
+        if (options.includeDirs) {
+          res.push([childRel, stat]);
+        }
         await this.readDirRecursively(options, childRel, res);
       }
 
-      if ((stat.isDirectory() && options.includeDirs) || (stat.isFile() && options.includeFiles)) {
-        res.push(childRel);
+      if (stat.isFile() && options.includeFiles) {
+        res.push([childRel, stat]);
       }
     }
     return res;
@@ -345,23 +351,15 @@ export class Session {
 
   async syncInternalWorkspaceToVscodeAndDisk(targetUris?: t.Uri[]) {
     // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
-    const ctrl = this.runtime?.internalWorkspace;
-    assert(ctrl);
+    const internalWorkspace = this.runtime?.internalWorkspace;
+    assert(internalWorkspace);
 
-    // TODO having both directories and files in targetUris and ctrl.worktree can make things
-    //      a bit confusing. Especially when it comes to deleting directories when there's
-    //      still a file inside but is supposed to be ignored according to .codemicignore
-    //      I think it's best to keep the directory structure in a separate variable than ctrl.worktree
-    //      worktreeFiles: {[key: Uri]: WorktreeFile} vs worktreeDirs: Uri[]
-    // assert(_.values(ctrl.worktree).every(item => item.file.type !== 'dir'));
-    // assert(!targetUris || targetUris.every(uri => ctrl.worktree[uri]?.file.type !== 'dir'));
-
-    // all text editor tabs that are not in ctrl's textEditors should be closed
+    // all text editor tabs that are not in internalWorkspace's textEditors should be closed
     for (const tabGroup of vscode.window.tabGroups.all) {
       for (const tab of tabGroup.tabs) {
         if (tab.input instanceof vscode.TabInputText && this.shouldRecordVscUri(tab.input.uri)) {
           const uri = this.uriFromVsc(tab.input.uri);
-          if (!ctrl.findTextEditorByUri(uri)) await this.closeVscTabInputText(tab, true);
+          if (!internalWorkspace.findTextEditorByUri(uri)) await this.closeVscTabInputText(tab, true);
         }
       }
     }
@@ -370,41 +368,42 @@ export class Session {
     await fs.promises.mkdir(this.workspace, { recursive: true });
 
     if (targetUris) {
-      // all files in targetUris that are no longer in ctrl's worktree should be deleted
+      // all files and directories in targetUris that are no longer in internalWorkspace's worktree should be deleted
       for (const targetUri of targetUris) {
-        if (!ctrl.doesUriExist(targetUri)) {
+        if (!internalWorkspace.doesUriExist(targetUri)) {
           if (path.isWorkspaceUri(targetUri)) {
-            await fs.promises.rm(path.getFileUriPath(this.resolveUri(targetUri)), { force: true });
+            await fs.promises.rm(path.getFileUriPath(this.resolveUri(targetUri)), { force: true, recursive: true });
           }
         }
       }
     } else {
-      // all files in workspace that are not in ctrl's worktree should be deleted
-      const workspaceFiles = await this.readDirRecursively({ includeFiles: true });
-      for (const file of workspaceFiles) {
-        const uri = path.workspaceUriFromRelPath(file);
-        if (!ctrl.doesUriExist(uri)) {
-          await fs.promises.rm(path.join(this.workspace, file), { force: true });
+      // all files in workspace that are not in internalWorkspace's worktree should be deleted
+      const workspacePathsWithStats = await this.readDirRecursively({ includeFiles: true, includeDirs: true });
+      for (const [p, stat] of workspacePathsWithStats) {
+        const uri = path.workspaceUriFromRelPath(p);
+        if (!internalWorkspace.doesUriExist(uri)) {
+          await fs.promises.rm(path.join(this.workspace, p), { force: true, recursive: true });
         }
       }
 
-      // set targetUris to all known uris in ctrl
-      targetUris = ctrl.getWorktreeUris();
+      // set targetUris to all known uris in internalWorkspace
+      targetUris = internalWorkspace.getWorktreeUris();
     }
 
-    // for now, just delete empty directories
-    {
-      const dirs = await this.readDirRecursively({ includeDirs: true });
-      const workspaceUriPaths = ctrl.getWorktreeUris().filter(path.isWorkspaceUri).map(path.getWorkspaceUriPath);
-      for (const dir of dirs) {
-        const dirIsEmpty = !workspaceUriPaths.some(p => path.isBaseOf(dir, p));
-        if (dirIsEmpty) await fs.promises.rm(path.join(this.workspace, dir), { force: true, recursive: true });
-      }
-    }
+    // // for now, just delete empty directories
+    // {
+    //   const dirs = await this.readDirRecursively({ includeDirs: true });
+    //   const workspaceUriPaths = internalWorkspace.getWorktreeUris().filter(path.isWorkspaceUri).map(path.getWorkspaceUriPath);
+    //   for (const dir of dirs) {
+    //     const dirIsEmpty = !workspaceUriPaths.some(p => path.isBaseOf(dir, p));
+    //     if (dirIsEmpty) await fs.promises.rm(path.join(this.workspace, dir), { force: true, recursive: true });
+    //   }
+    // }
 
     // for each targetUri
-    //   if it doesn't exist in ctrl.worktree, it's already been deleted above, so ignore it
+    //   if it doesn't exist in internalWorkspace.worktree, it's already been deleted above, so ignore it
     //   if there's a text editor open in vscode, replace its content
+    //   if it's a directory, mkdir
     //   else, mkdir and write to file
     // NOTE: changing documents with WorkspaceEdit without immediately savig them causes them to be
     //       opened even if they did not have an associated editor.
@@ -412,7 +411,7 @@ export class Session {
       const targetUrisOutsideVsc: t.Uri[] = [];
       const edit = new vscode.WorkspaceEdit();
       for (const targetUri of targetUris) {
-        if (!ctrl.doesUriExist(targetUri)) continue;
+        if (!internalWorkspace.doesUriExist(targetUri)) continue;
 
         let vscTextDocument: vscode.TextDocument | undefined;
         if (path.isUntitledUri(targetUri)) {
@@ -422,7 +421,7 @@ export class Session {
         }
 
         if (vscTextDocument) {
-          const text = new TextDecoder().decode(await ctrl.getContentByUri(targetUri));
+          const text = new TextDecoder().decode(await internalWorkspace.getContentByUri(targetUri));
           edit.replace(vscTextDocument.uri, misc.toVscRange(this.getVscTextDocumentRange(vscTextDocument)), text);
         } else {
           targetUrisOutsideVsc.push(targetUri);
@@ -433,17 +432,21 @@ export class Session {
       // untitled uris have been opened above and not included in targetUrisOutsideVsc.
       for (const targetUri of targetUrisOutsideVsc) {
         assert(path.isWorkspaceUri(targetUri));
-        const data = await ctrl.getContentByUri(targetUri);
         const absPath = path.getFileUriPath(this.resolveUri(targetUri));
-        await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
-        await fs.promises.writeFile(absPath, data);
+        if (internalWorkspace.isDirUri(targetUri)) {
+          await fs.promises.mkdir(absPath, { recursive: true });
+        } else {
+          const data = await internalWorkspace.getContentByUri(targetUri);
+          await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
+          await fs.promises.writeFile(absPath, data);
+        }
       }
     }
 
-    // open all ctrl's textEditors in vscdoe
+    // open all internalWorkspace's textEditors in vscdoe
     {
       const tabUris = this.getRelevantTabUris();
-      for (const textEditor of ctrl.textEditors) {
+      for (const textEditor of internalWorkspace.textEditors) {
         if (!tabUris.includes(textEditor.document.uri)) {
           const vscUri = this.uriToVsc(textEditor.document.uri);
           await vscode.window.showTextDocument(vscUri, {
@@ -457,12 +460,12 @@ export class Session {
     }
 
     // show this.activeTextEditor
-    if (ctrl.activeTextEditor) {
-      const vscUri = this.uriToVsc(ctrl.activeTextEditor.document.uri);
+    if (internalWorkspace.activeTextEditor) {
+      const vscUri = this.uriToVsc(internalWorkspace.activeTextEditor.document.uri);
       await vscode.window.showTextDocument(vscUri, {
         preview: false,
         preserveFocus: false,
-        selection: misc.toVscSelection(ctrl.activeTextEditor.selections[0]),
+        selection: misc.toVscSelection(internalWorkspace.activeTextEditor.selections[0]),
         viewColumn: vscode.ViewColumn.One,
       });
     }

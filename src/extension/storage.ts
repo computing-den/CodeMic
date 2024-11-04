@@ -32,7 +32,7 @@ export async function readJSONOptional<T>(p: t.AbsPath): Promise<T | undefined> 
 
 export async function writeJSON(p: t.AbsPath, data: any) {
   await fs.promises.mkdir(path.dirname(p), { recursive: true });
-  await fs.promises.writeFile(p, stringify(data, { maxLength: 100, indent: 2 }), 'utf8');
+  await fs.promises.writeFile(p, stringify(data, { maxLength: 200, indent: 2 }), 'utf8');
 }
 
 // export async function readCachedSessionCoverPhotos(p: t.AbsPath): Promise<string[]> {

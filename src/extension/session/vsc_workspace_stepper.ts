@@ -6,6 +6,7 @@ import * as misc from '../misc.js';
 import Session from './session.js';
 import type { SeekStep, SeekData } from './internal_workspace.js';
 import * as vscode from 'vscode';
+import fs from 'fs';
 import _ from 'lodash';
 
 class VscWorkspaceStepper implements t.WorkspaceStepper {
@@ -25,7 +26,14 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
   }
 
   async applyInitEvent(e: t.InitEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
-    // nothing
+    if (direction === t.Direction.Forwards) {
+      if (e.file.type === 'dir') {
+        const absPath = path.getFileUriPath(this.session.resolveUri(uri));
+        await fs.promises.mkdir(absPath, { recursive: true });
+      }
+    } else {
+      throw new Error('Cannot reverse init event');
+    }
   }
 
   async applyTextChangeEvent(e: t.TextChangeEvent, uri: t.Uri, direction: t.Direction) {
