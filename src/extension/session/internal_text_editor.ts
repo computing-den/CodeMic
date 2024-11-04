@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
-import { Range, Selection, Position } from '../../lib/types.js';
+import { Range, Selection, Position } from '../../lib/lib.js';
 import TextDocument from './internal_text_document.js';
 
 /**

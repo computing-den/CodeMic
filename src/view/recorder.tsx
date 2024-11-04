@@ -549,11 +549,11 @@ class Timeline extends Component<TimelineProps, TimelineState> {
       return target.closest('.track') || target.closest('.marker') ? undefined : this.getClockUnderMouse(e);
     }
 
-    const clientPos = [e.clientX, e.clientY] as t.Vec2;
+    const clientPos = new lib.Vec2(e.clientX, e.clientY);
     const timeline = document.getElementById('timeline')!;
-    const timelineRect = timeline.getBoundingClientRect();
-    if (lib.vec2InRect(clientPos, timelineRect, { top: 5 })) {
-      const mouseOffsetInTimeline = Math.max(0, clientPos[1] - timelineRect.top);
+    const timelineRect = lib.Rect.fromDOMRect(timeline.getBoundingClientRect());
+    if (timelineRect.isPointInRect(clientPos, { top: 5 })) {
+      const mouseOffsetInTimeline = Math.max(0, clientPos.y - timelineRect.top);
       const ratio = mouseOffsetInTimeline / timelineRect.height;
       return ratio * this.getTimelineDuration();
     }

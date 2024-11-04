@@ -4,7 +4,7 @@ import os from 'os';
 import fs from 'fs';
 import * as git from './git';
 import * as t from '../lib/types.js';
-import { Position, Range, Selection } from '../lib/types.js';
+import { Position, Range, Selection } from '../lib/lib.js';
 import * as path from '../lib/path.js';
 import _ from 'lodash';
 import assert from 'assert';

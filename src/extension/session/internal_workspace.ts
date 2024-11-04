@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
-import { Range, Selection, Position } from '../../lib/types.js';
+import { Range, Selection, Position } from '../../lib/lib.js';
 import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
 import EventContainer from '../../lib/event_container.js';

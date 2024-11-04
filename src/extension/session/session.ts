@@ -1,6 +1,6 @@
 import { deserializeSessionBody, serializeSessionBodyJSON } from './serialization.js';
 import * as t from '../../lib/types.js';
-import { Range, Selection, Position } from '../../lib/types.js';
+import { Range, Selection, Position } from '../../lib/lib.js';
 import * as path from '../../lib/path.js';
 import InternalTextDocument from './internal_text_document.js';
 import * as lib from '../../lib/lib.js';

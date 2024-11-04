@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
-import { Range, Selection, Position } from '../../lib/types.js';
+import { Range, Selection, Position, ContentChange } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 
 export default class InternalTextDocument implements t.InternalDocument {
@@ -48,11 +48,11 @@ export default class InternalTextDocument implements t.InternalDocument {
    * We calculate in increasing order instead of doing it in reverse because it makes calculating
    * the line and character shifts for the reverse content changes easier.
    */
-  applyContentChanges(contentChanges: t.ContentChange[], calcReverse: true): t.ContentChange[];
-  applyContentChanges(contentChanges: t.ContentChange[], calcReverse: false): undefined;
-  applyContentChanges(contentChanges: t.ContentChange[], calcReverse: boolean) {
+  applyContentChanges(contentChanges: ContentChange[], calcReverse: true): ContentChange[];
+  applyContentChanges(contentChanges: ContentChange[], calcReverse: false): undefined;
+  applyContentChanges(contentChanges: ContentChange[], calcReverse: boolean) {
     const { lines } = this;
-    let revContentChanges: t.ContentChange[] | undefined;
+    let revContentChanges: ContentChange[] | undefined;
     let totalLineShift: number = 0;
     let lastLineShifted = 0;
     let lastLineCharShift = 0;

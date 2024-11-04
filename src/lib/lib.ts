@@ -1,5 +1,6 @@
 import _ from 'lodash';
 import * as t from './types.js';
+import assert from './assert.js';
 
 export function unreachable(arg: never, message: string = 'Unreachable'): never {
   throw new Error(`${message}: ${JSON.stringify(arg)}`);
@@ -102,22 +103,6 @@ export function getSessionHistoryItemLastOpenTimestamp(h: t.SessionHistory): str
   return _.max([h.lastRecordedTimestamp, h.lastWatchedTimestamp]);
 }
 
-export function vec2Sub(a: t.Vec2, b: t.Vec2): t.Vec2 {
-  return [a[0] - b[0], a[1] - b[1]];
-}
-
-export function vec2InRect(v: t.Vec2, rect: t.Rect, offset?: Partial<t.Rect>): boolean {
-  const ol = offset?.left ?? 0;
-  const ot = offset?.top ?? 0;
-  const or = offset?.right ?? 0;
-  const ob = offset?.bottom ?? 0;
-  return v[0] >= rect.left - ol && v[0] <= rect.right + or && v[1] >= rect.top - ot && v[1] <= rect.bottom + ob;
-}
-
-export function rectMid(rect: t.Rect): t.Vec2 {
-  return [(rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2];
-}
-
 export function approxEqual(a: number, b: number, tolerance: number) {
   return Math.abs(a - b) <= tolerance;
 }
@@ -176,3 +161,92 @@ export function insertIntoArray<T>(array: T[], newItems: T[], at: number) {
 }
 
 // export function getOrSetMap<T,U>(map: Map<T,U>, key: T, make: () => U):
+
+export class Vec2 {
+  constructor(public x: number, public y: number) {}
+  sub(p: Vec2): Vec2 {
+    return new Vec2(this.x - p.x, this.y - p.y);
+  }
+}
+
+export class Rect {
+  constructor(public top: number, public right: number, public bottom: number, public left: number) {}
+
+  get height(): number {
+    return this.bottom - this.top;
+  }
+
+  get width(): number {
+    return this.right - this.left;
+  }
+
+  get midPoint(): Vec2 {
+    return new Vec2((this.left + this.right) / 2, (this.top + this.bottom) / 2);
+  }
+
+  isPointInRect(p: Vec2, offset?: { top?: number; right?: number; bottom?: number; left?: number }): boolean {
+    const ol = offset?.left ?? 0;
+    const ot = offset?.top ?? 0;
+    const or = offset?.right ?? 0;
+    const ob = offset?.bottom ?? 0;
+    return p.x >= this.left - ol && p.x <= this.right + or && p.y >= this.top - ot && p.y <= this.bottom + ob;
+  }
+
+  static fromDOMRect(r: { top: number; right: number; bottom: number; left: number }) {
+    return new Rect(r.top, r.right, r.bottom, r.left);
+  }
+}
+
+export class Position {
+  constructor(public line: number, public character: number) {
+    assert(line >= 0, 'Position line must be >= 0');
+    assert(character >= 0, 'Position character must be >= 0');
+  }
+
+  isEqual(other: Position): boolean {
+    return this.line === other.line && this.character === other.character;
+  }
+
+  compareTo(other: Position): number {
+    if (this.line < other.line) return -1;
+    if (this.line > other.line) return 1;
+    if (this.character < other.character) return -1;
+    if (this.character > other.character) return 1;
+    return 0;
+  }
+
+  isAfter(other: Position): boolean {
+    return this.compareTo(other) > 0;
+  }
+
+  isAfterOrEqual(other: Position): boolean {
+    return this.compareTo(other) >= 0;
+  }
+
+  isBefore(other: Position): boolean {
+    return this.compareTo(other) < 0;
+  }
+
+  isBeforeOrEqual(other: Position): boolean {
+    return this.compareTo(other) <= 0;
+  }
+}
+
+export class Range {
+  constructor(public start: Position, public end: Position) {}
+}
+
+export class Selection {
+  constructor(public anchor: Position, public active: Position) {}
+
+  get start(): Position {
+    return this.anchor.isBeforeOrEqual(this.active) ? this.anchor : this.active;
+  }
+  get end(): Position {
+    return this.anchor.isAfter(this.active) ? this.anchor : this.active;
+  }
+}
+
+export class ContentChange {
+  constructor(public text: string, public range: Range) {}
+}

@@ -1,4 +1,5 @@
 import * as t from '../../lib/types.js';
+import { Range, Selection, ContentChange, Position } from '../../lib/lib.js';
 import _ from 'lodash';
 
 export function serializeSessionBodyJSON(body: t.SessionBodyJSON): t.SessionBodyCompact {
@@ -92,15 +93,15 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
   }
 }
 
-function serializeContentChange(cc: t.ContentChange): t.ContentChangeCompact {
+function serializeContentChange(cc: ContentChange): t.ContentChangeCompact {
   return { t: cc.text, r: serializeRange(cc.range) };
 }
 
-function serializeRange(r: t.Range): t.RangeCompact {
+function serializeRange(r: Range): t.RangeCompact {
   return [r.start.line, r.start.character, r.end.line, r.end.character];
 }
 
-function serializeSelection(r: t.Selection): t.SelectionCompact {
+function serializeSelection(r: Selection): t.SelectionCompact {
   return [r.anchor.line, r.anchor.character, r.active.line, r.active.character];
 }
 
@@ -212,16 +213,16 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
   }
 }
 
-function deserializeContentChange(cc: t.ContentChangeCompact): t.ContentChange {
-  return new t.ContentChange(cc.t, deserializeRange(cc.r));
+function deserializeContentChange(cc: t.ContentChangeCompact): ContentChange {
+  return new ContentChange(cc.t, deserializeRange(cc.r));
 }
 
-function deserializeRange(r: t.RangeCompact): t.Range {
-  return new t.Range(new t.Position(r[0], r[1]), new t.Position(r[2], r[3]));
+function deserializeRange(r: t.RangeCompact): Range {
+  return new Range(new Position(r[0], r[1]), new Position(r[2], r[3]));
 }
 
-function deserializeSelection(r: t.SelectionCompact): t.Selection {
-  return new t.Selection(new t.Position(r[0], r[1]), new t.Position(r[2], r[3]));
+function deserializeSelection(r: t.SelectionCompact): Selection {
+  return new Selection(new Position(r[0], r[1]), new Position(r[2], r[3]));
 }
 
 function deserializeClock(clock: number): number {

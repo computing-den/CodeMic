@@ -1,5 +1,5 @@
 import * as t from '../../lib/types.js';
-import { Range, Selection, Position, ContentChange } from '../../lib/types.js';
+import { Range, Selection, Position, ContentChange } from '../../lib/lib.js';
 import * as lib from '../../lib/lib.js';
 import InternalWorkspace from './internal_workspace.js';
 import InternalTextEditor from './internal_text_editor.js';
