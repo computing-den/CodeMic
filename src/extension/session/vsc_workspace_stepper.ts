@@ -54,10 +54,6 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     await vscode.workspace.applyEdit(edit);
   }
 
-  /**
-   * 'openTextDocument' event always has the text field since if the document was already in checkpoint, no
-   * 'openTextDocument' event would be generated at all.
-   */
   async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, uri: t.Uri, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
       const vscUri = this.session.uriToVsc(uri);
@@ -73,7 +69,11 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
         return;
       }
 
-      vscTextDocument = await vscode.workspace.openTextDocument(vscUri);
+      if (!vscTextDocument && vscUri.scheme === 'untitled') {
+        vscTextDocument = await this.session.openVscUntitledByName(vscUri.path);
+      }
+
+      assert(vscTextDocument, `Failed to open text document: ${vscUri.toString()}`);
 
       // Set text if given.
       if (e.text !== undefined) {

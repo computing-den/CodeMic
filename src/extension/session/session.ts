@@ -351,6 +351,7 @@ export class Session {
 
   async syncInternalWorkspaceToVscodeAndDisk(targetUris?: t.Uri[]) {
     // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
+
     const internalWorkspace = this.runtime?.internalWorkspace;
     assert(internalWorkspace);
 
@@ -405,7 +406,7 @@ export class Session {
     //   if there's a text editor open in vscode, replace its content
     //   if it's a directory, mkdir
     //   else, mkdir and write to file
-    // NOTE: changing documents with WorkspaceEdit without immediately savig them causes them to be
+    // NOTE: changing documents with WorkspaceEdit without immediately saving them causes them to be
     //       opened even if they did not have an associated editor.
     {
       const targetUrisOutsideVsc: t.Uri[] = [];
@@ -413,11 +414,17 @@ export class Session {
       for (const targetUri of targetUris) {
         if (!internalWorkspace.doesUriExist(targetUri)) continue;
 
+        if (internalWorkspace.isDirUri(targetUri)) {
+          targetUrisOutsideVsc.push(targetUri);
+          continue;
+        }
+
+        // Handle text documents that have an associated text editor or have untitled schema
         let vscTextDocument: vscode.TextDocument | undefined;
-        if (path.isUntitledUri(targetUri)) {
-          vscTextDocument = await vscode.workspace.openTextDocument(targetUri);
-        } else if (this.findTabInputTextByUri(targetUri)) {
+        if (this.findTabInputTextByUri(targetUri)) {
           vscTextDocument = this.findVscTextDocumentByUri(targetUri);
+        } else if (path.isUntitledUri(targetUri)) {
+          vscTextDocument = await this.openVscUntitledByName(path.getUntitledUriName(targetUri));
         }
 
         if (vscTextDocument) {
@@ -474,8 +481,10 @@ export class Session {
   async saveAllRelevantVscTabs() {
     const uris = this.getRelevantTabVscUris();
     for (const uri of uris) {
-      const vscTextDocument = this.findVscTextDocumentByVscUri(uri);
-      await vscTextDocument?.save();
+      if (uri.scheme === 'file') {
+        const vscTextDocument = this.findVscTextDocumentByVscUri(uri);
+        await vscTextDocument?.save();
+      }
     }
   }
 
@@ -490,6 +499,43 @@ export class Session {
         }
       }
     }
+  }
+
+  async openVscUntitledByName(untitledName: string): Promise<vscode.TextDocument> {
+    // The problem is that we do something like =vscode.workspace.openTextDocument('untitled:Untitled-1')= which gives
+    // the document a name and a path. It will want to save the untitled document to file =./Untitled-1= even if its
+    // content is empty.
+    // if instead we use =await vscode.commands.executeCommand('workbench.action.files.newUntitledFile')= we get an
+    // unnamed untitled file which will not prompt to save when the content is empty. However, the URI of the new
+    // document will be picked by vscode. For example, if Untitled-1 and Untitled-3 are already open, when we open
+    // a new untitled file, vscode will name it Untitled-2.
+    // So, we must make sure that when opening Untitled-X, every untitled number less than X is already open
+    // and then try to open a new a new file.
+
+    // Gather all the untitled names.
+    const untitledNames: string[] = [];
+    for (const tabGroup of vscode.window.tabGroups.all) {
+      for (const tab of tabGroup.tabs) {
+        if (tab.input instanceof vscode.TabInputText && tab.input.uri.scheme === 'untitled') {
+          untitledNames.push(tab.input.uri.path);
+        }
+      }
+    }
+
+    console.log('XXX untitled names: ', untitledNames.join(', '));
+    // Open every untitled name up to target name.
+    for (let i = 1; i < 100; i++) {
+      let name = `Untitled-${i}`;
+      if (!untitledNames.includes(name)) {
+        await vscode.commands.executeCommand('workbench.action.files.newUntitledFile');
+      }
+      if (untitledName === name) break;
+    }
+
+    // Now its text document should be open.
+    const textDocument = this.findVscTextDocumentByVscUri(vscode.Uri.from({ scheme: 'untitled', path: untitledName }));
+    assert(textDocument, `openVscUntitledUri failed to open untitled file named ${untitledName}`);
+    return textDocument;
   }
 
   async write() {
@@ -708,24 +754,21 @@ export class Session {
 
     if (skipConfirmation) {
       const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
-      // .save() returns false if document was not dirty
-      if (vscTextDocument.isDirty) {
-        if (tab.input.uri.scheme === 'untitled') {
-          // for untitled scheme, empty it first, then can close without confirmation
-          const edit = new vscode.WorkspaceEdit();
-          edit.replace(vscTextDocument.uri, misc.toVscRange(this.getVscTextDocumentRange(vscTextDocument)), '');
-          await vscode.workspace.applyEdit(edit);
-          // TODO We're gonna skip closing it for now. We must use unnamed untitled document
-          // to prevent vscode from showing the confirmation dialog when the content is empty.
-          // See the TODOs in notes.
-          return;
-        } else if (tab.input.uri.scheme === 'file') {
-          // Sometimes .save() fails and returns false. No idea why.
-          for (let i = 0; i < 5; i++) {
-            if (await vscTextDocument.save()) break;
-            console.error('closeVscTabInputText Failed to save:', tab.input.uri.toString());
-            await lib.timeout(100 * i + 100);
-          }
+      console.log('XXX ', vscTextDocument.uri.toString(), 'isDirty: ', vscTextDocument.isDirty);
+      if (tab.input.uri.scheme === 'untitled') {
+        // Sometimes isDirty is false for untitled document even though it should be true.
+        // So, don't check isDirty for untitled.
+        // For untitled scheme, empty it first, then can close without confirmation.
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(vscTextDocument.uri, misc.toVscRange(this.getVscTextDocumentRange(vscTextDocument)), '');
+        await vscode.workspace.applyEdit(edit);
+      } else if (tab.input.uri.scheme === 'file' && vscTextDocument.isDirty) {
+        // .save() returns false if document was not dirty
+        // Sometimes .save() fails and returns false. No idea why.
+        for (let i = 0; i < 5; i++) {
+          if (await vscTextDocument.save()) break;
+          console.error('closeVscTabInputText Failed to save:', tab.input.uri.toString());
+          await lib.timeout(100 * i + 100);
         }
       }
     }
@@ -734,7 +777,11 @@ export class Session {
     // Error: Tab close: Invalid tab not found!
     // Maybe it automatically closes it? I don't know.
     const newTab = this.findTabInputTextByVscUri(tab.input.uri);
-    if (newTab) await vscode.window.tabGroups.close(newTab);
+    if (newTab) {
+      console.log('XXX trying to close', tab.input.uri.toString());
+      await vscode.window.tabGroups.close(newTab);
+      console.log('XXX closed', tab.input.uri.toString());
+    }
   }
 
   // makeTextEditorSnapshotFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {

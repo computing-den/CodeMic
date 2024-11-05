@@ -51,12 +51,10 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
       if (textDocument && e.text !== undefined && e.text !== textDocument.getText()) {
         textDocument.applyContentChanges([{ range: textDocument.getRange(), text: e.text }], false);
       } else if (!textDocument) {
-        let text: string;
+        let text = '';
         if (e.text !== undefined) {
           text = e.text;
-        } else if (path.isUntitledUri(uri)) {
-          text = '';
-        } else {
+        } else if (this.internalWorkspace.doesUriExist(uri)) {
           text = new TextDecoder().decode(await this.internalWorkspace.getContentByUri(uri));
         }
         textDocument = InternalTextDocument.fromText(uri, text, e.eol);
