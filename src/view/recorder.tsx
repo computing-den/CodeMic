@@ -96,6 +96,11 @@ class DetailsView extends Component<DetailsViewProps> {
     await postMessage({ type: 'recorder/update', changes });
   };
 
+  handleChanged = async (e: InputEvent) => {
+    const changes = { handle: (e.target as HTMLInputElement).value };
+    await postMessage({ type: 'recorder/update', changes });
+  };
+
   descriptionChanged = async (e: InputEvent) => {
     const changes = { description: (e.target as HTMLInputElement).value };
     await postMessage({ type: 'recorder/update', changes });
@@ -168,6 +173,15 @@ class DetailsView extends Component<DetailsViewProps> {
         >
           Title
         </vscode-text-area>
+        <vscode-text-field
+          className="subsection"
+          placeholder="A-Z a-z 0-9 _ (e.g. my_project)"
+          value={s.handle}
+          onInput={this.handleChanged}
+          disabled={Boolean(s.publishTimestamp)}
+        >
+          Handle
+        </vscode-text-field>
         <vscode-text-area
           className="description subsection"
           rows={10}

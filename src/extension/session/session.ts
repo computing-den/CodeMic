@@ -62,9 +62,11 @@ export class Session {
   }
 
   static async fromExisting(context: Context, id: string): Promise<Session | undefined> {
-    const workspace = Session.getWorkspace(context, id);
     const head = await Session.headFromExisting(context, id);
-    return head && new Session(context, workspace, head, true);
+    if (head) {
+      const workspace = Session.getWorkspace(context, head);
+      return new Session(context, workspace, head, true);
+    }
   }
 
   static async headFromExisting(context: Context, id: string): Promise<t.SessionHead | undefined> {
@@ -76,8 +78,11 @@ export class Session {
     return new Session(context, workspace, head, false);
   }
 
-  static getWorkspace(context: Context, id: string): t.AbsPath {
-    return context.settings.history[id]?.workspace ?? path.abs(defaultWorkspacePath, id);
+  static getWorkspace(context: Context, head: t.SessionHead): t.AbsPath {
+    const history = context.settings.history[head.id];
+    if (history) return history.workspace;
+    assert(head.handle);
+    return path.abs(defaultWorkspacePath, head.handle);
   }
 
   static getCoverPhotoWebviewUri(context: Context, id: string): t.Uri {
@@ -89,6 +94,7 @@ export class Session {
   static makeNewHead(author?: t.UserSummary): t.SessionHead {
     return {
       id: uuid(),
+      handle: '',
       title: '',
       description: '',
       author,
@@ -185,6 +191,7 @@ export class Session {
     const forkHead: t.SessionHead = {
       id: uuid(),
       title: `Fork: ${this.head.title}`,
+      handle: `fork_${this.head.handle}`,
       description: this.head.description,
       author: options?.author ?? this.head.author,
       duration: this.head.duration,

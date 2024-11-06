@@ -7,7 +7,7 @@ import Session from './session/session.js';
 import * as storage from './storage.js';
 import * as serverApi from './server_api.js';
 import type { Context, RecorderRestoreState, WorkspaceChangeGlobalState } from './types.js';
-import { osPaths, defaultWorkspacePath } from './paths.js';
+import { osPaths } from './paths.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';

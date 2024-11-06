@@ -100,6 +100,7 @@ class Recorder {
 
   updateState(changes: t.RecorderUpdate) {
     if (changes.title !== undefined) this.session.head.title = changes.title;
+    if (changes.handle !== undefined) this.session.head.handle = changes.handle;
     if (changes.description !== undefined) this.session.head.description = changes.description;
     // if (changes.clock !== undefined) this.sessionHead.duration = this.runtime.clock = changes.clock;
     if (changes.workspace !== undefined)

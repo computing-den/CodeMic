@@ -268,6 +268,7 @@ export type RecorderTabId = 'editor-view' | 'details-view';
 
 export type RecorderUpdate = {
   title?: string;
+  handle?: string;
   description?: string;
   workspace?: string;
   duration?: number;
@@ -306,6 +307,7 @@ export type TocItem = { title: string; clock: number };
 
 export type SessionHead = {
   id: string;
+  handle: string;
   title: string;
   description: string;
   author?: UserSummary;
