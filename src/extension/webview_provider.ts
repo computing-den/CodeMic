@@ -5,7 +5,7 @@ import _ from 'lodash';
 import { v4 as uuid } from 'uuid';
 import * as t from '../lib/types.js';
 import * as b from '../lib/bus.js';
-import { basePaths } from './paths.js';
+import { osPaths } from './paths.js';
 
 class WebviewProvider implements vscode.WebviewViewProvider {
   static readonly viewType = 'codemic-view';
@@ -34,7 +34,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
 
       // Allow access to files from these directories
-      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri), vscode.Uri.file(basePaths.data)],
+      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri), vscode.Uri.file(osPaths.data)],
     };
 
     webviewView.webview.html = this.getHtmlForWebview();

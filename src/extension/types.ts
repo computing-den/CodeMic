@@ -1,12 +1,10 @@
 import type { ExtensionContext, WebviewView } from 'vscode';
-import type { DataPaths, DefaultWorkspacePaths } from './paths.js';
 import * as t from '../lib/types.js';
 import _ from 'lodash';
 
 export type Context = {
   extension: ExtensionContext;
-  dataPaths: DataPaths;
-  defaultWorkspacePaths: DefaultWorkspacePaths;
+  userDataPath: t.AbsPath;
   settings: t.Settings;
   postAudioMessage?: (req: t.BackendAudioRequest) => Promise<t.FrontendAudioResponse>;
   postVideoMessage?: (req: t.BackendVideoRequest) => Promise<t.FrontendVideoResponse>;

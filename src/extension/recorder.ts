@@ -183,13 +183,13 @@ class Recorder {
   }
 
   async setCoverPhoto(uri: t.Uri) {
-    await fs.promises.copyFile(path.getFileUriPath(uri), this.session.sessionDataPaths.coverPhoto);
+    await fs.promises.copyFile(path.getFileUriPath(uri), path.abs(this.session.sessionDataPath, 'cover_photo'));
     this.session.head.hasCoverPhoto = true;
     this.dirty = true;
   }
 
   async deleteCoverPhoto() {
-    await fs.promises.rm(this.session.sessionDataPaths.coverPhoto, { force: true });
+    await fs.promises.rm(path.abs(this.session.sessionDataPath, 'cover_photo'), { force: true });
     this.session.head.hasCoverPhoto = false;
     this.dirty = true;
   }

@@ -7,7 +7,7 @@ import Session from './session/session.js';
 import * as storage from './storage.js';
 import * as serverApi from './server_api.js';
 import type { Context, RecorderRestoreState, WorkspaceChangeGlobalState } from './types.js';
-import * as paths from './paths.js';
+import { osPaths, defaultWorkspacePath } from './paths.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
@@ -63,7 +63,7 @@ class CodeMic {
     // await this.updateFrontend();
 
     // this.cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(
-    //   this.context.dataPaths.cachedSessionCoverPhotos,
+    //   this.context.userDataPath.cachedSessionCoverPhotos,
     // );
 
     // DEV
@@ -89,10 +89,12 @@ class CodeMic {
 
   static async fromExtensionContext(extension: vscode.ExtensionContext): Promise<CodeMic> {
     const user = extension.globalState.get<t.User>('user');
-    const dataPaths = paths.dataPaths(user?.username);
-    const settings = await storage.readJSON<t.Settings>(dataPaths.settings, CodeMic.makeDefaultSettings);
-    const { defaultWorkspacePaths } = paths;
-    const context: Context = { extension, user, dataPaths, defaultWorkspacePaths, settings };
+    const userDataPath = path.abs(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
+    const settings = await storage.readJSON<t.Settings>(
+      path.abs(userDataPath, 'settings.json'),
+      CodeMic.makeDefaultSettings,
+    );
+    const context: Context = { extension, user, userDataPath, settings };
     return new CodeMic(context);
   }
 
@@ -798,14 +800,17 @@ class CodeMic {
   async changeUser(user?: t.User) {
     // TODO ask user to convert anonymous sessions to the new user.
 
-    const dataPaths = paths.dataPaths(user?.username);
-    const settings = await storage.readJSON<t.Settings>(dataPaths.settings, CodeMic.makeDefaultSettings);
-    // const cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(dataPaths.cachedSessionCoverPhotos);
+    const userDataPath = path.abs(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
+    const settings = await storage.readJSON<t.Settings>(
+      path.abs(userDataPath, 'settings.json'),
+      CodeMic.makeDefaultSettings,
+    );
+    // const cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(userDataPath.cachedSessionCoverPhotos);
 
     this.session = undefined;
     // this.cachedSessionCoverPhotos = cachedSessionCoverPhotos;
     this.context.user = user;
-    this.context.dataPaths = dataPaths;
+    this.context.userDataPath = userDataPath;
     this.context.settings = settings;
     this.context.extension.globalState.update('user', user);
 
@@ -841,7 +846,7 @@ class CodeMic {
 
   // getCachedSessionCoverPhotoWebviewUri(id: string): t.Uri {
   //   return this.context
-  //     .view!.webview.asWebviewUri(vscode.Uri.file(this.context.dataPaths.cachedSessionCoverPhoto(id)))
+  //     .view!.webview.asWebviewUri(vscode.Uri.file(this.context.userDataPath.cachedSessionCoverPhoto(id)))
   //     .toString();
   // }
 

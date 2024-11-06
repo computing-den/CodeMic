@@ -6,7 +6,6 @@ import InternalTextDocument from './internal_text_document.js';
 import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import * as serverApi from '../server_api.js';
-import type { SessionDataPaths } from '../paths.js';
 import * as misc from '../misc.js';
 import type { Context, ReadDirOptions } from '../types.js';
 import * as storage from '../storage.js';
@@ -19,6 +18,7 @@ import unzipper from 'unzipper';
 import stream from 'stream';
 import vscode from 'vscode';
 import { v4 as uuid } from 'uuid';
+import { defaultWorkspacePath } from '../paths.js';
 
 // export type SessionBody = {
 //   internalWorkspace: InternalWorkspace;
@@ -41,8 +41,8 @@ export class Session {
     this.inStorage = inStorage;
   }
 
-  get sessionDataPaths(): SessionDataPaths {
-    return this.context.dataPaths.session(this.head.id);
+  get sessionDataPath(): t.AbsPath {
+    return path.abs(this.context.userDataPath, 'sessions', this.head.id);
   }
 
   get clock(): number | undefined {
@@ -68,7 +68,7 @@ export class Session {
   }
 
   static async headFromExisting(context: Context, id: string): Promise<t.SessionHead | undefined> {
-    const headPath = context.dataPaths.session(id).head;
+    const headPath = path.abs(context.userDataPath, 'sessions', id, 'head.json');
     return storage.readJSONOptional<t.SessionHead>(headPath);
   }
 
@@ -77,11 +77,13 @@ export class Session {
   }
 
   static getWorkspace(context: Context, id: string): t.AbsPath {
-    return context.settings.history[id]?.workspace ?? context.defaultWorkspacePaths.session(id).root;
+    return context.settings.history[id]?.workspace ?? path.abs(defaultWorkspacePath, id);
   }
 
   static getCoverPhotoWebviewUri(context: Context, id: string): t.Uri {
-    return context.view!.webview.asWebviewUri(vscode.Uri.file(context.dataPaths.session(id).coverPhoto)).toString();
+    return context
+      .view!.webview.asWebviewUri(vscode.Uri.file(path.abs(context.userDataPath, 'sessions', id, 'cover_photo')))
+      .toString();
   }
 
   static makeNewHead(author?: t.UserSummary): t.SessionHead {
@@ -196,9 +198,9 @@ export class Session {
     };
 
     // Copy the entire session data, then rewrite the head.
-    const forkSessionDataPaths = this.context.dataPaths.session(forkHead.id);
-    await fs.promises.cp(this.sessionDataPaths.root, forkSessionDataPaths.root, { recursive: true });
-    await storage.writeJSON(forkSessionDataPaths.head, forkHead);
+    const forkSessionDataPath = path.abs(this.context.userDataPath, 'sessions', forkHead.id);
+    await fs.promises.cp(this.sessionDataPath, forkSessionDataPath, { recursive: true });
+    await storage.writeJSON(path.abs(forkSessionDataPath, 'head.json'), forkHead);
 
     return forkHead;
   }
@@ -518,7 +520,7 @@ export class Session {
 
     const untitledNames: string[] = vscode.workspace.textDocuments.map(d => d.uri.path);
 
-    console.log('XXX untitled names: ', untitledNames.join(', '));
+    // console.log('XXX untitled names: ', untitledNames.join(', '));
     // Open every untitled name up to target name.
     for (let i = 1; i < 100; i++) {
       let name = `Untitled-${i}`;
@@ -540,13 +542,16 @@ export class Session {
   }
 
   async writeHead() {
-    await storage.writeJSON(this.sessionDataPaths.head, this.head);
+    await storage.writeJSON(path.abs(this.sessionDataPath, 'head.json'), this.head);
     this.inStorage = true;
   }
 
   async writeBody() {
     assert(this.runtime, 'writeBody: body is not yet loaded.');
-    await storage.writeJSON(this.sessionDataPaths.body, serializeSessionBodyJSON(this.runtime.toJSON()));
+    await storage.writeJSON(
+      path.abs(this.sessionDataPath, 'body.json'),
+      serializeSessionBodyJSON(this.runtime.toJSON()),
+    );
     this.inStorage = true;
   }
 
@@ -556,23 +561,23 @@ export class Session {
     if (update) {
       settings.history[id] = update(settings.history[id] ?? { id, workspace: this.workspace });
     }
-    await storage.writeJSON(this.context.dataPaths.settings, settings);
+    await storage.writeJSON(path.abs(this.context.userDataPath, 'settings.json'), settings);
   }
 
   async readBody(options?: { download: boolean }): Promise<t.SessionBodyJSON> {
     if (options?.download) await this.download({ skipIfExists: true });
-    const compact = await storage.readJSON<t.SessionBodyCompact>(this.sessionDataPaths.body);
+    const compact = await storage.readJSON<t.SessionBodyCompact>(path.abs(this.sessionDataPath, 'body.json'));
     return deserializeSessionBody(compact);
   }
 
   async download(options?: { skipIfExists: boolean }) {
-    if (options?.skipIfExists && (await misc.fileExists(this.sessionDataPaths.body))) return;
+    if (options?.skipIfExists && (await misc.fileExists(path.abs(this.sessionDataPath, 'body.json')))) return;
 
-    await serverApi.downloadSession(this.head.id, this.sessionDataPaths.zip, this.context.user?.token);
+    await serverApi.downloadSession(this.head.id, path.abs(this.sessionDataPath, 'body.zip'), this.context.user?.token);
     // For some reason when stream.pipeline() resolves, the extracted files have not
     // yet been written. So we have to wait on out.promise().
-    const out = unzipper.Extract({ path: this.sessionDataPaths.root, verbose: true });
-    await stream.promises.pipeline(fs.createReadStream(this.sessionDataPaths.zip), out);
+    const out = unzipper.Extract({ path: this.sessionDataPath, verbose: true });
+    await stream.promises.pipeline(fs.createReadStream(path.abs(this.sessionDataPath, 'body.zip')), out);
     await out.promise();
   }
 
@@ -585,11 +590,11 @@ export class Session {
   }
 
   async readBlob(sha1: string): Promise<Uint8Array> {
-    return fs.promises.readFile(this.sessionDataPaths.blob(sha1));
+    return fs.promises.readFile(path.abs(this.sessionDataPath, 'blobs', sha1));
   }
 
   async writeBlob(sha1: string, data: string | NodeJS.ArrayBufferView) {
-    await fs.promises.writeFile(this.sessionDataPaths.blob(sha1), data, 'utf8');
+    await fs.promises.writeFile(path.abs(this.sessionDataPath, 'blobs', sha1), data, 'utf8');
   }
 
   async readFile(file: t.File): Promise<Uint8Array> {
@@ -601,27 +606,27 @@ export class Session {
   }
 
   async copyToBlob(src: t.AbsPath, sha1: string) {
-    await fs.promises.cp(src, this.sessionDataPaths.blob(sha1), { recursive: true });
+    await fs.promises.cp(src, path.abs(this.sessionDataPath, 'blobs', sha1), { recursive: true });
   }
 
   async delete() {
-    await fs.promises.rm(this.sessionDataPaths.root, { force: true, recursive: true });
+    await fs.promises.rm(this.sessionDataPath, { force: true, recursive: true });
     delete this.context.settings.history[this.head.id];
-    await storage.writeJSON(this.context.dataPaths.settings, this.context.settings);
+    await storage.writeJSON(path.abs(this.context.userDataPath, 'settings.json'), this.context.settings);
   }
 
   async package() {
-    assert(await misc.fileExists(this.sessionDataPaths.body), "Session body doesn't exist");
+    assert(await misc.fileExists(path.abs(this.sessionDataPath, 'body.json')), "Session body doesn't exist");
 
     return new Promise<t.AbsPath>((resolve, reject) => {
       // const packagePath = path.abs(os.tmpdir(), this.head.id + '.zip');
 
-      const output = fs.createWriteStream(this.sessionDataPaths.zip);
+      const output = fs.createWriteStream(path.abs(this.sessionDataPath, 'body.zip'));
       const archive = archiver('zip', { zlib: { level: 9 } });
 
       // 'close' event is fired only when a file descriptor is involved
       output.on('close', () => {
-        resolve(this.sessionDataPaths.zip);
+        resolve(path.abs(this.sessionDataPath, 'body.zip'));
       });
 
       // This event is fired when the data source is drained no matter what was the data source.
@@ -637,10 +642,10 @@ export class Session {
 
       archive.pipe(output);
       if (this.head.hasCoverPhoto) {
-        archive.file(this.sessionDataPaths.coverPhoto, { name: path.basename(this.sessionDataPaths.coverPhoto) });
+        archive.file(path.abs(this.sessionDataPath, 'cover_photo'), { name: 'cover_photo' });
       }
-      archive.file(this.sessionDataPaths.body, { name: path.basename(this.sessionDataPaths.body) });
-      archive.directory(this.sessionDataPaths.blobs, path.basename(this.sessionDataPaths.blobs));
+      archive.file(path.abs(this.sessionDataPath, 'body.json'), { name: 'body.json' });
+      archive.directory(path.abs(this.sessionDataPath, 'blobs'), 'blobs');
       archive.finalize();
     });
   }
@@ -750,7 +755,7 @@ export class Session {
 
     if (skipConfirmation) {
       const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
-      console.log('XXX ', vscTextDocument.uri.toString(), 'isDirty: ', vscTextDocument.isDirty);
+      // console.log('XXX ', vscTextDocument.uri.toString(), 'isDirty: ', vscTextDocument.isDirty);
       if (tab.input.uri.scheme === 'untitled') {
         // Sometimes isDirty is false for untitled document even though it should be true.
         // So, don't check isDirty for untitled.
@@ -774,9 +779,9 @@ export class Session {
     // Maybe it automatically closes it? I don't know.
     const newTab = this.findTabInputTextByVscUri(tab.input.uri);
     if (newTab) {
-      console.log('XXX trying to close', tab.input.uri.toString());
+      // console.log('XXX trying to close', tab.input.uri.toString());
       await vscode.window.tabGroups.close(newTab);
-      console.log('XXX closed', tab.input.uri.toString());
+      // console.log('XXX closed', tab.input.uri.toString());
     }
   }
 
@@ -877,7 +882,7 @@ export class Session {
 
   getTrackFileWebviewUri(trackFile: t.RangedTrackFile): t.Uri {
     assert(trackFile.file.type === 'local');
-    const vscUri = vscode.Uri.file(this.sessionDataPaths.blob(trackFile.file.sha1));
+    const vscUri = vscode.Uri.file(path.abs(this.sessionDataPath, 'blobs', trackFile.file.sha1));
     return this.context.view!.webview.asWebviewUri(vscUri).toString();
   }
 

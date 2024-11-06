@@ -5,7 +5,7 @@ import os from 'os';
 import process from 'process';
 import _ from 'lodash';
 
-export type BasePaths = {
+export type OSPaths = {
   data: t.AbsPath;
   config: t.AbsPath;
   cache: t.AbsPath;
@@ -13,35 +13,7 @@ export type BasePaths = {
   temp: t.AbsPath;
 };
 
-export type DataPaths = {
-  root: t.AbsPath;
-  settings: t.AbsPath;
-  sessions: t.AbsPath;
-  // cachedSessionCoverPhotos: t.AbsPath;
-  // cachedSessionCoverPhoto: (id: string) => t.AbsPath;
-  session: (id: string) => SessionDataPaths;
-};
-
-export type SessionDataPaths = {
-  root: t.AbsPath;
-  head: t.AbsPath;
-  body: t.AbsPath;
-  zip: t.AbsPath;
-  blobs: t.AbsPath;
-  blob: (sha1: string) => t.AbsPath;
-  coverPhoto: t.AbsPath;
-};
-
-export type DefaultWorkspacePaths = {
-  root: t.AbsPath;
-  session: (id: string) => DefaultSessionWorkspacePaths;
-};
-
-export type DefaultSessionWorkspacePaths = {
-  root: t.AbsPath;
-};
-
-function macos(name: string): BasePaths {
+function macos(name: string): OSPaths {
   return {
     data: path.abs(os.homedir(), 'Library', 'Application Support', name),
     config: path.abs(os.homedir(), 'Library', 'Preferences', name),
@@ -51,7 +23,7 @@ function macos(name: string): BasePaths {
   };
 }
 
-function windows(name: string): BasePaths {
+function windows(name: string): OSPaths {
   const appData = process.env.APPDATA || path.abs(os.homedir(), 'AppData', 'Roaming');
   const localAppData = process.env.LOCALAPPDATA || path.abs(os.homedir(), 'AppData', 'Local');
 
@@ -66,7 +38,7 @@ function windows(name: string): BasePaths {
 }
 
 // https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
-function linux(name: string): BasePaths {
+function linux(name: string): OSPaths {
   return {
     data: path.abs(process.env.XDG_DATA_HOME || path.abs(os.homedir(), '.local', 'share'), name),
     config: path.abs(process.env.XDG_CONFIG_HOME || path.abs(os.homedir(), '.config'), name),
@@ -77,47 +49,11 @@ function linux(name: string): BasePaths {
   };
 }
 
-function getBasePaths(name: string) {
+function getOSPaths(name: string): OSPaths {
   if (process.platform === 'darwin') return macos(name);
   if (process.platform === 'win32') return windows(name);
   return linux(name);
 }
 
-export const basePaths = getBasePaths('codemic');
-
-export const ANONYM = '_'; // minimum valid username is 3 characters
-
-export const dataPaths = _.memoize((username?: string): DataPaths => {
-  const root = path.abs(basePaths.data, username ?? ANONYM);
-  return {
-    root,
-    settings: path.abs(root, 'settings.json'),
-    sessions: path.abs(root, 'sessions'),
-    // cachedSessionCoverPhotos: path.abs(root, 'cached_cover_photos'),
-    // cachedSessionCoverPhoto: id => path.abs(root, 'cached_cover_photos', id),
-    session: _.memoize(id => {
-      const sessionRoot = path.abs(root, 'sessions', id);
-      return {
-        root: sessionRoot,
-        head: path.abs(sessionRoot, 'head.json'),
-        body: path.abs(sessionRoot, 'body.json'),
-        zip: path.abs(sessionRoot, 'body.zip'),
-        blobs: path.abs(sessionRoot, 'blobs'),
-        blob: _.memoize(sha1 => path.abs(sessionRoot, 'blobs', sha1)),
-        coverPhoto: path.abs(sessionRoot, 'cover_photo'),
-      };
-    }),
-  };
-});
-
-const workspacePath = path.abs(os.homedir(), 'codemic');
-
-export const defaultWorkspacePaths = {
-  root: workspacePath,
-  session: _.memoize(id => {
-    const sessionRoot = path.abs(workspacePath, id);
-    return {
-      root: sessionRoot,
-    };
-  }),
-};
+export const osPaths = getOSPaths('CodeMic');
+export const defaultWorkspacePath = path.abs(os.homedir(), 'CodeMic');

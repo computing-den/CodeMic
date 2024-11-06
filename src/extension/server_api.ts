@@ -54,8 +54,8 @@ export async function downloadSession(id: string, dst: t.AbsPath, token?: string
           maxContentLength: Infinity,
         });
 
-        const contentLength = res.headers['Content-Length'];
-        console.log('XXX: contentLength', typeof contentLength, contentLength);
+        // const contentLength = res.headers['Content-Length'];
+        // console.log('XXX: contentLength', typeof contentLength, contentLength);
 
         await fs.promises.mkdir(path.dirname(dst), { recursive: true });
         await stream.promises.pipeline(res.data, fs.createWriteStream(dst));
