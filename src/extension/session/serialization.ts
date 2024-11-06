@@ -31,6 +31,7 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
         c: serializeClock(e.clock),
         cc: e.contentChanges.map(serializeContentChange),
         rcc: e.revContentChanges.map(serializeContentChange),
+        u: e.updateSelection ? undefined : false,
       };
     case 'openTextDocument':
       return {
@@ -156,6 +157,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
         clock: deserializeClock(e.c),
         contentChanges: e.cc.map(deserializeContentChange),
         revContentChanges: e.rcc.map(deserializeContentChange),
+        updateSelection: e.u ?? true,
       };
     case 2:
       return {

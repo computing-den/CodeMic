@@ -1,5 +1,6 @@
 import * as t from '../../lib/types.js';
 import * as path from '../../lib/path.js';
+import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
 import * as misc from '../misc.js';
@@ -52,6 +53,18 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
       }
     }
     await vscode.workspace.applyEdit(edit);
+
+    if (e.updateSelection) {
+      const vscTextEditor = await vscode.window.showTextDocument(this.session.uriToVsc(uri), {
+        preview: false,
+        preserveFocus: false,
+      });
+      if (direction === t.Direction.Forwards) {
+        vscTextEditor.selections = misc.toVscSelections(lib.getSelectionsAfterTextChangeEvent(e));
+      } else {
+        vscTextEditor.selections = misc.toVscSelections(lib.getSelectionsBeforeTextChangeEvent(e));
+      }
+    }
   }
 
   async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, uri: t.Uri, direction: t.Direction) {

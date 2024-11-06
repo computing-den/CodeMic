@@ -497,6 +497,7 @@ export type TextChangeEvent = {
   clock: number;
   contentChanges: ContentChange[];
   revContentChanges: ContentChange[];
+  updateSelection: boolean;
 };
 
 export type OpenTextDocumentEvent = {
@@ -517,10 +518,10 @@ export type CloseTextDocumentEvent = {
 export type ShowTextEditorEvent = {
   type: 'showTextEditor';
   clock: number;
-  selections: readonly Selection[];
+  selections: Selection[];
   visibleRange: Range;
   revUri?: Uri;
-  revSelections?: readonly Selection[];
+  revSelections?: Selection[];
   revVisibleRange?: Range;
   // revSelections: Selection[];
 };
@@ -528,7 +529,7 @@ export type ShowTextEditorEvent = {
 export type CloseTextEditorEvent = {
   type: 'closeTextEditor';
   clock: number;
-  revSelections?: readonly Selection[];
+  revSelections?: Selection[];
   revVisibleRange?: Range;
   // revSelections: Selection[];
 };
@@ -536,9 +537,9 @@ export type CloseTextEditorEvent = {
 export type SelectEvent = {
   type: 'select';
   clock: number;
-  selections: readonly Selection[];
+  selections: Selection[];
   visibleRange: Range;
-  revSelections: readonly Selection[];
+  revSelections: Selection[];
   revVisibleRange: Range;
 };
 
@@ -576,6 +577,7 @@ export type TextChangeEventCompact = {
   c: number;
   cc: ContentChangeCompact[];
   rcc: ContentChangeCompact[];
+  u?: boolean; // undefined defaults to true
 };
 
 export type OpenTextDocumentEventCompact = {
@@ -596,10 +598,10 @@ export type CloseTextDocumentEventCompact = {
 export type ShowTextEditorEventCompact = {
   t: 4;
   c: number;
-  s: readonly SelectionCompact[];
+  s: SelectionCompact[];
   v: RangeCompact;
   ru?: Uri;
-  rs?: readonly SelectionCompact[];
+  rs?: SelectionCompact[];
   rv?: RangeCompact;
   // revSelections: Selection[];
 };
@@ -607,16 +609,16 @@ export type ShowTextEditorEventCompact = {
 export type CloseTextEditorEventCompact = {
   t: 5;
   c: number;
-  rs?: readonly SelectionCompact[];
+  rs?: SelectionCompact[];
   rv?: RangeCompact;
 };
 
 export type SelectEventCompact = {
   t: 6;
   c: number;
-  s: readonly SelectionCompact[];
+  s: SelectionCompact[];
   v: RangeCompact;
-  rs: readonly SelectionCompact[];
+  rs: SelectionCompact[];
   rv: RangeCompact;
 };
 
@@ -687,7 +689,7 @@ export type GitFile = {
 
 export type TextEditor = {
   uri: Uri;
-  selections: readonly Selection[];
+  selections: Selection[];
   visibleRange: Range;
   // = [{ anchor: { line: 0, character: 0 }, active: { line: 0, character: 0 } }],
   // = { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },

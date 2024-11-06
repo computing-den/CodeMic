@@ -247,8 +247,61 @@ export class Selection {
   get end(): Position {
     return this.anchor.isAfter(this.active) ? this.anchor : this.active;
   }
+
+  isEqual(other: Selection): boolean {
+    return this.anchor.isEqual(other.anchor) && this.active.isEqual(other.active);
+  }
+
+  static areEqual(a: Selection[], b: Selection[]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!a[i].isEqual(b[i])) return false;
+    }
+    return true;
+  }
 }
 
 export class ContentChange {
   constructor(public text: string, public range: Range) {}
+}
+
+export function getSelectionsAfterTextChangeEvent(e: t.TextChangeEvent): Selection[] {
+  // e.contentChanges: [
+  //   {"text": "!", "range": [0, 2, 0, 2]},
+  //   {"text": "!", "range": [1, 9, 1, 9]}
+  // ]
+  // e.revContentChanges: [
+  //   {"text": "", "range": [0, 2, 0, 3]},
+  //   {"text": "", "range": [1, 9, 1, 10]}
+  // ]
+  // new selection: [
+  //   [0, 3, 0, 3],
+  //   [1, 10, 1, 10]
+  // ]
+  // new revSelection: [
+  //   [0, 2, 0, 2],
+  //   [1, 9, 1, 9]]
+  // ]
+
+  return e.revContentChanges.map(cc => new Selection(cc.range.end, cc.range.end));
+}
+
+export function getSelectionsBeforeTextChangeEvent(e: t.TextChangeEvent): Selection[] {
+  // e.contentChanges: [
+  //   {"text": "!", "range": [0, 2, 0, 2]},
+  //   {"text": "!", "range": [1, 9, 1, 9]}
+  // ]
+  // e.revContentChanges: [
+  //   {"text": "", "range": [0, 2, 0, 3]},
+  //   {"text": "", "range": [1, 9, 1, 10]}
+  // ]
+  // new selection: [
+  //   [0, 3, 0, 3],
+  //   [1, 10, 1, 10]
+  // ]
+  // new revSelection: [
+  //   [0, 2, 0, 2],
+  //   [1, 9, 1, 9]]
+  // ]
+  return e.contentChanges.map(cc => new Selection(cc.range.start, cc.range.end));
 }

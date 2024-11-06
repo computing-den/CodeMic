@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
 import * as path from '../../lib/path.js';
+import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
 import type Session from './session.js';
@@ -35,8 +36,16 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     const textDocument = await this.internalWorkspace.openTextDocumentByUri(uri);
     if (direction === t.Direction.Forwards) {
       textDocument.applyContentChanges(e.contentChanges, false);
+      if (e.updateSelection) {
+        const textEditor = await this.internalWorkspace.openTextEditorByUri(uri);
+        textEditor.select(lib.getSelectionsAfterTextChangeEvent(e));
+      }
     } else {
       textDocument.applyContentChanges(e.revContentChanges, false);
+      if (e.updateSelection) {
+        const textEditor = await this.internalWorkspace.openTextEditorByUri(uri);
+        textEditor.select(lib.getSelectionsBeforeTextChangeEvent(e));
+      }
     }
   }
 
@@ -118,9 +127,11 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     if (uriSet) uriSet.add(uri);
     const textEditor = await this.internalWorkspace.openTextEditorByUri(uri);
     if (direction === t.Direction.Forwards) {
-      textEditor.select(e.selections, e.visibleRange);
+      textEditor.select(e.selections);
+      textEditor.scroll(e.visibleRange);
     } else {
-      textEditor.select(e.revSelections, e.revVisibleRange);
+      textEditor.select(e.revSelections);
+      textEditor.scroll(e.revVisibleRange);
     }
   }
 

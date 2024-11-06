@@ -9,13 +9,12 @@ import TextDocument from './internal_text_document.js';
 export default class InternalTextEditor implements t.InternalEditor {
   constructor(
     public document: TextDocument,
-    public selections: readonly Selection[] = [new Selection(new Position(0, 0), new Position(0, 0))],
+    public selections: Selection[] = [new Selection(new Position(0, 0), new Position(0, 0))],
     public visibleRange: Range = new Range(new Position(0, 0), new Position(1, 0)),
   ) {}
 
-  select(selections: readonly Selection[], visibleRange: Range) {
+  select(selections: Selection[]) {
     this.selections = selections;
-    this.visibleRange = visibleRange;
   }
 
   scroll(visibleRange: Range) {

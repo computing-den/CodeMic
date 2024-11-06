@@ -148,11 +148,7 @@ export default class InternalWorkspace {
     this.textDocuments.push(textDocument);
   }
 
-  async openTextEditorByUri(
-    uri: t.Uri,
-    selections?: readonly Selection[],
-    visibleRange?: Range,
-  ): Promise<InternalTextEditor> {
+  async openTextEditorByUri(uri: t.Uri, selections?: Selection[], visibleRange?: Range): Promise<InternalTextEditor> {
     const worktreeItem = this.worktree.get(uri);
     if (!worktreeItem) throw new Error(`file not found ${uri}`);
 
@@ -161,7 +157,8 @@ export default class InternalWorkspace {
         throw new Error(`file is not a text document ${uri}`);
       }
       if (selections && visibleRange) {
-        worktreeItem.editor.select(selections, visibleRange);
+        worktreeItem.editor.select(selections);
+        worktreeItem.editor.scroll(visibleRange);
       }
       return worktreeItem.editor;
     }

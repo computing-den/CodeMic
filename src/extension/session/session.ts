@@ -247,14 +247,13 @@ export class Session {
     // Walk through the relevant tabs and take snapshots of the text editors.
     // For untitled tabs, we will also create a blob and put it into the worktree.
     // We ignore those text editors whose files have been deleted on disk.
-    const textEditors: t.TextEditor[] = [];
     for (const vscUri of this.getRelevantTabVscUris()) {
+      const vscTextDocument = this.findVscTextDocumentByVscUri(vscUri);
+      if (!vscTextDocument) continue;
+
       const uri = this.uriFromVsc(vscUri);
 
       if (vscUri.scheme === 'untitled') {
-        const vscTextDocument = this.findVscTextDocumentByVscUri(vscUri);
-        if (!vscTextDocument) continue;
-
         const data = new TextEncoder().encode(vscTextDocument.getText());
         const sha1 = await misc.computeSHA1(data);
         await this.writeBlob(sha1, data);
@@ -262,62 +261,74 @@ export class Session {
         events.push({
           uri,
           event: {
-            type: 'showTextEditor',
+            type: 'openTextDocument',
             clock: 0,
-            selections: [new Selection(new Position(0, 0), new Position(0, 0))],
-            visibleRange: new Range(new Position(0, 0), new Position(1, 0)),
+            eol: misc.eolFromVsc(vscTextDocument.eol),
+            isInWorktree: false,
           },
         });
       } else if (vscUri.scheme === 'file') {
-        if (!(await misc.fileExists(path.abs(vscUri.path)))) {
-          // File is deleted but the text editor is still there. Ignore it.
-          continue;
-        }
+        // If file is deleted but the text editor is still there, ignore it.
+        if (!(await misc.fileExists(path.abs(vscUri.path)))) continue;
 
-        // We can only set selection and visible range if we have the vscTextEditor
-        const vscTextEditor = this.findVscTextEditorByVscUri(vscode.window.visibleTextEditors, vscUri);
-        if (vscTextEditor) {
-          textEditors.push({
-            uri: this.uriFromVsc(vscTextEditor.document.uri),
-            selections: vscTextEditor.selections,
-            visibleRange: vscTextEditor.visibleRanges[0],
-          });
-        } else {
-          textEditors.push({
-            uri,
-            selections: [new Selection(new Position(0, 0), new Position(0, 0))],
-            visibleRange: new Range(new Position(0, 0), new Position(1, 0)),
-          });
-        }
+        events.push({
+          uri,
+          event: {
+            type: 'openTextDocument',
+            clock: 0,
+            eol: misc.eolFromVsc(vscTextDocument.eol),
+            isInWorktree: events.some(e => e.uri === uri && e.event.type === 'init'),
+          },
+        });
+      } else {
+        // ignore unknown scheme
+        continue;
       }
-    }
 
-    // Get the active text editor.
-    const activeTextEditorVscUri = vscode.window.activeTextEditor?.document.uri;
-    let activeTextEditorUri;
-    if (activeTextEditorVscUri && this.shouldRecordVscUri(activeTextEditorVscUri)) {
-      activeTextEditorUri = this.uriFromVsc(activeTextEditorVscUri);
-    }
-
-    // Insert showTextEditor for activeTextEditorUri only if it's not the same as the
-    // last showTextEditor already inserted
-    const lastShowTextEditor = _.findLast(events, e => e.event.type === 'showTextEditor');
-    if (activeTextEditorUri && (!lastShowTextEditor || lastShowTextEditor.uri !== activeTextEditorUri)) {
+      // Show text editor
+      const vscTextEditor = this.findVscTextEditorByVscUri(vscode.window.visibleTextEditors, vscUri);
+      const selections = vscTextEditor
+        ? misc.fromVscSelections(vscTextEditor.selections)
+        : [new Selection(new Position(0, 0), new Position(0, 0))];
+      const visibleRange = vscTextEditor
+        ? misc.fromVscRange(vscTextEditor.visibleRanges[0])
+        : new Range(new Position(0, 0), new Position(1, 0));
       events.push({
-        uri: activeTextEditorUri,
+        uri,
         event: {
           type: 'showTextEditor',
           clock: 0,
-          selections: [new Selection(new Position(0, 0), new Position(0, 0))],
-          visibleRange: new Range(new Position(0, 0), new Position(1, 0)),
+          selections,
+          visibleRange,
         },
       });
     }
 
+    // Show the active text editor.
+    // const activeVscTextEditor = ;
+    if (vscode.window.activeTextEditor && this.shouldRecordVscUri(vscode.window.activeTextEditor.document.uri)) {
+      const activeTextEditorUri = this.uriFromVsc(vscode.window.activeTextEditor.document.uri);
+
+      // Insert showTextEditor for activeTextEditorUri only if it's not the same as the
+      // last showTextEditor already inserted
+      const lastShowTextEditor = _.findLast(events, e => e.event.type === 'showTextEditor');
+      if (!lastShowTextEditor || lastShowTextEditor.uri !== activeTextEditorUri) {
+        events.push({
+          uri: activeTextEditorUri,
+          event: {
+            type: 'showTextEditor',
+            clock: 0,
+            selections: misc.fromVscSelections(vscode.window.activeTextEditor.selections),
+            visibleRange: misc.fromVscRange(vscode.window.activeTextEditor.visibleRanges[0]),
+          },
+        });
+      }
+    }
+
     // Insert into event container.
     const ec = this.runtime.internalWorkspace.eventContainer;
-    for (const e of events) {
-      ec.insert(e.uri, [e.event]);
+    for (const { uri, event } of events) {
+      ec.insert(uri, [event]);
     }
   }
 
@@ -698,10 +709,6 @@ export class Session {
     return path.resolveUri(this.workspace, uri);
   }
 
-  eolFromVsc(eol: vscode.EndOfLine): t.EndOfLine {
-    return eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
-  }
-
   // findVscTextDocumentByAbsPath(p: t.AbsPath): vscode.TextDocument | undefined {
   //   return vscode.workspace.textDocuments.find(d => d.uri.scheme === 'file' && d.uri.path === p);
   // }
@@ -742,7 +749,7 @@ export class Session {
     return new InternalTextDocument(
       uri,
       _.times(vscTextDocument.lineCount, i => vscTextDocument.lineAt(i).text),
-      this.eolFromVsc(vscTextDocument.eol),
+      misc.eolFromVsc(vscTextDocument.eol),
     );
   }
 

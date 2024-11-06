@@ -1,6 +1,7 @@
 import * as t from '../../lib/types.js';
 import { Range, Selection, Position, ContentChange } from '../../lib/lib.js';
 import * as lib from '../../lib/lib.js';
+import * as misc from '../misc.js';
 import InternalWorkspace from './internal_workspace.js';
 import InternalTextEditor from './internal_text_editor.js';
 import InternalTextDocument from './internal_text_document.js';
@@ -81,7 +82,7 @@ class WorkspaceRecorder {
       const disposable = vscode.window.onDidChangeTextEditorSelection(e => {
         // checking for e.kind !== TextEditorSelectionChangeKind.Keyboard isn't helpful
         // because shift+arrow keys would trigger this event kind
-        this.select(e.textEditor, e.selections);
+        this.select(e.textEditor, misc.fromVscSelections(e.selections));
       });
       this.disposables.push(disposable);
     }
@@ -97,7 +98,7 @@ class WorkspaceRecorder {
     // listen for scroll events
     {
       const disposable = vscode.window.onDidChangeTextEditorVisibleRanges(e => {
-        this.scroll(e.textEditor, e.visibleRanges);
+        this.scroll(e.textEditor, misc.fromVscRange(e.visibleRanges[0]));
       });
       this.disposables.push(disposable);
     }
@@ -215,7 +216,7 @@ class WorkspaceRecorder {
       }
 
       // Read https://github.com/microsoft/vscode/issues/11487 about contentChanges array.
-      let irContentChanges = vscContentChanges.map(c => new ContentChange(c.text, c.range));
+      let irContentChanges = vscContentChanges.map(c => new ContentChange(c.text, misc.fromVscRange(c.range)));
 
       // Order content changes.
       irContentChanges.sort((a, b) => a.range.start.compareTo(b.range.start));
@@ -239,6 +240,7 @@ class WorkspaceRecorder {
         clock: this.clock,
         contentChanges: irContentChanges,
         revContentChanges: irRevContentChanges,
+        updateSelection: false,
       };
       this.insertEvent(irTextChangeEvent, uri);
 
@@ -352,7 +354,7 @@ class WorkspaceRecorder {
     );
   }
 
-  private select(vscTextEditor: vscode.TextEditor, selections: readonly Selection[]) {
+  private select(vscTextEditor: vscode.TextEditor, selections: Selection[]) {
     logRawEvent(`event: select ${vscTextEditor.document.uri} ${JSON.stringify(selections)}`);
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
@@ -370,7 +372,23 @@ class WorkspaceRecorder {
 
     const revSelections = irTextEditor.selections;
     const revVisibleRanges = irTextEditor.visibleRange;
-    irTextEditor.select(selections, vscTextEditor.visibleRanges[0]);
+    irTextEditor.select(selections);
+    irTextEditor.scroll(misc.fromVscRange(vscTextEditor.visibleRanges[0]));
+
+    // Avoid inserting unnecessary select event if the selections can be calculated
+    // from the last textChange event.
+    const lastEvent = this.internalWorkspace.eventContainer.getTrack(uri).at(-1);
+    if (lastEvent?.type === 'textChange' && lastEvent.clock > this.clock - 1) {
+      const calculatedSelections = lib.getSelectionsAfterTextChangeEvent(lastEvent);
+      const calculatedRevSelections = lib.getSelectionsBeforeTextChangeEvent(lastEvent);
+      if (
+        Selection.areEqual(calculatedSelections, irTextEditor.selections) &&
+        Selection.areEqual(calculatedRevSelections, revSelections)
+      ) {
+        lastEvent.updateSelection = true;
+        return;
+      }
+    }
 
     this.insertEvent(
       {
@@ -401,8 +419,8 @@ class WorkspaceRecorder {
     );
   }
 
-  private scroll(vscTextEditor: vscode.TextEditor, visibleRanges: readonly Range[]) {
-    logRawEvent(`event: scroll ${vscTextEditor.document.uri} ${JSON.stringify(visibleRanges)}`);
+  private scroll(vscTextEditor: vscode.TextEditor, visibleRange: Range) {
+    logRawEvent(`event: scroll ${vscTextEditor.document.uri} ${JSON.stringify(visibleRange)}`);
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
     const uri = this.session.uriFromVsc(vscTextEditor.document.uri);
@@ -411,8 +429,6 @@ class WorkspaceRecorder {
       this.showTextEditor(vscTextEditor); // Will insert selection.
       return;
     }
-
-    const visibleRange = visibleRanges[0];
 
     if (!this.scrolling) {
       this.scrollStartRange ??= visibleRange;
@@ -477,7 +493,7 @@ class WorkspaceRecorder {
 
     if (irTextDocument && irText !== vscText) {
       const irRange = irTextDocument.getRange();
-      const irContentChanges = [{ range: irRange, text: vscText }];
+      const irContentChanges: ContentChange[] = [{ range: irRange, text: vscText }];
       const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
       this.insertEvent(
         {
@@ -485,6 +501,7 @@ class WorkspaceRecorder {
           clock: this.clock,
           contentChanges: irContentChanges,
           revContentChanges: irRevContentChanges,
+          updateSelection: false,
         },
         uri,
       );
@@ -511,15 +528,16 @@ class WorkspaceRecorder {
    * Then, it will create or update the internal text editor.
    */
   private async openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri): Promise<InternalTextEditor> {
-    const selections = vscTextEditor.selections;
-    const visibleRange = vscTextEditor.visibleRanges[0];
+    const selections = misc.fromVscSelections(vscTextEditor.selections);
+    const visibleRange = misc.fromVscRange(vscTextEditor.visibleRanges[0]);
     const textDocument = await this.openTextDocumentByUri(vscTextEditor.document, uri);
     let textEditor = this.internalWorkspace.findTextEditorByUri(textDocument.uri);
     if (!textEditor) {
       textEditor = new InternalTextEditor(textDocument, selections, visibleRange);
       this.internalWorkspace.insertTextEditor(textEditor);
     } else {
-      textEditor.select(selections, visibleRange);
+      textEditor.select(selections);
+      textEditor.scroll(visibleRange);
     }
     return textEditor;
   }

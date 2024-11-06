@@ -60,7 +60,7 @@ export default class InternalTextDocument implements t.InternalDocument {
       revContentChanges = [];
     }
 
-    for (let { range, text } of contentChanges) {
+    for (let { range: range, text: text } of contentChanges) {
       const origRange = range;
 
       // Apply shifts.

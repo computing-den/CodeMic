@@ -87,10 +87,14 @@ export function fromVscSelection(vscSelection: vscode.Selection): Selection {
   return new Selection(fromVscPosition(vscSelection.anchor), fromVscPosition(vscSelection.active));
 }
 
-export function toVscSelections(selections: readonly Selection[]): readonly vscode.Selection[] {
+export function toVscSelections(selections: Selection[]): readonly vscode.Selection[] {
   return selections.map(toVscSelection);
 }
 
-export function fromVscSelections(vscSelections: readonly vscode.Selection[]): readonly Selection[] {
+export function fromVscSelections(vscSelections: readonly vscode.Selection[]): Selection[] {
   return vscSelections.map(fromVscSelection);
+}
+
+export function eolFromVsc(eol: vscode.EndOfLine): t.EndOfLine {
+  return eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
 }
