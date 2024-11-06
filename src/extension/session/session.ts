@@ -502,25 +502,21 @@ export class Session {
   }
 
   async openVscUntitledByName(untitledName: string): Promise<vscode.TextDocument> {
-    // The problem is that we do something like =vscode.workspace.openTextDocument('untitled:Untitled-1')= which gives
-    // the document a name and a path. It will want to save the untitled document to file =./Untitled-1= even if its
-    // content is empty.
-    // if instead we use =await vscode.commands.executeCommand('workbench.action.files.newUntitledFile')= we get an
-    // unnamed untitled file which will not prompt to save when the content is empty. However, the URI of the new
-    // document will be picked by vscode. For example, if Untitled-1 and Untitled-3 are already open, when we open
-    // a new untitled file, vscode will name it Untitled-2.
+    // The problem is that when we do something like =vscode.workspace.openTextDocument('untitled:Untitled-1')= it
+    // creates a document with associated resource, a document with a path that will be saved to file =./Untitled-1=
+    // even if its content is empty.
+    // If instead we use =await vscode.commands.executeCommand('workbench.action.files.newUntitledFile')= we get an
+    // untitled file without an associated resource which will not prompt to save when the content is empty.
+    // However, the URI of the new document will be picked by vscode. For example, if Untitled-1 and Untitled-3 are
+    // already open, when we open a new untitled file, vscode will name it Untitled-2.
     // So, we must make sure that when opening Untitled-X, every untitled number less than X is already open
-    // and then try to open a new a new file.
+    // and then try to open a new file.
+    // Another thing is that just because there is no tab currently with that name, doesn't necessarily mean that
+    // there is no document open with that name.
 
     // Gather all the untitled names.
-    const untitledNames: string[] = [];
-    for (const tabGroup of vscode.window.tabGroups.all) {
-      for (const tab of tabGroup.tabs) {
-        if (tab.input instanceof vscode.TabInputText && tab.input.uri.scheme === 'untitled') {
-          untitledNames.push(tab.input.uri.path);
-        }
-      }
-    }
+
+    const untitledNames: string[] = vscode.workspace.textDocuments.map(d => d.uri.path);
 
     console.log('XXX untitled names: ', untitledNames.join(', '));
     // Open every untitled name up to target name.
