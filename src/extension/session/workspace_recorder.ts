@@ -9,7 +9,6 @@ import assert from '../../lib/assert.js';
 import type Session from './session.js';
 import config from '../config.js';
 import vscode from 'vscode';
-
 import _ from 'lodash';
 
 const SCROLL_LINES_TRIGGER = 2;
@@ -82,7 +81,7 @@ class WorkspaceRecorder {
       const disposable = vscode.window.onDidChangeTextEditorSelection(e => {
         // checking for e.kind !== TextEditorSelectionChangeKind.Keyboard isn't helpful
         // because shift+arrow keys would trigger this event kind
-        this.select(e.textEditor, misc.fromVscSelections(e.selections));
+        this.select(e.textEditor, e.selections);
       });
       this.disposables.push(disposable);
     }
@@ -98,7 +97,7 @@ class WorkspaceRecorder {
     // listen for scroll events
     {
       const disposable = vscode.window.onDidChangeTextEditorVisibleRanges(e => {
-        this.scroll(e.textEditor, misc.fromVscRange(e.visibleRanges[0]));
+        this.scroll(e.textEditor, e.visibleRanges);
       });
       this.disposables.push(disposable);
     }
@@ -354,7 +353,8 @@ class WorkspaceRecorder {
     );
   }
 
-  private select(vscTextEditor: vscode.TextEditor, selections: Selection[]) {
+  private select(vscTextEditor: vscode.TextEditor, vscSelections: readonly vscode.Selection[]) {
+    const selections = misc.fromVscSelections(vscSelections);
     logRawEvent(`event: select ${vscTextEditor.document.uri} ${JSON.stringify(selections)}`);
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
@@ -419,10 +419,12 @@ class WorkspaceRecorder {
     );
   }
 
-  private scroll(vscTextEditor: vscode.TextEditor, visibleRange: Range) {
-    logRawEvent(`event: scroll ${vscTextEditor.document.uri} ${JSON.stringify(visibleRange)}`);
+  private scroll(vscTextEditor: vscode.TextEditor, vscVisibleRanges: readonly vscode.Range[]) {
+    const visibleRanges = vscVisibleRanges.map(misc.fromVscRange);
+    logRawEvent(`event: scroll ${vscTextEditor.document.uri} ${JSON.stringify(visibleRanges)}`);
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
+    const visibleRange = visibleRanges[0];
     const uri = this.session.uriFromVsc(vscTextEditor.document.uri);
     const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
     if (!irTextEditor) {
