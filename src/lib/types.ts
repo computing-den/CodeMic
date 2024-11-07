@@ -538,9 +538,9 @@ export type SelectEvent = {
   type: 'select';
   clock: number;
   selections: Selection[];
-  visibleRange: Range;
+  // visibleRange: Range;
   revSelections: Selection[];
-  revVisibleRange: Range;
+  // revVisibleRange: Range;
 };
 
 export type ScrollEvent = {
@@ -617,9 +617,9 @@ export type SelectEventCompact = {
   t: 6;
   c: number;
   s: SelectionCompact[];
-  v: RangeCompact;
+  // v: RangeCompact;
   rs: SelectionCompact[];
-  rv: RangeCompact;
+  // rv: RangeCompact;
 };
 
 export type ScrollEventCompact = {

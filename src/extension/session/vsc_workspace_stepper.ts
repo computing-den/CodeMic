@@ -164,10 +164,10 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
 
     if (direction === t.Direction.Forwards) {
       vscTextEditor.selections = misc.toVscSelections(e.selections);
-      await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
+      // await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
     } else {
       vscTextEditor.selections = misc.toVscSelections(e.revSelections);
-      await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
+      // await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
     }
   }
 

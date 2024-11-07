@@ -236,6 +236,10 @@ export class Position {
 
 export class Range {
   constructor(public start: Position, public end: Position) {}
+
+  isEqual(other: Range) {
+    return this.start.isEqual(other.start) && this.end.isEqual(other.end);
+  }
 }
 
 export class Selection {

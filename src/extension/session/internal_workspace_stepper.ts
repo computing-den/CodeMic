@@ -128,10 +128,10 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     const textEditor = await this.internalWorkspace.openTextEditorByUri(uri);
     if (direction === t.Direction.Forwards) {
       textEditor.select(e.selections);
-      textEditor.scroll(e.visibleRange);
+      // textEditor.scroll(e.visibleRange);
     } else {
       textEditor.select(e.revSelections);
-      textEditor.scroll(e.revVisibleRange);
+      // textEditor.scroll(e.revVisibleRange);
     }
   }
 

@@ -21,8 +21,8 @@ class WorkspaceRecorder {
   private session: Session;
   private clock = 0;
   private disposables: vscode.Disposable[] = [];
-  private scrolling: boolean = false;
-  private scrollStartRange?: Range;
+  // private scrolling: boolean = false;
+  // private scrollStartRange?: Range;
   // private lastUri?: t.Uri;
   // private lastPosition?: Position;
   private lastLine: number | undefined;
@@ -109,8 +109,8 @@ class WorkspaceRecorder {
   pause() {
     this.popLastLineFocusIfTrivial();
     this.recording = false;
-    this.scrolling = false;
-    this.scrollStartRange = undefined;
+    // this.scrolling = false;
+    // this.scrollStartRange = undefined;
 
     this.dispose();
   }
@@ -358,10 +358,8 @@ class WorkspaceRecorder {
     logRawEvent(`event: select ${vscTextEditor.document.uri} ${JSON.stringify(selections)}`);
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
+    // const visibleRange = misc.fromVscRange(vscTextEditor.visibleRanges[0]);
     const uri = this.session.uriFromVsc(vscTextEditor.document.uri);
-    logAcceptedEvent(
-      `accepted select for ${uri} visibleRange: ${vscTextEditor.visibleRanges[0].start.line}:${vscTextEditor.visibleRanges[0].end.line}`,
-    );
 
     const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
 
@@ -370,14 +368,14 @@ class WorkspaceRecorder {
       return;
     }
 
+    const lastEvent = this.internalWorkspace.eventContainer.getTrack(uri).at(-1);
     const revSelections = irTextEditor.selections;
-    const revVisibleRanges = irTextEditor.visibleRange;
+    // const revVisibleRanges = irTextEditor.visibleRange;
     irTextEditor.select(selections);
-    irTextEditor.scroll(misc.fromVscRange(vscTextEditor.visibleRanges[0]));
+    // irTextEditor.scroll(visibleRange);
 
     // Avoid inserting unnecessary select event if the selections can be calculated
     // from the last textChange event.
-    const lastEvent = this.internalWorkspace.eventContainer.getTrack(uri).at(-1);
     if (lastEvent?.type === 'textChange' && lastEvent.clock > this.clock - 1) {
       const calculatedSelections = lib.getSelectionsAfterTextChangeEvent(lastEvent);
       const calculatedRevSelections = lib.getSelectionsBeforeTextChangeEvent(lastEvent);
@@ -390,14 +388,21 @@ class WorkspaceRecorder {
       }
     }
 
+    // Merge successive select events.
+    if (lastEvent?.type === 'select' && lastEvent.clock > this.clock - 0.2) {
+      logAcceptedEvent(`accepted select for ${uri} (SHORTCUT)`);
+      lastEvent.selections = selections;
+      return;
+    }
+
+    logAcceptedEvent(`accepted select for ${uri}`);
+
     this.insertEvent(
       {
         type: 'select',
         clock: this.clock,
-        selections: irTextEditor.selections,
-        visibleRange: irTextEditor.visibleRange,
+        selections,
         revSelections,
-        revVisibleRange: revVisibleRanges,
       },
       uri,
     );
@@ -432,20 +437,33 @@ class WorkspaceRecorder {
       return;
     }
 
-    if (!this.scrolling) {
-      this.scrollStartRange ??= visibleRange;
-      const delta = Math.abs(visibleRange.start.line - this.scrollStartRange.start.line);
-      if (delta > SCROLL_LINES_TRIGGER) {
-        this.scrolling = true;
-      }
-    }
+    // if (!this.scrolling) {
+    //   this.scrollStartRange ??= visibleRange;
+    //   const delta = Math.abs(visibleRange.start.line - this.scrollStartRange.start.line);
+    //   if (delta > SCROLL_LINES_TRIGGER) {
+    //     this.scrolling = true;
+    //   }
+    // }
 
-    if (!this.scrolling) return;
+    // if (!this.scrolling) return;
 
-    logAcceptedEvent(`accepted scroll for ${uri} visible range: ${visibleRange.start.line}:${visibleRange.end.line}`);
+    // Avoid redundant scrolls.
+    if (irTextEditor.visibleRange.isEqual(visibleRange)) return;
 
     const revVisibleRange = irTextEditor.visibleRange;
     irTextEditor.scroll(visibleRange);
+
+    // Merge successive scrolls.
+    const lastEvent = this.internalWorkspace.eventContainer.getTrack(uri).at(-1);
+    if (lastEvent?.type === 'scroll' && lastEvent.clock > this.clock - 0.5) {
+      logAcceptedEvent(
+        `accepted scroll for ${uri} visible range: ${visibleRange.start.line}:${visibleRange.end.line} (SHORTCUT)`,
+      );
+      lastEvent.visibleRange = visibleRange;
+      return;
+    }
+
+    logAcceptedEvent(`accepted scroll for ${uri} visible range: ${visibleRange.start.line}:${visibleRange.end.line}`);
 
     this.insertEvent(
       {
@@ -459,10 +477,10 @@ class WorkspaceRecorder {
   }
 
   private insertEvent(e: t.EditorEvent, uri: t.Uri) {
-    if (e.type !== 'scroll') {
-      this.scrolling = false;
-      this.scrollStartRange = undefined;
-    }
+    // if (e.type !== 'scroll') {
+    //   this.scrolling = false;
+    //   this.scrollStartRange = undefined;
+    // }
 
     this.session.runtime!.internalWorkspace.eventContainer.insert(uri, [e]);
     // this.simplifyEvents();

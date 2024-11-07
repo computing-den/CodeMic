@@ -73,9 +73,9 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
         t: 6,
         c: serializeClock(e.clock),
         s: e.selections.map(serializeSelection),
-        v: serializeRange(e.visibleRange),
+        // v: serializeRange(e.visibleRange),
         rs: e.revSelections?.map(serializeSelection),
-        rv: e.revVisibleRange && serializeRange(e.revVisibleRange),
+        // rv: e.revVisibleRange && serializeRange(e.revVisibleRange),
       };
 
     case 'scroll':
@@ -196,9 +196,9 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
         type: 'select',
         clock: deserializeClock(e.c),
         selections: e.s.map(deserializeSelection),
-        visibleRange: deserializeRange(e.v),
+        // visibleRange: deserializeRange(e.v),
         revSelections: e.rs.map(deserializeSelection),
-        revVisibleRange: deserializeRange(e.rv),
+        // revVisibleRange: deserializeRange(e.rv),
       };
     case 7:
       return {
