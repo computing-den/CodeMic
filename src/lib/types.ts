@@ -518,8 +518,9 @@ export type CloseTextDocumentEvent = {
 export type ShowTextEditorEvent = {
   type: 'showTextEditor';
   clock: number;
-  selections: Selection[];
-  visibleRange: Range;
+  preserveFocus: boolean;
+  selections?: Selection[];
+  visibleRange?: Range;
   revUri?: Uri;
   revSelections?: Selection[];
   revVisibleRange?: Range;
@@ -598,8 +599,9 @@ export type CloseTextDocumentEventCompact = {
 export type ShowTextEditorEventCompact = {
   t: 4;
   c: number;
-  s: SelectionCompact[];
-  v: RangeCompact;
+  p?: boolean; // undefined defaults to false
+  s?: SelectionCompact[];
+  v?: RangeCompact;
   ru?: Uri;
   rs?: SelectionCompact[];
   rv?: RangeCompact;

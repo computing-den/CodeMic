@@ -127,15 +127,23 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
         preview: false,
         preserveFocus: false,
       });
-      vscTextEditor.selections = misc.toVscSelections(e.selections);
-      await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
+      if (e.selections) {
+        vscTextEditor.selections = misc.toVscSelections(e.selections);
+      }
+      if (e.visibleRange) {
+        await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
+      }
     } else if (e.revUri) {
       const vscTextEditor = await vscode.window.showTextDocument(this.session.uriToVsc(e.revUri), {
         preview: false,
         preserveFocus: false,
       });
-      vscTextEditor.selections = misc.toVscSelections(e.revSelections!);
-      await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange!.start.line, at: 'top' });
+      if (e.revSelections) {
+        vscTextEditor.selections = misc.toVscSelections(e.revSelections);
+      }
+      if (e.revVisibleRange) {
+        await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
+      }
     }
   }
 

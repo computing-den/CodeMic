@@ -342,6 +342,7 @@ class WorkspaceRecorder {
     this.insertEvent(
       {
         type: 'showTextEditor',
+        preserveFocus: false,
         clock: this.clock,
         selections: irTextEditor.selections,
         visibleRange: irTextEditor.visibleRange,

@@ -54,8 +54,9 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
       return {
         t: 4,
         c: serializeClock(e.clock),
-        s: e.selections.map(serializeSelection),
-        v: serializeRange(e.visibleRange),
+        p: e.preserveFocus ? true : undefined,
+        s: e.selections?.map(serializeSelection),
+        v: e.visibleRange && serializeRange(e.visibleRange),
         ru: e.revUri,
         rs: e.revSelections?.map(serializeSelection),
         rv: e.revVisibleRange && serializeRange(e.revVisibleRange),
@@ -178,8 +179,9 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
       return {
         type: 'showTextEditor',
         clock: deserializeClock(e.c),
-        selections: e.s.map(deserializeSelection),
-        visibleRange: deserializeRange(e.v),
+        preserveFocus: e.p ?? false,
+        selections: e.s?.map(deserializeSelection),
+        visibleRange: e.v && deserializeRange(e.v),
         revUri: e.ru,
         revSelections: e.rs?.map(deserializeSelection),
         revVisibleRange: e.rv && deserializeRange(e.rv),

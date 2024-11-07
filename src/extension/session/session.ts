@@ -26,6 +26,10 @@ import { defaultWorkspacePath } from '../paths.js';
 //   videoTracks: t.VideoTrack[];
 // };
 
+type TabWithInputText = Omit<vscode.Tab, 'input'> & {
+  readonly input: vscode.TabInputText;
+};
+
 export class Session {
   context: Context;
   workspace: t.AbsPath;
@@ -229,7 +233,7 @@ export class Session {
     //   }
     // }
 
-    // Create the worktree and copy files to session directory.
+    // Scan the workspace directory (files and dirs) and create init events.
     // TODO: ignore files in .codemicignore
     const pathsWithStats = await this.readDirRecursively({ includeFiles: true, includeDirs: true });
     for (const [p, stat] of pathsWithStats) {
@@ -244,88 +248,72 @@ export class Session {
       }
     }
 
-    // Walk through the relevant tabs and take snapshots of the text editors.
-    // For untitled tabs, we will also create a blob and put it into the worktree.
-    // We ignore those text editors whose files have been deleted on disk.
-    for (const vscUri of this.getRelevantTabVscUris()) {
-      const vscTextDocument = this.findVscTextDocumentByVscUri(vscUri);
-      if (!vscTextDocument) continue;
+    // Walk through untitled text documents and create init events.
+    for (const vscTextDocument of vscode.workspace.textDocuments) {
+      if (vscTextDocument.uri.scheme !== 'untitled') continue;
 
-      const uri = this.uriFromVsc(vscUri);
+      const uri = this.uriFromVsc(vscTextDocument.uri);
 
-      if (vscUri.scheme === 'untitled') {
-        const data = new TextEncoder().encode(vscTextDocument.getText());
-        const sha1 = await misc.computeSHA1(data);
-        await this.writeBlob(sha1, data);
-        events.push({ uri, event: { type: 'init', clock: 0, file: { type: 'local', sha1 } } });
-        events.push({
-          uri,
-          event: {
-            type: 'openTextDocument',
-            clock: 0,
-            eol: misc.eolFromVsc(vscTextDocument.eol),
-            isInWorktree: false,
-          },
-        });
-      } else if (vscUri.scheme === 'file') {
-        // If file is deleted but the text editor is still there, ignore it.
-        if (!(await misc.fileExists(path.abs(vscUri.path)))) continue;
+      const data = new TextEncoder().encode(vscTextDocument.getText());
+      const sha1 = await misc.computeSHA1(data);
+      await this.writeBlob(sha1, data);
+      events.push({ uri, event: { type: 'init', clock: 0, file: { type: 'local', sha1 } } });
+    }
 
-        events.push({
-          uri,
-          event: {
-            type: 'openTextDocument',
-            clock: 0,
-            eol: misc.eolFromVsc(vscTextDocument.eol),
-            isInWorktree: events.some(e => e.uri === uri && e.event.type === 'init'),
-          },
-        });
-      } else {
-        // ignore unknown scheme
+    // Walk through text documents and create openTextDocument events.
+    // Ignore files outside workspace or with schemes other than untitled or file.
+    // Ignore deleted files.
+    for (const vscTextDocument of vscode.workspace.textDocuments) {
+      // Ignore files outside workspace or with schemes other than untitled or file.
+      if (!this.shouldRecordVscUri(vscTextDocument.uri)) continue;
+
+      // If file is deleted but the text editor is still there, ignore it.
+      if (vscTextDocument.uri.scheme === 'file' && !(await misc.fileExists(path.abs(vscTextDocument.uri.path)))) {
         continue;
       }
 
-      // Show text editor
-      const vscTextEditor = this.findVscTextEditorByVscUri(vscode.window.visibleTextEditors, vscUri);
-      const selections = vscTextEditor
-        ? misc.fromVscSelections(vscTextEditor.selections)
-        : [new Selection(new Position(0, 0), new Position(0, 0))];
-      const visibleRange = vscTextEditor
-        ? misc.fromVscRange(vscTextEditor.visibleRanges[0])
-        : new Range(new Position(0, 0), new Position(1, 0));
+      events.push({
+        uri: this.uriFromVsc(vscTextDocument.uri),
+        event: {
+          type: 'openTextDocument',
+          clock: 0,
+          eol: misc.eolFromVsc(vscTextDocument.eol),
+          isInWorktree: false,
+        },
+      });
+    }
+
+    // Walk through open tabs and create showTextEditor events.
+    // Ignore anything for which we don't have an openTextDocument event.
+    for (const tab of this.getTabsWithInputText()) {
+      // Ignore files outside workspace or with schemes other than untitled or file.
+      if (!this.shouldRecordVscUri(tab.input.uri)) continue;
+
+      // Ignore if we don't have an openTextDocument event.
+      const uri = this.uriFromVsc(tab.input.uri);
+      if (!events.some(e => e.uri === uri && e.event.type === 'openTextDocument')) continue;
+
+      // Create showTextEditor event.
+      // vscode.window.visibleTextEditors does not include tabs that exist but are not currently open.
+      // Basically, it only includes the visible panes.
+      const vscTextEditor = this.findVscTextEditorByVscUri(vscode.window.visibleTextEditors, tab.input.uri);
+      const selections = vscTextEditor && misc.fromVscSelections(vscTextEditor.selections);
+      const visibleRange = vscTextEditor && misc.fromVscRange(vscTextEditor.visibleRanges[0]);
+      const activeVscUri = vscode.window.activeTextEditor?.document.uri;
+      const isActiveEditor = activeVscUri?.toString() === tab.input.uri.toString();
       events.push({
         uri,
         event: {
           type: 'showTextEditor',
           clock: 0,
+          preserveFocus: !isActiveEditor,
           selections,
           visibleRange,
         },
       });
     }
 
-    // Show the active text editor.
-    // const activeVscTextEditor = ;
-    if (vscode.window.activeTextEditor && this.shouldRecordVscUri(vscode.window.activeTextEditor.document.uri)) {
-      const activeTextEditorUri = this.uriFromVsc(vscode.window.activeTextEditor.document.uri);
-
-      // Insert showTextEditor for activeTextEditorUri only if it's not the same as the
-      // last showTextEditor already inserted
-      const lastShowTextEditor = _.findLast(events, e => e.event.type === 'showTextEditor');
-      if (!lastShowTextEditor || lastShowTextEditor.uri !== activeTextEditorUri) {
-        events.push({
-          uri: activeTextEditorUri,
-          event: {
-            type: 'showTextEditor',
-            clock: 0,
-            selections: misc.fromVscSelections(vscode.window.activeTextEditor.selections),
-            visibleRange: misc.fromVscRange(vscode.window.activeTextEditor.visibleRanges[0]),
-          },
-        });
-      }
-    }
-
-    // Insert into event container.
+    // Insert events into the event container.
     const ec = this.runtime.internalWorkspace.eventContainer;
     for (const { uri, event } of events) {
       ec.insert(uri, [event]);
@@ -376,11 +364,10 @@ export class Session {
     assert(internalWorkspace);
 
     // all text editor tabs that are not in internalWorkspace's textEditors should be closed
-    for (const tabGroup of vscode.window.tabGroups.all) {
-      for (const tab of tabGroup.tabs) {
-        if (tab.input instanceof vscode.TabInputText && this.shouldRecordVscUri(tab.input.uri)) {
-          const uri = this.uriFromVsc(tab.input.uri);
-          if (!internalWorkspace.findTextEditorByUri(uri)) await this.closeVscTabInputText(tab, true);
+    for (const tab of this.getTabsWithInputText()) {
+      if (this.shouldRecordVscUri(tab.input.uri)) {
+        if (!internalWorkspace.findTextEditorByUri(this.uriFromVsc(tab.input.uri))) {
+          await this.closeVscTabInputText(tab, true);
         }
       }
     }
@@ -400,7 +387,7 @@ export class Session {
     } else {
       // all files in workspace that are not in internalWorkspace's worktree should be deleted
       const workspacePathsWithStats = await this.readDirRecursively({ includeFiles: true, includeDirs: true });
-      for (const [p, stat] of workspacePathsWithStats) {
+      for (const [p] of workspacePathsWithStats) {
         const uri = path.workspaceUriFromRelPath(p);
         if (!internalWorkspace.doesUriExist(uri)) {
           await fs.promises.rm(path.join(this.workspace, p), { force: true, recursive: true });
@@ -512,11 +499,9 @@ export class Session {
    * Will ask for confirmation.
    */
   async closeIrrelevantVscTabs() {
-    for (const tabGroup of vscode.window.tabGroups.all) {
-      for (const tab of tabGroup.tabs) {
-        if (tab.input instanceof vscode.TabInputText && !this.shouldRecordVscUri(tab.input.uri)) {
-          await this.closeVscTabInputText(tab);
-        }
+    for (const tab of this.getTabsWithInputText()) {
+      if (!this.shouldRecordVscUri(tab.input.uri)) {
+        await this.closeVscTabInputText(tab);
       }
     }
   }
@@ -713,18 +698,12 @@ export class Session {
   //   return vscode.workspace.textDocuments.find(d => d.uri.scheme === 'file' && d.uri.path === p);
   // }
 
-  findTabInputTextByUri(uri: t.Uri): vscode.Tab | undefined {
+  findTabInputTextByUri(uri: t.Uri): TabWithInputText | undefined {
     return this.findTabInputTextByVscUri(this.uriToVsc(uri));
   }
 
-  findTabInputTextByVscUri(uri: vscode.Uri): vscode.Tab | undefined {
-    for (const tabGroup of vscode.window.tabGroups.all) {
-      for (const tab of tabGroup.tabs) {
-        if (tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === uri.toString()) {
-          return tab;
-        }
-      }
-    }
+  findTabInputTextByVscUri(uri: vscode.Uri): TabWithInputText | undefined {
+    return this.getTabsWithInputText().find(tab => tab.input.uri.toString() === uri.toString());
   }
 
   findVscTextDocumentByUri(uri: t.Uri): vscode.TextDocument | undefined {
@@ -755,11 +734,9 @@ export class Session {
 
   async closeVscTextEditorByUri(uri: t.Uri, skipConfirmation: boolean = false) {
     uri = this.resolveUri(uri);
-    for (const tabGroup of vscode.window.tabGroups.all) {
-      for (const tab of tabGroup.tabs) {
-        if (tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === uri) {
-          this.closeVscTabInputText(tab, skipConfirmation);
-        }
+    for (const tab of this.getTabsWithInputText()) {
+      if (tab.input.uri.toString() === uri) {
+        this.closeVscTabInputText(tab, skipConfirmation);
       }
     }
   }
@@ -812,15 +789,21 @@ export class Session {
   }
 
   getRelevantTabVscUris(): vscode.Uri[] {
-    const uris: vscode.Uri[] = [];
+    return this.getTabsWithInputText()
+      .map(tab => tab.input.uri)
+      .filter(uri => this.shouldRecordVscUri(uri));
+  }
+
+  getTabsWithInputText(): TabWithInputText[] {
+    const res: TabWithInputText[] = [];
     for (const tabGroup of vscode.window.tabGroups.all) {
       for (const tab of tabGroup.tabs) {
-        if (tab.input instanceof vscode.TabInputText && this.shouldRecordVscUri(tab.input.uri)) {
-          uris.push(tab.input.uri);
+        if (tab.input instanceof vscode.TabInputText) {
+          res.push(tab as TabWithInputText);
         }
       }
     }
-    return uris;
+    return res;
   }
 
   async askToOverwriteWorkspace(): Promise<boolean> {

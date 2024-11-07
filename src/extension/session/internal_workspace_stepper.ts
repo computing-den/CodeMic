@@ -98,18 +98,16 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
   async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
     if (direction === t.Direction.Forwards) {
       if (uriSet) uriSet.add(uri);
-      this.internalWorkspace.activeTextEditor = await this.internalWorkspace.openTextEditorByUri(
-        uri,
-        e.selections,
-        e.visibleRange,
-      );
+      const textEditor = await this.internalWorkspace.openTextEditorByUri(uri, e.selections, e.visibleRange);
+      if (!e.preserveFocus) {
+        this.internalWorkspace.activeTextEditor = textEditor;
+      }
     } else if (e.revUri) {
       if (uriSet) uriSet.add(e.revUri);
-      this.internalWorkspace.activeTextEditor = await this.internalWorkspace.openTextEditorByUri(
-        e.revUri,
-        e.revSelections,
-        e.revVisibleRange,
-      );
+      const textEditor = await this.internalWorkspace.openTextEditorByUri(e.revUri, e.revSelections, e.revVisibleRange);
+      if (!e.preserveFocus) {
+        this.internalWorkspace.activeTextEditor = textEditor;
+      }
     }
   }
 
