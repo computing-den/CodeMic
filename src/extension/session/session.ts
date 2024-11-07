@@ -298,7 +298,7 @@ export class Session {
       // Basically, it only includes the visible panes.
       const vscTextEditor = this.findVscTextEditorByVscUri(vscode.window.visibleTextEditors, tab.input.uri);
       const selections = vscTextEditor && misc.fromVscSelections(vscTextEditor.selections);
-      const visibleRange = vscTextEditor && misc.fromVscRange(vscTextEditor.visibleRanges[0]);
+      const visibleRange = vscTextEditor && misc.fromVscLineRange(vscTextEditor.visibleRanges[0]);
       const activeVscUri = vscode.window.activeTextEditor?.document.uri;
       const isActiveEditor = activeVscUri?.toString() === tab.input.uri.toString();
       events.push({

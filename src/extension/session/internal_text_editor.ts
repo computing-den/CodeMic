@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
-import { Range, Selection, Position } from '../../lib/lib.js';
+import { Range, LineRange, Selection, Position } from '../../lib/lib.js';
 import TextDocument from './internal_text_document.js';
 
 /**
@@ -10,14 +10,14 @@ export default class InternalTextEditor implements t.InternalEditor {
   constructor(
     public document: TextDocument,
     public selections: Selection[] = [new Selection(new Position(0, 0), new Position(0, 0))],
-    public visibleRange: Range = new Range(new Position(0, 0), new Position(1, 0)),
+    public visibleRange: LineRange = new LineRange(0, 1),
   ) {}
 
   select(selections: Selection[]) {
     this.selections = selections;
   }
 
-  scroll(visibleRange: Range) {
+  scroll(visibleRange: LineRange) {
     this.visibleRange = visibleRange;
   }
 }

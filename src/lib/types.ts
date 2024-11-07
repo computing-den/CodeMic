@@ -1,4 +1,4 @@
-import type { Range, Selection, ContentChange } from './lib.js';
+import type { Position, Range, LineRange, Selection, ContentChange } from './lib.js';
 
 // Type branding is a hack. The __brand__ property doesn't actually exist at runtime.
 export type Path = RelPath | AbsPath;
@@ -471,6 +471,7 @@ export interface WorkspaceStepper {
   applySelectEvent(e: SelectEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyScrollEvent(e: ScrollEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
   applySaveEvent(e: SaveEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyTextInsertEvent(e: TextInsertEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
 }
 
 export type EditorEvent =
@@ -482,7 +483,8 @@ export type EditorEvent =
   | CloseTextEditorEvent
   | SelectEvent
   | ScrollEvent
-  | SaveEvent;
+  | SaveEvent
+  | TextInsertEvent;
 
 export type EditorEventWithUri = { event: EditorEvent; uri: Uri };
 
@@ -520,10 +522,10 @@ export type ShowTextEditorEvent = {
   clock: number;
   preserveFocus: boolean;
   selections?: Selection[];
-  visibleRange?: Range;
+  visibleRange?: LineRange;
   revUri?: Uri;
   revSelections?: Selection[];
-  revVisibleRange?: Range;
+  revVisibleRange?: LineRange;
   // revSelections: Selection[];
 };
 
@@ -531,7 +533,7 @@ export type CloseTextEditorEvent = {
   type: 'closeTextEditor';
   clock: number;
   revSelections?: Selection[];
-  revVisibleRange?: Range;
+  revVisibleRange?: LineRange;
   // revSelections: Selection[];
 };
 
@@ -547,13 +549,21 @@ export type SelectEvent = {
 export type ScrollEvent = {
   type: 'scroll';
   clock: number;
-  visibleRange: Range;
-  revVisibleRange: Range;
+  visibleRange: LineRange;
+  revVisibleRange: LineRange;
 };
 
 export type SaveEvent = {
   type: 'save';
   clock: number;
+};
+
+export type TextInsertEvent = {
+  type: 'textInsert';
+  clock: number;
+  text: string;
+  revRange: Range; // range.start is the position before text insert, while range.end is the position after text insert
+  updateSelection: boolean;
 };
 
 export type EditorEventCompact =
@@ -565,7 +575,8 @@ export type EditorEventCompact =
   | CloseTextEditorEventCompact
   | SelectEventCompact
   | ScrollEventCompact
-  | SaveEventCompact;
+  | SaveEventCompact
+  | TextInsertEventCompact;
 
 export type InitEventCompact = {
   t: 0;
@@ -601,10 +612,10 @@ export type ShowTextEditorEventCompact = {
   c: number;
   p?: boolean; // undefined defaults to false
   s?: SelectionCompact[];
-  v?: RangeCompact;
+  v?: LineRangeCompact;
   ru?: Uri;
   rs?: SelectionCompact[];
-  rv?: RangeCompact;
+  rv?: LineRangeCompact;
   // revSelections: Selection[];
 };
 
@@ -612,7 +623,7 @@ export type CloseTextEditorEventCompact = {
   t: 5;
   c: number;
   rs?: SelectionCompact[];
-  rv?: RangeCompact;
+  rv?: LineRangeCompact;
 };
 
 export type SelectEventCompact = {
@@ -627,8 +638,8 @@ export type SelectEventCompact = {
 export type ScrollEventCompact = {
   t: 7;
   c: number;
-  v: RangeCompact;
-  rv: RangeCompact;
+  v: LineRangeCompact;
+  rv: LineRangeCompact;
 };
 
 export type SaveEventCompact = {
@@ -636,8 +647,17 @@ export type SaveEventCompact = {
   c: number;
 };
 
+export type TextInsertEventCompact = {
+  t: 9;
+  c: number;
+  x: string;
+  r: RangeCompact;
+  u?: boolean; // undefined defaults to true
+};
+
 export type PositionCompact = [number, number];
 export type RangeCompact = [number, number, number, number];
+export type LineRangeCompact = [number, number];
 export type SelectionCompact = [number, number, number, number];
 export type ContentChangeCompact = { t: string; r: [number, number, number, number] };
 
@@ -692,7 +712,7 @@ export type GitFile = {
 export type TextEditor = {
   uri: Uri;
   selections: Selection[];
-  visibleRange: Range;
+  visibleRange: LineRange;
   // = [{ anchor: { line: 0, character: 0 }, active: { line: 0, character: 0 } }],
   // = { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },
 };

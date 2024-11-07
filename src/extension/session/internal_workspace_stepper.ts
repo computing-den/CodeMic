@@ -2,6 +2,7 @@ import _ from 'lodash';
 import * as t from '../../lib/types.js';
 import * as path from '../../lib/path.js';
 import * as lib from '../../lib/lib.js';
+import { ContentChange, Range } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
 import type Session from './session.js';
@@ -146,6 +147,10 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
   async applySaveEvent(e: t.SaveEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(uri);
     // nothing
+  }
+
+  async applyTextInsertEvent(e: t.TextInsertEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+    await this.applyTextChangeEvent(lib.getTextChangeEventFromTextInsertEvent(e), uri, direction, uriSet);
   }
 }
 export default InternalWorkspaceStepper;

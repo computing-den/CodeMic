@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
-import { Range, Selection, Position } from '../../lib/lib.js';
+import { Range, LineRange, Selection, Position } from '../../lib/lib.js';
 import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
 import EventContainer from '../../lib/event_container.js';
@@ -148,7 +148,11 @@ export default class InternalWorkspace {
     this.textDocuments.push(textDocument);
   }
 
-  async openTextEditorByUri(uri: t.Uri, selections?: Selection[], visibleRange?: Range): Promise<InternalTextEditor> {
+  async openTextEditorByUri(
+    uri: t.Uri,
+    selections?: Selection[],
+    visibleRange?: LineRange,
+  ): Promise<InternalTextEditor> {
     const worktreeItem = this.worktree.get(uri);
     if (!worktreeItem) throw new Error(`file not found ${uri}`);
 

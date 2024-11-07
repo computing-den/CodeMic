@@ -269,6 +269,13 @@ export class ContentChange {
   constructor(public text: string, public range: Range) {}
 }
 
+export class LineRange {
+  constructor(public start: number, public end: number) {}
+  isEqual(other: LineRange) {
+    return this.start === other.start && this.end === other.end;
+  }
+}
+
 export function getSelectionsAfterTextChangeEvent(e: t.TextChangeEvent): Selection[] {
   // e.contentChanges: [
   //   {"text": "!", "range": [0, 2, 0, 2]},
@@ -308,4 +315,22 @@ export function getSelectionsBeforeTextChangeEvent(e: t.TextChangeEvent): Select
   //   [1, 9, 1, 9]]
   // ]
   return e.contentChanges.map(cc => new Selection(cc.range.start, cc.range.end));
+}
+
+export function getSelectionsAfterTextInsertEvent(e: t.TextInsertEvent): Selection[] {
+  return [new Selection(e.revRange.end, e.revRange.end)];
+}
+
+export function getSelectionsBeforeTextInsertEvent(e: t.TextInsertEvent): Selection[] {
+  return [new Selection(e.revRange.start, e.revRange.start)];
+}
+
+export function getTextChangeEventFromTextInsertEvent(e: t.TextInsertEvent): t.TextChangeEvent {
+  return {
+    type: 'textChange',
+    clock: e.clock,
+    contentChanges: [new ContentChange(e.text, new Range(e.revRange.start, e.revRange.start))],
+    revContentChanges: [new ContentChange('', e.revRange)],
+    updateSelection: e.updateSelection,
+  };
 }

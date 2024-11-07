@@ -4,7 +4,7 @@ import os from 'os';
 import fs from 'fs';
 import * as git from './git';
 import * as t from '../lib/types.js';
-import { Position, Range, Selection } from '../lib/lib.js';
+import { Position, Range, Selection, LineRange } from '../lib/lib.js';
 import * as path from '../lib/path.js';
 import _ from 'lodash';
 import assert from 'assert';
@@ -77,6 +77,10 @@ export function toVscRange(range: Range): vscode.Range {
 
 export function fromVscRange(vscRange: vscode.Range): Range {
   return new Range(fromVscPosition(vscRange.start), fromVscPosition(vscRange.end));
+}
+
+export function fromVscLineRange(vscRange: vscode.Range): LineRange {
+  return new LineRange(vscRange.start.line, vscRange.end.line);
 }
 
 export function toVscSelection(selection: Selection): vscode.Selection {

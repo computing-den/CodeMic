@@ -131,7 +131,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
         vscTextEditor.selections = misc.toVscSelections(e.selections);
       }
       if (e.visibleRange) {
-        await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
+        await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start, at: 'top' });
       }
     } else if (e.revUri) {
       const vscTextEditor = await vscode.window.showTextDocument(this.session.uriToVsc(e.revUri), {
@@ -142,7 +142,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
         vscTextEditor.selections = misc.toVscSelections(e.revSelections);
       }
       if (e.revVisibleRange) {
-        await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
+        await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start, at: 'top' });
       }
     }
   }
@@ -159,7 +159,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
         vscTextEditor.selections = misc.toVscSelections(e.revSelections);
       }
       if (e.revVisibleRange) {
-        await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
+        await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start, at: 'top' });
       }
     }
   }
@@ -183,9 +183,9 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     await vscode.window.showTextDocument(this.session.uriToVsc(uri), { preview: false, preserveFocus: false });
 
     if (direction === t.Direction.Forwards) {
-      await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start.line, at: 'top' });
+      await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start, at: 'top' });
     } else {
-      await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start.line, at: 'top' });
+      await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start, at: 'top' });
     }
   }
 
@@ -194,6 +194,10 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     if (!(await vscTextDocument.save())) {
       throw new Error(`Could not save ${uri}`);
     }
+  }
+
+  async applyTextInsertEvent(e: t.TextInsertEvent, uri: t.Uri, direction: t.Direction) {
+    await this.applyTextChangeEvent(lib.getTextChangeEventFromTextInsertEvent(e), uri, direction);
   }
 }
 

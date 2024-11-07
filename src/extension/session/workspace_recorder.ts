@@ -234,15 +234,44 @@ class WorkspaceRecorder {
 
       const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
 
-      const irTextChangeEvent: t.EditorEvent = {
-        type: 'textChange',
-        clock: this.clock,
-        contentChanges: irContentChanges,
-        revContentChanges: irRevContentChanges,
-        updateSelection: false,
-      };
-      this.insertEvent(irTextChangeEvent, uri);
+      // Try to simplify it to textInsert event when:
+      // - There is only one cursor: only one content change.
+      // - No text is replaced: the range's start and end are the same.
+      let irEvent: t.EditorEvent;
+      if (irContentChanges.length === 1 && irContentChanges[0].range.start.isEqual(irContentChanges[0].range.end)) {
+        // example:
+        // contentChanges:    [{"text":"a\nb","range":{"start":{"line":0,"character":5},"end":{"line":0,"character":5}}}]
+        // revContentChanges: [{"range":{"start":{"line":0,"character":5},"end":{"line":1,"character":1}},"text":""}]
+        irEvent = {
+          type: 'textInsert',
+          clock: this.clock,
+          revRange: irRevContentChanges[0].range, // range.start is the position before text insert, while range.end is the position after text insert
+          text: irContentChanges[0].text,
+          updateSelection: false,
+        };
 
+        console.log('XXX textInsert:', irEvent);
+        console.log('XXX equivalent textChange:', lib.getTextChangeEventFromTextInsertEvent(irEvent));
+        console.log('XXX expected textChange:', {
+          type: 'textChange',
+          clock: this.clock,
+          contentChanges: irContentChanges,
+          revContentChanges: irRevContentChanges,
+          updateSelection: false,
+        });
+      } else {
+        irEvent = {
+          type: 'textChange',
+          clock: this.clock,
+          contentChanges: irContentChanges,
+          revContentChanges: irRevContentChanges,
+          updateSelection: false,
+        };
+      }
+
+      this.insertEvent(irEvent, uri);
+
+      // DEBUG
       if (config.debug) {
         assert(
           irTextDocument.getText() === vscTextDocument.getText(),
@@ -250,14 +279,14 @@ class WorkspaceRecorder {
         );
 
         const debugNextIrText = irTextDocument.getText();
-        await this.internalWorkspace.stepper.applyTextChangeEvent(irTextChangeEvent, uri, t.Direction.Backwards);
+        await this.internalWorkspace.stepper.applyEditorEvent(irEvent, uri, t.Direction.Backwards);
         const debugReInitIrText = irTextDocument.getText();
         assert(
           debugInitIrText === debugReInitIrText,
           "textChange: text doesn't match what it was after applying changes in reverse",
         );
 
-        await this.internalWorkspace.stepper.applyTextChangeEvent(irTextChangeEvent, uri, t.Direction.Forwards);
+        await this.internalWorkspace.stepper.applyEditorEvent(irEvent, uri, t.Direction.Forwards);
         assert(
           debugNextIrText === irTextDocument.getText(),
           "textChange: text doesn't match what it was after applying changes again",
@@ -389,6 +418,20 @@ class WorkspaceRecorder {
       }
     }
 
+    // Avoid inserting unnecessary select event if the selections can be calculated
+    // from the last textInsert event.
+    if (lastEvent?.type === 'textInsert' && lastEvent.clock > this.clock - 1) {
+      const calculatedSelections = lib.getSelectionsAfterTextInsertEvent(lastEvent);
+      const calculatedRevSelections = lib.getSelectionsBeforeTextInsertEvent(lastEvent);
+      if (
+        Selection.areEqual(calculatedSelections, irTextEditor.selections) &&
+        Selection.areEqual(calculatedRevSelections, revSelections)
+      ) {
+        lastEvent.updateSelection = true;
+        return;
+      }
+    }
+
     // Merge successive select events.
     if (lastEvent?.type === 'select' && lastEvent.clock > this.clock - 0.2) {
       logAcceptedEvent(`accepted select for ${uri} (SHORTCUT)`);
@@ -426,7 +469,7 @@ class WorkspaceRecorder {
   }
 
   private scroll(vscTextEditor: vscode.TextEditor, vscVisibleRanges: readonly vscode.Range[]) {
-    const visibleRanges = vscVisibleRanges.map(misc.fromVscRange);
+    const visibleRanges = vscVisibleRanges.map(misc.fromVscLineRange);
     logRawEvent(`event: scroll ${vscTextEditor.document.uri} ${JSON.stringify(visibleRanges)}`);
     if (!this.session.shouldRecordVscUri(vscTextEditor.document.uri)) return;
 
@@ -458,13 +501,13 @@ class WorkspaceRecorder {
     const lastEvent = this.internalWorkspace.eventContainer.getTrack(uri).at(-1);
     if (lastEvent?.type === 'scroll' && lastEvent.clock > this.clock - 0.5) {
       logAcceptedEvent(
-        `accepted scroll for ${uri} visible range: ${visibleRange.start.line}:${visibleRange.end.line} (SHORTCUT)`,
+        `accepted scroll for ${uri} visible range: ${visibleRange.start}:${visibleRange.end} (SHORTCUT)`,
       );
       lastEvent.visibleRange = visibleRange;
       return;
     }
 
-    logAcceptedEvent(`accepted scroll for ${uri} visible range: ${visibleRange.start.line}:${visibleRange.end.line}`);
+    logAcceptedEvent(`accepted scroll for ${uri} visible range: ${visibleRange.start}:${visibleRange.end}`);
 
     this.insertEvent(
       {
@@ -550,7 +593,7 @@ class WorkspaceRecorder {
    */
   private async openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri): Promise<InternalTextEditor> {
     const selections = misc.fromVscSelections(vscTextEditor.selections);
-    const visibleRange = misc.fromVscRange(vscTextEditor.visibleRanges[0]);
+    const visibleRange = misc.fromVscLineRange(vscTextEditor.visibleRanges[0]);
     const textDocument = await this.openTextDocumentByUri(vscTextEditor.document, uri);
     let textEditor = this.internalWorkspace.findTextEditorByUri(textDocument.uri);
     if (!textEditor) {

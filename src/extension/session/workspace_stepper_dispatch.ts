@@ -26,5 +26,7 @@ export default function workspaceStepperDispatch(
       return stepper.applyScrollEvent(e, uri, direction, uriSet);
     case 'save':
       return stepper.applySaveEvent(e, uri, direction, uriSet);
+    case 'textInsert':
+      return stepper.applyTextInsertEvent(e, uri, direction, uriSet);
   }
 }

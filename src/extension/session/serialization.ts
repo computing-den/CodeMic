@@ -1,5 +1,5 @@
 import * as t from '../../lib/types.js';
-import { Range, Selection, ContentChange, Position } from '../../lib/lib.js';
+import { Range, LineRange, Selection, ContentChange, Position } from '../../lib/lib.js';
 import _ from 'lodash';
 
 export function serializeSessionBodyJSON(body: t.SessionBodyJSON): t.SessionBodyCompact {
@@ -56,10 +56,10 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
         c: serializeClock(e.clock),
         p: e.preserveFocus ? true : undefined,
         s: e.selections?.map(serializeSelection),
-        v: e.visibleRange && serializeRange(e.visibleRange),
+        v: e.visibleRange && serializeLineRange(e.visibleRange),
         ru: e.revUri,
         rs: e.revSelections?.map(serializeSelection),
-        rv: e.revVisibleRange && serializeRange(e.revVisibleRange),
+        rv: e.revVisibleRange && serializeLineRange(e.revVisibleRange),
       };
 
     case 'closeTextEditor':
@@ -67,7 +67,7 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
         t: 5,
         c: serializeClock(e.clock),
         rs: e.revSelections?.map(serializeSelection),
-        rv: e.revVisibleRange && serializeRange(e.revVisibleRange),
+        rv: e.revVisibleRange && serializeLineRange(e.revVisibleRange),
       };
     case 'select':
       return {
@@ -83,14 +83,22 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
       return {
         t: 7,
         c: serializeClock(e.clock),
-        v: serializeRange(e.visibleRange),
-        rv: e.revVisibleRange && serializeRange(e.revVisibleRange),
+        v: serializeLineRange(e.visibleRange),
+        rv: e.revVisibleRange && serializeLineRange(e.revVisibleRange),
       };
 
     case 'save':
       return {
         t: 8,
         c: serializeClock(e.clock),
+      };
+    case 'textInsert':
+      return {
+        t: 9,
+        c: serializeClock(e.clock),
+        x: e.text,
+        r: serializeRange(e.revRange),
+        u: e.updateSelection ? undefined : false,
       };
   }
 }
@@ -101,6 +109,10 @@ function serializeContentChange(cc: ContentChange): t.ContentChangeCompact {
 
 function serializeRange(r: Range): t.RangeCompact {
   return [r.start.line, r.start.character, r.end.line, r.end.character];
+}
+
+function serializeLineRange(r: LineRange): t.LineRangeCompact {
+  return [r.start, r.end];
 }
 
 function serializeSelection(r: Selection): t.SelectionCompact {
@@ -181,17 +193,17 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
         clock: deserializeClock(e.c),
         preserveFocus: e.p ?? false,
         selections: e.s?.map(deserializeSelection),
-        visibleRange: e.v && deserializeRange(e.v),
+        visibleRange: e.v && deserializeLineRange(e.v),
         revUri: e.ru,
         revSelections: e.rs?.map(deserializeSelection),
-        revVisibleRange: e.rv && deserializeRange(e.rv),
+        revVisibleRange: e.rv && deserializeLineRange(e.rv),
       };
     case 5:
       return {
         type: 'closeTextEditor',
         clock: deserializeClock(e.c),
         revSelections: e.rs?.map(deserializeSelection),
-        revVisibleRange: e.rv && deserializeRange(e.rv),
+        revVisibleRange: e.rv && deserializeLineRange(e.rv),
       };
     case 6:
       return {
@@ -206,13 +218,21 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
       return {
         type: 'scroll',
         clock: deserializeClock(e.c),
-        visibleRange: deserializeRange(e.v),
-        revVisibleRange: deserializeRange(e.rv),
+        visibleRange: deserializeLineRange(e.v),
+        revVisibleRange: deserializeLineRange(e.rv),
       };
     case 8:
       return {
         type: 'save',
         clock: deserializeClock(e.c),
+      };
+    case 9:
+      return {
+        type: 'textInsert',
+        clock: deserializeClock(e.c),
+        text: e.x,
+        revRange: deserializeRange(e.r),
+        updateSelection: e.u ?? true,
       };
   }
 }
@@ -223,6 +243,10 @@ function deserializeContentChange(cc: t.ContentChangeCompact): ContentChange {
 
 function deserializeRange(r: t.RangeCompact): Range {
   return new Range(new Position(r[0], r[1]), new Position(r[2], r[3]));
+}
+
+function deserializeLineRange(r: t.LineRangeCompact): LineRange {
+  return new LineRange(r[0], r[1]);
 }
 
 function deserializeSelection(r: t.SelectionCompact): Selection {
