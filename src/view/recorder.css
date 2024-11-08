@@ -126,220 +126,235 @@
       }
 
       #timeline {
-        flex: 1;
+        /* replace margins with padding so that the numbers on the ruler won't be cut off */
+        margin-bottom: calc(-1 * var(--container-padding-ver));
+        margin-left: calc(-1 * var(--container-padding-hor));
+        margin-right: calc(-1 * var(--container-padding-hor));
+        padding-top: var(--spacing-medium);
+        padding-bottom: var(--spacing-x-large);
+        padding-right: var(--container-padding-hor);
+        padding-left: var(--container-padding-hor);
+
+        flex: 1 0 0;
         display: flex;
-        position: relative;
-        /* margin-left: calc(var(--container-padding-hor) * -1); */
-        /* margin-right: calc(var(--container-padding-hor) * -1); */
-        cursor: pointer;
-        user-select: none;
+        overflow: hidden auto;
 
-        .timeline-body {
-          flex: 1;
-          position: relative;
+        #timeline-body {
+          flex: 1 0 0;
           display: flex;
+          position: relative;
 
-          .track {
-            /* display: flex; */
-            /* justify-content: center; */
-            /* align-items: center; */
-            border-radius: 4px;
-            z-index: var(--track-z-index);
-            transition: background 0.2s ease-in-out;
-            overflow: hidden;
-            /* container-type: size; */
-            /* container-name: track; */
+          /* margin-left: calc(var(--container-padding-hor) * -1); */
+          /* margin-right: calc(var(--container-padding-hor) * -1); */
+          cursor: pointer;
+          user-select: none;
 
-            &:hover,
-            &.active {
-              z-index: var(--active-track-z-index);
-            }
-
-            p {
-              font-size: 0.7rem;
-              width: 100%;
-              height: 100%;
-              text-overflow: ellipsis;
-              white-space: pre;
-              line-height: 10px;
-              padding: 0.3rem;
-              margin: 0;
-
-              .codicon {
-                font-size: 0.7rem;
-              }
-
-              /* @container (min-height: 60px) { */
-              /*   padding: 0.5rem; */
-              /*   font-size: 0.9rem; */
-              /*   .track-text .codicon { */
-              /*     font-size: 0.9rem; */
-              /*   } */
-              /* } */
-            }
-          }
-
-          .editor-track {
-            --left-border-width: 3px;
-            --hor-padding: var(--spacing-medium);
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            left: 0;
-            /* flex: 1; */
-            /* position: relative; */
-
-            .document-focus {
-              position: absolute;
-              left: 0;
-              font-size: 0.8rem;
-              white-space: nowrap;
-              overflow: hidden;
-              border-left: var(--left-border-width) solid;
-              /* border-right: 0; */
-              /* border-bottom: 0; */
-              /* border-top-left-radius: 5px; */
-              padding: var(--spacing-x-small) var(--hor-padding);
-              border-color: var(--editor-track-document-focus-color-1);
-              font-weight: bold;
-            }
-            .document-focus:nth-child(even) {
-              border-color: var(--editor-track-document-focus-color-2);
-            }
-
-            .line-focus {
-              position: absolute;
-              left: var(--left-border-width);
-              font-size: 0.8rem;
-              white-space: nowrap;
-              overflow: hidden;
-              padding: 0 var(--hor-padding);
-              text-overflow: ellipsis;
-              width: calc(100% - 2 * var(--hor-padding));
-              color: var(--editor-track-color);
-            }
-          }
-
-          /* .editor-track { */
-          /*   grid-area: editor-track; */
-          /*   display: grid; */
-          /*   grid-template-columns: repeat(2, 1fr); */
-          /*   grid-gap: 0.5rem; */
-
-          /*   .column { */
-          /*     position: relative; */
-
-          /*     .track { */
-          /*       &.textChange { */
-          /*         border: 1px solid var(--editor-track-text-change-border); */
-          /*         background: var(--editor-track-text-change-background); */
-
-          /*         &:hover, */
-          /*         &.active { */
-          /*           background: var(--editor-track-text-change-background-hover); */
-          /*         } */
-          /*         &.active { */
-          /*           border-color: var(--editor-track-text-change-border-active); */
-          /*         } */
-          /*       } */
-
-          /*       &.documentChange { */
-          /*         border: 1px solid var(--editor-track-document-change-border); */
-          /*         background: var(--editor-track-document-change-background); */
-
-          /*         &:hover, */
-          /*         &.active { */
-          /*           background: var(--editor-track-document-change-background-hover); */
-          /*         } */
-          /*         &.active { */
-          /*           border-color: var(--editor-track-document-change-border-active); */
-          /*         } */
-          /*       } */
-          /*     } */
-          /*   } */
-          /* } */
-
-          .ranged-tracks {
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            /* left: 0; */
-            width: 130px;
-            /* position: relative; */
+          .timeline-grid {
+            flex: 1;
+            position: relative;
+            display: flex;
 
             .track {
-              position: absolute;
-              border: 1px solid var(--ranged-track-border);
-              background: var(--ranged-track-background);
-              /* right: 0; */
+              /* display: flex; */
+              /* justify-content: center; */
+              /* align-items: center; */
+              border-radius: 4px;
+              z-index: var(--track-z-index);
+              transition: background 0.2s ease-in-out;
               overflow: hidden;
-              min-width: 10px;
+              /* container-type: size; */
+              /* container-name: track; */
 
               &:hover,
               &.active {
-                background: var(--ranged-track-background-hover);
+                z-index: var(--active-track-z-index);
               }
-              &.active {
-                border-color: var(--ranged-track-border-active);
+
+              p {
+                font-size: 0.7rem;
+                width: 100%;
+                height: 100%;
+                text-overflow: ellipsis;
+                white-space: pre;
+                line-height: 10px;
+                padding: 0.3rem;
+                margin: 0;
+
+                .codicon {
+                  font-size: 0.7rem;
+                }
+
+                /* @container (min-height: 60px) { */
+                /*   padding: 0.5rem; */
+                /*   font-size: 0.9rem; */
+                /*   .track-text .codicon { */
+                /*     font-size: 0.9rem; */
+                /*   } */
+                /* } */
               }
             }
-          }
 
-          .markers {
-            .marker {
+            .editor-track {
+              --left-border-width: 3px;
+              --hor-padding: var(--spacing-medium);
               position: absolute;
-              left: 0;
+              top: 0;
               right: 0;
-              /* height: 1px; */
-              border-top: 1px solid;
-              z-index: var(--marker-z-index);
+              bottom: 0;
+              left: 0;
+              /* flex: 1; */
+              /* position: relative; */
 
-              /* &:hover { */
-              /*   z-index: 1; */
-              /* } */
+              .document-focus {
+                position: absolute;
+                left: 0;
+                font-size: 0.8rem;
+                white-space: nowrap;
+                overflow: hidden;
+                border-left: var(--left-border-width) solid;
+                /* border-right: 0; */
+                /* border-bottom: 0; */
+                /* border-top-left-radius: 5px; */
+                padding: var(--spacing-x-small) var(--hor-padding);
+                border-color: var(--editor-track-document-focus-color-1);
+                font-weight: bold;
+              }
+              .document-focus:nth-child(even) {
+                border-color: var(--editor-track-document-focus-color-2);
+              }
 
-              /* &.marker_hidden { */
-              /*   display: none; */
-              /* } */
-              &.marker_active {
-                border-width: 2px;
+              .line-focus {
+                position: absolute;
+                left: var(--left-border-width);
+                font-size: 0.8rem;
+                white-space: nowrap;
+                overflow: hidden;
+                padding: 0 var(--hor-padding);
+                text-overflow: ellipsis;
+                width: calc(100% - 2 * var(--hor-padding));
+                color: var(--editor-track-color);
               }
-              &.marker_cursor {
-                border-color: var(--marker-cursor-color);
-                z-index: var(--cursor-marker-z-index);
-                pointer-events: none;
-              }
-              &.marker_clock {
-                border-color: var(--marker-clock-color);
-              }
-              &.marker_anchor {
-                border-color: var(--marker-anchor-color);
-              }
-              &.marker_selection {
-                border-color: var(--marker-anchor-color);
-              }
-              &.marker_end {
-                border-color: var(--marker-end-color);
-                border-width: 3px;
+            }
 
-                &:hover {
-                  border-width: var(--marker-end-color-hover);
-                  border-width: 3px;
-                  font-weight: bold;
+            /* .editor-track { */
+            /*   grid-area: editor-track; */
+            /*   display: grid; */
+            /*   grid-template-columns: repeat(2, 1fr); */
+            /*   grid-gap: 0.5rem; */
+
+            /*   .column { */
+            /*     position: relative; */
+
+            /*     .track { */
+            /*       &.textChange { */
+            /*         border: 1px solid var(--editor-track-text-change-border); */
+            /*         background: var(--editor-track-text-change-background); */
+
+            /*         &:hover, */
+            /*         &.active { */
+            /*           background: var(--editor-track-text-change-background-hover); */
+            /*         } */
+            /*         &.active { */
+            /*           border-color: var(--editor-track-text-change-border-active); */
+            /*         } */
+            /*       } */
+
+            /*       &.documentChange { */
+            /*         border: 1px solid var(--editor-track-document-change-border); */
+            /*         background: var(--editor-track-document-change-background); */
+
+            /*         &:hover, */
+            /*         &.active { */
+            /*           background: var(--editor-track-document-change-background-hover); */
+            /*         } */
+            /*         &.active { */
+            /*           border-color: var(--editor-track-document-change-border-active); */
+            /*         } */
+            /*       } */
+            /*     } */
+            /*   } */
+            /* } */
+
+            .ranged-tracks {
+              position: absolute;
+              top: 0;
+              right: 0;
+              bottom: 0;
+              /* left: 0; */
+              width: 130px;
+              /* position: relative; */
+
+              .track {
+                position: absolute;
+                border: 1px solid var(--ranged-track-border);
+                background: var(--ranged-track-background);
+                /* right: 0; */
+                overflow: hidden;
+                min-width: 10px;
+
+                &:hover,
+                &.active {
+                  background: var(--ranged-track-background-hover);
+                }
+                &.active {
+                  border-color: var(--ranged-track-border-active);
                 }
               }
-              &.marker_recording {
-                border-color: var(--marker-end-color);
-              }
+            }
 
-              /* &.draggable { */
-              /*   cursor: grab; */
-              /* } */
+            .markers {
+              .marker {
+                position: absolute;
+                left: 0;
+                right: 0;
+                /* height: 1px; */
+                border-top: 1px solid;
+                z-index: var(--marker-z-index);
 
-              .time {
-                /*
+                /* &:hover { */
+                /*   z-index: 1; */
+                /* } */
+
+                /* &.marker_hidden { */
+                /*   display: none; */
+                /* } */
+                &.marker_active {
+                  border-width: 2px;
+                }
+                &.marker_cursor {
+                  border-color: var(--marker-cursor-color);
+                  z-index: var(--cursor-marker-z-index);
+                  pointer-events: none;
+                }
+                &.marker_clock {
+                  border-color: var(--marker-clock-color);
+                }
+                &.marker_anchor {
+                  border-color: var(--marker-anchor-color);
+                }
+                &.marker_selection {
+                  border-color: var(--marker-anchor-color);
+                }
+                &.marker_end {
+                  border-color: var(--marker-end-color);
+                  border-width: 3px;
+
+                  &:hover {
+                    border-width: var(--marker-end-color-hover);
+                    border-width: 3px;
+                    font-weight: bold;
+                  }
+                }
+                &.marker_recording {
+                  border-color: var(--marker-end-color);
+                }
+
+                /* &.draggable { */
+                /*   cursor: grab; */
+                /* } */
+
+                .time {
+                  /*
             position: absolute;
             left: calc(100% + 3px);
             background: var(--vscode-sideBar-background);
@@ -347,55 +362,56 @@
             top: -11px;
             font-weight: bold;
             */
-                position: absolute;
-                left: calc(100% + 9px);
-                background: var(--input-background);
-                top: -12px;
-                font-size: 0.9em;
-                padding: var(--input-padding-vertical) var(--input-padding-horizontal);
-                border-radius: 8px;
-                border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--dropdown-border));
-                text-align: center;
+                  position: absolute;
+                  left: calc(100% + 9px);
+                  background: var(--input-background);
+                  top: -12px;
+                  font-size: 0.9em;
+                  padding: var(--input-padding-vertical) var(--input-padding-horizontal);
+                  border-radius: 8px;
+                  border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--dropdown-border));
+                  text-align: center;
+                }
               }
             }
           }
-        }
 
-        #ruler {
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          /* padding-left: 8px; */
-          border-left: 1px solid var(--vscode-input-border, var(--dropdown-border));
-          /* overflow: hidden; */
-          margin-left: auto;
-          margin-right: 0;
-
-          .step {
+          #ruler {
             display: flex;
-            height: 0;
-            position: relative;
-            overflow: visible;
+            flex-direction: column;
+            justify-content: space-between;
+            /* padding-left: 8px; */
+            border-left: 1px solid var(--vscode-input-border, var(--dropdown-border));
+            /* overflow: hidden; */
+            margin-left: auto;
+            margin-right: 0;
 
-            .indicator {
-              width: 7px;
-              border-top: 1px solid var(--vscode-input-border, var(--dropdown-border));
+            .step {
+              display: flex;
+              height: 0;
+              position: relative;
+              overflow: visible;
+
+              .indicator {
+                width: 7px;
+                border-top: 1px solid var(--vscode-input-border, var(--dropdown-border));
+              }
+              .time {
+                margin-left: 5px;
+                margin-top: -7px;
+                font-size: 0.9em;
+                opacity: 0.8;
+              }
+              /* position: relative; */
+              /* &::after { */
+              /*   content: ''; */
+              /*   position: absolute; */
+              /*   right: calc(100% + 3px); */
+              /*   width: 11px; */
+              /*   border-bottom: 1px solid var(--vscode-input-border, var(--dropdown-border)); */
+              /*   top: 50%; */
+              /* } */
             }
-            .time {
-              margin-left: 5px;
-              margin-top: -7px;
-              font-size: 0.9em;
-              opacity: 0.8;
-            }
-            /* position: relative; */
-            /* &::after { */
-            /*   content: ''; */
-            /*   position: absolute; */
-            /*   right: calc(100% + 3px); */
-            /*   width: 11px; */
-            /*   border-bottom: 1px solid var(--vscode-input-border, var(--dropdown-border)); */
-            /*   top: 50%; */
-            /* } */
           }
         }
       }

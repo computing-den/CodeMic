@@ -3,6 +3,7 @@ import MediaToolbar, * as MT from './media_toolbar.jsx';
 import { h, Fragment, Component } from 'preact';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
+import { Vec2, Rect } from '../lib/lib.js';
 import assert from '../lib/assert.js';
 // import FakeMedia from './fake_media.js';
 import PathField from './path_field.jsx';
@@ -19,6 +20,10 @@ import _ from 'lodash';
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
 const TRACK_INDENT_PX = 5;
+const TIMELINE_STEP_HEIGHT = 30;
+const TIMELINE_INITIAL_STEP_DURATION = 10;
+const TIMELINE_MIN_STEP_DURATION = 5;
+const TIMELINE_ZOOM_MULTIPLIER = 10;
 
 type Props = { user?: t.User; recorder: t.RecorderState };
 export default class Recorder extends Component<Props> {
@@ -253,7 +258,7 @@ class EditorView extends Component<EditorViewProps> {
     anchor: undefined as Marker | undefined,
     markers: [] as Marker[],
     trackSelection: undefined as TrackSelection | undefined,
-    timelineHeightPx: 0,
+    // timelineHeightPx: 0,
   };
 
   updateState = (recipe: EditorViewStateRecipe) => this.setState(state => produce(state, recipe));
@@ -285,33 +290,6 @@ class EditorView extends Component<EditorViewProps> {
       await postMessage({ type: 'recorder/insertVideo', uri: uris[0], clock });
     }
   };
-
-  updateTimelineHeightPx = () => {
-    const timelineHeightPx = document.getElementById('timeline')!.getBoundingClientRect().height;
-    console.log('updateTimelineHeightPx', timelineHeightPx);
-    this.updateState(state => {
-      state.timelineHeightPx = timelineHeightPx;
-    });
-  };
-
-  resized = () => {
-    this.updateTimelineHeightPx();
-  };
-
-  componentDidMount() {
-    window.addEventListener('resize', this.resized);
-    this.updateTimelineHeightPx();
-  }
-
-  componentWillUnmount() {
-    window.removeEventListener('resize', this.resized);
-  }
-
-  componentDidUpdate(prevProps: EditorViewProps) {
-    if (!prevProps.active && this.props.active) {
-      this.updateTimelineHeightPx();
-    }
-  }
 
   render() {
     const { id, recorder, className, onRecord, onPlay } = this.props;
@@ -393,7 +371,6 @@ class EditorView extends Component<EditorViewProps> {
           trackSelection={this.state.trackSelection}
           clock={recorder.clock}
           duration={recorder.sessionHead.duration}
-          timelineHeightPx={this.state.timelineHeightPx}
           onChange={this.updateState}
         />
       </div>
@@ -409,27 +386,46 @@ type TimelineProps = {
   trackSelection?: TrackSelection;
   clock: number;
   duration: number;
-  timelineHeightPx: number;
   onChange: (draft: EditorViewStateRecipe) => any;
 };
 type TimelineState = {
-  stepCount: number;
+  stepDuration: number;
   trackDragStart?: TrackSelection & t.RangedTrack & { clock: number };
   markerDragStart?: Marker;
+  // timelineHeightPx: number;
 };
 class Timeline extends Component<TimelineProps, TimelineState> {
   state = {
-    stepCount: 10,
+    stepDuration: TIMELINE_INITIAL_STEP_DURATION,
     trackDragStart: undefined,
+    // timelineHeightPx: 1,
   } as TimelineState;
 
-  getTimelineStepClock(): number {
-    return calcTimelineStepClock(this.props.recorder.sessionHead.duration, this.state.stepCount);
-  }
+  // getTimelineStepClock(): number {
+  //   return calcTimelineStepClock(this.props.recorder.sessionHead.duration, this.state.stepCount);
+  // }
 
   getTimelineDuration(): number {
-    return this.getTimelineStepClock() * this.state.stepCount;
+    return roundTo(this.props.recorder.sessionHead.duration + this.state.stepDuration * 4, this.state.stepDuration + 1);
   }
+
+  wheelMoved = (e: WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      const newStepDuration = this.state.stepDuration + (e.deltaY / 100) * TIMELINE_ZOOM_MULTIPLIER;
+      const clippedStepDuration = Math.min(
+        this.getTimelineDuration() / 2,
+        Math.max(TIMELINE_MIN_STEP_DURATION, newStepDuration),
+      );
+      // const deltaModes = { 0: 'pixel', 1: 'line', 2: 'page' } as Record<number, string>;
+      // console.log(
+      //   `wheel delta: ${e.deltaY}, wheel deltaMode: ${
+      //     deltaModes[e.deltaMode]
+      //   }, new step dur: ${newStepDuration}, clipped: ${clippedStepDuration}`,
+      // );
+
+      this.setState({ stepDuration: clippedStepDuration });
+    }
+  };
 
   mouseMoved = (e: MouseEvent) => {
     const clock = this.getClockUnderMouse(e, { emptySpace: true });
@@ -557,47 +553,83 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     }
   };
 
+  autoScroll = () => {
+    if (this.props.recorder.recording) {
+      const timeline = document.getElementById('timeline')!;
+      const atBottom = timeline.scrollTop + timeline.clientHeight >= timeline.scrollHeight;
+      if (!atBottom) {
+        timeline.scrollTo({ top: timeline.scrollHeight, behavior: 'instant' });
+      }
+    }
+  };
+
   getClockUnderMouse(e: MouseEvent, opts?: { emptySpace?: boolean }): number | undefined {
     if (opts?.emptySpace) {
       const target = e.target as HTMLElement;
-      return target.closest('.track') || target.closest('.marker') ? undefined : this.getClockUnderMouse(e);
+      if (target.closest('.track') || target.closest('.marker')) return;
     }
 
-    const clientPos = new lib.Vec2(e.clientX, e.clientY);
+    const clientPos = new Vec2(e.clientX, e.clientY);
     const timeline = document.getElementById('timeline')!;
-    const timelineRect = lib.Rect.fromDOMRect(timeline.getBoundingClientRect());
-    if (timelineRect.isPointInRect(clientPos, { top: 5 })) {
-      const mouseOffsetInTimeline = Math.max(0, clientPos.y - timelineRect.top);
-      const ratio = mouseOffsetInTimeline / timelineRect.height;
+    const timelineBody = document.getElementById('timeline-body')!;
+    const timelineRect = Rect.fromDOMRect(timeline.getBoundingClientRect());
+    const timelineBodyRect = Rect.fromDOMRect(timelineBody.getBoundingClientRect());
+    if (timelineRect.isPointInRect(clientPos)) {
+      const mouseOffsetInTimelineBody = Math.min(
+        timelineBodyRect.height,
+        Math.max(0, clientPos.y - timelineBodyRect.top),
+      );
+      const ratio = mouseOffsetInTimelineBody / timelineBodyRect.height;
       return ratio * this.getTimelineDuration();
     }
   }
 
+  // updateTimelineHeightPx = () => {
+  //   const timelineHeightPx = document.getElementById('timeline-body')!.getBoundingClientRect().height;
+  //   if (timelineHeightPx !== this.state.timelineHeightPx) {
+  //     console.log('updateTimelineHeightPx', timelineHeightPx);
+  //     this.setState({ timelineHeightPx });
+  //   }
+  // };
+
+  // resized = () => this.updateTimelineHeightPx();
+
   componentDidMount() {
+    // window.addEventListener('resize', this.resized);
+    // this.updateTimelineHeightPx();
+
+    document.addEventListener('wheel', this.wheelMoved);
     document.addEventListener('mousemove', this.mouseMoved);
     document.addEventListener('mousedown', this.mouseDown);
     document.addEventListener('mouseup', this.mouseUp);
     document.addEventListener('keydown', this.keyDown);
 
-    const timeline = document.getElementById('timeline')!;
-    timeline.addEventListener('mouseleave', this.mouseLeft);
-    timeline.addEventListener('mouseout', this.mouseOut);
+    const timelineBody = document.getElementById('timeline-body')!;
+    timelineBody.addEventListener('mouseleave', this.mouseLeft);
+    timelineBody.addEventListener('mouseout', this.mouseOut);
   }
 
   componentWillUnmount() {
+    // window.removeEventListener('resize', this.resized);
+
+    document.removeEventListener('wheel', this.wheelMoved);
     document.removeEventListener('mousemove', this.mouseMoved);
     document.removeEventListener('mousedown', this.mouseDown);
     document.removeEventListener('mouseup', this.mouseUp);
     document.removeEventListener('keydown', this.keyDown);
 
-    const timeline = document.getElementById('timeline')!;
-    timeline.removeEventListener('mouseleave', this.mouseLeft);
-    timeline.removeEventListener('mouseout', this.mouseOut);
+    const timelineBody = document.getElementById('timeline-body')!;
+    timelineBody.removeEventListener('mouseleave', this.mouseLeft);
+    timelineBody.removeEventListener('mouseout', this.mouseOut);
+  }
+
+  componentDidUpdate(prevProps: TimelineProps) {
+    this.autoScroll();
   }
 
   render() {
-    const { markers, cursor, anchor, clock, trackSelection, duration, timelineHeightPx, recorder } = this.props;
-    const { stepCount } = this.state;
+    const { markers, cursor, anchor, clock, trackSelection, duration, recorder } = this.props;
+    const { stepDuration /*timelineHeightPx*/ } = this.state;
     const clockMarker: Marker | undefined =
       clock > 0 && clock !== duration && !recorder.recording ? { clock, type: 'clock' } : undefined;
     const endOrRecordingMarker: Marker = recorder.recording
@@ -621,39 +653,45 @@ class Timeline extends Component<TimelineProps, TimelineState> {
 
     return (
       <div id="timeline" className="subsection">
-        <div className="timeline-body">
-          <EditorTrackUI
-            workspaceFocusTimeline={recorder.workspaceFocusTimeline}
-            timelineDuration={timelineDuration}
-            timelineHeightPx={timelineHeightPx}
-          />
-          <RangedTracksUI
-            timelineDuration={timelineDuration}
-            tracks={tracks}
-            trackSelection={trackSelection}
-            onClick={this.trackClicked}
-            onDrag={this.trackDragged}
-            onDragStart={this.trackDragStarted}
-          />
-          <div className="markers">
-            {allMarkers.map(marker => (
-              <MarkerUI
-                marker={marker}
-                timelineDuration={timelineDuration}
-                onClick={this.markerClicked}
-                onDragStart={this.markerDragStarted}
-                onDrag={this.markerDragged}
-              />
+        <div
+          id="timeline-body"
+          style={{ minHeight: `${(this.getTimelineDuration() / stepDuration + 1) * TIMELINE_STEP_HEIGHT}px` }}
+        >
+          <div className="timeline-grid">
+            <EditorTrackUI
+              workspaceFocusTimeline={recorder.workspaceFocusTimeline}
+              timelineDuration={timelineDuration}
+              // timelineHeightPx={timelineHeightPx}
+              stepDuration={stepDuration}
+            />
+            <RangedTracksUI
+              timelineDuration={timelineDuration}
+              tracks={tracks}
+              trackSelection={trackSelection}
+              onClick={this.trackClicked}
+              onDrag={this.trackDragged}
+              onDragStart={this.trackDragStarted}
+            />
+            <div className="markers">
+              {allMarkers.map(marker => (
+                <MarkerUI
+                  marker={marker}
+                  timelineDuration={timelineDuration}
+                  onClick={this.markerClicked}
+                  onDragStart={this.markerDragStarted}
+                  onDrag={this.markerDragged}
+                />
+              ))}
+            </div>
+          </div>
+          <div id="ruler">
+            {_.times(this.getTimelineDuration() / stepDuration + 1, i => (
+              <div className="step">
+                <div className="indicator"></div>
+                <div className="time">{lib.formatTimeSeconds(i * stepDuration)}</div>
+              </div>
             ))}
           </div>
-        </div>
-        <div id="ruler">
-          {_.times(stepCount + 1, i => (
-            <div className="step">
-              <div className="indicator"></div>
-              <div className="time">{lib.formatTimeSeconds(i * this.getTimelineStepClock())}</div>
-            </div>
-          ))}
         </div>
       </div>
     );
@@ -775,12 +813,12 @@ class RangedTracksUI extends Component<RangedTracksUIProps> {
 
 type EditorTrackUIProps = {
   timelineDuration: number;
-  timelineHeightPx: number;
+  stepDuration: number;
   workspaceFocusTimeline?: t.WorkspaceFocusTimeline;
 };
 class EditorTrackUI extends Component<EditorTrackUIProps> {
   render() {
-    const { timelineDuration, timelineHeightPx, workspaceFocusTimeline } = this.props;
+    const { timelineDuration, stepDuration, workspaceFocusTimeline } = this.props;
 
     // const lineFocusItems:t.LineFocus [] = [];
     // if (workspaceFocusTimeline) {
@@ -808,7 +846,8 @@ class EditorTrackUI extends Component<EditorTrackUIProps> {
 
     // Skip lines that may cut into the previous line.
     const lineFocusTimeline: (t.LineFocus & { offsetPx?: number })[] = [];
-    const heightOf1Sec = timelineHeightPx / timelineDuration;
+    // const heightOf1Sec = timelineHeightPx / timelineDuration;
+    const heightOf1Sec = TIMELINE_STEP_HEIGHT / stepDuration;
     for (const lineFocus of workspaceFocusTimeline?.lines || []) {
       const lastLineFocus = lineFocusTimeline.at(-1);
       if (!lastLineFocus) {
