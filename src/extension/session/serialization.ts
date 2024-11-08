@@ -120,7 +120,7 @@ function serializeSelection(r: Selection): t.SelectionCompact {
 }
 
 function serializeClock(clock: number): number {
-  return Math.floor(clock * 1000);
+  return Math.floor(clock * 10);
 }
 
 function serializeClockRange(cr: t.ClockRange): t.ClockRangeCompact {
@@ -254,7 +254,7 @@ function deserializeSelection(r: t.SelectionCompact): Selection {
 }
 
 function deserializeClock(clock: number): number {
-  return clock / 1000;
+  return clock / 10;
 }
 
 function deserializeClockRange(cr: t.ClockRangeCompact): t.ClockRange {
