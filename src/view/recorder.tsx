@@ -14,16 +14,20 @@ import Screen from './screen.jsx';
 import Section from './section.jsx';
 import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
+import Toolbar from './toolbar.jsx';
 import { cn } from './misc.js';
 import _ from 'lodash';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
 const TRACK_INDENT_PX = 5;
-const TIMELINE_STEP_HEIGHT = 30;
-const TIMELINE_INITIAL_STEP_DURATION = 30;
-const TIMELINE_MIN_STEP_DURATION = 5;
-const TIMELINE_ZOOM_MULTIPLIER = 10;
+// const TIMELINE_STEP_HEIGHT = 30;
+// const TIMELINE_INITIAL_STEP_DURATION = 30;
+const TIMELINE_DEFAULT_PX_TO_SEC_RATIO = 1;
+const TIMELINE_MAX_PX_TO_TIME_RATIO = 5;
+const TIMELINE_MIN_PX_TO_TIME_RATIO = 1 / 60;
+// const TIMELINE_MIN_STEP_DURATION = 5;
+const TIMELINE_WHEEL_ZOOM_SPEED = 0.001;
 
 type Props = { user?: t.User; recorder: t.RecorderState };
 export default class Recorder extends Component<Props> {
@@ -313,7 +317,7 @@ class EditorView extends Component<EditorViewProps> {
       };
     }
 
-    const toolbarActions = [
+    const mediaToolbarActions = [
       recorder.playing
         ? {
             title: 'Pause',
@@ -328,6 +332,9 @@ class EditorView extends Component<EditorViewProps> {
             disabled: recorder.recording,
             onClick: () => onPlay(this.state.anchor?.clock),
           },
+    ];
+
+    const toolbarActions = [
       {
         title: 'Insert audio',
         icon: 'codicon-mic',
@@ -353,7 +360,7 @@ class EditorView extends Component<EditorViewProps> {
         <MediaToolbar
           className="subsection subsection_spaced"
           primaryAction={primaryAction}
-          actions={toolbarActions}
+          actions={mediaToolbarActions}
           clock={recorder.clock}
           duration={s.duration}
         />
@@ -362,6 +369,9 @@ class EditorView extends Component<EditorViewProps> {
           <div className="empty-content">
             <span className="codicon codicon-device-camera-video" />
           </div>
+        </div>
+        <div className="subsection">
+          <Toolbar actions={toolbarActions} />
         </div>
         <Timeline
           recorder={recorder}
@@ -389,14 +399,14 @@ type TimelineProps = {
   onChange: (draft: EditorViewStateRecipe) => any;
 };
 type TimelineState = {
-  stepDuration: number;
+  pxToSecRatio: number;
   trackDragStart?: TrackSelection & t.RangedTrack & { clock: number };
   markerDragStart?: Marker;
   // timelineHeightPx: number;
 };
 class Timeline extends Component<TimelineProps, TimelineState> {
   state = {
-    stepDuration: TIMELINE_INITIAL_STEP_DURATION,
+    pxToSecRatio: TIMELINE_DEFAULT_PX_TO_SEC_RATIO,
     trackDragStart: undefined,
     // timelineHeightPx: 1,
   } as TimelineState;
@@ -413,8 +423,30 @@ class Timeline extends Component<TimelineProps, TimelineState> {
   //   return calcTimelineStepClock(this.props.recorder.sessionHead.duration, this.state.stepCount);
   // }
 
+  getRulerStepDur(): number {
+    const { pxToSecRatio } = this.state;
+    if (pxToSecRatio >= 3.4 && pxToSecRatio <= 5) {
+      return 5;
+    } else if (pxToSecRatio >= 1.6 && pxToSecRatio < 3.4) {
+      return 10;
+    } else if (pxToSecRatio >= 0.64 && pxToSecRatio < 1.6) {
+      return 30;
+    } else if (pxToSecRatio >= 0.3 && pxToSecRatio < 0.64) {
+      return 60;
+    } else if (pxToSecRatio >= 0.11 && pxToSecRatio < 0.3) {
+      return 60 * 5;
+    } else if (pxToSecRatio >= 0.06 && pxToSecRatio < 0.11) {
+      return 60 * 10;
+    } else if (pxToSecRatio >= 0.03 && pxToSecRatio < 0.06) {
+      return 60 * 15;
+    } else {
+      return 60 * 30;
+    }
+  }
+
   getTimelineDuration(): number {
-    return roundTo(this.props.recorder.sessionHead.duration + this.state.stepDuration * 4, this.state.stepDuration + 1);
+    const stepDur = this.getRulerStepDur();
+    return roundTo(this.props.recorder.sessionHead.duration + stepDur * 4, stepDur);
   }
 
   wheelMoved = (e: WheelEvent) => {
@@ -430,12 +462,25 @@ class Timeline extends Component<TimelineProps, TimelineState> {
       console.log('setting zoomState: ', JSON.stringify(this.zoomState));
       // }
 
-      const newStepDuration = this.state.stepDuration + (e.deltaY / 100) * TIMELINE_ZOOM_MULTIPLIER;
-      const clippedStepDuration = Math.min(
-        this.getTimelineDuration() / 2,
-        Math.max(TIMELINE_MIN_STEP_DURATION, newStepDuration),
-      );
-      this.setState({ stepDuration: clippedStepDuration });
+      // 120  => px2sec = px2sec * 1.1
+      // -120 => px2sec = px2sec * 0.9
+
+      // 120 / 1000 = 0.12
+      // 0.12 + 1 = 1.12
+
+      // -120 /1000 = -0.12
+      // -0.12 + 1 = 0.88
+
+      let pxToSecRatio = this.state.pxToSecRatio * (1 - e.deltaY * TIMELINE_WHEEL_ZOOM_SPEED);
+      pxToSecRatio = Math.min(TIMELINE_MAX_PX_TO_TIME_RATIO, Math.max(TIMELINE_MIN_PX_TO_TIME_RATIO, pxToSecRatio));
+      this.setState({ pxToSecRatio });
+
+      // // const newStepDuration = this.state.stepDuration + (e.deltaY / 100) * TIMELINE_ZOOM_MULTIPLIER;
+      // const clippedStepDuration = Math.min(
+      //   this.getTimelineDuration() / 2,
+      //   Math.max(TIMELINE_MIN_STEP_DURATION, newStepDuration),
+      // );
+      // this.setState({ stepDuration: clippedStepDuration });
 
       // const deltaModes = { 0: 'pixel', 1: 'line', 2: 'page' } as Record<number, string>;
       // console.log(
@@ -661,7 +706,9 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     // window.addEventListener('resize', this.resized);
     // this.updateTimelineHeightPx();
 
-    document.addEventListener('wheel', this.wheelMoved);
+    const timeline = document.getElementById('timeline')!;
+    timeline.addEventListener('wheel', this.wheelMoved);
+
     document.addEventListener('mousemove', this.mouseMoved);
     document.addEventListener('mousedown', this.mouseDown);
     document.addEventListener('mouseup', this.mouseUp);
@@ -675,7 +722,8 @@ class Timeline extends Component<TimelineProps, TimelineState> {
   componentWillUnmount() {
     // window.removeEventListener('resize', this.resized);
 
-    document.removeEventListener('wheel', this.wheelMoved);
+    const timeline = document.getElementById('timeline')!;
+    timeline.removeEventListener('wheel', this.wheelMoved);
     document.removeEventListener('mousemove', this.mouseMoved);
     document.removeEventListener('mousedown', this.mouseDown);
     document.removeEventListener('mouseup', this.mouseUp);
@@ -691,14 +739,14 @@ class Timeline extends Component<TimelineProps, TimelineState> {
       this.autoScroll();
     }
 
-    if (prevState.stepDuration !== this.state.stepDuration) {
+    if (prevState.pxToSecRatio !== this.state.pxToSecRatio) {
       this.scrollAfterZoom();
     }
   }
 
   render() {
     const { markers, cursor, anchor, clock, trackSelection, duration, recorder } = this.props;
-    const { stepDuration /*timelineHeightPx*/ } = this.state;
+    const { pxToSecRatio /*timelineHeightPx*/ } = this.state;
     const clockMarker: Marker | undefined =
       clock > 0 && clock !== duration && !recorder.recording ? { clock, type: 'clock' } : undefined;
     const endOrRecordingMarker: Marker = recorder.recording
@@ -720,18 +768,22 @@ class Timeline extends Component<TimelineProps, TimelineState> {
       track => track.clockRange.start,
     );
 
+    const rulerStepDur = this.getRulerStepDur();
+
     return (
       <div id="timeline" className="subsection">
         <div
           id="timeline-body"
-          style={{ minHeight: `${(this.getTimelineDuration() / stepDuration + 1) * TIMELINE_STEP_HEIGHT}px` }}
+          style={{
+            height: `${this.getTimelineDuration() * pxToSecRatio + 1}px`,
+          }}
         >
           <div className="timeline-grid">
             <EditorTrackUI
               workspaceFocusTimeline={recorder.workspaceFocusTimeline}
               timelineDuration={timelineDuration}
               // timelineHeightPx={timelineHeightPx}
-              stepDuration={stepDuration}
+              pxToSecRatio={pxToSecRatio}
             />
             <RangedTracksUI
               timelineDuration={timelineDuration}
@@ -754,10 +806,10 @@ class Timeline extends Component<TimelineProps, TimelineState> {
             </div>
           </div>
           <div id="ruler">
-            {_.times(this.getTimelineDuration() / stepDuration + 1, i => (
+            {_.times(this.getTimelineDuration() / rulerStepDur + 1, i => (
               <div className="step">
                 <div className="indicator"></div>
-                <div className="time">{lib.formatTimeSeconds(i * stepDuration)}</div>
+                <div className="time">{lib.formatTimeSeconds(i * rulerStepDur)}</div>
               </div>
             ))}
           </div>
@@ -882,12 +934,12 @@ class RangedTracksUI extends Component<RangedTracksUIProps> {
 
 type EditorTrackUIProps = {
   timelineDuration: number;
-  stepDuration: number;
+  pxToSecRatio: number;
   workspaceFocusTimeline?: t.WorkspaceFocusTimeline;
 };
 class EditorTrackUI extends Component<EditorTrackUIProps> {
   render() {
-    const { timelineDuration, stepDuration, workspaceFocusTimeline } = this.props;
+    const { timelineDuration, pxToSecRatio, workspaceFocusTimeline } = this.props;
 
     // const lineFocusItems:t.LineFocus [] = [];
     // if (workspaceFocusTimeline) {
@@ -916,7 +968,7 @@ class EditorTrackUI extends Component<EditorTrackUIProps> {
     // Skip lines that may cut into the previous line.
     const lineFocusTimeline: (t.LineFocus & { offsetPx?: number })[] = [];
     // const heightOf1Sec = timelineHeightPx / timelineDuration;
-    const heightOf1Sec = TIMELINE_STEP_HEIGHT / stepDuration;
+    // const heightOf1Sec = TIMELINE_STEP_HEIGHT / stepDuration;
     for (const lineFocus of workspaceFocusTimeline?.lines || []) {
       const lastLineFocus = lineFocusTimeline.at(-1);
       if (!lastLineFocus) {
@@ -938,9 +990,9 @@ class EditorTrackUI extends Component<EditorTrackUIProps> {
       // | |
       //   | second line
 
-      const lastLineBottomPx = lastLineFocus.clockRange.start * heightOf1Sec + TRACK_HEIGHT_PX;
-      const lineOriginalTopPx = lineFocus.clockRange.start * heightOf1Sec;
-      const lineOriginalBottomPx = lineFocus.clockRange.end * heightOf1Sec;
+      const lastLineBottomPx = lastLineFocus.clockRange.start * pxToSecRatio + TRACK_HEIGHT_PX;
+      const lineOriginalTopPx = lineFocus.clockRange.start * pxToSecRatio;
+      const lineOriginalBottomPx = lineFocus.clockRange.end * pxToSecRatio;
 
       const availableSpace = lineOriginalBottomPx - lastLineBottomPx;
       const requiredSpace = TRACK_HEIGHT_PX + TRACK_MIN_GAP_PX;
@@ -1088,9 +1140,9 @@ function roundTo(value: number, to: number) {
   return Math.floor((value + to - 1) / to) * to;
 }
 
-function calcTimelineStepClock(dur: number, steps: number): number {
-  return Math.max(roundTo(dur / steps, 30), 30);
-}
+// function calcTimelineStepClock(dur: number, steps: number): number {
+//   return Math.max(roundTo(dur / steps, 30), 30);
+// }
 
 // function groupEditorEvents(
 //   events: t.EditorEvent[],

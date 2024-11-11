@@ -127,10 +127,11 @@
 
       #timeline {
         /* replace margins with padding so that the numbers on the ruler won't be cut off */
+        margin-top: var(--spacing-small);
         margin-bottom: calc(-1 * var(--container-padding-ver));
         margin-left: calc(-1 * var(--container-padding-hor));
         margin-right: calc(-1 * var(--container-padding-hor));
-        padding-top: var(--spacing-medium);
+        padding-top: calc(var(--spacing-large) - var(--spacing-small));
         padding-bottom: var(--spacing-x-large);
         padding-right: var(--container-padding-hor);
         padding-left: var(--container-padding-hor);
@@ -397,10 +398,12 @@
                 border-top: 1px solid var(--vscode-input-border, var(--dropdown-border));
               }
               .time {
+                flex: 1;
                 margin-left: 5px;
                 margin-top: -7px;
                 font-size: 0.9em;
                 opacity: 0.8;
+                /* text-align: right; */
               }
               /* position: relative; */
               /* &::after { */
