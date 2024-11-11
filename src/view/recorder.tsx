@@ -21,7 +21,7 @@ const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
 const TRACK_INDENT_PX = 5;
 const TIMELINE_STEP_HEIGHT = 30;
-const TIMELINE_INITIAL_STEP_DURATION = 10;
+const TIMELINE_INITIAL_STEP_DURATION = 30;
 const TIMELINE_MIN_STEP_DURATION = 5;
 const TIMELINE_ZOOM_MULTIPLIER = 10;
 
@@ -401,6 +401,14 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     // timelineHeightPx: 1,
   } as TimelineState;
 
+  zoomState:
+    | {
+        timestampMs: number;
+        clock: number;
+        clientY: number;
+      }
+    | undefined;
+
   // getTimelineStepClock(): number {
   //   return calcTimelineStepClock(this.props.recorder.sessionHead.duration, this.state.stepCount);
   // }
@@ -411,19 +419,30 @@ class Timeline extends Component<TimelineProps, TimelineState> {
 
   wheelMoved = (e: WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const clock = this.getClockUnderMouse(e);
+      if (!clock) return;
+
+      // if (!this.zoomState || this.zoomState.timestampMs < Date.now() - 300) {
+      this.zoomState = { timestampMs: Date.now(), clock, clientY: e.clientY };
+      console.log('setting zoomState: ', JSON.stringify(this.zoomState));
+      // }
+
       const newStepDuration = this.state.stepDuration + (e.deltaY / 100) * TIMELINE_ZOOM_MULTIPLIER;
       const clippedStepDuration = Math.min(
         this.getTimelineDuration() / 2,
         Math.max(TIMELINE_MIN_STEP_DURATION, newStepDuration),
       );
+      this.setState({ stepDuration: clippedStepDuration });
+
       // const deltaModes = { 0: 'pixel', 1: 'line', 2: 'page' } as Record<number, string>;
       // console.log(
       //   `wheel delta: ${e.deltaY}, wheel deltaMode: ${
       //     deltaModes[e.deltaMode]
       //   }, new step dur: ${newStepDuration}, clipped: ${clippedStepDuration}`,
       // );
-
-      this.setState({ stepDuration: clippedStepDuration });
     }
   };
 
@@ -554,13 +573,57 @@ class Timeline extends Component<TimelineProps, TimelineState> {
   };
 
   autoScroll = () => {
-    if (this.props.recorder.recording) {
-      const timeline = document.getElementById('timeline')!;
-      const atBottom = timeline.scrollTop + timeline.clientHeight >= timeline.scrollHeight;
-      if (!atBottom) {
-        timeline.scrollTo({ top: timeline.scrollHeight, behavior: 'instant' });
-      }
+    const timeline = document.getElementById('timeline')!;
+    const atBottom = timeline.scrollTop + timeline.clientHeight >= timeline.scrollHeight;
+    if (!atBottom) {
+      timeline.scrollTo({ top: timeline.scrollHeight, behavior: 'instant' });
     }
+  };
+
+  scrollAfterZoom = () => {
+    /*
+     __________  Timeline Body (TB) -|
+    |          |                     |
+    |          |                     |
+    |          |                     |
+    |          |                     |
+    |__________| Timeline (T) -|     |
+    |==========| + padding     |     |
+    |          |               |     |
+    |----------| ClientY (CY)  |     |
+    |          |               |     |
+    |__________|               |     |
+
+
+    Clock@CY = ( (CY - TB.top) / TB.height ) * dur
+    TB.top = CY - Clock@CY * TB.height / dur
+
+    T.scroll = T.top + T.padding - TB.top
+    T.scroll = T.top + T.padding - (CY - Clock@CY * TB.height / dur)
+
+    */
+
+    if (!this.zoomState) return;
+
+    // Scroll timeline to keep the mouse position the same after zoom.
+    const timeline = document.getElementById('timeline')!;
+    const timelineBody = document.getElementById('timeline-body')!;
+    const timelineRect = Rect.fromDOMRect(timeline.getBoundingClientRect());
+    const timelineBodyRect = Rect.fromDOMRect(timelineBody.getBoundingClientRect());
+    const dur = this.getTimelineDuration();
+    const timelineTopPadding = parseFloat(window.getComputedStyle(timeline).paddingTop) || 0;
+
+    console.log(
+      `scroll: ${timeline.scrollTop} = T.top ${timelineRect.top} - TB.top ${
+        timelineBodyRect.top
+      } + TP ${timelineTopPadding} = ${timelineRect.top - timelineBodyRect.top + timelineTopPadding}`,
+    );
+
+    const top =
+      timelineRect.top +
+      timelineTopPadding -
+      (this.zoomState.clientY - (this.zoomState.clock * timelineBodyRect.height) / dur);
+    timeline.scrollTo({ behavior: 'instant', top });
   };
 
   getClockUnderMouse(e: MouseEvent, opts?: { emptySpace?: boolean }): number | undefined {
@@ -623,8 +686,14 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     timelineBody.removeEventListener('mouseout', this.mouseOut);
   }
 
-  componentDidUpdate(prevProps: TimelineProps) {
-    this.autoScroll();
+  componentDidUpdate(prevProps: TimelineProps, prevState: TimelineState) {
+    if (this.props.recorder.recording) {
+      this.autoScroll();
+    }
+
+    if (prevState.stepDuration !== this.state.stepDuration) {
+      this.scrollAfterZoom();
+    }
   }
 
   render() {
