@@ -1,4 +1,4 @@
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { SessionHeadList } from './session_head.jsx';
@@ -8,15 +8,16 @@ import Section from './section.jsx';
 // import LatencyTest from './latency_test.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
+import { VSCodeButton, VSCodeLink, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 
 type Props = { user?: t.User; welcome: t.WelcomeState };
-export default class Welcome extends Component<Props> {
-  login = (e: Event) => {
+export default class Welcome extends React.Component<Props> {
+  login = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     postMessage({ type: 'account/open' });
   };
-  join = (e: Event) => {
+  join = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     postMessage({ type: 'account/open', join: true });
@@ -30,20 +31,20 @@ export default class Welcome extends Component<Props> {
         <Section className="search-section">
           <Section.Body>
             <div className="search-subsection subsection">
-              <vscode-text-field placeholder="Search" autofocus></vscode-text-field>
-              <vscode-button onClick={() => postMessage({ type: 'recorder/open' })} title="Record a new session">
+              <VSCodeTextField placeholder="Search" autofocus></VSCodeTextField>
+              <VSCodeButton onClick={() => postMessage({ type: 'recorder/open' })} title="Record a new session">
                 <span className="codicon codicon-device-camera-video" />
-              </vscode-button>
+              </VSCodeButton>
             </div>
             {!this.props.user && (
               <div className="signin-subsection subsection">
-                <vscode-link href="#" onClick={this.login}>
+                <VSCodeLink href="#" onClick={this.login}>
                   Log in
-                </vscode-link>{' '}
+                </VSCodeLink>{' '}
                 or{' '}
-                <vscode-link href="#" onClick={this.join}>
+                <VSCodeLink href="#" onClick={this.join}>
                   join
-                </vscode-link>{' '}
+                </VSCodeLink>{' '}
                 to publish your own CodeMics.
               </div>
             )}
@@ -76,7 +77,7 @@ type SessionsSectionProps = {
 
 type SessionAndHistory = { sessionHead: t.SessionHead; history?: t.SessionHistory };
 
-class SessionsSection extends Component<SessionsSectionProps> {
+class SessionsSection extends React.Component<SessionsSectionProps> {
   render() {
     let sh: SessionAndHistory[] = _.map(this.props.sessionHeads, s => ({
       sessionHead: s,

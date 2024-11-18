@@ -2,7 +2,8 @@ import * as t from '../lib/types.js';
 import * as path from '../lib/path.js';
 import { cn } from './misc.js';
 import postMessage from './api.js';
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
+import { VSCodeButton, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 
 export type Props = {
   className?: string;
@@ -13,10 +14,9 @@ export type Props = {
   pickTitle: string;
   disabled?: boolean;
 };
-export default class PathField extends Component<Props> {
-  changed = async (e: InputEvent) => {
+export default class PathField extends React.Component<Props> {
+  changed = async (e: Event | React.FormEvent<HTMLElement>) =>
     this.props.onChange((e.target as HTMLInputElement).value);
-  };
 
   pick = async () => {
     const { uris } = await postMessage({
@@ -38,7 +38,7 @@ export default class PathField extends Component<Props> {
 
   render() {
     return (
-      <vscode-text-field
+      <VSCodeTextField
         className={cn('path-field', this.props.className)}
         onInput={this.changed}
         value={this.props.value}
@@ -46,10 +46,10 @@ export default class PathField extends Component<Props> {
         disabled={this.props.disabled}
       >
         {this.props.label}
-        <vscode-button slot="end" appearance="icon" title="Pick" onClick={this.pick}>
+        <VSCodeButton slot="end" appearance="icon" title="Pick" onClick={this.pick}>
           <span className="codicon codicon-search" />
-        </vscode-button>
-      </vscode-text-field>
+        </VSCodeButton>
+      </VSCodeTextField>
     );
   }
 }

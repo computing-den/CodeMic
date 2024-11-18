@@ -1,7 +1,7 @@
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 
 type Props = { text: string };
-export default class TextToParagraphs extends Component<Props> {
+export default class TextToParagraphs extends React.Component<Props> {
   updateInterval: any;
 
   render() {

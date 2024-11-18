@@ -1,6 +1,6 @@
 import { produce, type Draft } from 'immer';
 import MediaToolbar, * as MT from './media_toolbar.jsx';
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { Vec2, Rect } from '../lib/lib.js';
@@ -17,6 +17,7 @@ import MediaManager from './media_manager.js';
 import Toolbar, { type Action as ToolbarAction } from './toolbar.jsx';
 import { cn } from './misc.js';
 import _ from 'lodash';
+import { VSCodeButton, VSCodeTextArea, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -30,7 +31,7 @@ const TIMELINE_MIN_PX_TO_TIME_RATIO = 1 / 60;
 const TIMELINE_WHEEL_ZOOM_SPEED = 0.001;
 
 type Props = { user?: t.User; recorder: t.RecorderState };
-export default class Recorder extends Component<Props> {
+export default class Recorder extends React.Component<Props> {
   mediaManager = new MediaManager();
 
   tabs = [
@@ -96,21 +97,21 @@ export default class Recorder extends Component<Props> {
 
 type DetailsViewProps = Props & TabViewProps & { onLoadRecorder: () => any };
 
-class DetailsView extends Component<DetailsViewProps> {
+class DetailsView extends React.Component<DetailsViewProps> {
   state = {
     // coverPhotoKey: 0,
   };
-  titleChanged = async (e: InputEvent) => {
+  titleChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
     const changes = { title: (e.target as HTMLInputElement).value };
     await postMessage({ type: 'recorder/update', changes });
   };
 
-  handleChanged = async (e: InputEvent) => {
+  handleChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
     const changes = { handle: (e.target as HTMLInputElement).value };
     await postMessage({ type: 'recorder/update', changes });
   };
 
-  descriptionChanged = async (e: InputEvent) => {
+  descriptionChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
     const changes = { description: (e.target as HTMLInputElement).value };
     await postMessage({ type: 'recorder/update', changes });
   };
@@ -123,7 +124,7 @@ class DetailsView extends Component<DetailsViewProps> {
     await postMessage({ type: 'recorder/publish' });
   };
 
-  pickCoverPhoto = async (e: Event) => {
+  pickCoverPhoto = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const { uris } = await postMessage({
@@ -139,7 +140,7 @@ class DetailsView extends Component<DetailsViewProps> {
     }
   };
 
-  deleteCoverPhoto = async (e: Event) => {
+  deleteCoverPhoto = async () => {
     await postMessage({ type: 'recorder/deleteCoverPhoto' });
   };
 
@@ -154,24 +155,24 @@ class DetailsView extends Component<DetailsViewProps> {
           {s.hasCoverPhoto ? <img src={recorder.coverPhotoWebviewUri} /> : <p>NO COVER PHOTO</p>}
           <div className="buttons">
             {s.hasCoverPhoto && (
-              <vscode-button
+              <VSCodeButton
                 className="delete"
                 appearance="secondary"
                 title="Delete cover photo"
                 onClick={this.deleteCoverPhoto}
               >
                 Delete cover
-              </vscode-button>
+              </VSCodeButton>
             )}
-            <vscode-button className="pick" onClick={this.pickCoverPhoto}>
+            <VSCodeButton className="pick" onClick={this.pickCoverPhoto}>
               {s.hasCoverPhoto ? 'Change cover' : 'Pick cover'}
-            </vscode-button>
+            </VSCodeButton>
           </div>
         </div>
         <div className="subsection">
           <label className="label"></label>
         </div>
-        <vscode-text-area
+        <VSCodeTextArea
           className="title subsection"
           rows={2}
           resize="vertical"
@@ -181,8 +182,8 @@ class DetailsView extends Component<DetailsViewProps> {
           autoFocus={!recorder.loaded}
         >
           Title
-        </vscode-text-area>
-        <vscode-text-field
+        </VSCodeTextArea>
+        <VSCodeTextField
           className="subsection"
           placeholder="A-Z a-z 0-9 _ (e.g. my_project)"
           value={s.handle}
@@ -190,8 +191,8 @@ class DetailsView extends Component<DetailsViewProps> {
           disabled={Boolean(s.publishTimestamp)}
         >
           Handle
-        </vscode-text-field>
-        <vscode-text-area
+        </VSCodeTextField>
+        <VSCodeTextArea
           className="description subsection"
           rows={10}
           resize="vertical"
@@ -200,39 +201,39 @@ class DetailsView extends Component<DetailsViewProps> {
           placeholder="What is this project about?"
         >
           Description
-        </vscode-text-area>
-        <vscode-text-field
+        </VSCodeTextArea>
+        <VSCodeTextField
           className="subsection"
           // value={''}
           // onInput={this.descriptionChanged}
           placeholder="e.g. https://github.com/computing-den/codemic.git"
         >
           Git repository
-        </vscode-text-field>
-        <vscode-text-field
+        </VSCodeTextField>
+        <VSCodeTextField
           className="subsection"
           // value={''}
           // onInput={this.descriptionChanged}
           placeholder="e.g. 86056b1"
         >
           Git commit
-        </vscode-text-field>
+        </VSCodeTextField>
         <p className="subsection help">
           Use <code>.codemicignore</code> to ignore paths.
         </p>
         <div className="subsection buttons">
-          <vscode-button onClick={this.publish} disabled={!recorder.loaded}>
+          <VSCodeButton onClick={this.publish} disabled={!recorder.loaded}>
             Publish
-          </vscode-button>
-          <vscode-button appearance="secondary" onClick={this.save} disabled={recorder.mustScan}>
+          </VSCodeButton>
+          <VSCodeButton appearance="secondary" onClick={this.save} disabled={recorder.mustScan}>
             Save
-          </vscode-button>
+          </VSCodeButton>
         </div>
         {!recorder.loaded && (
-          <vscode-button className="subsection" onClick={onLoadRecorder} autoFocus>
+          <VSCodeButton className="subsection" onClick={onLoadRecorder} autoFocus>
             {recorder.mustScan ? 'Scan workspace to start' : 'Load project into workspace'}
             <span className="codicon codicon-chevron-right va-top m-left_small" />
-          </vscode-button>
+          </VSCodeButton>
         )}
       </div>
     );
@@ -256,7 +257,7 @@ type EditorViewProps = Props &
   };
 type TrackSelection = { id: string; type: 'audio' | 'video' | 'editor' };
 
-class EditorView extends Component<EditorViewProps> {
+class EditorView extends React.Component<EditorViewProps> {
   state = {
     cursor: undefined as Marker | undefined,
     anchor: undefined as Marker | undefined,
@@ -426,7 +427,7 @@ type TimelineState = {
   markerDragStart?: Marker;
   // timelineHeightPx: number;
 };
-class Timeline extends Component<TimelineProps, TimelineState> {
+class Timeline extends React.Component<TimelineProps, TimelineState> {
   state = {
     pxToSecRatio: TIMELINE_DEFAULT_PX_TO_SEC_RATIO,
     trackDragStart: undefined,
@@ -576,18 +577,18 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     return { id: track.id, type: track.type };
   };
 
-  trackClicked = (e: MouseEvent, track: t.RangedTrack) => {
+  trackClicked = (e: React.MouseEvent, track: t.RangedTrack) => {
     this.props.onChange(state => {
       state.trackSelection = track;
     });
   };
 
-  trackDragStarted = (e: DragEvent, track: t.RangedTrack) => {
+  trackDragStarted = (e: React.DragEvent, track: t.RangedTrack) => {
     e.dataTransfer?.setDragImage(new Image(), 0, 0);
 
     if (track.type === 'editor') return;
 
-    const clock = this.getClockUnderMouse(e);
+    const clock = this.getClockUnderMouse(e.nativeEvent);
     if (!clock) return;
 
     console.log('trackDragStarted', track, clock);
@@ -595,8 +596,8 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     this.setState({ trackDragStart: { ...this.getSelectionFromTrack(track), ...track, clock } });
   };
 
-  trackDragged = async (e: DragEvent, track: t.RangedTrack) => {
-    const clock = this.getClockUnderMouse(e);
+  trackDragged = async (e: React.DragEvent, track: t.RangedTrack) => {
+    const clock = this.getClockUnderMouse(e.nativeEvent);
     const { trackDragStart } = this.state;
     if (!clock || !trackDragStart) return;
 
@@ -615,22 +616,22 @@ class Timeline extends Component<TimelineProps, TimelineState> {
     }
   };
 
-  markerClicked = (e: MouseEvent, marker: Marker) => {
+  markerClicked = (e: React.MouseEvent, marker: Marker) => {
     console.log('Marker clicked', marker);
     this.props.onChange(state => {
       state.anchor = { clock: marker.clock, type: 'anchor', active: true };
     });
   };
 
-  markerDragStarted = (e: DragEvent, marker: Marker) => {
+  markerDragStarted = (e: React.DragEvent, marker: Marker) => {
     e.dataTransfer?.setDragImage(new Image(), 0, 0);
     //  if (!this.getClockUnderMouse(e)) return;
 
     this.setState({ markerDragStart: marker });
   };
 
-  markerDragged = async (e: DragEvent, marker: Marker) => {
-    const clock = this.getClockUnderMouse(e);
+  markerDragged = async (e: React.DragEvent, marker: Marker) => {
+    const clock = this.getClockUnderMouse(e.nativeEvent);
     const { markerDragStart } = this.state;
     if (!clock || !markerDragStart) return;
     if (markerDragStart.type === 'end') {
@@ -845,9 +846,9 @@ type RangedTracksUIProps = {
   timelineDuration: number;
   tracks: t.RangedTrack[];
   trackSelection?: TrackSelection;
-  onClick: (e: MouseEvent, track: t.RangedTrack) => any;
-  onDragStart: (e: DragEvent, track: t.RangedTrack) => any;
-  onDrag: (e: DragEvent, track: t.RangedTrack) => any;
+  onClick: (e: React.MouseEvent, track: t.RangedTrack) => any;
+  onDragStart: (e: React.DragEvent, track: t.RangedTrack) => any;
+  onDrag: (e: React.DragEvent, track: t.RangedTrack) => any;
 };
 // type RangedTrackLayout = {
 //   start: number;
@@ -858,7 +859,7 @@ type RangedTracksUIProps = {
 // type TrackLayout = {columns: RangedTrackLayoutColumn[]};
 // type RangedTrackLayoutColumn = {};
 // type RangedTrackLayoutColumn = t.RangedTrack[];
-class RangedTracksUI extends Component<RangedTracksUIProps> {
+class RangedTracksUI extends React.Component<RangedTracksUIProps> {
   render() {
     const { tracks, timelineDuration, trackSelection, onClick, onDrag, onDragStart } = this.props;
 
@@ -959,7 +960,7 @@ type EditorTrackUIProps = {
   pxToSecRatio: number;
   workspaceFocusTimeline?: t.WorkspaceFocusTimeline;
 };
-class EditorTrackUI extends Component<EditorTrackUIProps> {
+class EditorTrackUI extends React.Component<EditorTrackUIProps> {
   render() {
     const { timelineDuration, pxToSecRatio, workspaceFocusTimeline } = this.props;
 
@@ -1058,7 +1059,7 @@ class EditorTrackUI extends Component<EditorTrackUIProps> {
 }
 
 // const EDITOR_TRACK_COLUMN_COUNT = 2;
-// class EditorTrackUI extends Component<EditorTrackUIProps> {
+// class EditorTrackUI extends React.Component<EditorTrackUIProps> {
 //   render() {
 //     const { timelineDuration } = this.props;
 //     const columns: h.JSX.Element[][] = _.times(EDITOR_TRACK_COLUMN_COUNT, () => []);
@@ -1125,14 +1126,14 @@ class EditorTrackUI extends Component<EditorTrackUIProps> {
 type MarkerProps = {
   marker: Marker;
   timelineDuration: number;
-  onClick?: (e: MouseEvent, m: Marker) => any;
-  onDragStart?: (e: DragEvent, m: Marker) => any;
-  onDrag?: (e: DragEvent, m: Marker) => any;
+  onClick?: (e: React.MouseEvent, m: Marker) => any;
+  onDragStart?: (e: React.DragEvent, m: Marker) => any;
+  onDrag?: (e: React.DragEvent, m: Marker) => any;
 };
-class MarkerUI extends Component<MarkerProps> {
-  clicked = (e: MouseEvent) => this.props.onClick?.(e, this.props.marker);
-  dragStarted = (e: DragEvent) => this.props.onDragStart?.(e, this.props.marker);
-  dragged = (e: DragEvent) => this.props.onDrag?.(e, this.props.marker);
+class MarkerUI extends React.Component<MarkerProps> {
+  clicked = (e: React.MouseEvent) => this.props.onClick?.(e, this.props.marker);
+  dragStarted = (e: React.DragEvent) => this.props.onDragStart?.(e, this.props.marker);
+  dragged = (e: React.DragEvent) => this.props.onDrag?.(e, this.props.marker);
 
   render() {
     const { marker, timelineDuration } = this.props;

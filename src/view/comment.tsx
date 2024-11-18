@@ -3,15 +3,16 @@ import TextToParagraphs from './text_to_paragraphs.jsx';
 import TimeFromNow from './time_from_now.jsx';
 import WithAvatar from './with_avatar.jsx';
 import { cn } from './misc.js';
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 import postMessage from './api.js';
 import _ from 'lodash';
+import { VSCodeTextArea } from '@vscode/webview-ui-toolkit/react';
 
 export type CommentProps = {
   className?: string;
   comment: t.Comment;
 };
-export class Comment extends Component<CommentProps> {
+export class Comment extends React.Component<CommentProps> {
   render() {
     const { className, comment } = this.props;
 
@@ -41,7 +42,7 @@ export class Comment extends Component<CommentProps> {
   }
 }
 
-// export class SelectableLiComment extends Component<CommentProps> {
+// export class SelectableLiComment extends React.Component<CommentProps> {
 //   actions: SL.Action[] = [
 //     {
 //       icon: 'codicon-reply',
@@ -80,14 +81,18 @@ export class Comment extends Component<CommentProps> {
 // }
 
 export type CommentListProps = { comments?: t.Comment[]; className?: string };
-export class CommentList extends Component<CommentListProps> {
+export class CommentList extends React.Component<CommentListProps> {
   render() {
     let { comments, className } = this.props;
 
     comments = _.orderBy(comments, 'creation_timestamp', 'desc');
 
     return (
-      <div className={cn('comment-list', className)}>{comments?.map(comment => <Comment comment={comment} />)}</div>
+      <div className={cn('comment-list', className)}>
+        {comments?.map(comment => (
+          <Comment comment={comment} />
+        ))}
+      </div>
     );
   }
 }
@@ -96,12 +101,13 @@ export type CommentInputProps = {
   className?: string;
   author: t.UserSummary;
 };
-export class CommentInput extends Component<CommentInputProps> {
+export class CommentInput extends React.Component<CommentInputProps> {
   state = {
     text: '',
   };
 
-  textChanged = async (e: InputEvent) => this.setState({ text: (e.target as HTMLInputElement).value });
+  textChanged = async (e: Event | React.FormEvent<HTMLElement>) =>
+    this.setState({ text: (e.target as HTMLInputElement).value });
 
   render() {
     const { className, author } = this.props;
@@ -109,13 +115,13 @@ export class CommentInput extends Component<CommentInputProps> {
 
     return (
       <WithAvatar className={cn('comment-input', className)} username={author.username}>
-        <vscode-text-area
+        <VSCodeTextArea
           rows={2}
           resize="vertical"
           value={text}
           onInput={this.textChanged}
           placeholder="Leave a comment"
-        ></vscode-text-area>
+        ></VSCodeTextArea>
       </WithAvatar>
     );
   }

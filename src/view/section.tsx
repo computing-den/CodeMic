@@ -1,10 +1,12 @@
-import { h, Fragment, Component, JSX } from 'preact';
+import React from 'react';
 import { cn } from './misc.js';
 import _ from 'lodash';
+import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 
 type SectionProps = {
   className?: string;
   bordered?: boolean;
+  children: React.ReactNode;
 };
 
 type HeaderProps = {
@@ -17,17 +19,17 @@ type ExitButtonProps = {
   onClick: () => void;
 };
 
-class ExitButton extends Component<ExitButtonProps> {
+class ExitButton extends React.Component<ExitButtonProps> {
   render() {
     return (
-      <vscode-button appearance="icon" title="Exit" onClick={this.props.onClick}>
+      <VSCodeButton appearance="icon" title="Exit" onClick={this.props.onClick}>
         <span className="codicon codicon-close" />
-      </vscode-button>
+      </VSCodeButton>
     );
   }
 }
 
-class Header extends Component<HeaderProps> {
+class Header extends React.Component<HeaderProps> {
   static ExitButton = ExitButton;
   render() {
     return (
@@ -42,13 +44,14 @@ class Header extends Component<HeaderProps> {
 
 export type BodyProps = {
   className?: string;
+  children: React.ReactNode;
   // padded?: boolean;
   // horPadded?: boolean;
   // topPadded?: boolean;
   // topPaddedSmall?: boolean;
 };
 
-export class Body extends Component<BodyProps> {
+export class Body extends React.Component<BodyProps> {
   render() {
     return (
       <div
@@ -67,7 +70,7 @@ export class Body extends Component<BodyProps> {
   }
 }
 
-export default class Section extends Component<SectionProps> {
+export default class Section extends React.Component<SectionProps> {
   static Header = Header;
   static Body = Body;
   render() {

@@ -1,13 +1,14 @@
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 import * as t from '../lib/types.js';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
 import moment from 'moment';
+import { VSCodeButton, VSCodeLink, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 
 type Props = { user?: t.User; account: t.AccountState };
-export default class Account extends Component<Props> {
+export default class Account extends React.Component<Props> {
   fieldChanged = async (field: keyof t.AccountUpdate, value: any) => {
     await postMessage({ type: 'account/update', changes: { [field]: value } });
   };
@@ -15,9 +16,12 @@ export default class Account extends Component<Props> {
     const credentials = { ...this.props.account.credentials, [field]: value };
     await postMessage({ type: 'account/update', changes: { credentials } });
   };
-  emailChanged = (e: InputEvent) => this.credentialsChanged('email', (e.target as HTMLInputElement).value);
-  usernameChanged = (e: InputEvent) => this.credentialsChanged('username', (e.target as HTMLInputElement).value);
-  passwordChanged = (e: InputEvent) => this.credentialsChanged('password', (e.target as HTMLInputElement).value);
+  emailChanged = (e: Event | React.FormEvent<HTMLElement>) =>
+    this.credentialsChanged('email', (e.target as HTMLInputElement).value);
+  usernameChanged = (e: Event | React.FormEvent<HTMLElement>) =>
+    this.credentialsChanged('username', (e.target as HTMLInputElement).value);
+  passwordChanged = (e: Event | React.FormEvent<HTMLElement>) =>
+    this.credentialsChanged('password', (e.target as HTMLInputElement).value);
   login = async () => {
     await postMessage({ type: 'account/login' });
   };
@@ -32,7 +36,7 @@ export default class Account extends Component<Props> {
     await postMessage({ type: 'account/join' });
   };
 
-  keyDown = async (e: KeyboardEvent) => {
+  keyDown = async (e: React.KeyboardEvent) => {
     if (e.code === 'Enter') {
       if (this.props.account.join) {
         await this.join();
@@ -46,7 +50,7 @@ export default class Account extends Component<Props> {
     const { user, account } = this.props;
     const { credentials, join, error } = account;
 
-    const wrap = (body: h.JSX.Element) => (
+    const wrap = (body: JSX.Element) => (
       <Screen className="account">
         <Section className="main-section">
           <Section.Body>
@@ -67,9 +71,9 @@ export default class Account extends Component<Props> {
           </p>
           <p>Joined on {moment(user.joinTimestamp).format('DD MMM YYYY')}.</p>
           <p>
-            <vscode-link href="#" onClick={this.logout}>
+            <VSCodeLink href="#" onClick={this.logout}>
               Log out
-            </vscode-link>
+            </VSCodeLink>
           </p>
         </div>,
       );
@@ -78,7 +82,7 @@ export default class Account extends Component<Props> {
     return wrap(
       <>
         <div className="fields-subsection subsection">
-          <vscode-text-field
+          <VSCodeTextField
             value={credentials.username}
             onInput={this.usernameChanged}
             onKeyDown={this.keyDown}
@@ -86,8 +90,8 @@ export default class Account extends Component<Props> {
             autoFocus
           >
             Username
-          </vscode-text-field>
-          <vscode-text-field
+          </VSCodeTextField>
+          <VSCodeTextField
             value={credentials.password}
             onInput={this.passwordChanged}
             onKeyDown={this.keyDown}
@@ -95,26 +99,26 @@ export default class Account extends Component<Props> {
             placeholder="At least 8 characters"
           >
             Password
-          </vscode-text-field>
+          </VSCodeTextField>
           {join && (
-            <vscode-text-field
+            <VSCodeTextField
               value={credentials.email}
               onInput={this.emailChanged}
               onKeyDown={this.keyDown}
               placeholder="Example: sean@computing-den.com"
             >
               Email
-            </vscode-text-field>
+            </VSCodeTextField>
           )}
           {error && <p className="error">{error}</p>}
         </div>
         <div className="buttons-subsection subsection">
-          <vscode-button appearance={join ? 'primary' : 'secondary'} onClick={this.join}>
+          <VSCodeButton appearance={join ? 'primary' : 'secondary'} onClick={this.join}>
             Join
-          </vscode-button>
-          <vscode-button appearance={join ? 'secondary' : 'primary'} onClick={this.login}>
+          </VSCodeButton>
+          <VSCodeButton appearance={join ? 'secondary' : 'primary'} onClick={this.login}>
             Log in
-          </vscode-button>
+          </VSCodeButton>
         </div>
       </>,
     );

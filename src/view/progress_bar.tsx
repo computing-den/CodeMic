@@ -2,7 +2,7 @@ import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import * as path from '../lib/path.js';
 import { cn } from './misc.js';
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 
 export type Props = {
   className?: string;
@@ -13,7 +13,7 @@ export type Props = {
   toc: t.TocItem[];
 };
 
-export default class ProgressBar extends Component<Props> {
+export default class ProgressBar extends React.Component<Props> {
   ref?: Element;
 
   state = {
@@ -26,10 +26,10 @@ export default class ProgressBar extends Component<Props> {
     this.ref = elem || undefined;
   };
 
-  clicked = async (e: MouseEvent) => {
+  clicked = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const clock = this.getClockOfMouse(e);
+    const clock = this.getClockOfMouse(e.nativeEvent);
     this.props.onSeek(clock);
   };
 

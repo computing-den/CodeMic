@@ -1,9 +1,9 @@
 import { cn } from './misc.js';
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 import { getStore } from './store.js';
 
-type Props = { className?: string; username?: string; small?: boolean };
-export default class WithAvatar extends Component<Props> {
+type Props = { className?: string; username?: string; small?: boolean; children: React.ReactNode };
+export default class WithAvatar extends React.Component<Props> {
   render() {
     const { className, username, children, small } = this.props;
     return (

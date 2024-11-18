@@ -1,7 +1,7 @@
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 
-type Props = { className?: string };
-export default class Screen extends Component<Props> {
+type Props = { className?: string; children: React.ReactNode };
+export default class Screen extends React.Component<Props> {
   componentDidMount() {
     window.scrollTo(0, 0);
   }

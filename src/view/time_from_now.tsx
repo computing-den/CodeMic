@@ -1,9 +1,9 @@
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 import moment from 'moment';
 import _ from 'lodash';
 
 type Props = { timestamp: string; capitalize?: boolean };
-export default class TimeFromNow extends Component<Props> {
+export default class TimeFromNow extends React.Component<Props> {
   updateInterval: any;
 
   state = { text: this.calc() };

@@ -5,10 +5,11 @@ import TextToParagraphs from './text_to_paragraphs.jsx';
 import TimeFromNow from './time_from_now.jsx';
 import WithAvatar from './with_avatar.jsx';
 import { cn } from './misc.js';
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 // import Selectable, * as SL from './selectable_li.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
+import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 
 export type CommonProps = {
   className?: string;
@@ -29,7 +30,7 @@ export type NormalProps = CommonProps & {
   withAuthor?: boolean;
 };
 
-export class SessionHead extends Component<NormalProps> {
+export class SessionHead extends React.Component<NormalProps> {
   render() {
     const { className, withAuthor, sessionHead: s } = this.props;
 
@@ -46,14 +47,14 @@ export class SessionHead extends Component<NormalProps> {
   }
 }
 
-// export class SessionHeadForList extends Component<ForListProps> {
+// export class SessionHeadForList extends React.Component<ForListProps> {
 //   render() {
 // }
 
 export type Action = { icon: string; title: string; onClick: () => unknown };
-export class SessionHeadListItem extends Component<ListItemProps> {
+export class SessionHeadListItem extends React.Component<ListItemProps> {
   clicked = () => postMessage({ type: 'player/open', sessionId: this.props.sessionHead.id });
-  actionClicked = (e: Event, a: Action) => {
+  actionClicked = (e: React.MouseEvent, a: Action) => {
     e.preventDefault();
     e.stopPropagation();
     a.onClick?.();
@@ -153,9 +154,9 @@ export class SessionHeadListItem extends Component<ListItemProps> {
           </div>
           <div className="actions">
             {actions.map(a => (
-              <vscode-button appearance="icon" title={a.title} onClick={(e: Event) => this.actionClicked(e, a)}>
+              <VSCodeButton appearance="icon" title={a.title} onClick={e => this.actionClicked(e, a)}>
                 <span className={`codicon ${a.icon}`} />
-              </vscode-button>
+              </VSCodeButton>
             ))}
           </div>
         </WithAvatar>
@@ -172,7 +173,7 @@ export type SessionHeadListProps = {
 };
 type SHPair = [t.SessionHead, t.SessionHistory];
 
-export class SessionHeadList extends Component<SessionHeadListProps> {
+export class SessionHeadList extends React.Component<SessionHeadListProps> {
   render() {
     const iteratee = ([s, h]: [t.SessionHead, t.SessionHistory]) =>
       (h && lib.getSessionHistoryItemLastOpenTimestamp(h)) || '';

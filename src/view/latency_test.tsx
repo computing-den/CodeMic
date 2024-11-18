@@ -1,10 +1,10 @@
 import * as t from '../lib/types.js';
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 import postMessage from './api.js';
 import _ from 'lodash';
 
 type Props = { store: t.Store };
-export default class LatencyTest extends Component<Props> {
+export default class LatencyTest extends React.Component<Props> {
   roundtripTimes = [] as number[];
   renderTimes = [] as number[];
   lastRenderTimestamp = performance.now();

@@ -1,6 +1,7 @@
-import { h, Fragment, Component, JSX } from 'preact';
+import React from 'react';
 import { cn } from './misc.js';
 import _ from 'lodash';
+import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 
 export type Action =
   | {
@@ -15,7 +16,7 @@ export type Action =
 
 export type ToolbarProps = { actions: Action[] };
 
-export default class Toolbar extends Component<ToolbarProps> {
+export default class Toolbar extends React.Component<ToolbarProps> {
   ref: HTMLElement | null = null;
   handleRef = (ref: HTMLElement | null) => (this.ref = ref);
 
@@ -37,7 +38,7 @@ export default class Toolbar extends Component<ToolbarProps> {
           'separator' in a ? (
             <div className="separator-line" />
           ) : (
-            <vscode-button
+            <VSCodeButton
               appearance="icon"
               title={a.title}
               // Setting popovertarget doesn't work because vscode-button doesn't pass it along
@@ -48,7 +49,7 @@ export default class Toolbar extends Component<ToolbarProps> {
             >
               {a.icon && <span className={cn(a.icon)} />}
               {a.label}
-            </vscode-button>
+            </VSCodeButton>
           ),
         )}
         {/*this.props.actions.map(

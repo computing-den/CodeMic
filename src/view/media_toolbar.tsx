@@ -1,7 +1,8 @@
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { cn } from './misc.js';
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
+import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 
 export type CommonAction = {
   title: string;
@@ -25,7 +26,7 @@ export type Props = {
   className?: string;
 };
 
-export default class MediaToolbar extends Component<Props> {
+export default class MediaToolbar extends React.Component<Props> {
   render() {
     let primaryActionIcon: string, primaryActionFor: string;
     switch (this.props.primaryAction.type) {
@@ -61,7 +62,7 @@ export default class MediaToolbar extends Component<Props> {
     return (
       <div className={cn('media-toolbar', this.props.className)}>
         <div className="primary-action-container">
-          <vscode-button
+          <VSCodeButton
             className={`primary-action ${primaryActionFor}`}
             onClick={this.props.primaryAction.onClick}
             title={this.props.primaryAction.title}
@@ -69,13 +70,13 @@ export default class MediaToolbar extends Component<Props> {
             disabled={Boolean(this.props.primaryAction.disabled)}
           >
             <div className={`codicon ${primaryActionIcon}`} />
-          </vscode-button>
+          </VSCodeButton>
         </div>
         <div className="actions">
           {this.props.actions.map(a => (
-            <vscode-button appearance="icon" title={a.title} onClick={a.onClick} disabled={Boolean(a.disabled)}>
+            <VSCodeButton appearance="icon" title={a.title} onClick={a.onClick} disabled={Boolean(a.disabled)}>
               <span className={cn('codicon', a.icon)} />
-            </vscode-button>
+            </VSCodeButton>
           ))}
         </div>
         <div className="time">

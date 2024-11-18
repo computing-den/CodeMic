@@ -1,4 +1,4 @@
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 // import FakeMedia from './fake_media.jsx';
@@ -14,9 +14,10 @@ import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
 import { cn } from './misc.js';
 import _ from 'lodash';
+import { VSCodeButton, VSCodeDropdown, VSCodeOption, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 
 type Props = { user?: t.User; player: t.PlayerState };
-export default class Player extends Component<Props> {
+export default class Player extends React.Component<Props> {
   seeking = false;
   mediaManager = new MediaManager();
 
@@ -53,7 +54,7 @@ export default class Player extends Component<Props> {
     return document.getElementById('cover-container')!;
   };
 
-  tocItemClicked = async (e: Event, item: t.TocItem) => {
+  tocItemClicked = async (e: React.MouseEvent, item: t.TocItem) => {
     e.preventDefault();
     await this.seek(item.clock);
   };
@@ -210,12 +211,12 @@ export default class Player extends Component<Props> {
               />
               )*/}
             <div className="subsection search">
-              <vscode-dropdown>
-                <vscode-option>Table of contents</vscode-option>
-                <vscode-option>Files</vscode-option>
-                <vscode-option>Entities</vscode-option>
-              </vscode-dropdown>
-              <vscode-text-field placeholder="Search"></vscode-text-field>
+              <VSCodeDropdown>
+                <VSCodeOption>Table of contents</VSCodeOption>
+                <VSCodeOption>Files</VSCodeOption>
+                <VSCodeOption>Entities</VSCodeOption>
+              </VSCodeDropdown>
+              <VSCodeTextField placeholder="Search"></VSCodeTextField>
             </div>
             {s.toc.length > 0 && (
               <div className="subsection toc">
@@ -256,7 +257,7 @@ export default class Player extends Component<Props> {
   }
 }
 
-// class DevTrackPlayer extends Component<{ p: t.TrackPlayerSummary }> {
+// class DevTrackPlayer extends React.Component<{ p: t.TrackPlayerSummary }> {
 //   render() {
 //     const { p } = this.props;
 

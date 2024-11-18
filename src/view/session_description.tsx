@@ -3,13 +3,13 @@ import * as lib from '../lib/lib.js';
 import TimeFromNow from './time_from_now.js';
 import { cn } from './misc.js';
 import TextToParagraphs from './text_to_paragraphs.jsx';
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 
 export type Props = {
   className?: string;
   sessionHead: t.SessionHead;
 };
-export default class SessionDescription extends Component<Props> {
+export default class SessionDescription extends React.Component<Props> {
   render() {
     const { className, sessionHead: s } = this.props;
 

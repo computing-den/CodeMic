@@ -1,4 +1,4 @@
-import { h, Fragment, Component } from 'preact';
+import React from 'react';
 import * as t from '../lib/types.js';
 import postMessage from './api.js';
 import Account from './account.jsx';
@@ -14,7 +14,7 @@ type AppProps = {
   // postMessage(req: t.FrontendRequest): Promise<t.BackendResponse>;
 };
 
-export default class App extends Component<AppProps> {
+export default class App extends React.Component<AppProps> {
   onExit?: () => Promise<boolean>;
 
   openWelcome = async () => {
@@ -54,13 +54,13 @@ export default class App extends Component<AppProps> {
   }
 }
 
-// class Breadcrumbs extends Component<BreadcrumbsProps> {
+// class Breadcrumbs extends React.Component<BreadcrumbsProps> {
 //   render() {
 //     let elems = this.props.breadcrumbs.map(b =>
 //       b.onClick ? (
-//         <vscode-link href="#" onClick={b.onClick}>
+//         <VSCodeLink href="#" onClick={b.onClick}>
 //           <h2>{b.title}</h2>
-//         </vscode-link>
+//         </VSCodeLink>
 //       ) : (
 //         <h2>{b.title}</h2>
 //       ),
