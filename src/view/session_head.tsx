@@ -30,26 +30,18 @@ export type NormalProps = CommonProps & {
   withAuthor?: boolean;
 };
 
-export class SessionHead extends React.Component<NormalProps> {
-  render() {
-    const { className, withAuthor, sessionHead: s } = this.props;
-
-    return (
-      <WithAvatar className={cn('session-head', className)} username={this.props.sessionHead.author?.username}>
-        <div className="title">{s.title || 'Untitled'}</div>
-        {withAuthor && (
-          <div className="footer">
-            <span className="footer-item author">{s.author?.username || 'anonymous'}</span>
-          </div>
-        )}
-      </WithAvatar>
-    );
-  }
+export function SessionHead({ className, withAuthor, sessionHead: s }: NormalProps) {
+  return (
+    <WithAvatar className={cn('session-head', className)} username={s.author?.username}>
+      <div className="title">{s.title || 'Untitled'}</div>
+      {withAuthor && (
+        <div className="footer">
+          <span className="footer-item author">{s.author?.username || 'anonymous'}</span>
+        </div>
+      )}
+    </WithAvatar>
+  );
 }
-
-// export class SessionHeadForList extends React.Component<ForListProps> {
-//   render() {
-// }
 
 export type Action = { icon: string; title: string; onClick: () => unknown };
 export class SessionHeadListItem extends React.Component<ListItemProps> {
