@@ -190,3 +190,8 @@ vscode-panels {
 button {
   min-width: 0;
 }
+
+.icon-rotate-cw-90 {
+  transform-origin: center;
+  transform: rotate(90deg);
+}

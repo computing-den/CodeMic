@@ -54,7 +54,7 @@ const viewCss = await esbuild.context({
   entryPoints: ['src/view/webview.css'],
   outfile: 'dist/webview.css',
   target: browsers,
-  loader: { '.ttf': 'file' },
+  loader: { '.ttf': 'file', '.woff2': 'file', '.ttf': 'file' },
 });
 
 /** @type {import('esbuild').BuildOptions} */

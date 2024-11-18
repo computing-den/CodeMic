@@ -69,8 +69,7 @@ class CodeMic {
     // DEV
     if (config.debug && this.webviewProvider.bus) {
       try {
-        // const sessionId = '8a232c93-39b8-4df3-a286-908079159738'; // Laptop
-        const sessionId = 'b25ec8c2-a9a1-45df-805e-e5fab7c18669'; // Desktop
+        const sessionId = '62a8b8fa-eed6-4b53-8de6-086cee68bc80'; // Desktop
         if (await Session.fromExisting(this.context, sessionId)) {
           // Recorder
           await this.messageHandler({ type: 'recorder/open', sessionId });

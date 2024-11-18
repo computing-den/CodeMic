@@ -14,7 +14,7 @@ import Screen from './screen.jsx';
 import Section from './section.jsx';
 import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
-import Toolbar from './toolbar.jsx';
+import Toolbar, { type Action as ToolbarAction } from './toolbar.jsx';
 import { cn } from './misc.js';
 import _ from 'lodash';
 
@@ -334,22 +334,44 @@ class EditorView extends Component<EditorViewProps> {
           },
     ];
 
-    const toolbarActions = [
+    const toolbarActions: ToolbarAction[] = [
       {
         title: 'Insert audio',
-        icon: 'codicon-mic',
+        icon: 'codicon codicon-mic',
         disabled: recorder.playing || recorder.recording,
         onClick: this.insertAudio,
       },
       {
         title: 'Insert video',
-        icon: 'codicon-device-camera-video',
+        icon: 'codicon codicon-device-camera-video',
         disabled: recorder.playing || recorder.recording,
         onClick: this.insertVideo,
       },
       {
         title: 'Insert image',
-        icon: 'codicon-device-camera',
+        icon: 'codicon codicon-device-camera',
+        disabled: recorder.playing || recorder.recording,
+        onClick: () => console.log('TODO'),
+      },
+      { separator: 'line' },
+      {
+        title: 'Slow down selection',
+        // icon: 'codicon-fold-up icon-rotate-cw-90',
+        icon: 'fa-solid fa-backward',
+        disabled: recorder.playing || recorder.recording,
+        onClick: () => console.log('TODO'),
+        // popover: (
+        //   <form>
+        //     <label for="inputField">Enter text:</label>
+        //     <input type="text" id="inputField" name="inputField" />
+        //     <button type="submit">Submit</button>
+        //   </form>
+        // ),
+      },
+      {
+        title: 'Speed up selection',
+        // icon: 'codicon-fold-up icon-rotate-cw-90',
+        icon: 'fa-solid fa-forward',
         disabled: recorder.playing || recorder.recording,
         onClick: () => console.log('TODO'),
       },

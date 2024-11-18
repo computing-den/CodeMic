@@ -19,6 +19,10 @@
 @import 'account.css';
 @import 'comment.css';
 @import '../../node_modules/@vscode/codicons/dist/codicon.css';
+@import '../../resources/fontawesome-free-6.6.0-web/css/fontawesome.css';
+@import '../../resources/fontawesome-free-6.6.0-web/css/solid.css';
+/* @import '../../resources/fontawesome-free-6.6.0-web/css/regular.css'; */
+/* @import '../../resources/fontawesome-free-6.6.0-web/css/brands.css'; */
 
 /*
 .card {
