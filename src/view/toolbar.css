@@ -3,14 +3,14 @@
   align-items: center;
   position: relative;
   background: var(--input-background);
-  border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--dropdown-border));
+  border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--popover-border));
   padding: var(--spacing-x-small) var(--spacing-medium);
   border-radius: 5px;
 
   .separator-line {
     width: 2px;
     height: 16px;
-    background: var(--vscode-input-border, var(--dropdown-border));
+    background: var(--vscode-input-border, var(--popover-border));
     margin: 0 var(--spacing-small);
   }
 }

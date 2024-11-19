@@ -1,67 +1,58 @@
-import React from 'react';
+import React, { forwardRef, useRef, useState } from 'react';
 import { cn } from './misc.js';
+import { useClickOutsideHandler } from './hooks.js';
 import _ from 'lodash';
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 
-export type Action =
-  | {
-      title: string;
-      onClick?: () => void;
-      disabled?: boolean;
-      icon?: string;
-      label?: string;
-      // popover?: { id: string; body: JSX.Element };
-    }
-  | { separator: 'line' };
+type ToolbarProps = { actions: React.ReactNode[] };
 
-export type ToolbarProps = { actions: Action[] };
-
-export default class Toolbar extends React.Component<ToolbarProps> {
-  ref: HTMLElement | null = null;
-  handleRef = (ref: HTMLElement | null) => (this.ref = ref);
-
-  // togglePopover = (i: number) => {
-  // const popover = this.ref?.querySelectorAll()
-  // if (popover) {
-  //   if (popover.matches(':popover-open')) {
-  //     popover.hidePopover();
-  //   } else {
-  //     popover.showPopover();
-  //   }
-  // }
-  // };
-
-  render() {
-    return (
-      <div className="toolbar" ref={this.handleRef}>
-        {this.props.actions.map((a, i) =>
-          'separator' in a ? (
-            <div className="separator-line" />
-          ) : (
-            <VSCodeButton
-              appearance="icon"
-              title={a.title}
-              // Setting popovertarget doesn't work because vscode-button doesn't pass it along
-              // to the button element.
-              // onClick={a.popover ? () => this.togglePopover(i) : a.onClick}
-              onClick={a.onClick}
-              disabled={Boolean(a.disabled)}
-            >
-              {a.icon && <span className={cn(a.icon)} />}
-              {a.label}
-            </VSCodeButton>
-          ),
-        )}
-        {/*this.props.actions.map(
-          (a, i) =>
-            'popover' in a &&
-            a.popover && (
-              <div key={i} popover>
-                {a.popover}
-              </div>
-            ),
-            )*/}
-      </div>
-    );
-  }
+function Toolbar(props: ToolbarProps) {
+  return <div className="toolbar">{props.actions}</div>;
 }
+
+function ToolbarSeparator() {
+  return <div className="separator-line" />;
+}
+
+type ToolbarButtonProps = { title: string; onClick?: () => any; icon: string; disabled?: boolean };
+const ToolbarButton = forwardRef(function ToolbarButton(props: ToolbarButtonProps, ref: React.Ref<any>) {
+  return (
+    <VSCodeButton
+      ref={ref}
+      appearance="icon"
+      title={props.title}
+      onClick={props.onClick}
+      disabled={Boolean(props.disabled)}
+    >
+      {props.icon && <span className={cn(props.icon)} />}
+    </VSCodeButton>
+  );
+});
+
+// function ToolbarButtonWithOverlay(props: {
+//   title: string;
+//   icon: string;
+//   overlay: React.ReactNode;
+//   disabled?: boolean;
+// }) {
+//   const triggerRef = useRef(null);
+//   const popover = usePopover({ triggerRef, placement: 'below', content: props.popover });
+//   return (
+//     <VSCodeButton
+//       ref={triggerRef}
+//       appearance="icon"
+//       title={props.title}
+//       onClick={props.popover ? () => setIsOpen(!isOpen) : props.onClick}
+//       disabled={Boolean(props.disabled)}
+//     >
+//       {props.icon && <span className={cn(props.icon)} />}
+//       {props.label}
+//     </VSCodeButton>
+//   );
+// }
+
+Toolbar.Separator = ToolbarSeparator;
+Toolbar.Button = ToolbarButton;
+// Toolbar.ButtonWithOverlay = ToolbarButtonWithOverlay;
+
+export default Toolbar;

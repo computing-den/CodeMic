@@ -3,7 +3,7 @@
   align-items: center;
   position: relative;
   background: var(--input-background);
-  border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--dropdown-border));
+  border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--popover-border));
   padding: 2px 11px 2px 7px;
   border-radius: 30px;
   border-left: none;

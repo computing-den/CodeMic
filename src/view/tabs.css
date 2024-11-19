@@ -23,7 +23,7 @@
     padding: 0 calc(var(--design-unit) * 1px);
     box-sizing: border-box;
     width: 100%;
-    border-bottom: 1px solid var(--vscode-input-border, var(--dropdown-border));
+    border-bottom: 1px solid var(--vscode-input-border, var(--popover-border));
 
     .tabs-header-item {
       /* flex: 1 0 0; */

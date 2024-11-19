@@ -18,6 +18,7 @@
 @import 'tabs.css';
 @import 'account.css';
 @import 'comment.css';
+@import 'popover.css';
 @import '../../node_modules/@vscode/codicons/dist/codicon.css';
 @import '../../resources/fontawesome-free-6.6.0-web/css/fontawesome.css';
 @import '../../resources/fontawesome-free-6.6.0-web/css/solid.css';

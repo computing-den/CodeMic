@@ -73,7 +73,7 @@ button.secondary:hover {
   background: var(--vscode-button-secondaryHoverBackground);
 }
 
-input:not([type='checkbox']),
+input:not([type='checkbox']):not([type='range']),
 textarea {
   display: block;
   width: 100%;
@@ -83,6 +83,10 @@ textarea {
   color: var(--vscode-input-foreground);
   outline-color: var(--vscode-input-border);
   background-color: var(--vscode-input-background);
+}
+
+input[type='range']:focus {
+  outline: none;
 }
 
 input::placeholder,

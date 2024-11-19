@@ -1,0 +1,14 @@
+.popover {
+  position: fixed;
+  background: var(--popover-background);
+  border: 1px solid var(--popover-border-color);
+  color: var(--popover-foreground);
+  padding: var(--spacing-medium);
+  z-index: var(--popover-z-index);
+  border-radius: 5px;
+  display: none;
+
+  &.open {
+    display: flex;
+  }
+}

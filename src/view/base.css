@@ -27,7 +27,8 @@
   --cursor-marker-z-index: 11;
   --track-z-index: 1;
   --active-track-z-index: 2;
-  --cover-container-border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--dropdown-border));
+  --popover-z-index: 100;
+  --cover-container-border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--popover-border));
 }
 
 body.vscode-light {
@@ -170,7 +171,7 @@ vscode-panels {
 
   &::part(tablist) {
     width: 100%;
-    border-bottom: 1px solid var(--vscode-input-border, var(--dropdown-border));
+    border-bottom: 1px solid var(--vscode-input-border, var(--popover-border));
     /* padding: 0; */
     padding-top: 0;
   }

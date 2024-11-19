@@ -1,6 +1,6 @@
 import { produce, type Draft } from 'immer';
 import MediaToolbar, * as MT from './media_toolbar.jsx';
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { Vec2, Rect } from '../lib/lib.js';
@@ -14,10 +14,11 @@ import Screen from './screen.jsx';
 import Section from './section.jsx';
 import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
-import Toolbar, { type Action as ToolbarAction } from './toolbar.jsx';
+import Toolbar from './toolbar.jsx';
 import { cn } from './misc.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeTextArea, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
+import Popover, { PopoverProps, RenderProps, usePopover } from './popover.jsx';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -248,27 +249,35 @@ type Marker = {
   draggable?: boolean;
 };
 
-type EditorViewStateRecipe = (draft: Draft<EditorView['state']>) => EditorView['state'] | void;
-
 type EditorViewProps = Props &
   TabViewProps & {
     onRecord: (clock?: number) => Promise<void>;
     onPlay: (clock?: number) => Promise<void>;
   };
+type EditorViewStateRecipe = (draft: Draft<EditorViewState>) => EditorViewState | void;
+type EditorViewState = {
+  cursor: Marker | undefined;
+  anchor: Marker | undefined;
+  markers: Marker[];
+  trackSelection: TrackSelection | undefined;
+};
 type TrackSelection = { id: string; type: 'audio' | 'video' | 'editor' };
 
-class EditorView extends React.Component<EditorViewProps> {
-  state = {
-    cursor: undefined as Marker | undefined,
-    anchor: undefined as Marker | undefined,
-    markers: [] as Marker[],
-    trackSelection: undefined as TrackSelection | undefined,
-    // timelineHeightPx: 0,
-  };
+function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewProps) {
+  const { sessionHead: s } = recorder;
 
-  updateState = (recipe: EditorViewStateRecipe) => this.setState(state => produce(state, recipe));
+  const [state, setState] = useState<EditorViewState>({
+    cursor: undefined,
+    anchor: undefined,
+    markers: [],
+    trackSelection: undefined,
+  });
 
-  insertAudio = async () => {
+  function updateState(recipe: EditorViewStateRecipe) {
+    setState(state => produce(state, recipe));
+  }
+
+  async function insertAudio() {
     const { uris } = await postMessage({
       type: 'showOpenDialog',
       options: {
@@ -277,12 +286,12 @@ class EditorView extends React.Component<EditorViewProps> {
       },
     });
     if (uris?.length === 1) {
-      const clock = this.state.anchor?.clock ?? 0;
+      const clock = state.anchor?.clock ?? 0;
       await postMessage({ type: 'recorder/insertAudio', uri: uris[0], clock });
     }
-  };
+  }
 
-  insertVideo = async () => {
+  async function insertVideo() {
     const { uris } = await postMessage({
       type: 'showOpenDialog',
       options: {
@@ -291,124 +300,139 @@ class EditorView extends React.Component<EditorViewProps> {
       },
     });
     if (uris?.length === 1) {
-      const clock = this.state.anchor?.clock ?? 0;
+      const clock = state.anchor?.clock ?? 0;
       await postMessage({ type: 'recorder/insertVideo', uri: uris[0], clock });
     }
-  };
-
-  render() {
-    const { id, recorder, className, onRecord, onPlay } = this.props;
-    const { sessionHead: s } = recorder;
-    let primaryAction: MT.PrimaryAction;
-
-    if (recorder.recording) {
-      primaryAction = {
-        type: 'recorder/pause',
-        title: 'Record',
-        onClick: async () => {
-          await postMessage({ type: 'recorder/pause' });
-        },
-      };
-    } else {
-      primaryAction = {
-        type: 'recorder/record',
-        title: 'Record',
-        disabled: recorder.playing,
-        onClick: () => onRecord(this.state.anchor?.clock),
-      };
-    }
-
-    const mediaToolbarActions = [
-      recorder.playing
-        ? {
-            title: 'Pause',
-            icon: 'codicon-debug-pause',
-            onClick: async () => {
-              await postMessage({ type: 'recorder/pause' });
-            },
-          }
-        : {
-            title: 'Play',
-            icon: 'codicon-play',
-            disabled: recorder.recording,
-            onClick: () => onPlay(this.state.anchor?.clock),
-          },
-    ];
-
-    const toolbarActions: ToolbarAction[] = [
-      {
-        title: 'Insert audio',
-        icon: 'codicon codicon-mic',
-        disabled: recorder.playing || recorder.recording,
-        onClick: this.insertAudio,
-      },
-      {
-        title: 'Insert video',
-        icon: 'codicon codicon-device-camera-video',
-        disabled: recorder.playing || recorder.recording,
-        onClick: this.insertVideo,
-      },
-      {
-        title: 'Insert image',
-        icon: 'codicon codicon-device-camera',
-        disabled: recorder.playing || recorder.recording,
-        onClick: () => console.log('TODO'),
-      },
-      { separator: 'line' },
-      {
-        title: 'Slow down selection',
-        // icon: 'codicon-fold-up icon-rotate-cw-90',
-        icon: 'fa-solid fa-backward',
-        disabled: recorder.playing || recorder.recording,
-        onClick: () => console.log('TODO'),
-        // popover: (
-        //   <form>
-        //     <label for="inputField">Enter text:</label>
-        //     <input type="text" id="inputField" name="inputField" />
-        //     <button type="submit">Submit</button>
-        //   </form>
-        // ),
-      },
-      {
-        title: 'Speed up selection',
-        // icon: 'codicon-fold-up icon-rotate-cw-90',
-        icon: 'fa-solid fa-forward',
-        disabled: recorder.playing || recorder.recording,
-        onClick: () => console.log('TODO'),
-      },
-    ];
-
-    return (
-      <div id={id} className={className}>
-        <MediaToolbar
-          className="subsection subsection_spaced"
-          primaryAction={primaryAction}
-          actions={mediaToolbarActions}
-          clock={recorder.clock}
-          duration={s.duration}
-        />
-        <div className="subsection subsection_spaced guide-video-container">
-          <video id="guide-video" />
-          <div className="empty-content">
-            <span className="codicon codicon-device-camera-video" />
-          </div>
-        </div>
-        <div className="subsection">
-          <Toolbar actions={toolbarActions} />
-        </div>
-        <Timeline
-          recorder={recorder}
-          markers={this.state.markers}
-          cursor={this.state.cursor}
-          anchor={this.state.anchor}
-          trackSelection={this.state.trackSelection}
-          clock={recorder.clock}
-          duration={recorder.sessionHead.duration}
-          onChange={this.updateState}
-        />
-      </div>
-    );
   }
+
+  let primaryAction: MT.PrimaryAction;
+  if (recorder.recording) {
+    primaryAction = {
+      type: 'recorder/pause',
+      title: 'Record',
+      onClick: async () => {
+        await postMessage({ type: 'recorder/pause' });
+      },
+    };
+  } else {
+    primaryAction = {
+      type: 'recorder/record',
+      title: 'Record',
+      disabled: recorder.playing,
+      onClick: () => onRecord(state.anchor?.clock),
+    };
+  }
+
+  const mediaToolbarActions = [
+    recorder.playing
+      ? {
+          title: 'Pause',
+          icon: 'codicon-debug-pause',
+          onClick: async () => {
+            await postMessage({ type: 'recorder/pause' });
+          },
+        }
+      : {
+          title: 'Play',
+          icon: 'codicon-play',
+          disabled: recorder.recording,
+          onClick: () => onPlay(state.anchor?.clock),
+        },
+  ];
+
+  function slowDown(factor: number) {
+    // TODO
+    console.log(`Slow down by ${factor}x`);
+  }
+
+  function speedUp(factor: number) {
+    // TODO
+    console.log(`Speed up by ${factor}x`);
+  }
+
+  const slowDownPopover = usePopover({
+    render: props => <SpeedControlPopover {...props} onConfirm={slowDown} title="Slow down" />,
+    placement: 'below',
+  });
+
+  const speedUpPopover = usePopover({
+    render: props => <SpeedControlPopover {...props} onConfirm={speedUp} title="Speed up" />,
+    placement: 'below',
+  });
+
+  const toolbarActions = [
+    <Toolbar.Button
+      title="Insert audio"
+      icon="codicon codicon-mic"
+      disabled={recorder.playing || recorder.recording}
+      onClick={insertAudio}
+    />,
+    <Toolbar.Button
+      title="Insert video"
+      icon="codicon codicon-device-camera-video"
+      disabled={recorder.playing || recorder.recording}
+      onClick={insertVideo}
+    />,
+    <Toolbar.Button
+      title="Insert Image"
+      icon="codicon codicon-device-camera"
+      disabled={recorder.playing || recorder.recording}
+      onClick={() => console.log('TODO')}
+    />,
+    <Toolbar.Separator />,
+    <Toolbar.Button
+      ref={slowDownPopover.anchor}
+      title="Slow down"
+      icon="fa-solid fa-backward"
+      disabled={recorder.playing || recorder.recording}
+      onClick={slowDownPopover.toggle}
+    />,
+    <Toolbar.Button
+      ref={speedUpPopover.anchor}
+      title="Slow down"
+      icon="fa-solid fa-forward"
+      disabled={recorder.playing || recorder.recording}
+      onClick={speedUpPopover.toggle}
+    />,
+    // {
+    //   title: 'Speed up selection',
+    //   // icon: 'codicon-fold-up icon-rotate-cw-90',
+    //   icon: 'fa-solid fa-forward',
+    //   disabled: recorder.playing || recorder.recording,
+    //   onClick: () => console.log('TODO'),
+    // },
+  ];
+
+  return (
+    <div id={id} className={className}>
+      <MediaToolbar
+        className="subsection subsection_spaced"
+        primaryAction={primaryAction}
+        actions={mediaToolbarActions}
+        clock={recorder.clock}
+        duration={s.duration}
+      />
+      <div className="subsection subsection_spaced guide-video-container">
+        <video id="guide-video" />
+        <div className="empty-content">
+          <span className="codicon codicon-device-camera-video" />
+        </div>
+      </div>
+      <div className="subsection">
+        <Toolbar actions={toolbarActions} />
+      </div>
+      <Timeline
+        recorder={recorder}
+        markers={state.markers}
+        cursor={state.cursor}
+        anchor={state.anchor}
+        trackSelection={state.trackSelection}
+        clock={recorder.clock}
+        duration={recorder.sessionHead.duration}
+        onChange={updateState}
+      />
+    </div>
+  );
 }
 
 type TimelineProps = {
@@ -1158,80 +1182,32 @@ class MarkerUI extends React.Component<MarkerProps> {
   }
 }
 
+function SpeedControlPopover(props: RenderProps & { title: string; onConfirm: (factor: number) => any }) {
+  const [factor, setFactor] = useState(2);
+  return (
+    <Popover {...props}>
+      <form className="recorder-speed-popover-form">
+        <label className="label" htmlFor="x-slider">
+          {props.title} by {factor}x
+        </label>
+        <input
+          type="range"
+          id="x-slider"
+          min={1}
+          max={10}
+          step={0.1}
+          value={factor}
+          onChange={e => setFactor(Number(e.currentTarget!.value))}
+        />
+        <VSCodeButton appearance="secondary" onClick={e => props.onConfirm(factor)} autoFocus>
+          OK
+        </VSCodeButton>
+      </form>
+    </Popover>
+  );
+}
+
 function roundTo(value: number, to: number) {
   assert(to > 0);
   return Math.floor((value + to - 1) / to) * to;
 }
-
-// function calcTimelineStepClock(dur: number, steps: number): number {
-//   return Math.max(roundTo(dur / steps, 30), 30);
-// }
-
-// function groupEditorEvents(
-//   events: t.EditorEvent[],
-//   timelineDuration: number,
-//   timelineHeightPx: number,
-// ): EditorRangedTrack[] {
-//   const groups: EditorRangedTrack[] = [];
-//   for (const e of events) {
-//     const groupType = EDITOR_EVENT_GROUP_TYPE_MAP[e.type] as EditorRangedTrack['groupType'] | undefined;
-//     if (!groupType) continue;
-
-//     const lastGroup = groups.at(-1);
-//     const lastEvent = lastGroup?.events.at(-1);
-//     const groupChanged = lastGroup && groupType !== lastGroup.groupType;
-//     const uriChanged = lastEvent && lastEvent.uri !== e.uri;
-//     const thereWasALongPause = lastEvent && e.clock - lastEvent.clock > 5;
-
-//     if (!lastGroup || uriChanged || groupChanged || thereWasALongPause) {
-//       const newGroup: EditorRangedTrack = {
-//         id: uuid(),
-//         type: 'editor',
-//         groupType,
-//         events: [e as any],
-//         clockRange: { start: 0, end: 0 },
-//         title: '',
-//       };
-//       groups.push(newGroup);
-//     } else {
-//       lastGroup.events.push(e as any);
-//     }
-//   }
-
-//   const minDuration = (TRACK_HEIGHT_PX * timelineDuration) / timelineHeightPx;
-
-//   for (const group of groups) {
-//     group.clockRange.start = group.events[0].clock;
-//     group.clockRange.end = Math.max(group.events[0].clock + minDuration, group.events.at(-1)!.clock);
-
-//     let text = '';
-//     if (group.groupType === 'textChange') {
-//       text = group.events
-//         .flatMap(e => e.contentChanges.map(cc => cc.text))
-//         .join('')
-//         .replace(/\n+/g, '\n')
-//         .trim();
-//     }
-
-//     const uri = group.events.at(-1)?.uri;
-//     let p: t.Path | undefined;
-//     let basename: string | undefined;
-
-//     if (uri) {
-//       p = path.getUriPathOpt(uri);
-//       basename = p && path.basename(p);
-//       basename ??= path.getUntitledUriNameOpt(uri);
-//     }
-
-//     // const title = [p, text].filter(Boolean).join('\n');
-
-//     if (group.groupType === 'documentChange') {
-//       group.title = basename || 'document';
-//       // icon = 'codicon-file';
-//     } else {
-//       group.title = text || 'text';
-//     }
-//   }
-
-//   return groups;
-// }

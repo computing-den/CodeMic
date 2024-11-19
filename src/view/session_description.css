@@ -1,6 +1,6 @@
 .session-description {
   /* margin: var(--spacing-large) var(--container-padding) var(--spacing-medium) var(--container-padding); */
-  border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--dropdown-border));
+  border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--popover-border));
   padding: var(--spacing-medium);
   background: var(--input-background);
   border-radius: calc(var(--corner-radius) * 1px);

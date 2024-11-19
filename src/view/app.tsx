@@ -1,71 +1,25 @@
 import React from 'react';
 import * as t from '../lib/types.js';
-import postMessage from './api.js';
 import Account from './account.jsx';
 import Welcome from './welcome.jsx';
 import Recorder from './recorder.jsx';
 import Player from './player.jsx';
 import Loading from './loading.jsx';
-
+import { PopoverProvider } from './popover.jsx';
 import _ from 'lodash';
 
 type AppProps = {
   store: t.Store;
-  // postMessage(req: t.FrontendRequest): Promise<t.BackendResponse>;
 };
 
-export default class App extends React.Component<AppProps> {
-  onExit?: () => Promise<boolean>;
-
-  openWelcome = async () => {
-    await postMessage({ type: 'welcome/open' });
+export default function App({ store }: AppProps) {
+  const renderers = {
+    [t.Screen.Account]: <Account user={store.user} account={store.account!} />,
+    [t.Screen.Welcome]: <Welcome user={store.user} welcome={store.welcome!} />,
+    [t.Screen.Recorder]: <Recorder user={store.user} recorder={store.recorder!} />,
+    [t.Screen.Player]: <Player user={store.user} player={store.player!} />,
+    [t.Screen.Loading]: <Loading />,
   };
 
-  // openRecorder = async () => {
-  //   await actions.openRecorder();
-  // };
-
-  // openPlayer = async (path: string) => {
-  //   await actions.openPlayer();
-  // };
-
-  // exitScreen = async () => {
-  //   if (!this.onExit || (await this.onExit())) {
-  //     this.onExit = undefined;
-  //     return true;
-  //   }
-  //   return false;
-  // };
-
-  // setOnExit = (onExit: () => Promise<boolean>) => {
-  //   this.onExit = onExit;
-  // };
-
-  renderers = {
-    [t.Screen.Account]: () => <Account user={this.props.store.user} account={this.props.store.account!} />,
-    [t.Screen.Welcome]: () => <Welcome user={this.props.store.user} welcome={this.props.store.welcome!} />,
-    [t.Screen.Recorder]: () => <Recorder user={this.props.store.user} recorder={this.props.store.recorder!} />,
-    [t.Screen.Player]: () => <Player user={this.props.store.user} player={this.props.store.player!} />,
-    [t.Screen.Loading]: () => <Loading />,
-  };
-
-  render() {
-    return this.renderers[this.props.store.screen]();
-  }
+  return <PopoverProvider>{renderers[store.screen]}</PopoverProvider>;
 }
-
-// class Breadcrumbs extends React.Component<BreadcrumbsProps> {
-//   render() {
-//     let elems = this.props.breadcrumbs.map(b =>
-//       b.onClick ? (
-//         <VSCodeLink href="#" onClick={b.onClick}>
-//           <h2>{b.title}</h2>
-//         </VSCodeLink>
-//       ) : (
-//         <h2>{b.title}</h2>
-//       ),
-//     );
-//     elems = elems.flatMap((x, i) => (i ? [<span className="separator codicon codicon-chevron-right" />, x] : [x]));
-//     return <div className="breadcrumbs">{elems}</div>;
-//   }
-// }
