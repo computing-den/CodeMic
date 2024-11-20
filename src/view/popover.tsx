@@ -9,108 +9,93 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { produce } from 'immer';
 import { useClickOutsideHandler } from './hooks';
+import _ from 'lodash';
 
-export type RenderProps = Instance & { onClose: () => void };
+export type RenderProps = PopoverData;
 export type PopoverProps = RenderProps & { children: React.ReactNode };
 export type Placement = 'top' | 'below' | 'left' | 'right';
 export type HookArgs = {
   render: (props: RenderProps) => React.ReactNode;
   placement: Placement;
 };
-
-type Instance = HookArgs & {
+type PopoverData = HookArgs & {
   id: string;
   anchor: RefObject<HTMLElement>;
   isOpen: boolean;
-};
-type Instances = Record<string, Instance>;
-type ContextValue = [Instances, Dispatch<SetStateAction<Instances>>];
-type HookResult = {
-  id: string;
-  isOpen: boolean;
-  anchor: RefObject<HTMLElement>;
   open: () => void;
   close: () => void;
   toggle: () => void;
   setIsOpen: (v: boolean) => void;
 };
+type PopoversData = Record<string, PopoverData>;
+type ContextValue = [PopoversData, Dispatch<SetStateAction<PopoversData>>];
 
 const PopoverContext = createContext<ContextValue>([{}, () => {}]);
 
 export function PopoverProvider(props: { children: React.ReactNode }) {
-  const [popovers, setPopovers] = useState<Instances>({});
+  const [popovers, setPopovers] = useState<PopoversData>({});
   const contextValue = useMemo<ContextValue>(() => [popovers, setPopovers], [popovers, setPopovers]);
-
-  function close(id: string) {
-    setPopovers(popovers =>
-      produce(popovers, draft => {
-        draft[id].isOpen = false;
-      }),
-    );
-  }
 
   return (
     <PopoverContext.Provider value={contextValue}>
       {props.children}
-      {Object.values(popovers).map(p => p.render({ ...p, onClose: () => close(p.id) }))}
+      {Object.values(popovers).map(p => p.render(p))}
     </PopoverContext.Provider>
   );
 }
 
-export function usePopover(args: HookArgs): HookResult {
+/**
+ * initArgs are only used during initialization and any changes to them
+ * are ignored.
+ */
+export function usePopover(initArgs: HookArgs): PopoverData {
   const [popovers, setPopovers] = useContext(PopoverContext);
   const [id] = useState(() => crypto.randomUUID());
-  const anchor = useRef(null);
-  const isOpen = Boolean(popovers[id]?.isOpen);
+  const anchor = useRef<HTMLElement>(null);
 
-  function open() {
-    setIsOpen(true);
-  }
-
-  function close() {
-    setIsOpen(false);
-  }
-
-  function toggle() {
-    setIsOpen(!isOpen);
-  }
-
-  function setIsOpen(v: boolean) {
-    setPopovers(popovers =>
-      produce(popovers, draft => {
-        draft[id].isOpen = v;
-      }),
-    );
-  }
-
-  useEffect(() => {
-    setPopovers(popovers =>
-      produce(popovers, draft => {
-        draft[id] = { id, anchor, isOpen, ...args };
-      }),
-    );
-
-    function cleanUp() {
-      setPopovers(popovers =>
-        produce(popovers, draft => {
-          delete draft[id];
-        }),
-      );
+  // Get or create popover.
+  let popover = popovers[id];
+  if (!popover) {
+    function update(recipe: (popover: PopoverData) => PopoverData) {
+      setPopovers(popovers => ({ ...popovers, [id]: recipe(popovers[id]) }));
     }
 
-    return cleanUp;
+    popover = {
+      ...initArgs,
+      id,
+      isOpen: false,
+      anchor,
+      open() {
+        update(popover => ({ ...popover, isOpen: true }));
+      },
+      close() {
+        update(popover => ({ ...popover, isOpen: false }));
+      },
+      toggle() {
+        update(popover => ({ ...popover, isOpen: !popover.isOpen }));
+      },
+      setIsOpen(v: boolean) {
+        update(popover => ({ ...popover, isOpen: v }));
+      },
+    };
+  }
+
+  // Add it to popovers on mount and remove it on unmount.
+  useEffect(() => {
+    setPopovers(popovers => ({ ...popovers, [id]: popover }));
+
+    return () => setPopovers(popovers => _.omit(popovers, id));
   }, []);
 
-  return { id, isOpen, anchor, open, close, toggle, setIsOpen };
+  return popover;
 }
 
 export default function Popover(props: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
-  useClickOutsideHandler({ popoverRef: ref, anchorRef: props.anchor, onClickOutside: props.onClose });
+  useClickOutsideHandler({ popoverRef: ref, anchorRef: props.anchor, onClickOutside: props.close });
 
-  // Update position.
+  // Update position when isOpen.
   useEffect(() => {
     function updatePos() {
       if (ref.current && props.anchor.current) {
@@ -123,10 +108,11 @@ export default function Popover(props: PopoverProps) {
       req = requestAnimationFrame(updatePos);
     }
 
-    let req = requestAnimationFrame(updatePos);
+    let req = 0;
+    if (props.isOpen) requestAnimationFrame(updatePos);
 
     return () => cancelAnimationFrame(req);
-  }, []);
+  }, [props.isOpen]);
 
   // function keyDown(e: React.KeyboardEvent) {
   //   if (e.key === 'Escape') {
