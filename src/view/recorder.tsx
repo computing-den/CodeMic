@@ -1,6 +1,6 @@
 import { produce, type Draft } from 'immer';
 import MediaToolbar, * as MT from './media_toolbar.jsx';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { Vec2, Rect } from '../lib/lib.js';
@@ -18,7 +18,7 @@ import Toolbar from './toolbar.jsx';
 import { cn } from './misc.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeTextArea, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
-import Popover, { PopoverProps, RenderProps, usePopover } from './popover.jsx';
+import Popover, { PointName, pointNames, pointNameToXY, PopoverProps, RenderProps, usePopover } from './popover.jsx';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -243,7 +243,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
 
 type Marker = {
   clock: number;
-  type: 'clock' | 'anchor' | 'cursor' | 'selection' | 'end' | 'recording';
+  type: 'clock' | 'anchor' | 'focus' | 'cursor' | 'end' | 'recording';
   active?: boolean;
   label?: string;
   draggable?: boolean;
@@ -258,6 +258,7 @@ type EditorViewStateRecipe = (draft: Draft<EditorViewState>) => EditorViewState 
 type EditorViewState = {
   cursor: Marker | undefined;
   anchor: Marker | undefined;
+  focus: Marker | undefined;
   markers: Marker[];
   trackSelection: TrackSelection | undefined;
 };
@@ -269,6 +270,7 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
   const [state, setState] = useState<EditorViewState>({
     cursor: undefined,
     anchor: undefined,
+    focus: undefined,
     markers: [],
     trackSelection: undefined,
   });
@@ -286,7 +288,7 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
       },
     });
     if (uris?.length === 1) {
-      const clock = state.anchor?.clock ?? 0;
+      const clock = state.focus?.clock ?? 0;
       await postMessage({ type: 'recorder/insertAudio', uri: uris[0], clock });
     }
   }
@@ -300,7 +302,7 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
       },
     });
     if (uris?.length === 1) {
-      const clock = state.anchor?.clock ?? 0;
+      const clock = state.focus?.clock ?? 0;
       await postMessage({ type: 'recorder/insertVideo', uri: uris[0], clock });
     }
   }
@@ -319,7 +321,7 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
       type: 'recorder/record',
       title: 'Record',
       disabled: recorder.playing,
-      onClick: () => onRecord(state.anchor?.clock),
+      onClick: () => onRecord(state.focus?.clock),
     };
   }
 
@@ -336,7 +338,7 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
           title: 'Play',
           icon: 'codicon-play',
           disabled: recorder.recording,
-          onClick: () => onPlay(state.anchor?.clock),
+          onClick: () => onPlay(state.focus?.clock),
         },
   ];
 
@@ -352,12 +354,10 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
 
   const slowDownPopover = usePopover({
     render: props => <SpeedControlPopover {...props} onConfirm={slowDown} title="Slow down" />,
-    placement: 'below',
   });
 
   const speedUpPopover = usePopover({
     render: props => <SpeedControlPopover {...props} onConfirm={speedUp} title="Speed up" />,
-    placement: 'below',
   });
 
   const toolbarActions = [
@@ -426,6 +426,7 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
         markers={state.markers}
         cursor={state.cursor}
         anchor={state.anchor}
+        focus={state.focus}
         trackSelection={state.trackSelection}
         clock={recorder.clock}
         duration={recorder.sessionHead.duration}
@@ -440,6 +441,7 @@ type TimelineProps = {
   markers: Marker[];
   cursor?: Marker;
   anchor?: Marker;
+  focus?: Marker;
   trackSelection?: TrackSelection;
   clock: number;
   duration: number;
@@ -447,24 +449,20 @@ type TimelineProps = {
 };
 type TimelineState = {
   pxToSecRatio: number;
-  trackDragStart?: TrackSelection & t.RangedTrack & { clock: number };
-  markerDragStart?: Marker;
-  // timelineHeightPx: number;
 };
 class Timeline extends React.Component<TimelineProps, TimelineState> {
   state = {
     pxToSecRatio: TIMELINE_DEFAULT_PX_TO_SEC_RATIO,
-    trackDragStart: undefined,
-    // timelineHeightPx: 1,
   } as TimelineState;
 
-  zoomState:
-    | {
-        timestampMs: number;
-        clock: number;
-        clientY: number;
-      }
-    | undefined;
+  trackDragStart?: TrackSelection & t.RangedTrack & { clock: number };
+  markerDragStart?: Marker;
+  rangeSelectionStart?: number;
+  zoomState?: {
+    timestampMs: number;
+    clock: number;
+    clientY: number;
+  };
 
   // getTimelineStepClock(): number {
   //   return calcTimelineStepClock(this.props.recorder.sessionHead.duration, this.state.stepCount);
@@ -539,12 +537,18 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   };
 
   mouseMoved = (e: MouseEvent) => {
-    const clock = this.getClockUnderMouse(e, { emptySpace: true });
+    const clock = this.getClockUnderMouse(e);
 
-    // console.log(`mouseMoved to clock ${clock}`, e.target);
-    this.props.onChange(state => {
-      state.cursor = clock === undefined ? undefined : { clock, type: 'cursor' };
-    });
+    if (this.rangeSelectionStart !== undefined && clock !== undefined) {
+      this.props.onChange(state => {
+        state.cursor = undefined;
+        state.focus = { clock, type: 'focus', active: true };
+      });
+    } else {
+      this.props.onChange(state => {
+        state.cursor = clock === undefined ? undefined : { clock, type: 'cursor' };
+      });
+    }
   };
 
   mouseLeft = (e: MouseEvent) => {
@@ -561,14 +565,17 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   mouseDown = (e: MouseEvent) => {
     const clock = this.getClockUnderMouse(e, { emptySpace: true });
     if (clock !== undefined) {
+      this.rangeSelectionStart = clock;
       this.props.onChange(state => {
         for (const marker of state.markers) marker.active = false;
-        state.anchor = { clock, type: 'anchor', active: true };
+        state.focus = { clock, type: 'focus', active: true };
+        state.anchor = { clock, type: 'anchor' };
       });
     }
   };
 
   mouseUp = (e: MouseEvent) => {
+    this.rangeSelectionStart = undefined;
     // const {anchor} = this.props;
     // if (anchor) {
     //   const clock = this.getClockUnderMouse(e, {emptySpace: true});
@@ -617,25 +624,24 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 
     console.log('trackDragStarted', track, clock);
 
-    this.setState({ trackDragStart: { ...this.getSelectionFromTrack(track), ...track, clock } });
+    this.trackDragStart = { ...this.getSelectionFromTrack(track), ...track, clock };
   };
 
   trackDragged = async (e: React.DragEvent, track: t.RangedTrack) => {
     const clock = this.getClockUnderMouse(e.nativeEvent);
-    const { trackDragStart } = this.state;
-    if (!clock || !trackDragStart) return;
+    if (!clock || !this.trackDragStart) return;
 
-    const clockDiff = clock - trackDragStart.clock;
-    const start = Math.max(0, trackDragStart.clockRange.start + clockDiff);
-    const end = start + trackDragStart.clockRange.end - trackDragStart.clockRange.start;
+    const clockDiff = clock - this.trackDragStart.clock;
+    const start = Math.max(0, this.trackDragStart.clockRange.start + clockDiff);
+    const end = start + this.trackDragStart.clockRange.end - this.trackDragStart.clockRange.start;
 
     const clockRange: t.ClockRange = { start, end };
 
     console.log('trackDragged', track, clock, clockDiff);
 
-    if (trackDragStart.type === 'audio') {
+    if (this.trackDragStart.type === 'audio') {
       await postMessage({ type: 'recorder/updateAudio', audio: { id: track.id, clockRange } });
-    } else if (trackDragStart.type === 'video') {
+    } else if (this.trackDragStart.type === 'video') {
       await postMessage({ type: 'recorder/updateVideo', video: { id: track.id, clockRange } });
     }
   };
@@ -643,7 +649,8 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   markerClicked = (e: React.MouseEvent, marker: Marker) => {
     console.log('Marker clicked', marker);
     this.props.onChange(state => {
-      state.anchor = { clock: marker.clock, type: 'anchor', active: true };
+      state.anchor = { clock: marker.clock, type: 'anchor' };
+      state.focus = { clock: marker.clock, type: 'focus', active: true };
     });
   };
 
@@ -651,14 +658,12 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     e.dataTransfer?.setDragImage(new Image(), 0, 0);
     //  if (!this.getClockUnderMouse(e)) return;
 
-    this.setState({ markerDragStart: marker });
+    this.markerDragStart = marker;
   };
 
   markerDragged = async (e: React.DragEvent, marker: Marker) => {
     const clock = this.getClockUnderMouse(e.nativeEvent);
-    const { markerDragStart } = this.state;
-    if (!clock || !markerDragStart) return;
-    if (markerDragStart.type === 'end') {
+    if (clock !== undefined && this.markerDragStart?.type === 'end') {
       const duration = Math.max(0, clock);
       await postMessage({ type: 'recorder/update', changes: { duration } });
     }
@@ -719,10 +724,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   };
 
   getClockUnderMouse(e: MouseEvent, opts?: { emptySpace?: boolean }): number | undefined {
-    if (opts?.emptySpace) {
-      const target = e.target as HTMLElement;
-      if (target.closest('.track') || target.closest('.marker')) return;
-    }
+    if (opts?.emptySpace && !this.isMouseOverEmptySpaceInTimeline(e)) return;
 
     const clientPos = new Vec2(e.clientX, e.clientY);
     const timeline = document.getElementById('timeline')!;
@@ -737,6 +739,11 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
       const ratio = mouseOffsetInTimelineBody / timelineBodyRect.height;
       return ratio * this.getTimelineDuration();
     }
+  }
+
+  isMouseOverEmptySpaceInTimeline(e: MouseEvent): boolean {
+    const target = e.target as HTMLElement;
+    return Boolean(target.closest('#timeline') && !target.closest('.track') && !target.closest('.marker'));
   }
 
   // updateTimelineHeightPx = () => {
@@ -792,7 +799,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   }
 
   render() {
-    const { markers, cursor, anchor, clock, trackSelection, duration, recorder } = this.props;
+    const { markers, cursor, anchor, focus, clock, trackSelection, duration, recorder } = this.props;
     const { pxToSecRatio /*timelineHeightPx*/ } = this.state;
     const clockMarker: Marker | undefined =
       clock > 0 && clock !== duration && !recorder.recording ? { clock, type: 'clock' } : undefined;
@@ -800,10 +807,13 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
       ? { clock: duration, type: 'recording' }
       : { clock: duration, type: 'end', draggable: true };
 
+    const hasRangeSelection = anchor && focus && anchor.clock !== focus.clock;
+
     const allMarkers = _.compact([
       ...markers,
       cursor,
-      !recorder.playing && !recorder.recording && anchor,
+      hasRangeSelection && anchor,
+      focus,
       clockMarker,
       endOrRecordingMarker,
     ]);
@@ -851,6 +861,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
                 />
               ))}
             </div>
+            {hasRangeSelection && <RangeSelection timelineDuration={timelineDuration} anchor={anchor} focus={focus} />}
           </div>
           <div id="ruler">
             {_.times(this.getTimelineDuration() / rulerStepDur + 1, i => (
@@ -1180,6 +1191,17 @@ class MarkerUI extends React.Component<MarkerProps> {
       </div>
     );
   }
+}
+
+function RangeSelection(props: { timelineDuration: number; anchor: Marker; focus: Marker }) {
+  const min = Math.min(props.anchor.clock, props.focus.clock);
+  const max = Math.max(props.anchor.clock, props.focus.clock);
+
+  const style = {
+    top: `${(min / props.timelineDuration) * 100}%`,
+    height: `${((max - min) / props.timelineDuration) * 100}%`,
+  };
+  return <div className="range-selection" style={style} />;
 }
 
 function SpeedControlPopover(props: RenderProps & { title: string; onConfirm: (factor: number) => any }) {

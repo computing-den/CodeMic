@@ -19,11 +19,14 @@
   --marker-clock-color: #5555ff;
   --marker-cursor-color: #5b5b5b;
   --marker-anchor-color: #55aaff;
+  --marker-focus-color: #22aaff;
   --marker-end-color: #f85149;
   --marker-end-color-hover: #e84139;
   --marker-base-color: #000;
-  --marker-selection-color: #55ffff;
+  /* --marker-selection-color: #55ffff; */
   --marker-z-index: 10;
+  --range-selection-z-index: 0;
+  --range-selection-background: var(--vscode-editor-selectionBackground);
   --cursor-marker-z-index: 11;
   --track-z-index: 1;
   --active-track-z-index: 2;

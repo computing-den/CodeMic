@@ -333,8 +333,8 @@
                 &.marker_anchor {
                   border-color: var(--marker-anchor-color);
                 }
-                &.marker_selection {
-                  border-color: var(--marker-anchor-color);
+                &.marker_focus {
+                  border-color: var(--marker-focus-color);
                 }
                 &.marker_end {
                   border-color: var(--marker-end-color);
@@ -374,6 +374,14 @@
                   text-align: center;
                 }
               }
+            }
+
+            .range-selection {
+              position: absolute;
+              left: 0;
+              right: 0;
+              background: var(--range-selection-background);
+              z-index: var(--range-selection-z-index);
             }
           }
 

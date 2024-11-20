@@ -11,14 +11,33 @@ import React, {
 } from 'react';
 import { useClickOutsideHandler } from './hooks';
 import _ from 'lodash';
+import assert from '../lib/assert';
 
 export type RenderProps = PopoverData;
 export type PopoverProps = RenderProps & { children: React.ReactNode };
-export type Placement = 'top' | 'below' | 'left' | 'right';
+export type HorizontalPlacement = 'left' | 'right' | 'center';
+export type VerticalPlacement = 'above' | 'below';
+export type PointXY = { x: number; y: number };
 export type HookArgs = {
   render: (props: RenderProps) => React.ReactNode;
-  placement: Placement;
+  pointOnPopover?: PointXY | PointName;
+  pointOnAnchor?: PointXY | PointName;
+  isOpen?: boolean;
 };
+export type PointName = keyof typeof pointNameToXY;
+export const pointNameToXY = {
+  'top-left': { x: 0, y: 0 },
+  'top-center': { x: 0.5, y: 0 },
+  'top-right': { x: 1, y: 0 },
+  'center-right': { x: 1, y: 0.5 },
+  'bottom-right': { x: 1, y: 1 },
+  'bottom-center': { x: 0.5, y: 1 },
+  'bottom-left': { x: 0, y: 1 },
+  'center-left': { x: 0, y: 0.5 },
+  center: { x: 0.5, y: 0.5 },
+} as const;
+export const pointNames = Object.keys(pointNameToXY) as PointName[];
+
 type PopoverData = HookArgs & {
   id: string;
   anchor: RefObject<HTMLElement>;
@@ -27,6 +46,7 @@ type PopoverData = HookArgs & {
   close: () => void;
   toggle: () => void;
   setIsOpen: (v: boolean) => void;
+  update: (recipe: ((popover: PopoverData) => PopoverData) | Partial<PopoverData>) => void;
 };
 type PopoversData = Record<string, PopoverData>;
 type ContextValue = [PopoversData, Dispatch<SetStateAction<PopoversData>>];
@@ -57,26 +77,31 @@ export function usePopover(initArgs: HookArgs): PopoverData {
   // Get or create popover.
   let popover = popovers[id];
   if (!popover) {
-    function update(recipe: (popover: PopoverData) => PopoverData) {
-      setPopovers(popovers => ({ ...popovers, [id]: recipe(popovers[id]) }));
+    function update(recipe: ((popover: PopoverData) => PopoverData) | Partial<PopoverData>) {
+      setPopovers(popovers => {
+        const popover = typeof recipe === 'function' ? recipe(popovers[id]) : { ...popovers[id], ...recipe };
+        assert(popover.id === id);
+        return { ...popovers, [id]: popover };
+      });
     }
 
     popover = {
       ...initArgs,
       id,
-      isOpen: false,
+      isOpen: initArgs.isOpen ?? false,
       anchor,
+      update,
       open() {
-        update(popover => ({ ...popover, isOpen: true }));
+        update({ isOpen: true });
       },
       close() {
-        update(popover => ({ ...popover, isOpen: false }));
+        update({ isOpen: false });
       },
       toggle() {
         update(popover => ({ ...popover, isOpen: !popover.isOpen }));
       },
       setIsOpen(v: boolean) {
-        update(popover => ({ ...popover, isOpen: v }));
+        update({ isOpen: v });
       },
     };
   }
@@ -96,13 +121,46 @@ export default function Popover(props: PopoverProps) {
   useClickOutsideHandler({ popoverRef: ref, anchorRef: props.anchor, onClickOutside: props.close });
 
   // Update position when isOpen.
+  //  _____________
+  // |             |
+  // |             |            Anchor
+  // |   (.5, 1)   |
+  // |______X______|______
+  //        | (0, 0)      |
+  //        |             |
+  //        |             |     Popover
+  //        |_____________|
+  //
   useEffect(() => {
     function updatePos() {
       if (ref.current && props.anchor.current) {
-        // TODO use props.placement
-        const rect = props.anchor.current.getBoundingClientRect();
-        ref.current.style.top = `${rect.bottom}px`;
-        ref.current.style.left = `${rect.left}px`;
+        const popoverRect = ref.current.getBoundingClientRect();
+        const anchorRect = props.anchor.current.getBoundingClientRect();
+        const pointOnAnchor = castPoint(props.pointOnAnchor ?? 'bottom-left');
+        const pointOnPopover = castPoint(props.pointOnPopover ?? 'top-left');
+
+        const left = anchorRect.left + anchorRect.width * pointOnAnchor.x - popoverRect.width * pointOnPopover.x;
+        const top = anchorRect.top + anchorRect.height * pointOnAnchor.y - popoverRect.height * pointOnPopover.y;
+
+        // Clip.
+        // There should be a maximum shift beyond which we must not push the popover.
+        // Otherwise, while scrolling down for example, a popover can get stuck at
+        // the top of the window.
+        if (left + popoverRect.width > document.documentElement.clientWidth) {
+          // TODO Shift to the left
+        }
+        if (left < 0) {
+          // TODO Shift to the right
+        }
+        if (top + popoverRect.height > document.documentElement.clientHeight) {
+          // TODO Shift to the top
+        }
+        if (top < 0) {
+          // TODO Shift to the bottom
+        }
+
+        ref.current.style.left = `${left}px`;
+        ref.current.style.top = `${top}px`;
       }
 
       req = requestAnimationFrame(updatePos);
@@ -112,7 +170,7 @@ export default function Popover(props: PopoverProps) {
     if (props.isOpen) requestAnimationFrame(updatePos);
 
     return () => cancelAnimationFrame(req);
-  }, [props.isOpen]);
+  }, [props.isOpen, props.pointOnAnchor, props.pointOnPopover]);
 
   // function keyDown(e: React.KeyboardEvent) {
   //   if (e.key === 'Escape') {
@@ -125,4 +183,8 @@ export default function Popover(props: PopoverProps) {
       {props.children}
     </div>
   );
+}
+
+function castPoint(point: PointXY | PointName): PointXY {
+  return typeof point === 'string' ? pointNameToXY[point] : point;
 }
