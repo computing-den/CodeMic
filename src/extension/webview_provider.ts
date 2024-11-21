@@ -95,6 +95,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
 			</head>
 			<body>
         <div id="app"></div>
+        <div id="popovers"></div>
         <script src="${webviewJs}" type="module"></script>
 			</body>
 			</html>`;

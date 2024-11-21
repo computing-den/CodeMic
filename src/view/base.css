@@ -112,6 +112,10 @@ body {
   flex-direction: column;
 }
 
+#popovers {
+  direction: ltr; /* Flip the scrollbar to be on the left */
+}
+
 & p {
   margin: 0;
 }

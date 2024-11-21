@@ -18,7 +18,7 @@ import Toolbar from './toolbar.jsx';
 import { cn } from './misc.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeTextArea, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
-import Popover, { PointName, pointNames, pointNameToXY, PopoverProps, RenderProps, usePopover } from './popover.jsx';
+import Popover, { PointName, pointNames, pointNameToXY, PopoverProps, usePopover } from './popover.jsx';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -342,23 +342,33 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
         },
   ];
 
+  const slowDownPopover = usePopover();
+  const slowDownButtonRef = useRef(null);
+
+  const speedUpPopover = usePopover();
+  const speedUpButtonRef = useRef(null);
+
   function slowDown(factor: number) {
     // TODO
     console.log(`Slow down by ${factor}x`);
   }
-
   function speedUp(factor: number) {
     // TODO
     console.log(`Speed up by ${factor}x`);
   }
 
-  const slowDownPopover = usePopover({
-    render: props => <SpeedControlPopover {...props} onConfirm={slowDown} title="Slow down" />,
-  });
+  // function openSlowDownPopover() {
+  //   slowDownPopover.open()
+  // }
 
-  const speedUpPopover = usePopover({
-    render: props => <SpeedControlPopover {...props} onConfirm={speedUp} title="Speed up" />,
-  });
+  // function speedUp(factor: number) {
+  //   // TODO
+  //   console.log(`Speed up by ${factor}x`);
+  // }
+
+  // const speedUpPopover = usePopover({
+  //   render: props => <SpeedControlPopover {...props} onConfirm={speedUp} title="Speed up" />,
+  // });
 
   const toolbarActions = [
     <Toolbar.Button
@@ -381,26 +391,19 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
     />,
     <Toolbar.Separator />,
     <Toolbar.Button
-      ref={slowDownPopover.anchor}
+      ref={slowDownButtonRef}
       title="Slow down"
       icon="fa-solid fa-backward"
       disabled={recorder.playing || recorder.recording}
       onClick={slowDownPopover.toggle}
     />,
     <Toolbar.Button
-      ref={speedUpPopover.anchor}
-      title="Slow down"
+      ref={speedUpButtonRef}
+      title="Speed up"
       icon="fa-solid fa-forward"
       disabled={recorder.playing || recorder.recording}
       onClick={speedUpPopover.toggle}
     />,
-    // {
-    //   title: 'Speed up selection',
-    //   // icon: 'codicon-fold-up icon-rotate-cw-90',
-    //   icon: 'fa-solid fa-forward',
-    //   disabled: recorder.playing || recorder.recording,
-    //   onClick: () => console.log('TODO'),
-    // },
   ];
 
   return (
@@ -432,6 +435,13 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
         duration={recorder.sessionHead.duration}
         onChange={updateState}
       />
+      <SpeedControlPopover
+        popover={slowDownPopover}
+        onConfirm={slowDown}
+        anchor={slowDownButtonRef}
+        title="Slow down"
+      />
+      <SpeedControlPopover popover={speedUpPopover} onConfirm={speedUp} anchor={speedUpButtonRef} title="Speed up" />
     </div>
   );
 }
@@ -1204,7 +1214,7 @@ function RangeSelection(props: { timelineDuration: number; anchor: Marker; focus
   return <div className="range-selection" style={style} />;
 }
 
-function SpeedControlPopover(props: RenderProps & { title: string; onConfirm: (factor: number) => any }) {
+function SpeedControlPopover(props: PopoverProps & { title: string; onConfirm: (factor: number) => any }) {
   const [factor, setFactor] = useState(2);
   return (
     <Popover {...props}>

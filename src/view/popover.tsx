@@ -12,18 +12,15 @@ import React, {
 import { useClickOutsideHandler } from './hooks';
 import _ from 'lodash';
 import assert from '../lib/assert';
+import ReactDOM from 'react-dom';
 
-export type RenderProps = PopoverData;
-export type PopoverProps = RenderProps & { children: React.ReactNode };
 export type HorizontalPlacement = 'left' | 'right' | 'center';
 export type VerticalPlacement = 'above' | 'below';
 export type PointXY = { x: number; y: number };
-export type HookArgs = {
-  render: (props: RenderProps) => React.ReactNode;
-  pointOnPopover?: PointXY | PointName;
-  pointOnAnchor?: PointXY | PointName;
-  isOpen?: boolean;
-};
+// export type HookArgs = {
+//   // render: (props: RenderProps) => React.ReactNode;
+
+// };
 export type PointName = keyof typeof pointNameToXY;
 export const pointNameToXY = {
   'top-left': { x: 0, y: 0 },
@@ -38,15 +35,18 @@ export const pointNameToXY = {
 } as const;
 export const pointNames = Object.keys(pointNameToXY) as PointName[];
 
-type PopoverData = HookArgs & {
+type PopoverData = {
   id: string;
-  anchor: RefObject<HTMLElement>;
+  // anchor: RefObject<HTMLElement>;
+  // ref: RefObject<HTMLElement>
+  // content: React.ReactNode;
+  // pointOnPopover: PointXY | PointName;
+  // pointOnAnchor: PointXY | PointName;
   isOpen: boolean;
   open: () => void;
   close: () => void;
   toggle: () => void;
   setIsOpen: (v: boolean) => void;
-  update: (recipe: ((popover: PopoverData) => PopoverData) | Partial<PopoverData>) => void;
 };
 type PopoversData = Record<string, PopoverData>;
 type ContextValue = [PopoversData, Dispatch<SetStateAction<PopoversData>>];
@@ -60,7 +60,7 @@ export function PopoverProvider(props: { children: React.ReactNode }) {
   return (
     <PopoverContext.Provider value={contextValue}>
       {props.children}
-      {Object.values(popovers).map(p => p.render(p))}
+      {/*Object.values(popovers).map(p => p.content)*/}
     </PopoverContext.Provider>
   );
 }
@@ -69,10 +69,9 @@ export function PopoverProvider(props: { children: React.ReactNode }) {
  * initArgs are only used during initialization and any changes to them
  * are ignored.
  */
-export function usePopover(initArgs: HookArgs): PopoverData {
+export function usePopover(): PopoverData {
   const [popovers, setPopovers] = useContext(PopoverContext);
   const [id] = useState(() => crypto.randomUUID());
-  const anchor = useRef<HTMLElement>(null);
 
   // Get or create popover.
   let popover = popovers[id];
@@ -86,11 +85,8 @@ export function usePopover(initArgs: HookArgs): PopoverData {
     }
 
     popover = {
-      ...initArgs,
       id,
-      isOpen: initArgs.isOpen ?? false,
-      anchor,
-      update,
+      isOpen: false,
       open() {
         update({ isOpen: true });
       },
@@ -108,6 +104,7 @@ export function usePopover(initArgs: HookArgs): PopoverData {
 
   // Add it to popovers on mount and remove it on unmount.
   useEffect(() => {
+    // Avoid calling setPopovers to prevent re-rendering.
     setPopovers(popovers => ({ ...popovers, [id]: popover }));
 
     return () => setPopovers(popovers => _.omit(popovers, id));
@@ -116,9 +113,26 @@ export function usePopover(initArgs: HookArgs): PopoverData {
   return popover;
 }
 
+// export function popoverPortal(node: React.ReactNode) {
+//   ReactDOM.createPortal(<SpeedControlPopover popover={slowDownPopover}
+//                            onConfirm={slowDown} title="Slow down"
+//     />, ref.current)
+// }
+
+export type PopoverProps = {
+  popover: PopoverData;
+  anchor: RefObject<HTMLElement>;
+  pointOnPopover?: PointXY | PointName;
+  pointOnAnchor?: PointXY | PointName;
+  children?: React.ReactNode;
+};
 export default function Popover(props: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
-  useClickOutsideHandler({ popoverRef: ref, anchorRef: props.anchor, onClickOutside: props.close });
+  useClickOutsideHandler({ popoverRef: ref, anchorRef: props.anchor, onClickOutside: props.popover.close });
+
+  const isOpen = props.popover.isOpen;
+  const pointOnAnchor = castPoint(props.pointOnAnchor ?? 'bottom-left');
+  const pointOnPopover = castPoint(props.pointOnPopover ?? 'top-left');
 
   // Update position when isOpen.
   //  _____________
@@ -136,8 +150,6 @@ export default function Popover(props: PopoverProps) {
       if (ref.current && props.anchor.current) {
         const popoverRect = ref.current.getBoundingClientRect();
         const anchorRect = props.anchor.current.getBoundingClientRect();
-        const pointOnAnchor = castPoint(props.pointOnAnchor ?? 'bottom-left');
-        const pointOnPopover = castPoint(props.pointOnPopover ?? 'top-left');
 
         const left = anchorRect.left + anchorRect.width * pointOnAnchor.x - popoverRect.width * pointOnPopover.x;
         const top = anchorRect.top + anchorRect.height * pointOnAnchor.y - popoverRect.height * pointOnPopover.y;
@@ -167,10 +179,10 @@ export default function Popover(props: PopoverProps) {
     }
 
     let req = 0;
-    if (props.isOpen) requestAnimationFrame(updatePos);
+    if (isOpen) requestAnimationFrame(updatePos);
 
     return () => cancelAnimationFrame(req);
-  }, [props.isOpen, props.pointOnAnchor, props.pointOnPopover]);
+  }, [isOpen, pointOnAnchor, pointOnPopover]);
 
   // function keyDown(e: React.KeyboardEvent) {
   //   if (e.key === 'Escape') {
@@ -178,10 +190,12 @@ export default function Popover(props: PopoverProps) {
   //   }
   // }
 
-  return (
-    <div id={props.id} ref={ref} className={`popover ${props.isOpen ? 'open' : ''}`} tabIndex={-1}>
+  return ReactDOM.createPortal(
+    <div id={props.popover.id} ref={ref} className={`popover ${props.popover.isOpen ? 'open' : ''}`} tabIndex={-1}>
       {props.children}
-    </div>
+    </div>,
+    document.getElementById('popovers')!,
+    props.popover.id,
   );
 }
 
