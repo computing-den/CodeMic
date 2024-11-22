@@ -5,6 +5,7 @@ import React, {
   SetStateAction,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -145,7 +146,7 @@ export default function Popover(props: PopoverProps) {
   //        |             |     Popover
   //        |_____________|
   //
-  useEffect(() => {
+  useLayoutEffect(() => {
     function updatePos() {
       if (ref.current && props.anchor.current) {
         const popoverRect = ref.current.getBoundingClientRect();
@@ -179,7 +180,7 @@ export default function Popover(props: PopoverProps) {
     }
 
     let req = 0;
-    if (isOpen) requestAnimationFrame(updatePos);
+    if (isOpen) updatePos;
 
     return () => cancelAnimationFrame(req);
   }, [isOpen, pointOnAnchor, pointOnPopover]);
