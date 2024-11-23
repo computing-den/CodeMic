@@ -200,6 +200,10 @@ export default class SessionRuntime {
     this.onChange?.();
   }
 
+  async merge(range: t.ClockRange) {
+    await this.changeSpeed(range, Infinity);
+  }
+
   toJSON(): t.SessionBodyJSON {
     return {
       audioTracks: this.audioTrackPlayers.map(c => c.audioTrack),

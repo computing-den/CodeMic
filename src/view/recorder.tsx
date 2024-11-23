@@ -275,6 +275,8 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
     trackSelection: undefined,
   });
 
+  const hasRangeSelection = state.anchor && state.focus && state.anchor.clock !== state.focus.clock;
+
   function updateState(recipe: EditorViewStateRecipe) {
     setState(state => produce(state, recipe));
   }
@@ -379,6 +381,18 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
     return changeSpeed(factor);
   }
 
+  async function merge() {
+    assert(state.anchor && state.focus);
+    await postMessage({ type: 'recorder/merge', range: getClockRangeOfSelection(state.anchor, state.focus) });
+    const mergeClock = Math.min(state.anchor.clock, state.focus.clock);
+    updateState(state => {
+      if (state.anchor && state.focus) {
+        state.focus.clock = mergeClock;
+        state.anchor.clock = mergeClock;
+      }
+    });
+  }
+
   const toolbarActions = [
     <Toolbar.Button
       title="Insert audio"
@@ -403,15 +417,21 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
       ref={slowDownButtonRef}
       title="Slow down"
       icon="fa-solid fa-backward"
-      disabled={recorder.playing || recorder.recording}
+      disabled={recorder.playing || recorder.recording || !hasRangeSelection}
       onClick={slowDownPopover.toggle}
     />,
     <Toolbar.Button
       ref={speedUpButtonRef}
       title="Speed up"
       icon="fa-solid fa-forward"
-      disabled={recorder.playing || recorder.recording}
+      disabled={recorder.playing || recorder.recording || !hasRangeSelection}
       onClick={speedUpPopover.toggle}
+    />,
+    <Toolbar.Button
+      title="Merge"
+      icon="fa-solid fa-arrows-up-to-line"
+      disabled={recorder.playing || recorder.recording || !hasRangeSelection}
+      onClick={merge}
     />,
   ];
 
@@ -1100,8 +1120,8 @@ class EditorTrackUI extends React.Component<EditorTrackUIProps> {
         })}
         {lineFocusTimeline.map(lineFocus => {
           const style = {
-            top: `${(lineFocus.clockRange.start / timelineDuration) * 100}%`,
-            paddingTop: `${lineFocus.offsetPx ?? 0}px`,
+            top: `calc(${(lineFocus.clockRange.start / timelineDuration) * 100}% + ${lineFocus.offsetPx ?? 0}px)`,
+            // paddingTop: `${lineFocus.offsetPx ?? 0}px`,
             bottom: `calc(100% - ${(lineFocus.clockRange.end / timelineDuration) * 100}%)`,
             minHeight: `${TRACK_HEIGHT_PX}px`,
           };
@@ -1257,6 +1277,5 @@ function roundTo(value: number, to: number) {
 }
 
 function getClockRangeOfSelection(anchor: Marker, focus: Marker): t.ClockRange {
-  assert(anchor && focus);
   return { start: Math.min(anchor.clock, focus.clock), end: Math.max(anchor.clock, focus.clock) };
 }

@@ -498,6 +498,11 @@ class CodeMic {
         await this.recorder.changeSpeed(req.range, req.factor);
         return this.respondWithStore();
       }
+      case 'recorder/merge': {
+        assert(this.recorder);
+        await this.recorder.merge(req.range);
+        return this.respondWithStore();
+      }
       case 'confirmForkFromPlayer': {
         const wasRunning = this.session?.playing;
         if (!wasRunning) return { type: 'boolean', value: true };
