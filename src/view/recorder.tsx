@@ -393,6 +393,15 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
     });
   }
 
+  const insertGapPopover = usePopover();
+  const insertGapButtonRef = useRef(null);
+
+  async function insertGap(dur: number) {
+    assert(state.focus);
+    await postMessage({ type: 'recorder/insertGap', clock: state.focus.clock, dur });
+    insertGapPopover.close();
+  }
+
   const toolbarActions = [
     <Toolbar.Button
       title="Insert audio"
@@ -433,6 +442,13 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
       disabled={recorder.playing || recorder.recording || !hasRangeSelection}
       onClick={merge}
     />,
+    <Toolbar.Button
+      ref={insertGapButtonRef}
+      title="Insert gap"
+      icon="fa-solid fa-arrows-left-right-to-line icon-rotate-cw-90"
+      disabled={recorder.playing || recorder.recording || hasRangeSelection || !state.focus}
+      onClick={insertGapPopover.toggle}
+    />,
   ];
 
   return (
@@ -471,6 +487,7 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
         title="Slow down"
       />
       <SpeedControlPopover popover={speedUpPopover} onConfirm={speedUp} anchor={speedUpButtonRef} title="Speed up" />
+      <InsertGapPopover popover={insertGapPopover} onConfirm={insertGap} anchor={insertGapButtonRef} />
     </div>
   );
 }
@@ -1251,19 +1268,65 @@ function SpeedControlPopover(props: PopoverProps & { title: string; onConfirm: (
   return (
     <Popover {...props}>
       <form className="recorder-speed-popover-form">
-        <label className="label" htmlFor="x-slider">
+        <label className="label" htmlFor="speed-control-slider">
           {props.title} by {factor}x
         </label>
         <input
           type="range"
-          id="x-slider"
+          id="speed-control-slider"
           min={1}
           max={10}
           step={0.1}
           value={factor}
           onChange={e => setFactor(Number(e.currentTarget!.value))}
+          autoFocus
         />
-        <VSCodeButton appearance="secondary" onClick={e => props.onConfirm(factor)} autoFocus>
+        <VSCodeButton appearance="secondary" onClick={e => props.onConfirm(factor)}>
+          OK
+        </VSCodeButton>
+      </form>
+    </Popover>
+  );
+}
+
+function InsertGapPopover(props: PopoverProps & { onConfirm: (dur: number) => any }) {
+  const [minutes, setMinutes] = useState('');
+  const [seconds, setSeconds] = useState('');
+  return (
+    <Popover {...props}>
+      <form className="insert-gap-popover-form">
+        <label className="label" htmlFor="gap-time-minute">
+          Insert gap
+        </label>
+        <div className="inputs">
+          <input
+            type="number"
+            id="gap-time-minute"
+            min={0}
+            max={60}
+            step={1}
+            value={minutes}
+            placeholder="minutes"
+            onChange={e => setMinutes(e.currentTarget.value)}
+          />
+          <input
+            type="number"
+            id="gap-time-seconds"
+            min={0}
+            max={59}
+            step={1}
+            value={seconds}
+            placeholder="seconds"
+            onChange={e => setSeconds(e.currentTarget.value)}
+          />
+        </div>
+        <VSCodeButton
+          appearance="secondary"
+          onClick={e => {
+            if (/[^0-9]/.test(minutes) || /[^0-9]/.test(seconds)) return;
+            props.onConfirm(Number(minutes || '0') * 60 + Number(seconds || '0'));
+          }}
+        >
           OK
         </VSCodeButton>
       </form>

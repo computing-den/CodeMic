@@ -503,6 +503,11 @@ class CodeMic {
         await this.recorder.merge(req.range);
         return this.respondWithStore();
       }
+      case 'recorder/insertGap': {
+        assert(this.recorder);
+        await this.recorder.insertGap(req.clock, req.dur);
+        return this.respondWithStore();
+      }
       case 'confirmForkFromPlayer': {
         const wasRunning = this.session?.playing;
         if (!wasRunning) return { type: 'boolean', value: true };

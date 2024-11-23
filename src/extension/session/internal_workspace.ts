@@ -305,7 +305,7 @@ export default class InternalWorkspace {
   changeSpeed(range: t.ClockRange, factor: number) {
     // Update events.
     this.eventContainer.forEachExc(
-      this.eventContainer.getIndexBeforeClock(range.start),
+      this.eventContainer.getIndexAfterClock(range.start),
       this.eventContainer.getSize(),
       (e, i) => {
         e.event.clock = calcClockAfterRangeSpeedChange(e.event.clock, range, factor);
@@ -327,10 +327,27 @@ export default class InternalWorkspace {
     this.session.head.duration = calcClockAfterRangeSpeedChange(this.session.head.duration, range, factor);
   }
 
-  private changeSpeedOfEvents(range: t.ClockRange, factor: number) {
-  }
+  insertGap(clock: number, dur: number) {
+    // Update events.
+    this.eventContainer.forEachExc(
+      this.eventContainer.getIndexAfterClock(clock),
+      this.eventContainer.getSize(),
+      e => void (e.event.clock += dur),
+    );
 
-  private async changeSpeedOfFocusTimeline(range: t.ClockRange, factor: number) {
+    // Reindex the event container.
+    this.eventContainer.reindexStableOrder();
+
+    // Update focus timeline.
+    for (const focusItems of [this.focusTimeline.documents, this.focusTimeline.lines]) {
+      for (const f of focusItems) {
+        if (f.clockRange.start > clock) f.clockRange.start += dur;
+        if (f.clockRange.end > clock) f.clockRange.end += dur;
+      }
+    }
+
+    // Update session duration.
+    this.session.head.duration += dur;
   }
 
   toJSON(): t.InternalWorkspaceJSON {

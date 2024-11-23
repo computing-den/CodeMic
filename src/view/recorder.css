@@ -449,3 +449,16 @@
     margin-top: var(--spacing-medium);
   }
 }
+
+.popover .insert-gap-popover-form {
+  display: grid;
+  gap: var(--spacing-small);
+
+  .inputs {
+    display: flex;
+    gap: var(--spacing-small);
+  }
+  & vscode-button {
+    margin-top: var(--spacing-medium);
+  }
+}

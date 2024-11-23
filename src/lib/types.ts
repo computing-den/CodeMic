@@ -60,6 +60,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/deleteCoverPhoto' }; response: StoreResponse }
   | { request: { type: 'recorder/changeSpeed'; range: ClockRange; factor: number }; response: StoreResponse }
   | { request: { type: 'recorder/merge'; range: ClockRange }; response: StoreResponse }
+  | { request: { type: 'recorder/insertGap'; clock: number; dur: number }; response: StoreResponse }
   // | { request: { type: 'toggleRecorderStudio' }; response: StoreResponse }
   | { request: { type: 'deleteSession'; sessionId: string }; response: StoreResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }

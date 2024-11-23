@@ -196,12 +196,20 @@ export default class SessionRuntime {
 
   async changeSpeed(range: t.ClockRange, factor: number) {
     this.internalWorkspace.changeSpeed(range, factor);
-    await this.seek(this.internalWorkspace.getCurrentEvent()?.event.clock ?? 0);
+    const e = this.internalWorkspace.getCurrentEvent();
+    if (e) await this.seek(e.event.clock);
     this.onChange?.();
   }
 
   async merge(range: t.ClockRange) {
     await this.changeSpeed(range, Infinity);
+  }
+
+  async insertGap(clock: number, dur: number) {
+    this.internalWorkspace.insertGap(clock, dur);
+    const e = this.internalWorkspace.getCurrentEvent();
+    if (e) await this.seek(e.event.clock);
+    this.onChange?.();
   }
 
   toJSON(): t.SessionBodyJSON {
