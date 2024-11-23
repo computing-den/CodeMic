@@ -183,6 +183,11 @@ class Recorder {
     this.dirty = true;
   }
 
+  async changeSpeed(range: t.ClockRange, factor: number) {
+    assert(this.session.runtime);
+    await this.session.runtime.changeSpeed(range, factor);
+  }
+
   async setCoverPhoto(uri: t.Uri) {
     await fs.promises.copyFile(path.getFileUriPath(uri), path.abs(this.session.sessionDataPath, 'cover_photo'));
     this.session.head.hasCoverPhoto = true;

@@ -58,6 +58,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/updateVideo'; video: Partial<VideoTrack> & { id: string } }; response: StoreResponse }
   | { request: { type: 'recorder/setCoverPhoto'; uri: Uri }; response: StoreResponse }
   | { request: { type: 'recorder/deleteCoverPhoto' }; response: StoreResponse }
+  | { request: { type: 'recorder/changeSpeed'; range: ClockRange; factor: number }; response: StoreResponse }
   // | { request: { type: 'toggleRecorderStudio' }; response: StoreResponse }
   | { request: { type: 'deleteSession'; sessionId: string }; response: StoreResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }

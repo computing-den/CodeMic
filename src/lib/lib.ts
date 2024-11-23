@@ -113,21 +113,33 @@ export function isClockInRange(clock: number, range: t.ClockRange): boolean {
   return clock >= range.start && clock < range.end;
 }
 
-export function doClockRangesIntersect(a: t.ClockRange, b: t.ClockRange): boolean {
+export function doClockRangesOverlap(a: t.ClockRange, b: t.ClockRange): boolean {
   /*
      a: 0-5, b: 5-10
      a: -----
      b:      -----
-     NO INTERSECTION: b.start (5) < a.end (5) && a.start (0) < b.end (10)
+     NOT OVERLAPPING: b.start (5) < a.end (5) && a.start (0) < b.end (10)
 
 
      a: 0-5, b: 4-10
      a: -----
      b:     -----
-     INTERSECTION: b.start (4) < a.end (5) && a.start (0) < b.end (10)
+     OVERLAPPING: b.start (4) < a.end (5) && a.start (0) < b.end (10)
 
   */
   return b.start < a.end && a.start < b.end;
+}
+
+export function getClockRangeOverlap(a: t.ClockRange, b: t.ClockRange): t.ClockRange | undefined {
+  const start = Math.max(a.start, b.start);
+  const end = Math.min(a.end, b.end);
+  if (end > start) return { start, end };
+}
+
+export function getClockRangeOverlapDur(a: t.ClockRange, b: t.ClockRange): number {
+  const start = Math.max(a.start, b.start);
+  const end = Math.min(a.end, b.end);
+  return Math.max(0, end - start);
 }
 
 export function getClockRangeDur(r: t.ClockRange): number {
@@ -140,6 +152,10 @@ export function clockToLocal(clock: number, range: t.ClockRange): number {
 
 export function clockToGlobal(clock: number, range: t.ClockRange): number {
   return clock + range.start;
+}
+
+export function calcClockAfterRangeSpeedChange(clock: number, range: t.ClockRange, factor: number): number {
+  return clock + getClockRangeOverlapDur(range, { start: 0, end: clock }) * (1 / factor - 1);
 }
 
 export function userToUserSummary(user: t.User): t.UserSummary {

@@ -1,6 +1,14 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
-import { Range, LineRange, Selection, Position } from '../../lib/lib.js';
+import {
+  Range,
+  LineRange,
+  Selection,
+  Position,
+  getClockRangeOverlapDur,
+  getClockRangeDur,
+  calcClockAfterRangeSpeedChange,
+} from '../../lib/lib.js';
 import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
 import EventContainer from '../../lib/event_container.js';
@@ -61,6 +69,13 @@ export default class InternalWorkspace {
   //   // await track.restoreInitSnapshot();
   //   return track;
   // }
+
+  /**
+   * Returns the last event that was executed. That is, the effects of that event are visible.
+   */
+  getCurrentEvent(): t.EditorEventWithUri | undefined {
+    return this.eventContainer.at(this.eventIndex);
+  }
 
   async restoreInitState() {
     assert(this.eventIndex === -1, 'calling restoreInitState on an already initialized internal workspace');
@@ -285,6 +300,37 @@ export default class InternalWorkspace {
     //   this.cutFocusItems(this.editorTrack.focusTimeline.documents, clock);
     //   this.cutFocusItems(this.editorTrack.focusTimeline.lines, clock);
     // }
+  }
+
+  changeSpeed(range: t.ClockRange, factor: number) {
+    // Update events.
+    this.eventContainer.forEachExc(
+      this.eventContainer.getIndexBeforeClock(range.start),
+      this.eventContainer.getSize(),
+      (e, i) => {
+        e.event.clock = calcClockAfterRangeSpeedChange(e.event.clock, range, factor);
+      },
+    );
+
+    // Reindex the event container.
+    this.eventContainer.reindexStableOrder();
+
+    // Update focus timeline.
+    for (const focusItems of [this.focusTimeline.documents, this.focusTimeline.lines]) {
+      for (const f of focusItems) {
+        f.clockRange.start = calcClockAfterRangeSpeedChange(f.clockRange.start, range, factor);
+        f.clockRange.end = calcClockAfterRangeSpeedChange(f.clockRange.end, range, factor);
+      }
+    }
+
+    // Update session duration.
+    this.session.head.duration = calcClockAfterRangeSpeedChange(this.session.head.duration, range, factor);
+  }
+
+  private changeSpeedOfEvents(range: t.ClockRange, factor: number) {
+  }
+
+  private async changeSpeedOfFocusTimeline(range: t.ClockRange, factor: number) {
   }
 
   toJSON(): t.InternalWorkspaceJSON {

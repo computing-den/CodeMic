@@ -147,7 +147,7 @@ export default function Popover(props: PopoverProps) {
   //        |_____________|
   //
   useLayoutEffect(() => {
-    function updatePos() {
+    function updatePosContinuously() {
       if (ref.current && props.anchor.current) {
         const popoverRect = ref.current.getBoundingClientRect();
         const anchorRect = props.anchor.current.getBoundingClientRect();
@@ -176,11 +176,11 @@ export default function Popover(props: PopoverProps) {
         ref.current.style.top = `${top}px`;
       }
 
-      req = requestAnimationFrame(updatePos);
+      req = requestAnimationFrame(updatePosContinuously);
     }
 
     let req = 0;
-    if (isOpen) updatePos;
+    if (isOpen) updatePosContinuously();
 
     return () => cancelAnimationFrame(req);
   }, [isOpen, pointOnAnchor, pointOnPopover]);

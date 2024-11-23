@@ -95,7 +95,7 @@ export default class SessionRuntime {
     this.mode.status = SessionRuntimeStatus.Running;
 
     if (this.isAlmostAtTheEnd()) {
-      this.seek(0, { noUpdate: true });
+      await this.seek(0, { noUpdate: true });
     }
 
     await this.workspacePlayer.play();
@@ -192,6 +192,12 @@ export default class SessionRuntime {
 
   handleFrontendVideoEvent(e: t.FrontendMediaEvent) {
     this.videoTrackPlayer.handleVideoEvent(e);
+  }
+
+  async changeSpeed(range: t.ClockRange, factor: number) {
+    this.internalWorkspace.changeSpeed(range, factor);
+    await this.seek(this.internalWorkspace.getCurrentEvent()?.event.clock ?? 0);
+    this.onChange?.();
   }
 
   toJSON(): t.SessionBodyJSON {

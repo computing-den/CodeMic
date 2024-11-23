@@ -25,9 +25,9 @@ const TRACK_MIN_GAP_PX = 1;
 const TRACK_INDENT_PX = 5;
 // const TIMELINE_STEP_HEIGHT = 30;
 // const TIMELINE_INITIAL_STEP_DURATION = 30;
-const TIMELINE_DEFAULT_PX_TO_SEC_RATIO = 1;
-const TIMELINE_MAX_PX_TO_TIME_RATIO = 5;
+const TIMELINE_MAX_PX_TO_TIME_RATIO = 20;
 const TIMELINE_MIN_PX_TO_TIME_RATIO = 1 / 60;
+const TIMELINE_DEFAULT_PX_TO_SEC_RATIO = 20;
 // const TIMELINE_MIN_STEP_DURATION = 5;
 const TIMELINE_WHEEL_ZOOM_SPEED = 0.001;
 
@@ -348,27 +348,36 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
   const speedUpPopover = usePopover();
   const speedUpButtonRef = useRef(null);
 
+  async function changeSpeed(factor: number) {
+    assert(state.anchor && state.focus);
+    // TODO disable speed control popover buttons till done.
+    await postMessage({
+      type: 'recorder/changeSpeed',
+      range: getClockRangeOfSelection(state.anchor, state.focus),
+      factor,
+    });
+
+    updateState(state => {
+      if (state.anchor && state.focus) {
+        const dur = Math.abs(state.anchor.clock - state.focus.clock);
+        if (state.anchor.clock < state.focus.clock) {
+          state.focus.clock = state.anchor.clock + dur / factor;
+        } else {
+          state.anchor.clock = state.focus.clock + dur / factor;
+        }
+      }
+    });
+
+    slowDownPopover.close();
+    speedUpPopover.close();
+  }
+
   function slowDown(factor: number) {
-    // TODO
-    console.log(`Slow down by ${factor}x`);
+    return changeSpeed(1 / factor);
   }
   function speedUp(factor: number) {
-    // TODO
-    console.log(`Speed up by ${factor}x`);
+    return changeSpeed(factor);
   }
-
-  // function openSlowDownPopover() {
-  //   slowDownPopover.open()
-  // }
-
-  // function speedUp(factor: number) {
-  //   // TODO
-  //   console.log(`Speed up by ${factor}x`);
-  // }
-
-  // const speedUpPopover = usePopover({
-  //   render: props => <SpeedControlPopover {...props} onConfirm={speedUp} title="Speed up" />,
-  // });
 
   const toolbarActions = [
     <Toolbar.Button
@@ -480,7 +489,11 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 
   getRulerStepDur(): number {
     const { pxToSecRatio } = this.state;
-    if (pxToSecRatio >= 3.4 && pxToSecRatio <= 5) {
+    if (pxToSecRatio >= 11) {
+      return 1;
+    } else if (pxToSecRatio >= 7 && pxToSecRatio < 11) {
+      return 2;
+    } else if (pxToSecRatio >= 3.4 && pxToSecRatio < 7) {
       return 5;
     } else if (pxToSecRatio >= 1.6 && pxToSecRatio < 3.4) {
       return 10;
@@ -912,7 +925,7 @@ class RangedTracksUI extends React.Component<RangedTracksUIProps> {
 
     // Two columns
     // for (let i = 0; i < tracks.length; ) {
-    //   if (i === tracks.length - 1 || !doClockRangesIntersect(tracks[i], tracks[i + 1])) {
+    //   if (i === tracks.length - 1 || !doClockRangesOverlap(tracks[i], tracks[i + 1])) {
     //     layouts.push({ start: 0, end: 2, track: tracks[i] });
     //     i++;
     //   } else {
@@ -926,7 +939,7 @@ class RangedTracksUI extends React.Component<RangedTracksUIProps> {
     // for (const [i, track] of tracks.entries()) {
     //   let indent = 0;
     //   for (const track2 of tracks.slice(0, i)) {
-    //     if (lib.doClockRangesIntersect(track.clockRange, track2.clockRange)) indent++;
+    //     if (lib.doClockRangesOverlap(track.clockRange, track2.clockRange)) indent++;
     //   }
     //   layouts.push({ start: 0, end: 2, track, indent });
     // }
@@ -936,7 +949,7 @@ class RangedTracksUI extends React.Component<RangedTracksUIProps> {
     const layouts: { track: t.RangedTrack; indent: number }[] = tracks.map(track => ({ track, indent: 0 }));
     for (const [i, layout] of layouts.entries()) {
       for (const layout2 of layouts.slice(0, i)) {
-        if (lib.doClockRangesIntersect(layout.track.clockRange, layout2.track.clockRange)) {
+        if (lib.doClockRangesOverlap(layout.track.clockRange, layout2.track.clockRange)) {
           layout.indent = Math.max(layout.indent, layout2.indent) + 1;
         }
       }
@@ -992,7 +1005,7 @@ class RangedTracksUI extends React.Component<RangedTracksUIProps> {
   // }
 
   // private doesTrackFitInColumn(track: t.RangedTrack, column: RangedTrackLayoutColumn): boolean {
-  //   return column.every(track2 => !this.doClockRangesIntersect(track, track2));
+  //   return column.every(track2 => !this.doClockRangesOverlap(track, track2));
   // }
 
   // private orderedColumn(columns: RangedTrackLayoutColumn): RangedTrackLayoutColumn {
@@ -1027,7 +1040,7 @@ class EditorTrackUI extends React.Component<EditorTrackUIProps> {
     //     };
 
     //     // TODO write an algorithm with better time complexity.
-    //     if (!clockRangesOfOccupiedLines.some(x => lib.doClockRangesIntersect(x, lineClockRange))) {
+    //     if (!clockRangesOfOccupiedLines.some(x => lib.doClockRangesOverlap(x, lineClockRange))) {
     //       lineFocusItems.push(line);
     //     }
     //   }
@@ -1204,12 +1217,11 @@ class MarkerUI extends React.Component<MarkerProps> {
 }
 
 function RangeSelection(props: { timelineDuration: number; anchor: Marker; focus: Marker }) {
-  const min = Math.min(props.anchor.clock, props.focus.clock);
-  const max = Math.max(props.anchor.clock, props.focus.clock);
+  const { start, end } = getClockRangeOfSelection(props.anchor, props.focus);
 
   const style = {
-    top: `${(min / props.timelineDuration) * 100}%`,
-    height: `${((max - min) / props.timelineDuration) * 100}%`,
+    top: `${(start / props.timelineDuration) * 100}%`,
+    height: `${((end - start) / props.timelineDuration) * 100}%`,
   };
   return <div className="range-selection" style={style} />;
 }
@@ -1242,4 +1254,9 @@ function SpeedControlPopover(props: PopoverProps & { title: string; onConfirm: (
 function roundTo(value: number, to: number) {
   assert(to > 0);
   return Math.floor((value + to - 1) / to) * to;
+}
+
+function getClockRangeOfSelection(anchor: Marker, focus: Marker): t.ClockRange {
+  assert(anchor && focus);
+  return { start: Math.min(anchor.clock, focus.clock), end: Math.max(anchor.clock, focus.clock) };
 }

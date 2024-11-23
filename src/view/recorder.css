@@ -234,6 +234,17 @@
                 text-overflow: ellipsis;
                 width: calc(100% - 2 * var(--hor-padding));
                 color: var(--editor-track-color);
+
+                &::after {
+                  content: '';
+                  position: absolute;
+                  left: 10px;
+                  top: 1rem;
+                  /* width: 2px; */
+                  /* background: #444444; */
+                  bottom: 0;
+                  border-left: 2px dashed var(--editor-track-color);
+                }
               }
             }
 

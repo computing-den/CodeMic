@@ -69,7 +69,7 @@ class CodeMic {
     // DEV
     if (config.debug && this.webviewProvider.bus) {
       try {
-        const sessionId = '62a8b8fa-eed6-4b53-8de6-086cee68bc80'; // Desktop
+        const sessionId = '39033c97-ed93-4c22-9bee-afcc0de01d65';
         if (await Session.fromExisting(this.context, sessionId)) {
           // Recorder
           await this.messageHandler({ type: 'recorder/open', sessionId });
@@ -491,6 +491,11 @@ class CodeMic {
       case 'recorder/deleteCoverPhoto': {
         assert(this.recorder);
         await this.recorder.deleteCoverPhoto();
+        return this.respondWithStore();
+      }
+      case 'recorder/changeSpeed': {
+        assert(this.recorder);
+        await this.recorder.changeSpeed(req.range, req.factor);
         return this.respondWithStore();
       }
       case 'confirmForkFromPlayer': {

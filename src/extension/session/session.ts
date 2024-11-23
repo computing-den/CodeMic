@@ -428,10 +428,10 @@ export class Session {
 
         // Handle text documents that have an associated text editor or have untitled schema
         let vscTextDocument: vscode.TextDocument | undefined;
-        if (this.findTabInputTextByUri(targetUri)) {
-          vscTextDocument = this.findVscTextDocumentByUri(targetUri);
-        } else if (path.isUntitledUri(targetUri)) {
+        if (path.isUntitledUri(targetUri)) {
           vscTextDocument = await this.openVscUntitledByName(path.getUntitledUriName(targetUri));
+        } else if (this.findTabInputTextByUri(targetUri)) {
+          vscTextDocument = this.findVscTextDocumentByUri(targetUri);
         }
 
         if (vscTextDocument) {

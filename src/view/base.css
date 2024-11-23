@@ -25,7 +25,7 @@
   --marker-base-color: #000;
   /* --marker-selection-color: #55ffff; */
   --marker-z-index: 10;
-  --range-selection-z-index: 0;
+  --range-selection-z-index: -1;
   --range-selection-background: var(--vscode-editor-selectionBackground);
   --cursor-marker-z-index: 11;
   --track-z-index: 1;

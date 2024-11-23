@@ -40,11 +40,26 @@ export default class EventContainer {
   insert(uri: Uri, events: EditorEvent[]) {
     this.insertIntoTrack(uri, events);
     this.insertIntoBucket(uri, events);
-    this.size + events.length;
+    this.size += events.length;
   }
 
   delete() {
     throw new Error('TODO');
+  }
+
+  /**
+   * Use reindexStableOrder when event clocks have changed but the relative order of events hasn't changed.
+   */
+  reindexStableOrder() {
+    const oldBuckets = this.buckets;
+    this.buckets = [];
+    for (const oldBucket of oldBuckets) {
+      for (const event of oldBucket) {
+        const i = this.getBucketIndex(event.event.clock);
+        this.ensureBucketAt(i);
+        this.buckets[i].push(event);
+      }
+    }
   }
 
   getTrack(uri: Uri): readonly EditorEvent[] {
@@ -76,6 +91,12 @@ export default class EventContainer {
     }
   }
 
+  collectExc(from: number, to: number): EditorEventWithUri[] {
+    let res: EditorEventWithUri[] = [];
+    this.forEachExc(from, to, e => void res.push(e));
+    return res;
+  }
+
   at(i: number): EditorEventWithUri | undefined {
     const pos = this.posOfIndex(i);
     return pos && this.atPos(pos);
@@ -102,6 +123,7 @@ export default class EventContainer {
     // buckets:      xxxxx xxxxxxxx xxxxxxxxxxxxxxxxxxxx
     // bucket sizes: 5     8        20
     // indices:      0     5        13
+    if (target < 0) return;
 
     for (let i = 0, acc = 0; i < this.buckets.length; i++) {
       const bucket = this.buckets[i];
