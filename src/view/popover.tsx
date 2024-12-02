@@ -121,11 +121,13 @@ export function usePopover(): PopoverData {
 // }
 
 export type PopoverProps = {
+  className?: string;
   popover: PopoverData;
   anchor: RefObject<HTMLElement>;
   pointOnPopover?: PointXY | PointName;
   pointOnAnchor?: PointXY | PointName;
   children?: React.ReactNode;
+  showOnAnchorHover?: boolean;
 };
 export default function Popover(props: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -185,6 +187,33 @@ export default function Popover(props: PopoverProps) {
     return () => cancelAnimationFrame(req);
   }, [isOpen, pointOnAnchor, pointOnPopover]);
 
+  useEffect(() => {
+    let timeoutId = 0;
+    function mouseOver(e: MouseEvent) {
+      timeoutId++;
+      props.popover.open();
+    }
+    function mouseOut(e: MouseEvent) {
+      const id = timeoutId;
+      setTimeout(() => {
+        if (id === timeoutId) {
+          props.popover.close();
+        }
+      }, 500);
+    }
+
+    const elem = props.anchor.current;
+    if (props.showOnAnchorHover && elem) {
+      elem.addEventListener('mouseover', mouseOver);
+      elem.addEventListener('mouseout', mouseOut);
+      return () => {
+        timeoutId++;
+        elem.removeEventListener('mouseover', mouseOver);
+        elem.removeEventListener('mouseout', mouseOut);
+      };
+    }
+  }, [props.showOnAnchorHover, props.anchor.current]);
+
   // function keyDown(e: React.KeyboardEvent) {
   //   if (e.key === 'Escape') {
   //     props.onClose();
@@ -192,7 +221,12 @@ export default function Popover(props: PopoverProps) {
   // }
 
   return ReactDOM.createPortal(
-    <div id={props.popover.id} ref={ref} className={`popover ${props.popover.isOpen ? 'open' : ''}`} tabIndex={-1}>
+    <div
+      id={props.popover.id}
+      ref={ref}
+      className={`popover ${props.popover.isOpen ? 'open' : ''} ${props.className || ''}`}
+      tabIndex={-1}
+    >
       {props.children}
     </div>,
     document.getElementById('popovers')!,

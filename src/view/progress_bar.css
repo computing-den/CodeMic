@@ -9,10 +9,10 @@
   z-index: 1;
 
   &:hover {
-    .popover {
-      opacity: 1;
-      visibility: visible;
-    }
+    /* .focus-popover { */
+    /*   opacity: 1; */
+    /*   visibility: visible; */
+    /* } */
 
     .bar {
       width: calc(var(--progress-bar-full-width) - 4px);
@@ -20,42 +20,6 @@
       .shadow {
         opacity: 1;
       }
-    }
-  }
-
-  .popover {
-    position: absolute;
-    /* top: 0; */
-    right: 15px;
-    background: var(--popover-background);
-    color: var(--popover-foreground);
-    /* box-shadow: 0 0 10px 10px var(--popover-shadow-color); */
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.2s ease-in-out, visibility 0s 0.2s;
-    padding: var(--spacing-medium);
-    border-radius: 5px;
-    border: 1px solid var(--popover-border-color);
-
-    /* display: grid; */
-    /* grid-gap: var(--spacing-small); */
-
-    width: 250px;
-    max-width: 95vw;
-
-    * {
-      white-space: nowrap;
-    }
-
-    .row {
-      display: flex;
-      font-weight: bold;
-      justify-content: space-between;
-    }
-    .line-focus {
-      margin-top: var(--spacing-small);
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
   }
 
@@ -96,5 +60,42 @@
       background: #181818a1;
       transition: opacity 0.2s ease-in-out;
     }
+  }
+}
+
+.progress-bar-focus-popover {
+  /* position: absolute; */
+  /* top: 0; */
+  /* right: 15px; */
+  /* background: var(--popover-background); */
+  /* color: var(--popover-foreground); */
+  /* box-shadow: 0 0 10px 10px var(--popover-shadow-color); */
+  /* opacity: 0; */
+  /* visibility: hidden; */
+  /* transition: opacity 0.2s ease-in-out, visibility 0s 0.2s; */
+  /* padding: var(--spacing-medium); */
+  /* border-radius: 5px; */
+  /* border: 1px solid var(--popover-border-color); */
+
+  /* display: grid; */
+  /* grid-gap: var(--spacing-small); */
+
+  width: 250px;
+  max-width: 95vw;
+  flex-direction: column;
+
+  * {
+    white-space: nowrap;
+  }
+
+  .row {
+    display: flex;
+    font-weight: bold;
+    justify-content: space-between;
+  }
+  .line-focus {
+    margin-top: var(--spacing-small);
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
