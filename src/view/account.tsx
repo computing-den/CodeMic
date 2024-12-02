@@ -7,7 +7,7 @@ import _ from 'lodash';
 import moment from 'moment';
 import { VSCodeButton, VSCodeLink, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 
-type Props = { user?: t.User; account: t.AccountState };
+type Props = { user?: t.User; account: t.AccountUIState };
 export default class Account extends React.Component<Props> {
   fieldChanged = async (field: keyof t.AccountUpdate, value: any) => {
     await postMessage({ type: 'account/update', changes: { [field]: value } });

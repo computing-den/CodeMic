@@ -2,20 +2,19 @@ import _ from 'lodash';
 import * as t from '../../lib/types.js';
 import * as path from '../../lib/path.js';
 import * as lib from '../../lib/lib.js';
-import { ContentChange, Range } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
-import type Session from './session.js';
 import InternalWorkspace from './internal_workspace.js';
 import InternalTextDocument from './internal_text_document.js';
+import { LoadedSession } from './session.js';
 
 // Not every InternalTextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
 class InternalWorkspaceStepper implements t.WorkspaceStepper {
-  constructor(public session: Session) {}
+  constructor(public session: LoadedSession) {}
 
   get internalWorkspace(): InternalWorkspace {
-    return this.session.runtime!.internalWorkspace;
+    return this.session.rr.internalWorkspace;
   }
 
   async applyEditorEvent(event: t.EditorEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {

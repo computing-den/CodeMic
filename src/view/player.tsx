@@ -16,7 +16,7 @@ import { cn } from './misc.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeDropdown, VSCodeOption, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 
-type Props = { user?: t.User; player: t.PlayerState };
+type Props = { user?: t.User; player: t.PlayerUIState; session: t.SessionUIState };
 export default class Player extends React.Component<Props> {
   seeking = false;
   mediaManager = new MediaManager();
@@ -39,7 +39,7 @@ export default class Player extends React.Component<Props> {
   // };
 
   seek = async (clock: number) => {
-    if (!this.props.player.loaded) {
+    if (!lib.isLoadedSession(this.props.session)) {
       console.error(`Cannot seek track that is not loaded`);
       return;
     }
@@ -60,21 +60,21 @@ export default class Player extends React.Component<Props> {
   };
 
   fork = async () => {
-    const res = await postMessage({ type: 'confirmForkFromPlayer', clock: this.props.player.clock });
+    const res = await postMessage({ type: 'confirmForkFromPlayer', clock: this.props.session.clock });
     if (res.value) {
       await postMessage({
         type: 'recorder/open',
-        sessionId: this.props.player.sessionHead.id,
+        sessionId: this.props.session.head.id,
         fork: true,
-        clock: this.props.player.clock,
+        clock: this.props.session.clock,
       });
     }
   };
 
   edit = async () => {
-    const res = await postMessage({ type: 'confirmEditFromPlayer', clock: this.props.player.clock });
+    const res = await postMessage({ type: 'confirmEditFromPlayer', clock: this.props.session.clock });
     if (res.value) {
-      await postMessage({ type: 'recorder/open', sessionId: this.props.player.sessionHead.id });
+      await postMessage({ type: 'recorder/open', sessionId: this.props.session.head.id });
     }
   };
 
@@ -95,7 +95,7 @@ export default class Player extends React.Component<Props> {
   };
 
   updateResources() {
-    const { audioTracks, videoTracks, blobsWebviewUris: webviewUris } = this.props.player;
+    const { audioTracks, videoTracks, blobsWebviewUris: webviewUris } = this.props.session;
     if (webviewUris) {
       this.mediaManager.updateResources(webviewUris, audioTracks, videoTracks);
     }
@@ -119,27 +119,27 @@ export default class Player extends React.Component<Props> {
   }
 
   render() {
-    const { player, user } = this.props;
-    const { sessionHead: s } = player;
+    const { session, user } = this.props;
+    const { head } = session;
 
     let primaryAction: MT.PrimaryAction;
-    if (player.playing) {
+    if (session.playing) {
       primaryAction = { type: 'player/pause', title: 'Pause', onClick: this.pause };
-    } else if (player.loaded) {
+    } else if (session.loaded) {
       primaryAction = { type: 'player/play', title: 'Play', onClick: this.play };
     } else {
-      const title = player.workspace
-        ? `Load the project into ${player.workspace}`
+      const title = session.workspace
+        ? `Load the project into ${session.workspace}`
         : `Select a directory and load the project into it`;
       primaryAction = { type: 'player/load', title, onClick: this.load };
     }
 
     const toolbarActions = [
       {
-        title: player.playing
+        title: session.playing
           ? `Fork: create a new project starting at this point`
-          : player.clock > 0
-          ? `Fork: create a new project starting at ${lib.formatTimeSeconds(player.clock)}`
+          : session.clock > 0
+          ? `Fork: create a new project starting at ${lib.formatTimeSeconds(session.clock)}`
           : `Fork: create a new project based on this one`,
         icon: 'codicon-repo-forked',
         onClick: this.fork,
@@ -165,17 +165,17 @@ export default class Player extends React.Component<Props> {
       },
     ];
 
-    const tocIndex = _.findLastIndex(s.toc, item => item.clock <= player.clock);
+    const tocIndex = _.findLastIndex(head.toc, item => item.clock <= session.clock);
 
     return (
       <Screen className="player">
-        {player.loaded && (
+        {lib.isLoadedSession(session) && (
           <ProgressBar
-            duration={s.duration}
+            duration={head.duration}
             onSeek={this.seek}
-            clock={player.clock}
-            workspaceFocusTimeline={player.workspaceFocusTimeline}
-            toc={s.toc}
+            clock={session.clock}
+            workspaceFocusTimeline={session.workspaceFocusTimeline}
+            toc={head.toc}
           />
         )}
         <Section className="main-section">
@@ -187,19 +187,19 @@ export default class Player extends React.Component<Props> {
           />
             */}
           <Section.Body>
-            <SessionHead className="subsection subsection_spaced" sessionHead={s} withAuthor />
+            <SessionHead className="subsection subsection_spaced" sessionHead={head} withAuthor />
             <MediaToolbar
               className="subsection subsection_spaced"
               primaryAction={primaryAction}
               actions={toolbarActions}
-              clock={player.clock}
-              duration={s.duration}
+              clock={session.clock}
+              duration={head.duration}
             />
             <div id="cover-container" className="cover-container subsection">
-              {s.hasCoverPhoto && <img src={player.coverPhotoWebviewUri} />}
+              {head.hasCoverPhoto && <img src={session.coverPhotoWebviewUri} />}
               <video id="guide-video" />
             </div>
-            <SessionDescription className="subsection subsection_spaced" sessionHead={s} />
+            <SessionDescription className="subsection subsection_spaced" sessionHead={head} />
             {/*!player.loaded && (
               <PathField
                 className="subsection"
@@ -218,12 +218,12 @@ export default class Player extends React.Component<Props> {
               </VSCodeDropdown>
               <VSCodeTextField placeholder="Search"></VSCodeTextField>
             </div>
-            {s.toc.length > 0 && (
+            {head.toc.length > 0 && (
               <div className="subsection toc">
-                {s.toc.map((item, i) => (
+                {head.toc.map((item, i) => (
                   <div
                     tabIndex={0}
-                    className={cn('item', i === tocIndex && player.loaded && 'active')}
+                    className={cn('item', i === tocIndex && session.loaded && 'active')}
                     onClick={e => this.tocItemClicked(e, item)}
                   >
                     <div className="title">{item.title}</div>
@@ -238,7 +238,7 @@ export default class Player extends React.Component<Props> {
           <Section.Header title="COMMENTS" collapsible />
           <Section.Body>
             {user && <CommentInput author={user} />}
-            <CommentList comments={player.comments} />
+            <CommentList comments={session.comments} />
           </Section.Body>
         </Section>
         {/*

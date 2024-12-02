@@ -1,20 +1,20 @@
 import * as t from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
-import type Session from './session.js';
 import _ from 'lodash';
+import { LoadedSession } from './session.js';
 
 export default class VideoTrackPlayer {
   videoTrack: t.VideoTrack | undefined;
   running = false;
   onError?: (error: Error) => any;
 
-  private session: Session;
+  private session: LoadedSession;
   private clock = 0;
   private loaded = false;
   private loading = false;
   private seekAfterLoad = false;
 
-  constructor(session: Session) {
+  constructor(session: LoadedSession) {
     this.session = session;
   }
 

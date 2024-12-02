@@ -5,7 +5,7 @@ export type Config = {
   server: string;
   logRecorderAcceptedVscEvents: boolean;
   logRecorderRawVscEvents: boolean;
-  logSessionRuntimeUpdateStep: boolean;
+  logSessionRRUpdateStep: boolean;
   logTrackPlayerUpdateStep: boolean;
   debug: boolean;
 };

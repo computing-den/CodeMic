@@ -6,13 +6,11 @@ export function serializeSessionBodyJSON(body: t.SessionBodyJSON): t.SessionBody
   return {
     audioTracks: body.audioTracks,
     videoTracks: body.videoTracks,
-    internalWorkspace: {
-      editorTracks: _.mapValues(body.internalWorkspace.editorTracks, t => t.map(serializeEditorEvent)),
-      defaultEol: body.internalWorkspace.defaultEol,
-      focusTimeline: {
-        documents: body.internalWorkspace.focusTimeline.documents.map(serializeDocumentFocus),
-        lines: body.internalWorkspace.focusTimeline.lines.map(serializeLineFocus),
-      },
+    editorTracks: _.mapValues(body.editorTracks, t => t.map(serializeEditorEvent)),
+    defaultEol: body.defaultEol,
+    focusTimeline: {
+      documents: body.focusTimeline.documents.map(serializeDocumentFocus),
+      lines: body.focusTimeline.lines.map(serializeLineFocus),
     },
   };
 }
@@ -145,13 +143,11 @@ export function deserializeSessionBody(compact: t.SessionBodyCompact): t.Session
   return {
     audioTracks: compact.audioTracks,
     videoTracks: compact.videoTracks,
-    internalWorkspace: {
-      editorTracks: _.mapValues(compact.internalWorkspace.editorTracks, t => t.map(deserializeEditorEvent)),
-      defaultEol: compact.internalWorkspace.defaultEol,
-      focusTimeline: {
-        documents: compact.internalWorkspace.focusTimeline.documents.map(deserializeDocumentFocus),
-        lines: compact.internalWorkspace.focusTimeline.lines.map(deserializeLineFocus),
-      },
+    editorTracks: _.mapValues(compact.editorTracks, t => t.map(deserializeEditorEvent)),
+    defaultEol: compact.defaultEol,
+    focusTimeline: {
+      documents: compact.focusTimeline.documents.map(deserializeDocumentFocus),
+      lines: compact.focusTimeline.lines.map(deserializeLineFocus),
     },
   };
 }

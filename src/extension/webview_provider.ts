@@ -2,7 +2,6 @@ import config from './config.js';
 import * as vscode from 'vscode';
 import assert from 'assert';
 import _ from 'lodash';
-import { v4 as uuid } from 'uuid';
 import * as t from '../lib/types.js';
 import * as b from '../lib/bus.js';
 import { osPaths } from './paths.js';

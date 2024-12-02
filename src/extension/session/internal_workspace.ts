@@ -1,18 +1,9 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
-import {
-  Range,
-  LineRange,
-  Selection,
-  Position,
-  getClockRangeOverlapDur,
-  getClockRangeDur,
-  calcClockAfterRangeSpeedChange,
-} from '../../lib/lib.js';
+import { LineRange, Selection } from '../../lib/lib.js';
 import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
-import EventContainer from '../../lib/event_container.js';
-import Session from './session.js';
+import { LoadedSession } from './session.js';
 import InternalWorkspaceStepper from './internal_workspace_stepper.js';
 import InternalTextEditor from './internal_text_editor.js';
 import InternalTextDocument from './internal_text_document.js';
@@ -34,7 +25,6 @@ export type SeekData = { steps: SeekStep[]; direction: t.Direction };
 // Not every InternalTextDocument may be attached to a InternalTextEditor. At least not until the
 // TextEditor is opened.
 export default class InternalWorkspace {
-  // These fields change with the clock/eventIndex
   // If a InternalTextDocument is in this.textDocuments, it is also in this.worktree.
   // If a InternalTextEditor is in this.textEditors, it is also in this.worktree.
   // eventIndex represents the index of the last event that was executed. That is, the effects of that event are visible.
@@ -44,37 +34,20 @@ export default class InternalWorkspace {
   textEditors: InternalTextEditor[];
   activeTextEditor?: InternalTextEditor;
   stepper: InternalWorkspaceStepper;
-  eventContainer: EventContainer;
 
-  defaultEol: t.EndOfLine;
-  focusTimeline: t.WorkspaceFocusTimeline;
-
-  constructor(public session: Session, json: t.InternalWorkspaceJSON) {
+  constructor(public session: LoadedSession) {
     this.eventIndex = -1;
     this.worktree = new Map();
     this.textDocuments = [];
     this.textEditors = [];
     this.stepper = new InternalWorkspaceStepper(session);
-    this.eventContainer = new EventContainer(json.editorTracks);
-    this.defaultEol = json.defaultEol;
-    this.focusTimeline = json.focusTimeline;
   }
-
-  // get editorTrack(): t.InternalWorkspace {
-  //   return this.session.body!.editorTrack;
-  // }
-
-  // static async fromSession(session: Session, editorTracks: t.InternalEditorTracksJSON): Promise<InternalWorkspace> {
-  //   const track = new InternalWorkspace(session);
-  //   // await track.restoreInitSnapshot();
-  //   return track;
-  // }
 
   /**
    * Returns the last event that was executed. That is, the effects of that event are visible.
    */
   getCurrentEvent(): t.EditorEventWithUri | undefined {
-    return this.eventContainer.at(this.eventIndex);
+    return this.session.body.eventContainer.at(this.eventIndex);
   }
 
   async restoreInitState() {
@@ -107,7 +80,7 @@ export default class InternalWorkspace {
     }
 
     if (item.file.type === 'local') {
-      return this.session.readFile(item.file);
+      return this.session.core.readFile(item.file);
     }
 
     if (item.file.type === 'empty') {
@@ -150,8 +123,8 @@ export default class InternalWorkspace {
       return worktreeItem.document;
     }
 
-    const text = new TextDecoder().decode(await this.session.readFile(worktreeItem.file));
-    const textDocument = InternalTextDocument.fromText(uri, text, this.defaultEol);
+    const text = new TextDecoder().decode(await this.session.core.readFile(worktreeItem.file));
+    const textDocument = InternalTextDocument.fromText(uri, text, this.session.body.defaultEol);
     this.insertTextDocument(textDocument);
     return textDocument;
   }
@@ -232,38 +205,23 @@ export default class InternalWorkspace {
   getSeekData(toClock: number): SeekData {
     // FORWARD
 
-    const end = this.eventContainer.getIndexAfterClock(toClock);
+    const ec = this.session.body.eventContainer;
+
+    const end = ec.getIndexAfterClock(toClock);
     let direction = t.Direction.Forwards;
     const steps: SeekStep[] = [];
 
     if (this.eventIndex < end) {
       // Go forward
       const from = this.eventIndex + 1;
-      this.eventContainer.forEachExc(from, end, (e, i) => steps.push({ ...e, newEventIndex: i }));
+      ec.forEachExc(from, end, (e, i) => steps.push({ ...e, newEventIndex: i }));
     } else if (this.eventIndex > end) {
       // Go backward
-      this.eventContainer.forEachExc(this.eventIndex, end - 1, (e, i) => steps.push({ ...e, newEventIndex: i - 1 }));
+      ec.forEachExc(this.eventIndex, end - 1, (e, i) => steps.push({ ...e, newEventIndex: i - 1 }));
       direction = t.Direction.Backwards;
     }
 
     return { steps, direction };
-
-    // if (i < 0 || toClock > this.clockAt(i)) {
-    //   // go forwards
-    //   for (let j = i + 1; j < n && toClock >= this.clockAt(j); j++) {
-    //     events.push(this.eventAt(j));
-    //     i = j;
-    //   }
-    // } else if (toClock < this.clockAt(i)) {
-    //   // go backwards
-    //   direction = t.Direction.Backwards;
-    //   for (; i >= 0 && toClock <= this.clockAt(i); i--) {
-    //     events.push(this.eventAt(i));
-    //   }
-    // }
-
-    // const clock = Math.max(0, toClock);
-    // return { events, direction, i, clock };
   }
 
   async seek(seekData: SeekData, uriSet?: t.UriSet) {
@@ -281,98 +239,4 @@ export default class InternalWorkspace {
   finalizeSeek(seekData: SeekData) {
     this.eventIndex = seekData.steps.at(-1)?.newEventIndex ?? this.eventIndex;
   }
-
-  /**
-   * Cuts the sessions at clock.
-   * Current clock must be < cut clock.
-   */
-  cut(clock: number) {
-    throw new Error('TODO');
-    // // Cut events
-    // {
-    //   const i = this.editorTrack.events.findIndex(e => e.clock > clock);
-    //   assert(this.eventIndex < i);
-    //   if (i >= 0) this.editorTrack.events.length = i;
-    // }
-
-    // // Cut focusTimeline
-    // {
-    //   this.cutFocusItems(this.editorTrack.focusTimeline.documents, clock);
-    //   this.cutFocusItems(this.editorTrack.focusTimeline.lines, clock);
-    // }
-  }
-
-  changeSpeed(range: t.ClockRange, factor: number) {
-    // Update events.
-    this.eventContainer.forEachExc(
-      this.eventContainer.getIndexAfterClock(range.start),
-      this.eventContainer.getSize(),
-      (e, i) => {
-        e.event.clock = calcClockAfterRangeSpeedChange(e.event.clock, range, factor);
-      },
-    );
-
-    // Reindex the event container.
-    this.eventContainer.reindexStableOrder();
-
-    // Update focus timeline.
-    for (const focusItems of [this.focusTimeline.documents, this.focusTimeline.lines]) {
-      for (const f of focusItems) {
-        f.clockRange.start = calcClockAfterRangeSpeedChange(f.clockRange.start, range, factor);
-        f.clockRange.end = calcClockAfterRangeSpeedChange(f.clockRange.end, range, factor);
-      }
-    }
-
-    // Update session duration.
-    this.session.head.duration = calcClockAfterRangeSpeedChange(this.session.head.duration, range, factor);
-  }
-
-  insertGap(clock: number, dur: number) {
-    // Update events.
-    this.eventContainer.forEachExc(
-      this.eventContainer.getIndexAfterClock(clock),
-      this.eventContainer.getSize(),
-      e => void (e.event.clock += dur),
-    );
-
-    // Reindex the event container.
-    this.eventContainer.reindexStableOrder();
-
-    // Update focus timeline.
-    for (const focusItems of [this.focusTimeline.documents, this.focusTimeline.lines]) {
-      for (const f of focusItems) {
-        if (f.clockRange.start > clock) f.clockRange.start += dur;
-        if (f.clockRange.end > clock) f.clockRange.end += dur;
-      }
-    }
-
-    // Update session duration.
-    this.session.head.duration += dur;
-  }
-
-  toJSON(): t.InternalWorkspaceJSON {
-    return {
-      defaultEol: this.defaultEol,
-      focusTimeline: this.focusTimeline,
-      editorTracks: this.eventContainer.toJSON(),
-    };
-  }
-
-  // private cutFocusItems(focusItems: t.FocusItem[], clock: number) {
-  //   for (const [i, focus] of focusItems.entries()) {
-  //     if (focus.clockRange.start >= clock) {
-  //       focusItems.length = i;
-  //       break;
-  //     }
-  //     focus.clockRange.end = Math.min(focus.clockRange.end, clock);
-  //   }
-  // }
-
-  // private makeInitLiveWorktree(): LiveWorktree {
-  //   const map = new Map<t.Uri, LiveWorktreeItem>();
-  //   for (const [key, file] of Object.entries(worktree)) {
-  //     map.set(key, { file });
-  //   }
-  //   return map;
-  // }
 }

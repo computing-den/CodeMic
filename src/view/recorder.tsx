@@ -18,7 +18,7 @@ import Toolbar from './toolbar.jsx';
 import { cn } from './misc.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeTextArea, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
-import Popover, { PointName, pointNames, pointNameToXY, PopoverProps, usePopover } from './popover.jsx';
+import Popover, { PopoverProps, usePopover } from './popover.jsx';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -31,7 +31,7 @@ const TIMELINE_DEFAULT_PX_TO_SEC_RATIO = 20;
 // const TIMELINE_MIN_STEP_DURATION = 5;
 const TIMELINE_WHEEL_ZOOM_SPEED = 0.001;
 
-type Props = { user?: t.User; recorder: t.RecorderState };
+type Props = { user?: t.User; recorder: t.RecorderUIState; session: t.SessionUIState };
 export default class Recorder extends React.Component<Props> {
   mediaManager = new MediaManager();
 
@@ -41,7 +41,7 @@ export default class Recorder extends React.Component<Props> {
   ];
 
   tabChanged = async (tabId: string) => {
-    await postMessage({ type: 'recorder/openTab', tabId: tabId as t.RecorderTabId });
+    await postMessage({ type: 'recorder/openTab', tabId: tabId as t.RecorderUITabId });
   };
 
   loadRecorder = async () => {
@@ -65,7 +65,7 @@ export default class Recorder extends React.Component<Props> {
   };
 
   updateResources() {
-    const { audioTracks, videoTracks, blobsWebviewUris: webviewUris } = this.props.recorder;
+    const { audioTracks, videoTracks, blobsWebviewUris: webviewUris } = this.props.session;
     if (webviewUris) {
       this.mediaManager.updateResources(webviewUris, audioTracks, videoTracks);
     }
@@ -146,16 +146,16 @@ class DetailsView extends React.Component<DetailsViewProps> {
   };
 
   render() {
-    const { recorder, id, className, onLoadRecorder } = this.props;
+    const { session, id, className, onLoadRecorder } = this.props;
     // const { coverPhotoKey } = this.state;
-    const { sessionHead: s } = recorder;
+    const { head } = session;
 
     return (
       <div id={id} className={className}>
-        <div className={cn('cover-photo-container', s.hasCoverPhoto && 'has-cover-photo')}>
-          {s.hasCoverPhoto ? <img src={recorder.coverPhotoWebviewUri} /> : <p>NO COVER PHOTO</p>}
+        <div className={cn('cover-photo-container', head.hasCoverPhoto && 'has-cover-photo')}>
+          {head.hasCoverPhoto ? <img src={session.coverPhotoWebviewUri} /> : <p>NO COVER PHOTO</p>}
           <div className="buttons">
-            {s.hasCoverPhoto && (
+            {head.hasCoverPhoto && (
               <VSCodeButton
                 className="delete"
                 appearance="secondary"
@@ -166,7 +166,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
               </VSCodeButton>
             )}
             <VSCodeButton className="pick" onClick={this.pickCoverPhoto}>
-              {s.hasCoverPhoto ? 'Change cover' : 'Pick cover'}
+              {head.hasCoverPhoto ? 'Change cover' : 'Pick cover'}
             </VSCodeButton>
           </div>
         </div>
@@ -177,19 +177,19 @@ class DetailsView extends React.Component<DetailsViewProps> {
           className="title subsection"
           rows={2}
           resize="vertical"
-          value={s.title}
+          value={head.title}
           onInput={this.titleChanged}
           placeholder="The title of this project"
-          autoFocus={!recorder.loaded}
+          autoFocus={!session.loaded}
         >
           Title
         </VSCodeTextArea>
         <VSCodeTextField
           className="subsection"
           placeholder="A-Z a-z 0-9 _ (e.g. my_project)"
-          value={s.handle}
+          value={head.handle}
           onInput={this.handleChanged}
-          disabled={Boolean(s.publishTimestamp)}
+          disabled={Boolean(head.publishTimestamp)}
         >
           Handle
         </VSCodeTextField>
@@ -197,7 +197,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
           className="description subsection"
           rows={10}
           resize="vertical"
-          value={s.description}
+          value={head.description}
           onInput={this.descriptionChanged}
           placeholder="What is this project about?"
         >
@@ -223,16 +223,16 @@ class DetailsView extends React.Component<DetailsViewProps> {
           Use <code>.codemicignore</code> to ignore paths.
         </p>
         <div className="subsection buttons">
-          <VSCodeButton onClick={this.publish} disabled={!recorder.loaded}>
+          <VSCodeButton onClick={this.publish} disabled={!session.loaded}>
             Publish
           </VSCodeButton>
-          <VSCodeButton appearance="secondary" onClick={this.save} disabled={recorder.mustScan}>
+          <VSCodeButton appearance="secondary" onClick={this.save} disabled={session.mustScan}>
             Save
           </VSCodeButton>
         </div>
-        {!recorder.loaded && (
+        {!session.loaded && (
           <VSCodeButton className="subsection" onClick={onLoadRecorder} autoFocus>
-            {recorder.mustScan ? 'Scan workspace to start' : 'Load project into workspace'}
+            {session.mustScan ? 'Scan workspace to start' : 'Load project into workspace'}
             <span className="codicon codicon-chevron-right va-top m-left_small" />
           </VSCodeButton>
         )}
@@ -264,8 +264,8 @@ type EditorViewState = {
 };
 type TrackSelection = { id: string; type: 'audio' | 'video' | 'editor' };
 
-function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewProps) {
-  const { sessionHead: s } = recorder;
+function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProps) {
+  const { head } = session;
 
   const [state, setState] = useState<EditorViewState>({
     cursor: undefined,
@@ -310,7 +310,7 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
   }
 
   let primaryAction: MT.PrimaryAction;
-  if (recorder.recording) {
+  if (session.recording) {
     primaryAction = {
       type: 'recorder/pause',
       title: 'Record',
@@ -322,13 +322,13 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
     primaryAction = {
       type: 'recorder/record',
       title: 'Record',
-      disabled: recorder.playing,
+      disabled: session.playing,
       onClick: () => onRecord(state.focus?.clock),
     };
   }
 
   const mediaToolbarActions = [
-    recorder.playing
+    session.playing
       ? {
           title: 'Pause',
           icon: 'codicon-debug-pause',
@@ -339,7 +339,7 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
       : {
           title: 'Play',
           icon: 'codicon-play',
-          disabled: recorder.recording,
+          disabled: session.recording,
           onClick: () => onPlay(state.focus?.clock),
         },
   ];
@@ -406,19 +406,19 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
     <Toolbar.Button
       title="Insert audio"
       icon="codicon codicon-mic"
-      disabled={recorder.playing || recorder.recording}
+      disabled={session.playing || session.recording}
       onClick={insertAudio}
     />,
     <Toolbar.Button
       title="Insert video"
       icon="codicon codicon-device-camera-video"
-      disabled={recorder.playing || recorder.recording}
+      disabled={session.playing || session.recording}
       onClick={insertVideo}
     />,
     <Toolbar.Button
       title="Insert Image"
       icon="codicon codicon-device-camera"
-      disabled={recorder.playing || recorder.recording}
+      disabled={session.playing || session.recording}
       onClick={() => console.log('TODO')}
     />,
     <Toolbar.Separator />,
@@ -426,27 +426,27 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
       ref={slowDownButtonRef}
       title="Slow down"
       icon="fa-solid fa-backward"
-      disabled={recorder.playing || recorder.recording || !hasRangeSelection}
+      disabled={session.playing || session.recording || !hasRangeSelection}
       onClick={slowDownPopover.toggle}
     />,
     <Toolbar.Button
       ref={speedUpButtonRef}
       title="Speed up"
       icon="fa-solid fa-forward"
-      disabled={recorder.playing || recorder.recording || !hasRangeSelection}
+      disabled={session.playing || session.recording || !hasRangeSelection}
       onClick={speedUpPopover.toggle}
     />,
     <Toolbar.Button
       title="Merge"
       icon="fa-solid fa-arrows-up-to-line"
-      disabled={recorder.playing || recorder.recording || !hasRangeSelection}
+      disabled={session.playing || session.recording || !hasRangeSelection}
       onClick={merge}
     />,
     <Toolbar.Button
       ref={insertGapButtonRef}
       title="Insert gap"
       icon="fa-solid fa-arrows-left-right-to-line icon-rotate-cw-90"
-      disabled={recorder.playing || recorder.recording || hasRangeSelection || !state.focus}
+      disabled={session.playing || session.recording || hasRangeSelection || !state.focus}
       onClick={insertGapPopover.toggle}
     />,
   ];
@@ -457,8 +457,8 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
         className="subsection subsection_spaced"
         primaryAction={primaryAction}
         actions={mediaToolbarActions}
-        clock={recorder.clock}
-        duration={s.duration}
+        clock={session.clock}
+        duration={head.duration}
       />
       <div className="subsection subsection_spaced guide-video-container">
         <video id="guide-video" />
@@ -470,14 +470,12 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
         <Toolbar actions={toolbarActions} />
       </div>
       <Timeline
-        recorder={recorder}
+        session={session}
         markers={state.markers}
         cursor={state.cursor}
         anchor={state.anchor}
         focus={state.focus}
         trackSelection={state.trackSelection}
-        clock={recorder.clock}
-        duration={recorder.sessionHead.duration}
         onChange={updateState}
       />
       <SpeedControlPopover
@@ -493,14 +491,12 @@ function EditorView({ id, recorder, className, onRecord, onPlay }: EditorViewPro
 }
 
 type TimelineProps = {
-  recorder: t.RecorderState;
+  session: t.SessionUIState;
   markers: Marker[];
   cursor?: Marker;
   anchor?: Marker;
   focus?: Marker;
   trackSelection?: TrackSelection;
-  clock: number;
-  duration: number;
   onChange: (draft: EditorViewStateRecipe) => any;
 };
 type TimelineState = {
@@ -521,7 +517,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   };
 
   // getTimelineStepClock(): number {
-  //   return calcTimelineStepClock(this.props.recorder.sessionHead.duration, this.state.stepCount);
+  //   return calcTimelineStepClock(this.props.recorder.head.duration, this.state.stepCount);
   // }
 
   getRulerStepDur(): number {
@@ -551,7 +547,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 
   getTimelineDuration(): number {
     const stepDur = this.getRulerStepDur();
-    return roundTo(this.props.recorder.sessionHead.duration + stepDur * 4, stepDur);
+    return roundTo(this.props.session.head.duration + stepDur * 4, stepDur);
   }
 
   wheelMoved = (e: WheelEvent) => {
@@ -849,7 +845,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   }
 
   componentDidUpdate(prevProps: TimelineProps, prevState: TimelineState) {
-    if (this.props.recorder.recording) {
+    if (this.props.session.recording) {
       this.autoScroll();
     }
 
@@ -859,13 +855,15 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   }
 
   render() {
-    const { markers, cursor, anchor, focus, clock, trackSelection, duration, recorder } = this.props;
+    const { markers, cursor, anchor, focus, trackSelection, session } = this.props;
     const { pxToSecRatio /*timelineHeightPx*/ } = this.state;
     const clockMarker: Marker | undefined =
-      clock > 0 && clock !== duration && !recorder.recording ? { clock, type: 'clock' } : undefined;
-    const endOrRecordingMarker: Marker = recorder.recording
-      ? { clock: duration, type: 'recording' }
-      : { clock: duration, type: 'end', draggable: true };
+      session.clock > 0 && session.clock !== session.head.duration && !session.recording
+        ? { clock: session.clock, type: 'clock' }
+        : undefined;
+    const endOrRecordingMarker: Marker = session.recording
+      ? { clock: session.head.duration, type: 'recording' }
+      : { clock: session.head.duration, type: 'end', draggable: true };
 
     const hasRangeSelection = anchor && focus && anchor.clock !== focus.clock;
 
@@ -881,7 +879,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 
     // const groupedEditorTracks = groupEditorEvents(recorder.editorTrack!.events, timelineDuration, timelineHeightPx);
     const tracks = _.orderBy(
-      _.concat<t.RangedTrack>(recorder.audioTracks ?? [], recorder.videoTracks ?? []),
+      _.concat<t.RangedTrack>(session.audioTracks ?? [], session.videoTracks ?? []),
       track => track.clockRange.start,
     );
 
@@ -897,7 +895,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
         >
           <div className="timeline-grid">
             <EditorTrackUI
-              workspaceFocusTimeline={recorder.workspaceFocusTimeline}
+              workspaceFocusTimeline={session.workspaceFocusTimeline}
               timelineDuration={timelineDuration}
               // timelineHeightPx={timelineHeightPx}
               pxToSecRatio={pxToSecRatio}

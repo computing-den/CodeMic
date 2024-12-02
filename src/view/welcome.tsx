@@ -10,7 +10,7 @@ import postMessage from './api.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeLink, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 
-type Props = { user?: t.User; welcome: t.WelcomeState };
+type Props = { user?: t.User; welcome: t.WelcomeUIState };
 export default class Welcome extends React.Component<Props> {
   login = (e: React.MouseEvent) => {
     e.stopPropagation();

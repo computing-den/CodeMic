@@ -36,11 +36,22 @@ export default class EventContainer {
     }
   }
 
-  // Events must be sorted.
+  /**
+   * Events must be sorted.
+   */
   insert(uri: Uri, events: EditorEvent[]) {
     this.insertIntoTrack(uri, events);
     this.insertIntoBucket(uri, events);
     this.size += events.length;
+  }
+
+  /**
+   * Events of each Uri must be sorted.
+   */
+  insertMany(events: EditorEventWithUri[]) {
+    for (const { uri, event } of events) {
+      this.insert(uri, [event]);
+    }
   }
 
   delete() {

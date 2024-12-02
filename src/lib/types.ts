@@ -41,7 +41,7 @@ export type FrontendToBackendReqRes =
       request: { type: 'recorder/open'; sessionId?: string; clock?: number; fork?: boolean };
       response: StoreResponse;
     }
-  | { request: { type: 'recorder/openTab'; tabId: RecorderTabId }; response: StoreResponse }
+  | { request: { type: 'recorder/openTab'; tabId: RecorderUITabId }; response: StoreResponse }
   | { request: { type: 'recorder/load' }; response: StoreResponse }
   | { request: { type: 'recorder/play' }; response: StoreResponse }
   | { request: { type: 'recorder/record' }; response: StoreResponse }
@@ -49,7 +49,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/seek'; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/save' }; response: StoreResponse }
   | { request: { type: 'recorder/publish' }; response: StoreResponse }
-  | { request: { type: 'recorder/update'; changes: RecorderUpdate }; response: StoreResponse }
+  | { request: { type: 'recorder/update'; changes: SessionUIStateUpdate }; response: StoreResponse }
   | { request: { type: 'recorder/insertAudio'; uri: Uri; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/deleteAudio'; id: string }; response: StoreResponse }
   | { request: { type: 'recorder/updateAudio'; audio: Partial<AudioTrack> & { id: string } }; response: StoreResponse }
@@ -202,10 +202,11 @@ export enum Screen {
 export type Store = {
   screen: Screen;
   user?: User;
-  account?: AccountState;
-  welcome?: WelcomeState;
-  recorder?: RecorderState;
-  player?: PlayerState;
+  account?: AccountUIState;
+  welcome?: WelcomeUIState;
+  recorder?: RecorderUIState;
+  player?: PlayerUIState;
+  session?: SessionUIState;
   test?: any;
 
   // The followig values must not change.
@@ -241,70 +242,58 @@ export type AccountState = {
   error?: string;
 };
 
+export type AccountUIState = AccountState;
+
 export type AccountUpdate = Partial<AccountState>;
 
-export type WelcomeState = {
+export type WelcomeUIState = {
   workspace: SessionHead[];
   featured: SessionHead[];
   history: SessionsHistory;
   coverPhotosWebviewUris: WebviewUris;
 };
 
-export type RecorderState = {
-  tabId: RecorderTabId;
+export type RecorderUIState = {
+  tabId: RecorderUITabId;
+};
+export type RecorderUITabId = 'editor-view' | 'details-view';
+
+export type PlayerUIState = {
+  // nothing yet.
+};
+
+export type SessionUIState = {
   mustScan: boolean;
   loaded: boolean;
-  recording: boolean;
   playing: boolean;
+  recording: boolean;
+  head: SessionHead;
   clock: number;
-  sessionHead: SessionHead;
-  workspace?: string;
+  workspace: string;
+  coverPhotoWebviewUri: string;
   history?: SessionHistory;
   workspaceFocusTimeline?: WorkspaceFocusTimeline;
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
   blobsWebviewUris?: WebviewUris;
-  coverPhotoWebviewUri: string;
+  comments?: Comment[];
 };
 
-export type RecorderTabId = 'editor-view' | 'details-view';
+export type LoadedSessionUIState = SessionUIState & {
+  workspaceFocusTimeline: WorkspaceFocusTimeline;
+  audioTracks: AudioTrack[];
+  videoTracks: VideoTrack[];
+  blobsWebviewUris: WebviewUris;
+  comments: Comment[];
+};
 
-export type RecorderUpdate = {
+export type SessionUIStateUpdate = {
   title?: string;
   handle?: string;
   description?: string;
   workspace?: string;
   duration?: number;
 };
-
-export type PlayerState = {
-  loaded: boolean;
-  playing: boolean;
-  sessionHead: SessionHead;
-  clock: number;
-  workspace?: string;
-  history?: SessionHistory;
-  workspaceFocusTimeline?: WorkspaceFocusTimeline;
-  audioTracks?: AudioTrack[];
-  videoTracks?: VideoTrack[];
-  blobsWebviewUris?: WebviewUris;
-  coverPhotoWebviewUri: string;
-  comments?: Comment[];
-};
-
-// export type PlayerUpdate = {
-//   workspace?: string;
-//   // clock?: number;
-// };
-
-// export type Setup = {
-//   sessionHead: SessionHead;
-//   baseSessionHead?: SessionHead;
-//   fork?: { clock: number };
-//   workspace?: string;
-//   isNew?: boolean;
-//   dirty?: boolean;
-// };
 
 export type TocItem = { title: string; clock: number };
 
@@ -345,32 +334,17 @@ export type ClockRange = {
 
 export type ClockRangeCompact = [number, number];
 
-// export type InternalWorkspace = {
-//   initSnapshot: InternalEditorTrackSnapshot;
-//   events: EditorEvent[];
-//   defaultEol: EndOfLine;
-//   focusTimeline: WorkspaceFocusTimeline;
-// };
-
 export type SessionBodyJSON = {
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
-  internalWorkspace: InternalWorkspaceJSON;
-};
-
-export type SessionBodyCompact = {
-  audioTracks: AudioTrack[];
-  videoTracks: VideoTrack[];
-  internalWorkspace: InternalWorkspaceCompact;
-};
-
-export type InternalWorkspaceJSON = {
   editorTracks: InternalEditorTracksJSON;
   focusTimeline: WorkspaceFocusTimeline;
   defaultEol: EndOfLine;
 };
 
-export type InternalWorkspaceCompact = {
+export type SessionBodyCompact = {
+  audioTracks: AudioTrack[];
+  videoTracks: VideoTrack[];
   editorTracks: InternalEditorTracksCompact;
   focusTimeline: WorkspaceFocusTimelineCompact;
   defaultEol: EndOfLine;
@@ -434,12 +408,6 @@ export type VideoTrack = RangedTrackFile;
 
 export type WebviewUris = { [key: string]: string };
 
-// export type InternalEditorTrackSnapshot = {
-//   worktree: Worktree;
-//   textEditors: TextEditor[];
-//   activeTextEditorUri?: Uri;
-// };
-
 export type OpenDialogOptions = {
   canSelectFiles?: boolean;
   canSelectFolders?: boolean;
@@ -448,15 +416,6 @@ export type OpenDialogOptions = {
   filters?: { [name: string]: string[] };
   title?: string;
 };
-
-// export interface Session {
-//   workspace: AbsPath;
-//   head: SessionHead;
-//   body?: SessionBody;
-//   loaded: boolean;
-//   readFile(file: File): Promise<Uint8Array>;
-//   copyToBlob(src: AbsPath, sha1: string): Promise<void>;
-// }
 
 export interface WorkspaceStepper {
   applyEditorEvent(e: EditorEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;

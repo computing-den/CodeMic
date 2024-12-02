@@ -3,6 +3,7 @@ import * as lib from '../lib/lib.js';
 import * as path from '../lib/path.js';
 import { cn } from './misc.js';
 import React from 'react';
+import Popover, { PopoverProps, usePopover } from './popover.jsx';
 
 export type Props = {
   className?: string;

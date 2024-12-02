@@ -16,8 +16,8 @@ export default function App({ store }: AppProps) {
   const renderers = {
     [t.Screen.Account]: <Account user={store.user} account={store.account!} />,
     [t.Screen.Welcome]: <Welcome user={store.user} welcome={store.welcome!} />,
-    [t.Screen.Recorder]: <Recorder user={store.user} recorder={store.recorder!} />,
-    [t.Screen.Player]: <Player user={store.user} player={store.player!} />,
+    [t.Screen.Recorder]: <Recorder user={store.user} recorder={store.recorder!} session={store.session!} />,
+    [t.Screen.Player]: <Player user={store.user} player={store.player!} session={store.session!} />,
     [t.Screen.Loading]: <Loading />,
   };
 

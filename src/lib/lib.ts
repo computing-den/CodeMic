@@ -180,6 +180,10 @@ export function insertIntoArray<T>(array: T[], newItems: T[], at: number) {
 
 // export function getOrSetMap<T,U>(map: Map<T,U>, key: T, make: () => U):
 
+export function isLoadedSession(session: t.SessionUIState): session is t.LoadedSessionUIState {
+  return session.loaded;
+}
+
 export class Vec2 {
   constructor(public x: number, public y: number) {}
   sub(p: Vec2): Vec2 {

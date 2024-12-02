@@ -2,11 +2,12 @@ import * as t from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
 import InternalWorkspace from './internal_workspace.js';
 import VscWorkspaceStepper from './vsc_workspace_stepper.js';
-import type Session from './session.js';
 import config from '../config.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
+import { LoadedSession } from './session.js';
+import VscWorkspace from './vsc_workspace.js';
 
 const STEP_COUNT_THRESHOLD = 10;
 
@@ -14,24 +15,26 @@ class WorkspacePlayer {
   playing = false;
   onError?: (error: Error) => any;
 
-  private session: Session;
+  private session: LoadedSession;
+  private vscWorkspace: VscWorkspace;
   private vscWorkspaceStepper: VscWorkspaceStepper;
   private disposables: vscode.Disposable[] = [];
   private updateQueue = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
   get internalWorkspace(): InternalWorkspace {
-    return this.session.runtime!.internalWorkspace;
+    return this.session.rr.internalWorkspace;
   }
 
-  constructor(session: Session) {
+  constructor(session: LoadedSession, vscWorkspace: VscWorkspace) {
     this.session = session;
-    this.vscWorkspaceStepper = new VscWorkspaceStepper(session);
+    this.vscWorkspace = vscWorkspace;
+    this.vscWorkspaceStepper = new VscWorkspaceStepper(session, vscWorkspace);
   }
 
   async play() {
     if (this.playing) return;
 
-    await this.session.syncInternalWorkspaceToVscodeAndDisk();
+    await this.vscWorkspace.sync();
 
     this.playing = true;
 
@@ -39,7 +42,7 @@ class WorkspacePlayer {
     {
       const disposable = vscode.commands.registerCommand('type', (e: { text: string }) => {
         const uri = vscode.window.activeTextEditor?.document.uri;
-        if (!uri || !this.session.shouldRecordVscUri(uri)) {
+        if (!uri || !this.vscWorkspace.shouldRecordVscUri(uri)) {
           // approve the default type command
           vscode.commands.executeCommand('default:type', e);
         }
@@ -96,7 +99,7 @@ class WorkspacePlayer {
       // Update by seeking the internal this.internalWorkspace first, then syncing the this.internalWorkspace to vscode and disk
       const uriSet: t.UriSet = new Set();
       await this.internalWorkspace.seek(seekData, uriSet);
-      await this.session.syncInternalWorkspaceToVscodeAndDisk(Array.from(uriSet));
+      await this.vscWorkspace.sync(Array.from(uriSet));
     } else {
       if (config.logTrackPlayerUpdateStep) {
         console.log('updateImmediately: applying one at a time', seekData);

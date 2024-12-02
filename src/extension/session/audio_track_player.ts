@@ -1,21 +1,21 @@
 import * as t from '../../lib/types.js';
 import assert from '../../lib/assert.js';
 import * as lib from '../../lib/lib.js';
-import type Session from './session.js';
 import _ from 'lodash';
+import { LoadedSession } from './session.js';
 
 export default class AudioTrackPlayer {
   audioTrack: t.AudioTrack;
   running = false;
   onError?: (error: Error) => any;
 
-  private session: Session;
+  private session: LoadedSession;
   private clock = 0;
   private loaded = false;
   private loading = false;
   private seekAfterLoad = false;
 
-  constructor(session: Session, audioTrack: t.AudioTrack) {
+  constructor(session: LoadedSession, audioTrack: t.AudioTrack) {
     this.session = session;
     this.audioTrack = audioTrack;
   }
