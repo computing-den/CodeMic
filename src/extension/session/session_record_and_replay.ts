@@ -118,7 +118,9 @@ export default class SessionRecordAndReplay {
 
     // Scan VSCode & filesystem.
     const events = await this.vscWorkspace.scanDirAndVsc();
-    this.session.editor.insertEvents(events);
+    this.session.editor.insertInitialEvents(events);
+
+    // TODO insert focus document and focus line.
 
     // Initialize internal workspace.
     await this.internalWorkspace.restoreInitState();
@@ -224,6 +226,48 @@ export default class SessionRecordAndReplay {
 
   handleFrontendVideoEvent(e: t.FrontendMediaEvent) {
     this.videoTrackPlayer.handleVideoEvent(e);
+  }
+
+  async applySessionCmd(cmd: t.SessionCmd) {
+    switch (cmd.type) {
+      case 'insertEvent': {
+        if (this.internalWorkspace.eventIndex >= cmd.index) {
+          await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Forwards);
+        }
+        return;
+      }
+      case 'updateEvent':
+      case 'insertLineFocus':
+      case 'updateLineFocus':
+      case 'deleteLineFocus':
+      case 'insertDocumentFocus':
+      case 'updateDocumentFocus':
+      case 'deleteDocumentFocus':
+        return;
+      default:
+        throw new Error(`unknown cmd type: ${(cmd as any).type}`);
+    }
+  }
+
+  async unapplySessionCmd(cmd: t.SessionCmd) {
+    switch (cmd.type) {
+      case 'insertEvent': {
+        if (this.internalWorkspace.eventIndex >= cmd.index) {
+          await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Backwards);
+        }
+        return;
+      }
+      case 'updateEvent':
+      case 'insertLineFocus':
+      case 'updateLineFocus':
+      case 'deleteLineFocus':
+      case 'insertDocumentFocus':
+      case 'updateDocumentFocus':
+      case 'deleteDocumentFocus':
+        return;
+      default:
+        throw new Error(`unknown cmd type: ${(cmd as any).type}`);
+    }
   }
 
   // async insertGap(clock: number, dur: number) {

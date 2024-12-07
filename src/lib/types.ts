@@ -49,6 +49,8 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/seek'; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/save' }; response: StoreResponse }
   | { request: { type: 'recorder/publish' }; response: StoreResponse }
+  | { request: { type: 'recorder/undo' }; response: StoreResponse }
+  | { request: { type: 'recorder/redo' }; response: StoreResponse }
   | { request: { type: 'recorder/update'; changes: SessionUIStateUpdate }; response: StoreResponse }
   | { request: { type: 'recorder/insertAudio'; uri: Uri; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/deleteAudio'; id: string }; response: StoreResponse }
@@ -267,6 +269,8 @@ export type SessionUIState = {
   loaded: boolean;
   playing: boolean;
   recording: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
   head: SessionHead;
   clock: number;
   workspace: string;
@@ -372,11 +376,12 @@ export type DocumentFocus = FocusItem & {
 };
 
 export type LineFocus = FocusItem & {
+  number: number;
   text: string;
 };
 
 export type FocusItemCompact = {
-  cr: ClockRangeCompact;
+  r: ClockRangeCompact;
 };
 
 export type DocumentFocusCompact = FocusItemCompact & {
@@ -385,6 +390,7 @@ export type DocumentFocusCompact = FocusItemCompact & {
 
 export type LineFocusCompact = FocusItemCompact & {
   t: string;
+  n: number;
 };
 
 export type RangedTrack = {
@@ -629,6 +635,67 @@ export enum Direction {
 }
 
 export type UriSet = Set<Uri>;
+
+export type SessionCmd =
+  | InsertEventSessionCmd
+  | UpdateEventSessionCmd
+  | InsertLineFocusSessionCmd
+  | UpdateLineFocusSessionCmd
+  | DeleteLineFocusSessionCmd
+  | InsertDocumentFocusSessionCmd
+  | UpdateDocumentFocusSessionCmd
+  | DeleteDocumentFocusSessionCmd;
+
+export type InsertEventSessionCmd = {
+  type: 'insertEvent';
+  index: number;
+  uri: Uri;
+  event: EditorEvent;
+};
+
+export type UpdateEventSessionCmd = {
+  type: 'updateEvent';
+  index: number;
+  uri: Uri;
+  update: Partial<EditorEvent>;
+  revUpdate: Partial<EditorEvent>;
+};
+
+export type InsertLineFocusSessionCmd = {
+  type: 'insertLineFocus';
+  lineFocus: LineFocus;
+};
+
+export type UpdateLineFocusSessionCmd = {
+  type: 'updateLineFocus';
+  index: number;
+  update: Partial<LineFocus>;
+  revUpdate: Partial<LineFocus>;
+};
+
+export type DeleteLineFocusSessionCmd = {
+  type: 'deleteLineFocus';
+  index: number;
+  lineFocus: LineFocus;
+};
+
+export type InsertDocumentFocusSessionCmd = {
+  type: 'insertDocumentFocus';
+  documentFocus: DocumentFocus;
+};
+
+export type UpdateDocumentFocusSessionCmd = {
+  type: 'updateDocumentFocus';
+  index: number;
+  update: Partial<DocumentFocus>;
+  revUpdate: Partial<DocumentFocus>;
+};
+
+export type DeleteDocumentFocusSessionCmd = {
+  type: 'deleteDocumentFocus';
+  index: number;
+  documentFocus: DocumentFocus;
+};
 
 // export type Position = {
 //   line: number;

@@ -25,7 +25,7 @@ class WorkspaceRecorder {
   // private scrollStartRange?: Range;
   // private lastUri?: t.Uri;
   // private lastPosition?: Position;
-  private lastLine: number | undefined;
+  // private lastLine: number | undefined;
 
   get internalWorkspace(): InternalWorkspace {
     return this.session.rr.internalWorkspace;
@@ -108,7 +108,7 @@ class WorkspaceRecorder {
   }
 
   pause() {
-    this.popLastLineFocusIfTrivial();
+    // this.isLastLineFocusTrivial();
     this.recording = false;
     // this.scrolling = false;
     // this.scrollStartRange = undefined;
@@ -133,32 +133,45 @@ class WorkspaceRecorder {
     const { documents, lines } = this.session.body.focusTimeline;
     const { activeTextEditor } = this.internalWorkspace;
     const activeUri = activeTextEditor?.document.uri;
-    const lastDocumentFocus = documents.at(-1);
-    const lastLineFocus = lines.at(-1);
 
     if (activeUri) {
-      const sameUri = activeUri === lastDocumentFocus?.uri;
       const currentLine = this.getCurrentLine();
-      const sameLine = currentLine !== undefined && currentLine === this.lastLine;
+      const sameUri = activeUri === documents.at(-1)?.uri;
+      const lastLineFocus = lines.at(-1);
+      const lastDocumentFocus = documents.at(-1);
+      const sameLine = currentLine !== undefined && currentLine === lastLineFocus?.number;
 
       // If we're on the same uri and the same line, update focus line, otherwise push a new one.
-      if (lastLineFocus && sameUri && sameLine) {
-        lastLineFocus.clockRange.end = this.clock;
-        lastLineFocus.text = this.getCurrentLineText() ?? '';
-      } else {
-        this.popLastLineFocusIfTrivial();
-        lines.push({ text: this.getCurrentLineText() ?? '', clockRange: { start: this.clock, end: this.clock } });
-        this.lastLine = currentLine;
+      if (lines.length && sameUri && sameLine) {
+        this.session.editor.updateLineFocusAt(lines.length - 1, {
+          text: this.getCurrentLineText() ?? '',
+          clockRange: { start: lastLineFocus.clockRange.start, end: this.clock },
+        });
+      } else if (currentLine !== undefined) {
+        // If last line focus is trivial, remove it before pusing a new one.
+        if (lines.at(-1) && lib.getClockRangeDur(lines.at(-1)!.clockRange) < 2) {
+          this.session.editor.deleteLineFocusAt(lines.length - 1);
+        }
+        this.session.editor.insertLineFocus({
+          number: currentLine,
+          text: this.getCurrentLineText() ?? '',
+          clockRange: { start: this.clock, end: this.clock },
+        });
       }
 
       // Update last document focus clockRange.
       if (lastDocumentFocus) {
-        lastDocumentFocus.clockRange.end = this.clock;
+        this.session.editor.updateDocumentFocusAt(documents.length - 1, {
+          clockRange: { start: lastDocumentFocus.clockRange.start, end: this.clock },
+        });
       }
 
       // If uri has changed, push a new document focus.
       if (!sameUri) {
-        documents.push({ uri: activeUri, clockRange: { start: this.clock, end: this.clock } });
+        this.session.editor.insertDocumentFocus({
+          uri: activeUri,
+          clockRange: { start: this.clock, end: this.clock },
+        });
       }
     }
   }
@@ -173,21 +186,6 @@ class WorkspaceRecorder {
   private getCurrentLine(): number | undefined {
     const { activeTextEditor } = this.internalWorkspace;
     return activeTextEditor?.selections[0]?.start.line;
-  }
-
-  // private pushLineFocus() {
-  //   const { lines } = this.session.body!.editorTrack.focusTimeline;
-  // }
-
-  private popLastLineFocusIfTrivial() {
-    const { lines } = this.session.body.focusTimeline;
-    const lastLineFocus = lines.at(-1);
-    // const last2LineFocus = lines.at(-1);
-    if (!lastLineFocus) return;
-
-    if (lib.getClockRangeDur(lastLineFocus.clockRange) < 3 || lastLineFocus.text.trim().length < 5) {
-      lines.pop();
-    }
   }
 
   private async textChange(
@@ -414,7 +412,7 @@ class WorkspaceRecorder {
         Selection.areEqual(calculatedSelections, irTextEditor.selections) &&
         Selection.areEqual(calculatedRevSelections, revSelections)
       ) {
-        lastEvent.updateSelection = true;
+        this.session.editor.updateEvent(uri, lastEvent, { updateSelection: true });
         return;
       }
     }
@@ -428,7 +426,7 @@ class WorkspaceRecorder {
         Selection.areEqual(calculatedSelections, irTextEditor.selections) &&
         Selection.areEqual(calculatedRevSelections, revSelections)
       ) {
-        lastEvent.updateSelection = true;
+        this.session.editor.updateEvent(uri, lastEvent, { updateSelection: true });
         return;
       }
     }
@@ -436,7 +434,7 @@ class WorkspaceRecorder {
     // Merge successive select events.
     if (lastEvent?.type === 'select' && lastEvent.clock > this.clock - 0.2) {
       logAcceptedEvent(`accepted select for ${uri} (SHORTCUT)`);
-      lastEvent.selections = selections;
+      this.session.editor.updateEvent(uri, lastEvent, { selections });
       return;
     }
 
@@ -504,7 +502,7 @@ class WorkspaceRecorder {
       logAcceptedEvent(
         `accepted scroll for ${uri} visible range: ${visibleRange.start}:${visibleRange.end} (SHORTCUT)`,
       );
-      lastEvent.visibleRange = visibleRange;
+      this.session.editor.updateEvent(uri, lastEvent, { visibleRange });
       return;
     }
 
@@ -527,7 +525,7 @@ class WorkspaceRecorder {
     //   this.scrollStartRange = undefined;
     // }
 
-    this.session.body.eventContainer.insert(uri, [e]);
+    this.session.editor.insertEvent(uri, e);
     // this.onChange?.();
   }
 

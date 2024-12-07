@@ -32,17 +32,29 @@ export default class EventContainer {
 
   constructor(tracks: InternalEditorTracksJSON) {
     for (const [uri, events] of Object.entries(tracks)) {
-      this.insert(uri, events);
+      this.insertManyForUri(uri, events);
     }
   }
 
   /**
    * Events must be sorted.
    */
-  insert(uri: Uri, events: EditorEvent[]) {
-    this.insertIntoTrack(uri, events);
-    this.insertIntoBucket(uri, events);
+  insertManyForUri(uri: Uri, events: EditorEvent[]) {
+    this.insertManyIntoTrack(uri, events);
+    this.insertManyIntoBucket(uri, events);
     this.size += events.length;
+  }
+
+  insert(uri: Uri, event: EditorEvent) {
+    this.insertIntoTrack(uri, event);
+    this.insertIntoBucket(uri, event);
+    this.size += 1;
+  }
+
+  insertAt(uri: Uri, event: EditorEvent, i: number) {
+    this.insertIntoTrack(uri, event);
+    this.insertIntoBucketAtIndex(uri, event, i);
+    this.size += 1;
   }
 
   /**
@@ -50,12 +62,32 @@ export default class EventContainer {
    */
   insertMany(events: EditorEventWithUri[]) {
     for (const { uri, event } of events) {
-      this.insert(uri, [event]);
+      this.insert(uri, event);
     }
   }
 
-  delete() {
-    throw new Error('TODO');
+  deleteAt(index: number) {
+    const pos = this.posOfIndex(index);
+    assert(pos);
+    const [e] = this.buckets[pos[0]].splice(pos[1], 1);
+    const track = this.tracks.get(e.uri);
+    assert(track);
+    const i = track.indexOf(e.event);
+    assert(i !== -1);
+    track.splice(i, 1);
+    this.size -= 1;
+  }
+
+  indexOfEvent(e: EditorEvent): number {
+    const i = this.getBucketIndex(e.clock);
+    const bucket = this.buckets[i];
+    assert(bucket);
+    const min = sortedIndex(bucket, e.clock, getClockOfEditorEventWithUri);
+    const max = lastSortedIndex(bucket, e.clock, getClockOfEditorEventWithUri);
+    for (let j = min; j < max; j++) {
+      if (bucket[j].event === e) return this.indexOfPos([i, j]);
+    }
+    return -1;
   }
 
   /**
@@ -108,6 +140,9 @@ export default class EventContainer {
     return res;
   }
 
+  /**
+   * If i is not in range, it'll return undefined.
+   */
   at(i: number): EditorEventWithUri | undefined {
     const pos = this.posOfIndex(i);
     return pos && this.atPos(pos);
@@ -178,7 +213,7 @@ export default class EventContainer {
   private getInsertPosAfterClock(clock: number): Position {
     assert(clock >= 0);
     const i = this.getBucketIndex(clock);
-    const j = lastSortedIndex(this.buckets[i] ?? [], clock);
+    const j = lastSortedIndex(this.buckets[i] ?? [], clock, getClockOfEditorEventWithUri);
     return [i, j];
   }
 
@@ -193,7 +228,7 @@ export default class EventContainer {
   private getInsertPosBeforeClock(clock: number): Position {
     assert(clock >= 0);
     const i = this.getBucketIndex(clock);
-    const j = sortedIndex(this.buckets[i] ?? [], clock);
+    const j = sortedIndex(this.buckets[i] ?? [], clock, getClockOfEditorEventWithUri);
     return [i, j];
   }
 
@@ -209,7 +244,7 @@ export default class EventContainer {
     return this.tracks.get(uri) ?? this.tracks.set(uri, []).get(uri)!;
   }
 
-  private insertIntoTrack(uri: Uri, events: EditorEvent[]) {
+  private insertManyIntoTrack(uri: Uri, events: EditorEvent[]) {
     const track = this.getInitializedTrack(uri);
     const pushAtEnd = track.length === 0 || events.length === 0 || events[0].clock >= track.at(-1)!.clock;
 
@@ -221,30 +256,50 @@ export default class EventContainer {
     }
   }
 
-  private insertIntoBucket(uri: Uri, events: EditorEvent[]) {
+  private insertIntoTrack(uri: Uri, event: EditorEvent) {
+    const track = this.getInitializedTrack(uri);
+    const i = lastSortedIndex(track, event.clock, getClockOfEditorEvent);
+    track.splice(i, 0, event);
+  }
+
+  private insertManyIntoBucket(uri: Uri, events: EditorEvent[]) {
     for (const event of events) {
-      const [i, j] = this.getInsertPosAfterClock(event.clock);
-      this.ensureBucketAt(i);
-      this.buckets[i].splice(j, 0, { event, uri });
+      this.insertIntoBucket(uri, event);
     }
+  }
+
+  private insertIntoBucket(uri: Uri, event: EditorEvent) {
+    const pos = this.getInsertPosAfterClock(event.clock);
+    this.insertIntoBucketAtPos(uri, event, pos);
+  }
+
+  private insertIntoBucketAtIndex(uri: Uri, event: EditorEvent, index: number) {
+    const pos = this.posOfIndex(index);
+    assert(pos, 'invalid index');
+    this.insertIntoBucketAtPos(uri, event, pos);
+  }
+
+  private insertIntoBucketAtPos(uri: Uri, event: EditorEvent, pos: Position) {
+    this.ensureBucketAt(pos[0]);
+    this.buckets[pos[0]].splice(pos[1], 0, { event, uri });
   }
 }
 
 /**
- * Binary search events. It'll return the last index when clock could be inserted.
+ * Binary search array. It'll return the last index when clock could be inserted.
  * For example:
  * sortedIndex([{clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5}], 2)
  * => 3
  * sortedIndex([{clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5}], 2.5)
  * => 3
  */
-function lastSortedIndex(events: EditorEventWithUri[], clock: number): number {
+function lastSortedIndex<T>(array: T[], clock: number, iteratee: (x: T) => number): number {
   let low = 0;
-  let high = events.length;
+  let high = array.length;
 
   while (low < high) {
     const mid = Math.floor((low + high) / 2);
-    const computed = events[mid].event.clock;
+    const computed = iteratee(array[mid]);
 
     if (computed <= clock) {
       low = mid + 1;
@@ -256,20 +311,20 @@ function lastSortedIndex(events: EditorEventWithUri[], clock: number): number {
 }
 
 /**
- * Binary search events. It'll return the first index when clock could be inserted.
+ * Binary search array. It'll return the first index when clock could be inserted.
  * For example:
  * sortedIndex([{clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5}], 2)
  * => 2
  * sortedIndex([{clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5}], 2.5)
  * => 3
  */
-function sortedIndex(events: EditorEventWithUri[], clock: number): number {
+function sortedIndex<T>(array: T[], clock: number, iteratee: (x: T) => number): number {
   let low = 0;
-  let high = events.length;
+  let high = array.length;
 
   while (low < high) {
     const mid = Math.floor((low + high) / 2);
-    const computed = events[mid].event.clock;
+    const computed = iteratee(array[mid]);
 
     if (computed < clock) {
       low = mid + 1;
@@ -278,4 +333,12 @@ function sortedIndex(events: EditorEventWithUri[], clock: number): number {
     }
   }
   return high;
+}
+
+function getClockOfEditorEventWithUri(x: EditorEventWithUri) {
+  return x.event.clock;
+}
+
+function getClockOfEditorEvent(x: EditorEvent) {
+  return x.clock;
 }

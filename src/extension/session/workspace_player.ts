@@ -78,6 +78,11 @@ class WorkspacePlayer {
     this.internalWorkspace.finalizeSeek(seekData);
   }
 
+  async applyEditorEvent(e: t.EditorEvent, uri: t.Uri, dir: t.Direction) {
+    await this.internalWorkspace.stepper.applyEditorEvent(e, uri, dir);
+    await this.vscWorkspaceStepper.applyEditorEvent(e, uri, dir);
+  }
+
   private dispose() {
     this.updateQueue.rejectAllInQueue();
     for (const d of this.disposables) d.dispose();

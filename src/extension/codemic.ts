@@ -453,6 +453,20 @@ class CodeMic {
         const uris = await vscode.window.showOpenDialog(options);
         return { type: 'uris', uris: uris?.map(x => x.toString()) };
       }
+      case 'recorder/undo': {
+        assert(this.session?.isLoaded());
+        const cmd = this.session.editor.undo();
+        if (cmd) await this.session.rr.unapplySessionCmd(cmd);
+        console.log('Undo: ', cmd);
+        return this.respondWithStore();
+      }
+      case 'recorder/redo': {
+        assert(this.session?.isLoaded());
+        const cmd = this.session.editor.redo();
+        if (cmd) await this.session.rr.applySessionCmd(cmd);
+        console.log('Redo: ', cmd);
+        return this.respondWithStore();
+      }
       case 'recorder/update': {
         assert(this.session?.isLoaded());
         this.session.editor.updateHead(req.changes);
@@ -916,6 +930,8 @@ class CodeMic {
       session = {
         mustScan: this.session.mustScan,
         loaded: this.session.isLoaded(),
+        canUndo: this.session.editor.canUndo,
+        canRedo: this.session.editor.canRedo,
         playing: this.session.rr?.playing ?? false,
         recording: this.session.rr?.recording ?? false,
         head: this.session.head,

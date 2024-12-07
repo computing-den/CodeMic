@@ -402,7 +402,18 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
     insertGapPopover.close();
   }
 
+  async function undo() {
+    await postMessage({ type: 'recorder/undo' });
+  }
+
+  async function redo() {
+    await postMessage({ type: 'recorder/redo' });
+  }
+
   const toolbarActions = [
+    <Toolbar.Button title="Undo" icon="fa-solid fa-rotate-left" disabled={!session.canUndo} onClick={undo} />,
+    <Toolbar.Button title="Redo" icon="fa-solid fa-rotate-right" disabled={!session.canRedo} onClick={redo} />,
+    <Toolbar.Separator />,
     <Toolbar.Button
       title="Insert audio"
       icon="codicon codicon-mic"

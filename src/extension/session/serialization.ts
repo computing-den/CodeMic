@@ -121,21 +121,22 @@ function serializeClock(clock: number): number {
   return Math.floor(clock * 10);
 }
 
-function serializeClockRange(cr: t.ClockRange): t.ClockRangeCompact {
-  return [serializeClock(cr.start), serializeClock(cr.end)];
+function serializeClockRange(r: t.ClockRange): t.ClockRangeCompact {
+  return [serializeClock(r.start), serializeClock(r.end)];
 }
 
 function serializeDocumentFocus(focus: t.DocumentFocus): t.DocumentFocusCompact {
   return {
-    cr: serializeClockRange(focus.clockRange),
+    r: serializeClockRange(focus.clockRange),
     u: focus.uri,
   };
 }
 
 function serializeLineFocus(focus: t.LineFocus): t.LineFocusCompact {
   return {
-    cr: serializeClockRange(focus.clockRange),
+    r: serializeClockRange(focus.clockRange),
     t: focus.text,
+    n: focus.number,
   };
 }
 
@@ -253,20 +254,21 @@ function deserializeClock(clock: number): number {
   return clock / 10;
 }
 
-function deserializeClockRange(cr: t.ClockRangeCompact): t.ClockRange {
-  return { start: deserializeClock(cr[0]), end: deserializeClock(cr[1]) };
+function deserializeClockRange(r: t.ClockRangeCompact): t.ClockRange {
+  return { start: deserializeClock(r[0]), end: deserializeClock(r[1]) };
 }
 
 function deserializeDocumentFocus(focus: t.DocumentFocusCompact): t.DocumentFocus {
   return {
-    clockRange: deserializeClockRange(focus.cr),
+    clockRange: deserializeClockRange(focus.r),
     uri: focus.u,
   };
 }
 
 function deserializeLineFocus(focus: t.LineFocusCompact): t.LineFocus {
   return {
-    clockRange: deserializeClockRange(focus.cr),
+    clockRange: deserializeClockRange(focus.r),
     text: focus.t,
+    number: focus.n,
   };
 }
