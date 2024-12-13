@@ -25,7 +25,7 @@ const TRACK_MIN_GAP_PX = 1;
 const TRACK_INDENT_PX = 5;
 // const TIMELINE_STEP_HEIGHT = 30;
 // const TIMELINE_INITIAL_STEP_DURATION = 30;
-const TIMELINE_MAX_PX_TO_TIME_RATIO = 20;
+const TIMELINE_MAX_PX_TO_TIME_RATIO = 60;
 const TIMELINE_MIN_PX_TO_TIME_RATIO = 1 / 60;
 const TIMELINE_DEFAULT_PX_TO_SEC_RATIO = 20;
 // const TIMELINE_MIN_STEP_DURATION = 5;
@@ -1062,7 +1062,7 @@ class RangedTracksUI extends React.Component<RangedTracksUIProps> {
 type EditorTrackUIProps = {
   timelineDuration: number;
   pxToSecRatio: number;
-  workspaceFocusTimeline?: t.WorkspaceFocusTimeline;
+  workspaceFocusTimeline?: t.Focus[];
 };
 class EditorTrackUI extends React.Component<EditorTrackUIProps> {
   render() {
@@ -1093,46 +1093,59 @@ class EditorTrackUI extends React.Component<EditorTrackUIProps> {
     // }
 
     // Skip lines that may cut into the previous line.
-    const lineFocusTimeline: (t.LineFocus & { offsetPx?: number })[] = [];
+    const lineFocusTimeline: { text: string; clockRange: t.ClockRange; offsetPx: number }[] = [];
     // const heightOf1Sec = timelineHeightPx / timelineDuration;
     // const heightOf1Sec = TIMELINE_STEP_HEIGHT / stepDuration;
-    for (const lineFocus of workspaceFocusTimeline?.lines || []) {
+    for (const [i, focus] of (workspaceFocusTimeline ?? []).entries()) {
+      let offsetPx = 0;
       const lastLineFocus = lineFocusTimeline.at(-1);
-      if (!lastLineFocus) {
-        lineFocusTimeline.push(lineFocus);
-        continue;
+      const nextFocusClock = workspaceFocusTimeline?.[i + 1]?.clock ?? timelineDuration;
+      if (lastLineFocus) {
+        // The following:
+
+        // | first line
+        // | | second line
+        // | |
+        //   |
+        //
+        // must be turned into this:
+        //
+        // | first line
+        // | |
+        // | |
+        //   | second line
+
+        const lastLineBottomPx = lastLineFocus.clockRange.start * pxToSecRatio + TRACK_HEIGHT_PX;
+        const lineOriginalTopPx = focus.clock * pxToSecRatio;
+        const lineOriginalBottomPx = nextFocusClock * pxToSecRatio;
+
+        const availableSpace = lineOriginalBottomPx - lastLineBottomPx;
+        const requiredSpace = TRACK_HEIGHT_PX + TRACK_MIN_GAP_PX;
+
+        if (availableSpace < requiredSpace) continue;
+
+        const lineTopPx = Math.max(lastLineBottomPx + TRACK_MIN_GAP_PX, lineOriginalTopPx);
+        offsetPx = lineTopPx - lineOriginalTopPx;
       }
 
-      // The following:
+      lineFocusTimeline.push({ text: focus.text, offsetPx, clockRange: { start: focus.clock, end: nextFocusClock } });
+    }
 
-      // | first line
-      // | | second line
-      // | |
-      //   |
-      //
-      // must be turned into this:
-      //
-      // | first line
-      // | |
-      // | |
-      //   | second line
+    const documentFocusTimeline: { uri: t.Uri; clockRange: t.ClockRange }[] = [];
+    for (const [i, focus] of (workspaceFocusTimeline ?? []).entries()) {
+      const lastDocumentFocus = documentFocusTimeline.at(-1);
+      const nextFocusClock = workspaceFocusTimeline?.[i + 1]?.clock ?? timelineDuration;
 
-      const lastLineBottomPx = lastLineFocus.clockRange.start * pxToSecRatio + TRACK_HEIGHT_PX;
-      const lineOriginalTopPx = lineFocus.clockRange.start * pxToSecRatio;
-      const lineOriginalBottomPx = lineFocus.clockRange.end * pxToSecRatio;
-
-      const availableSpace = lineOriginalBottomPx - lastLineBottomPx;
-      const requiredSpace = TRACK_HEIGHT_PX + TRACK_MIN_GAP_PX;
-
-      if (availableSpace < requiredSpace) continue;
-
-      const lineTopPx = Math.max(lastLineBottomPx + TRACK_MIN_GAP_PX, lineOriginalTopPx);
-      lineFocusTimeline.push({ ...lineFocus, offsetPx: lineTopPx - lineOriginalTopPx });
+      if (lastDocumentFocus && lastDocumentFocus.uri === focus.uri) {
+        lastDocumentFocus.clockRange.end = nextFocusClock;
+      } else {
+        documentFocusTimeline.push({ uri: focus.uri, clockRange: { start: focus.clock, end: nextFocusClock } });
+      }
     }
 
     return (
       <div className="editor-track">
-        {workspaceFocusTimeline?.documents?.map(documentFocus => {
+        {documentFocusTimeline.map(documentFocus => {
           const style = {
             top: `${(documentFocus.clockRange.start / timelineDuration) * 100}%`,
             bottom: `calc(100% - ${(documentFocus.clockRange.end / timelineDuration) * 100}%)`,
@@ -1146,8 +1159,8 @@ class EditorTrackUI extends React.Component<EditorTrackUIProps> {
         })}
         {lineFocusTimeline.map(lineFocus => {
           const style = {
-            top: `calc(${(lineFocus.clockRange.start / timelineDuration) * 100}% + ${lineFocus.offsetPx ?? 0}px)`,
-            // paddingTop: `${lineFocus.offsetPx ?? 0}px`,
+            top: `calc(${(lineFocus.clockRange.start / timelineDuration) * 100}% + ${lineFocus.offsetPx}px)`,
+            // paddingTop: `${lineFocus.offsetPx }px`,
             bottom: `calc(100% - ${(lineFocus.clockRange.end / timelineDuration) * 100}%)`,
             minHeight: `${TRACK_HEIGHT_PX}px`,
           };

@@ -8,14 +8,14 @@ export default class SessionBody {
   videoTracks: t.VideoTrack[];
   eventContainer: EventContainer;
   defaultEol: t.EndOfLine;
-  focusTimeline: t.WorkspaceFocusTimeline;
+  focusTimeline: t.Focus[];
 
   constructor(json?: t.SessionBodyJSON) {
     this.audioTracks = json?.audioTracks ?? [];
     this.videoTracks = json?.videoTracks ?? [];
     this.eventContainer = new EventContainer(json?.editorTracks ?? {});
     this.defaultEol = json?.defaultEol ?? (os.EOL as t.EndOfLine);
-    this.focusTimeline = json?.focusTimeline ?? { documents: [], lines: [] };
+    this.focusTimeline = json?.focusTimeline ?? [];
   }
 
   toJSON(): t.SessionBodyJSON {

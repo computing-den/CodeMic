@@ -10,15 +10,14 @@ export type Props = {
   onSeek: (clock: number) => unknown;
   duration: number;
   clock: number;
-  workspaceFocusTimeline?: t.WorkspaceFocusTimeline;
+  workspaceFocusTimeline?: t.Focus[];
   toc: t.TocItem[];
 };
 
 type UnderMouse = {
   clock: number;
   yNorm: number;
-  documentFocus?: t.DocumentFocus;
-  lineFocus?: t.LineFocus;
+  focus?: t.Focus;
 };
 
 export default function ProgressBar(props: Props) {
@@ -50,12 +49,9 @@ export default function ProgressBar(props: Props) {
         //   popover.style.top = `${yNorm * 100}%`;
         // }
 
-        const documentFocus = props.workspaceFocusTimeline?.documents.find(x =>
-          lib.isClockInRange(clock, x.clockRange),
-        );
-        const lineFocus = props.workspaceFocusTimeline?.lines.find(x => lib.isClockInRange(clock, x.clockRange));
+        const focus = lib.findFocusByClock(props.workspaceFocusTimeline ?? [], clock);
 
-        setUnderMouse({ yNorm, clock, documentFocus: documentFocus, lineFocus: lineFocus });
+        setUnderMouse({ yNorm, clock, focus });
       }
     }
 
@@ -91,12 +87,10 @@ export default function ProgressBar(props: Props) {
         showOnAnchorHover
       >
         <div className="row">
-          <div className="document-focus">
-            {underMouse?.documentFocus ? path.getUriShortNameOpt(underMouse.documentFocus.uri) : ''}
-          </div>
+          <div className="document-focus">{underMouse?.focus ? path.getUriShortNameOpt(underMouse.focus.uri) : ''}</div>
           <div className="clock">{lib.formatTimeSeconds(underMouse?.clock ?? 0)}</div>
         </div>
-        <div className="line-focus">{underMouse?.lineFocus?.text || ''}</div>
+        <div className="line-focus">{underMouse?.focus?.text || ''}</div>
       </Popover>
       <div className="bar" onClick={clicked}>
         <div className="shadow" style={{ height: `${(underMouse?.yNorm ?? 0) * 100}%` }} />

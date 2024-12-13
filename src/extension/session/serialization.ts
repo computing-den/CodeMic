@@ -8,10 +8,7 @@ export function serializeSessionBodyJSON(body: t.SessionBodyJSON): t.SessionBody
     videoTracks: body.videoTracks,
     editorTracks: _.mapValues(body.editorTracks, t => t.map(serializeEditorEvent)),
     defaultEol: body.defaultEol,
-    focusTimeline: {
-      documents: body.focusTimeline.documents.map(serializeDocumentFocus),
-      lines: body.focusTimeline.lines.map(serializeLineFocus),
-    },
+    focusTimeline: body.focusTimeline.map(serializeFocus),
   };
 }
 
@@ -125,16 +122,10 @@ function serializeClockRange(r: t.ClockRange): t.ClockRangeCompact {
   return [serializeClock(r.start), serializeClock(r.end)];
 }
 
-function serializeDocumentFocus(focus: t.DocumentFocus): t.DocumentFocusCompact {
+function serializeFocus(focus: t.Focus): t.FocusCompact {
   return {
-    r: serializeClockRange(focus.clockRange),
+    c: serializeClock(focus.clock),
     u: focus.uri,
-  };
-}
-
-function serializeLineFocus(focus: t.LineFocus): t.LineFocusCompact {
-  return {
-    r: serializeClockRange(focus.clockRange),
     t: focus.text,
     n: focus.number,
   };
@@ -146,10 +137,7 @@ export function deserializeSessionBody(compact: t.SessionBodyCompact): t.Session
     videoTracks: compact.videoTracks,
     editorTracks: _.mapValues(compact.editorTracks, t => t.map(deserializeEditorEvent)),
     defaultEol: compact.defaultEol,
-    focusTimeline: {
-      documents: compact.focusTimeline.documents.map(deserializeDocumentFocus),
-      lines: compact.focusTimeline.lines.map(deserializeLineFocus),
-    },
+    focusTimeline: compact.focusTimeline.map(deserializeFocus),
   };
 }
 
@@ -258,17 +246,11 @@ function deserializeClockRange(r: t.ClockRangeCompact): t.ClockRange {
   return { start: deserializeClock(r[0]), end: deserializeClock(r[1]) };
 }
 
-function deserializeDocumentFocus(focus: t.DocumentFocusCompact): t.DocumentFocus {
+function deserializeFocus(focus: t.FocusCompact): t.Focus {
   return {
-    clockRange: deserializeClockRange(focus.r),
+    clock: deserializeClock(focus.c),
     uri: focus.u,
-  };
-}
-
-function deserializeLineFocus(focus: t.LineFocusCompact): t.LineFocus {
-  return {
-    clockRange: deserializeClockRange(focus.r),
-    text: focus.t,
     number: focus.n,
+    text: focus.t,
   };
 }

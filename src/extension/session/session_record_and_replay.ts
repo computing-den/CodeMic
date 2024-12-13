@@ -228,45 +228,47 @@ export default class SessionRecordAndReplay {
     this.videoTrackPlayer.handleVideoEvent(e);
   }
 
-  async applySessionCmd(cmd: t.SessionCmd) {
-    switch (cmd.type) {
-      case 'insertEvent': {
-        if (this.internalWorkspace.eventIndex >= cmd.index) {
-          await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Forwards);
+  async applySessionCmds(cmds: t.SessionCmd[]) {
+    for (const cmd of cmds) {
+      switch (cmd.type) {
+        case 'insertEvent': {
+          if (this.internalWorkspace.eventIndex === cmd.index - 1) {
+            this.internalWorkspace.eventIndex++;
+            await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Forwards);
+          }
+          break;
         }
-        return;
+        case 'updateTrackLastEvent':
+          // TODO
+          break;
+        case 'insertFocus':
+        case 'updateLastFocus':
+          break;
+        default:
+          throw new Error(`unknown cmd type: ${(cmd as any).type}`);
       }
-      case 'updateEvent':
-      case 'insertLineFocus':
-      case 'updateLineFocus':
-      case 'deleteLineFocus':
-      case 'insertDocumentFocus':
-      case 'updateDocumentFocus':
-      case 'deleteDocumentFocus':
-        return;
-      default:
-        throw new Error(`unknown cmd type: ${(cmd as any).type}`);
     }
   }
 
-  async unapplySessionCmd(cmd: t.SessionCmd) {
-    switch (cmd.type) {
-      case 'insertEvent': {
-        if (this.internalWorkspace.eventIndex >= cmd.index) {
-          await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Backwards);
+  async unapplySessionCmds(cmds: t.SessionCmd[]) {
+    for (const cmd of cmds) {
+      switch (cmd.type) {
+        case 'insertEvent': {
+          if (this.internalWorkspace.eventIndex === cmd.index) {
+            this.internalWorkspace.eventIndex--;
+            await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Backwards);
+          }
+          break;
         }
-        return;
+        case 'updateTrackLastEvent':
+          // TODO
+          break;
+        case 'insertFocus':
+        case 'updateLastFocus':
+          break;
+        default:
+          throw new Error(`unknown cmd type: ${(cmd as any).type}`);
       }
-      case 'updateEvent':
-      case 'insertLineFocus':
-      case 'updateLineFocus':
-      case 'deleteLineFocus':
-      case 'insertDocumentFocus':
-      case 'updateDocumentFocus':
-      case 'deleteDocumentFocus':
-        return;
-      default:
-        throw new Error(`unknown cmd type: ${(cmd as any).type}`);
     }
   }
 

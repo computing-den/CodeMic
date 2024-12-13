@@ -44,7 +44,7 @@ class WorkspaceRecorder {
     this.recording = true;
 
     // update focus
-    this.updateFocus();
+    // this.updateFocus();
 
     // listen for open document events
     {
@@ -119,9 +119,9 @@ class WorkspaceRecorder {
   setClock(clock: number) {
     this.clock = clock;
 
-    if (this.recording) {
-      this.updateFocus();
-    }
+    // if (this.recording) {
+    //   this.updateFocus();
+    // }
   }
 
   dispose() {
@@ -129,64 +129,81 @@ class WorkspaceRecorder {
     this.disposables = [];
   }
 
-  private updateFocus() {
-    const { documents, lines } = this.session.body.focusTimeline;
-    const { activeTextEditor } = this.internalWorkspace;
-    const activeUri = activeTextEditor?.document.uri;
+  private setFocus() {
+    const irTextEditor = this.internalWorkspace.activeTextEditor;
+    if (!irTextEditor) return;
 
-    if (activeUri) {
-      const currentLine = this.getCurrentLine();
-      const sameUri = activeUri === documents.at(-1)?.uri;
-      const lastLineFocus = lines.at(-1);
-      const lastDocumentFocus = documents.at(-1);
-      const sameLine = currentLine !== undefined && currentLine === lastLineFocus?.number;
-
-      // If we're on the same uri and the same line, update focus line, otherwise push a new one.
-      if (lines.length && sameUri && sameLine) {
-        this.session.editor.updateLineFocusAt(lines.length - 1, {
-          text: this.getCurrentLineText() ?? '',
-          clockRange: { start: lastLineFocus.clockRange.start, end: this.clock },
-        });
-      } else if (currentLine !== undefined) {
-        // If last line focus is trivial, remove it before pusing a new one.
-        if (lines.at(-1) && lib.getClockRangeDur(lines.at(-1)!.clockRange) < 2) {
-          this.session.editor.deleteLineFocusAt(lines.length - 1);
-        }
-        this.session.editor.insertLineFocus({
-          number: currentLine,
-          text: this.getCurrentLineText() ?? '',
-          clockRange: { start: this.clock, end: this.clock },
-        });
-      }
-
-      // Update last document focus clockRange.
-      if (lastDocumentFocus) {
-        this.session.editor.updateDocumentFocusAt(documents.length - 1, {
-          clockRange: { start: lastDocumentFocus.clockRange.start, end: this.clock },
-        });
-      }
-
-      // If uri has changed, push a new document focus.
-      if (!sameUri) {
-        this.session.editor.insertDocumentFocus({
-          uri: activeUri,
-          clockRange: { start: this.clock, end: this.clock },
-        });
-      }
-    }
+    this.session.editor.setFocus({
+      clock: this.clock,
+      uri: irTextEditor.document.uri,
+      number: irTextEditor.currentLine,
+      text: irTextEditor.currentLineText,
+    });
   }
+  // private updateFocus() {
+  //   const { documents, lines } = this.session.body.focusTimeline;
+  //   const { activeTextEditor } = this.internalWorkspace;
+  //   const activeUri = activeTextEditor?.document.uri;
 
-  private getCurrentLineText(): string | undefined {
-    const line = this.getCurrentLine();
-    if (line !== undefined) {
-      return this.internalWorkspace.activeTextEditor?.document.lines[line];
-    }
-  }
+  //   if (activeUri!) return;
 
-  private getCurrentLine(): number | undefined {
-    const { activeTextEditor } = this.internalWorkspace;
-    return activeTextEditor?.selections[0]?.start.line;
-  }
+  //   const currentLine = this.getCurrentLine();
+  //   const sameUri = activeUri === documents.at(-1)?.uri;
+  //   const lastLineFocus = lines.at(-1);
+  //   const lastDocumentFocus = documents.at(-1);
+  //   const sameLine = currentLine !== undefined && currentLine === lastLineFocus?.number;
+
+  //   // Update or insert line focus.
+  //   if (currentLine !== undefined) {
+  //     if (sameLine) {
+  //     }
+  //   }
+
+  //   // If we're on the same uri and the same line, update focus line, otherwise push a new one.
+  //   if (lines.length && sameUri && sameLine) {
+  //     this.session.editor.updateLineFocusAt(lines.length - 1, {
+  //       text: this.getCurrentLineText() ?? '',
+  //       clockRange: { start: lastLineFocus.clockRange.start, end: this.clock },
+  //     });
+  //   } else if (currentLine !== undefined) {
+  //     // If last line focus is trivial, remove it before pusing a new one.
+  //     if (lines.at(-1) && lib.getClockRangeDur(lines.at(-1)!.clockRange) < 2) {
+  //       this.session.editor.deleteLineFocusAt(lines.length - 1);
+  //     }
+  //     this.session.editor.insertLineFocus({
+  //       number: currentLine,
+  //       text: this.getCurrentLineText() ?? '',
+  //       clockRange: { start: this.clock, end: this.clock },
+  //     });
+  //   }
+
+  //   // Update last document focus clockRange.
+  //   if (lastDocumentFocus) {
+  //     this.session.editor.updateDocumentFocusAt(documents.length - 1, {
+  //       clockRange: { start: lastDocumentFocus.clockRange.start, end: this.clock },
+  //     });
+  //   }
+
+  //   // If uri has changed, push a new document focus.
+  //   if (!sameUri) {
+  //     this.session.editor.insertDocumentFocus({
+  //       uri: activeUri,
+  //       clockRange: { start: this.clock, end: this.clock },
+  //     });
+  //   }
+  // }
+
+  // private getCurrentLineText(): string | undefined {
+  //   const line = this.getCurrentLine();
+  //   if (line !== undefined) {
+  //     return this.internalWorkspace.activeTextEditor?.document.lines[line];
+  //   }
+  // }
+
+  // private getCurrentLine(): number | undefined {
+  //   const { activeTextEditor } = this.internalWorkspace;
+  //   return activeTextEditor?.selections[0]?.active.line;
+  // }
 
   private async textChange(
     vscTextDocument: vscode.TextDocument,
@@ -233,6 +250,8 @@ class WorkspaceRecorder {
 
       const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
 
+      let coalescing = false;
+
       // Try to simplify it to textInsert event when:
       // - There is only one cursor: only one content change.
       // - No text is replaced: the range's start and end are the same.
@@ -249,15 +268,17 @@ class WorkspaceRecorder {
           updateSelection: false,
         };
 
-        console.log('XXX textInsert:', irEvent);
-        console.log('XXX equivalent textChange:', lib.getTextChangeEventFromTextInsertEvent(irEvent));
-        console.log('XXX expected textChange:', {
-          type: 'textChange',
-          clock: this.clock,
-          contentChanges: irContentChanges,
-          revContentChanges: irRevContentChanges,
-          updateSelection: false,
-        });
+        coalescing = true;
+
+        // console.log('XXX textInsert:', irEvent);
+        // console.log('XXX equivalent textChange:', lib.getTextChangeEventFromTextInsertEvent(irEvent));
+        // console.log('XXX expected textChange:', {
+        //   type: 'textChange',
+        //   clock: this.clock,
+        //   contentChanges: irContentChanges,
+        //   revContentChanges: irRevContentChanges,
+        //   updateSelection: false,
+        // });
       } else {
         irEvent = {
           type: 'textChange',
@@ -268,7 +289,8 @@ class WorkspaceRecorder {
         };
       }
 
-      this.insertEvent(irEvent, uri);
+      this.insertEvent(irEvent, uri, { coalescing });
+      this.setFocus();
 
       // DEBUG
       if (config.debug) {
@@ -333,6 +355,7 @@ class WorkspaceRecorder {
         revVisibleRange,
       },
       uri,
+      { coalescing: false },
     );
 
     // No reason to remove/close the text document if it's not an untitled.
@@ -347,6 +370,7 @@ class WorkspaceRecorder {
           revEol: irTextDocument.eol,
         },
         uri,
+        { coalescing: true },
       );
     }
   }
@@ -379,7 +403,9 @@ class WorkspaceRecorder {
         revVisibleRange,
       },
       uri,
+      { coalescing: false },
     );
+    this.setFocus();
   }
 
   private select(vscTextEditor: vscode.TextEditor, vscSelections: readonly vscode.Selection[]) {
@@ -399,9 +425,7 @@ class WorkspaceRecorder {
 
     const lastEvent = this.session.body.eventContainer.getTrack(uri).at(-1);
     const revSelections = irTextEditor.selections;
-    // const revVisibleRanges = irTextEditor.visibleRange;
     irTextEditor.select(selections);
-    // irTextEditor.scroll(visibleRange);
 
     // Avoid inserting unnecessary select event if the selections can be calculated
     // from the last textChange event.
@@ -412,7 +436,8 @@ class WorkspaceRecorder {
         Selection.areEqual(calculatedSelections, irTextEditor.selections) &&
         Selection.areEqual(calculatedRevSelections, revSelections)
       ) {
-        this.session.editor.updateEvent(uri, lastEvent, { updateSelection: true });
+        this.session.editor.updateTrackLastEvent(uri, { updateSelection: true });
+        this.setFocus();
         return;
       }
     }
@@ -426,15 +451,17 @@ class WorkspaceRecorder {
         Selection.areEqual(calculatedSelections, irTextEditor.selections) &&
         Selection.areEqual(calculatedRevSelections, revSelections)
       ) {
-        this.session.editor.updateEvent(uri, lastEvent, { updateSelection: true });
+        this.session.editor.updateTrackLastEvent(uri, { updateSelection: true });
+        this.setFocus();
         return;
       }
     }
 
     // Merge successive select events.
-    if (lastEvent?.type === 'select' && lastEvent.clock > this.clock - 0.2) {
+    if (lastEvent?.type === 'select' && lastEvent.clock > this.clock - 0.5) {
       logAcceptedEvent(`accepted select for ${uri} (SHORTCUT)`);
-      this.session.editor.updateEvent(uri, lastEvent, { selections });
+      this.session.editor.updateTrackLastEvent(uri, { selections });
+      this.setFocus();
       return;
     }
 
@@ -448,7 +475,9 @@ class WorkspaceRecorder {
         revSelections,
       },
       uri,
+      { coalescing: false },
     );
+    this.setFocus();
   }
 
   private saveTextDocument(vscTextDocument: vscode.TextDocument) {
@@ -464,6 +493,7 @@ class WorkspaceRecorder {
         clock: this.clock,
       },
       uri,
+      { coalescing: false },
     );
   }
 
@@ -502,7 +532,7 @@ class WorkspaceRecorder {
       logAcceptedEvent(
         `accepted scroll for ${uri} visible range: ${visibleRange.start}:${visibleRange.end} (SHORTCUT)`,
       );
-      this.session.editor.updateEvent(uri, lastEvent, { visibleRange });
+      this.session.editor.updateTrackLastEvent(uri, { visibleRange });
       return;
     }
 
@@ -516,16 +546,17 @@ class WorkspaceRecorder {
         revVisibleRange,
       },
       uri,
+      { coalescing: true },
     );
   }
 
-  private insertEvent(e: t.EditorEvent, uri: t.Uri) {
+  private insertEvent(e: t.EditorEvent, uri: t.Uri, opts: { coalescing: boolean }) {
     // if (e.type !== 'scroll') {
     //   this.scrolling = false;
     //   this.scrollStartRange = undefined;
     // }
 
-    this.session.editor.insertEvent(uri, e);
+    this.session.editor.insertEvent(e, uri, opts);
     // this.onChange?.();
   }
 
@@ -566,6 +597,7 @@ class WorkspaceRecorder {
           updateSelection: false,
         },
         uri,
+        { coalescing: false },
       );
     } else if (!irTextDocument) {
       irTextDocument = this.vscWorkspace.textDocumentFromVsc(vscTextDocument, uri);
@@ -579,6 +611,7 @@ class WorkspaceRecorder {
           isInWorktree,
         },
         uri,
+        { coalescing: false },
       );
     }
 

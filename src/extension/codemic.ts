@@ -455,16 +455,16 @@ class CodeMic {
       }
       case 'recorder/undo': {
         assert(this.session?.isLoaded());
-        const cmd = this.session.editor.undo();
-        if (cmd) await this.session.rr.unapplySessionCmd(cmd);
-        console.log('Undo: ', cmd);
+        const cmds = this.session.editor.undo();
+        await this.session.rr.unapplySessionCmds(cmds);
+        console.log('Undo: ', cmds);
         return this.respondWithStore();
       }
       case 'recorder/redo': {
         assert(this.session?.isLoaded());
-        const cmd = this.session.editor.redo();
-        if (cmd) await this.session.rr.applySessionCmd(cmd);
-        console.log('Redo: ', cmd);
+        const cmds = this.session.editor.redo();
+        await this.session.rr.applySessionCmds(cmds);
+        console.log('Redo: ', cmds);
         return this.respondWithStore();
       }
       case 'recorder/update': {

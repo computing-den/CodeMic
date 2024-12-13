@@ -13,6 +13,14 @@ export default class InternalTextEditor implements t.InternalEditor {
     public visibleRange: LineRange = new LineRange(0, 1),
   ) {}
 
+  get currentLine(): number {
+    return this.selections[0]?.active.line ?? 0;
+  }
+
+  get currentLineText(): string {
+    return this.document.lines[this.currentLine] ?? '';
+  }
+
   select(selections: Selection[]) {
     this.selections = selections;
   }

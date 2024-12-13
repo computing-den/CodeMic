@@ -76,24 +76,9 @@ export class CancelledError extends Error {
 }
 
 export function formatTimeSeconds(time: number, full: boolean = false): string {
-  // 12345.777
-  // 12345.777 / 60 / 60 = 3.4293825 h
-  // 3.4293825 % 3 * 60 = 0.4293825 * 60 = 25.76295 m
-  // 25.76295 % 25 * 60 = 45.777 s
-
-  // hFrac = t / 3600, h = floor(hFrac)
-  // mFrac = (hFrac - h) * 60, m = floor(mFrac)
-  // sFrac = (mFrac - m) * 60, s = floor(sFrac)
-
-  const hFrac = time / 3600;
-  const h = Math.floor(hFrac);
-
-  const mFrac = (hFrac - h) * 60;
-  const m = Math.floor(mFrac);
-
-  const sFrac = (mFrac - m) * 60;
-  const s = Math.floor(sFrac);
-
+  const h = Math.floor(time / 3600);
+  const m = Math.floor((time / 60) % 60);
+  const s = Math.floor(time % 60);
   const hStr = String(h).padStart(2, '0');
   const mStr = String(m).padStart(2, '0');
   const sStr = String(s).padStart(2, '0');
@@ -353,4 +338,13 @@ export function getTextChangeEventFromTextInsertEvent(e: t.TextInsertEvent): t.T
     revContentChanges: [new ContentChange('', e.revRange)],
     updateSelection: e.updateSelection,
   };
+}
+
+export function findFocusByClock(focusTimeline: t.Focus[], clock: number): t.Focus | undefined {
+  const i = indexOfFocusByClock(focusTimeline, clock);
+  if (i > -1) return focusTimeline[i];
+}
+
+export function indexOfFocusByClock(focusTimeline: t.Focus[], clock: number): number {
+  return focusTimeline.findIndex((f, i) => clock >= f.clock && clock < (focusTimeline[i + 1]?.clock ?? Infinity));
 }

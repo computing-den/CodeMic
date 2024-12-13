@@ -276,7 +276,7 @@ export type SessionUIState = {
   workspace: string;
   coverPhotoWebviewUri: string;
   history?: SessionHistory;
-  workspaceFocusTimeline?: WorkspaceFocusTimeline;
+  workspaceFocusTimeline?: Focus[];
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
   blobsWebviewUris?: WebviewUris;
@@ -284,7 +284,7 @@ export type SessionUIState = {
 };
 
 export type LoadedSessionUIState = SessionUIState & {
-  workspaceFocusTimeline: WorkspaceFocusTimeline;
+  workspaceFocusTimeline: Focus[];
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
   blobsWebviewUris: WebviewUris;
@@ -342,7 +342,7 @@ export type SessionBodyJSON = {
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
   editorTracks: InternalEditorTracksJSON;
-  focusTimeline: WorkspaceFocusTimeline;
+  focusTimeline: Focus[];
   defaultEol: EndOfLine;
 };
 
@@ -350,47 +350,25 @@ export type SessionBodyCompact = {
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
   editorTracks: InternalEditorTracksCompact;
-  focusTimeline: WorkspaceFocusTimelineCompact;
+  focusTimeline: FocusCompact[];
   defaultEol: EndOfLine;
 };
 
 export type InternalEditorTracksJSON = Record<Uri, EditorEvent[]>;
 export type InternalEditorTracksCompact = Record<Uri, EditorEventCompact[]>;
 
-export type WorkspaceFocusTimeline = {
-  documents: DocumentFocus[];
-  lines: LineFocus[];
-};
-
-export type WorkspaceFocusTimelineCompact = {
-  documents: DocumentFocusCompact[];
-  lines: LineFocusCompact[];
-};
-
-export type FocusItem = {
-  clockRange: ClockRange;
-};
-
-export type DocumentFocus = FocusItem & {
+export type Focus = {
   uri: Uri;
-};
-
-export type LineFocus = FocusItem & {
   number: number;
   text: string;
+  clock: number;
 };
 
-export type FocusItemCompact = {
-  r: ClockRangeCompact;
-};
-
-export type DocumentFocusCompact = FocusItemCompact & {
+export type FocusCompact = {
   u: Uri;
-};
-
-export type LineFocusCompact = FocusItemCompact & {
   t: string;
   n: number;
+  c: number;
 };
 
 export type RangedTrack = {
@@ -638,79 +616,38 @@ export type UriSet = Set<Uri>;
 
 export type SessionCmd =
   | InsertEventSessionCmd
-  | UpdateEventSessionCmd
-  | InsertLineFocusSessionCmd
-  | UpdateLineFocusSessionCmd
-  | DeleteLineFocusSessionCmd
-  | InsertDocumentFocusSessionCmd
-  | UpdateDocumentFocusSessionCmd
-  | DeleteDocumentFocusSessionCmd;
+  | UpdateTrackLastEventSessionCmd
+  | InsertFocusSessionCmd
+  | UpdateLastFocusSessionCmd;
 
 export type InsertEventSessionCmd = {
   type: 'insertEvent';
   index: number;
   uri: Uri;
   event: EditorEvent;
+  coalescing: boolean;
 };
 
-export type UpdateEventSessionCmd = {
-  type: 'updateEvent';
-  index: number;
+export type UpdateTrackLastEventSessionCmd = {
+  type: 'updateTrackLastEvent';
   uri: Uri;
   update: Partial<EditorEvent>;
   revUpdate: Partial<EditorEvent>;
+  coalescing: boolean;
 };
 
-export type InsertLineFocusSessionCmd = {
-  type: 'insertLineFocus';
-  lineFocus: LineFocus;
+export type InsertFocusSessionCmd = {
+  type: 'insertFocus';
+  focus: Focus;
+  coalescing: boolean;
 };
 
-export type UpdateLineFocusSessionCmd = {
-  type: 'updateLineFocus';
-  index: number;
-  update: Partial<LineFocus>;
-  revUpdate: Partial<LineFocus>;
+export type UpdateLastFocusSessionCmd = {
+  type: 'updateLastFocus';
+  update: Partial<Focus>;
+  revUpdate: Partial<Focus>;
+  coalescing: boolean;
 };
-
-export type DeleteLineFocusSessionCmd = {
-  type: 'deleteLineFocus';
-  index: number;
-  lineFocus: LineFocus;
-};
-
-export type InsertDocumentFocusSessionCmd = {
-  type: 'insertDocumentFocus';
-  documentFocus: DocumentFocus;
-};
-
-export type UpdateDocumentFocusSessionCmd = {
-  type: 'updateDocumentFocus';
-  index: number;
-  update: Partial<DocumentFocus>;
-  revUpdate: Partial<DocumentFocus>;
-};
-
-export type DeleteDocumentFocusSessionCmd = {
-  type: 'deleteDocumentFocus';
-  index: number;
-  documentFocus: DocumentFocus;
-};
-
-// export type Position = {
-//   line: number;
-//   character: number;
-// };
-
-// export type Range = {
-//   start: Position;
-//   end: Position;
-// };
-
-// export type Selection = {
-//   anchor: Position;
-//   active: Position;
-// };
 
 export interface InternalEditor {
   document: InternalDocument;

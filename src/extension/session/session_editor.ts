@@ -4,7 +4,7 @@ import * as misc from '../misc.js';
 import * as path from '../../lib/path.js';
 import * as t from '../../lib/types.js';
 import assert from '../../lib/assert.js';
-import { Session, LoadedSession } from './session.js';
+import { Session } from './session.js';
 import _ from 'lodash';
 import { v4 as uuid } from 'uuid';
 import { calcClockAfterRangeSpeedChange } from '../../lib/lib.js';
@@ -26,22 +26,32 @@ export default class SessionEditor {
     return this.undoHistoryIndex < this.undoHistory.length - 1;
   }
 
-  undo(): t.SessionCmd | undefined {
-    if (this.canUndo) {
-      const cmd = this.undoHistory[this.undoHistoryIndex];
-      this.unapplyCmd(cmd);
-      this.undoHistoryIndex--;
-      return cmd;
+  undo(): t.SessionCmd[] {
+    const cmds: t.SessionCmd[] = [];
+
+    while (this.canUndo && this.undoHistory[this.undoHistoryIndex].coalescing) {
+      cmds.push(this.undoHistory[this.undoHistoryIndex--]);
     }
+    if (this.canUndo) {
+      cmds.push(this.undoHistory[this.undoHistoryIndex--]);
+    }
+
+    for (const cmd of cmds) this.unapplyCmd(cmd);
+    return cmds;
   }
 
-  redo(): t.SessionCmd | undefined {
-    if (this.canRedo) {
-      this.undoHistoryIndex++;
-      const cmd = this.undoHistory[this.undoHistoryIndex];
-      this.applyCmd(cmd);
-      return cmd;
+  redo(): t.SessionCmd[] {
+    const cmds: t.SessionCmd[] = [];
+
+    while (this.canRedo && this.undoHistory[this.undoHistoryIndex + 1].coalescing) {
+      cmds.push(this.undoHistory[++this.undoHistoryIndex]);
     }
+    if (this.canRedo) {
+      cmds.push(this.undoHistory[++this.undoHistoryIndex]);
+    }
+
+    for (const cmd of cmds) this.applyCmd(cmd);
+    return cmds;
   }
 
   /**
@@ -53,10 +63,16 @@ export default class SessionEditor {
     this.changed();
   }
 
-  insertEvent(uri: t.Uri, e: t.EditorEvent): t.SessionCmd {
+  insertEvent(e: t.EditorEvent, uri: t.Uri, opts: { coalescing: boolean }) {
     assert(this.session.isLoaded());
     const i = this.session.body.eventContainer.getIndexAfterClock(e.clock);
-    const cmd: t.InsertEventSessionCmd = { type: 'insertEvent', index: i, uri, event: e };
+    const cmd: t.InsertEventSessionCmd = {
+      type: 'insertEvent',
+      index: i,
+      uri,
+      event: e,
+      coalescing: opts.coalescing,
+    };
     this.applyInsertEvent(cmd);
     this.insertSessionCmd(cmd);
     return cmd;
@@ -72,159 +88,86 @@ export default class SessionEditor {
     this.session.body.eventContainer.deleteAt(cmd.index);
   }
 
-  updateEvent<T extends t.EditorEvent>(uri: t.Uri, e: T, update: Partial<T>): t.SessionCmd {
+  updateTrackLastEvent<T extends t.EditorEvent>(uri: t.Uri, update: Partial<T>) {
     assert(this.session.isLoaded());
-    const i = this.session.body.eventContainer.indexOfEvent(e);
-    const cmd: t.UpdateEventSessionCmd = {
-      type: 'updateEvent',
-      index: i,
+    const track = this.session.body.eventContainer.getTrack(uri);
+    const lastEvent = track.at(-1);
+    assert(lastEvent);
+
+    if (_.isEqual({ ...lastEvent, ...update }, lastEvent)) return;
+
+    const cmd: t.UpdateTrackLastEventSessionCmd = {
+      type: 'updateTrackLastEvent',
       uri,
       update,
-      revUpdate: _.pick(e, _.keys(update)),
+      revUpdate: _.pick(lastEvent, _.keys(update)),
+      coalescing: true,
     };
-    this.applyUpdateEvent(cmd);
+    this.applyUpdateTrackLastEvent(cmd);
     this.insertSessionCmd(cmd);
-    return cmd;
   }
 
-  private applyUpdateEvent(cmd: t.UpdateEventSessionCmd) {
+  private applyUpdateTrackLastEvent(cmd: t.UpdateTrackLastEventSessionCmd) {
     assert(this.session.isLoaded());
-    const e = this.session.body.eventContainer.at(cmd.index);
+    const e = this.session.body.eventContainer.getTrack(cmd.uri).at(-1);
     assert(e);
-    Object.assign(e.event, cmd.update);
+    Object.assign(e, cmd.update);
   }
 
-  private unapplyUpdateEvent(cmd: t.UpdateEventSessionCmd) {
+  private unapplyUpdateTrackLastEvent(cmd: t.UpdateTrackLastEventSessionCmd) {
     assert(this.session.isLoaded());
-    const e = this.session.body.eventContainer.at(cmd.index);
+    const e = this.session.body.eventContainer.getTrack(cmd.uri).at(-1);
     assert(e);
-    Object.assign(e.event, cmd.revUpdate);
+    Object.assign(e, cmd.revUpdate);
   }
 
-  insertLineFocus(lineFocus: t.LineFocus): t.SessionCmd {
+  setFocus(focus: t.Focus) {
     assert(this.session.isLoaded());
-    const cmd: t.InsertLineFocusSessionCmd = { type: 'insertLineFocus', lineFocus };
-    this.applyInsertLineFocus(cmd);
-    this.insertSessionCmd(cmd);
-    return cmd;
+    const lastFocus = this.session.body.focusTimeline.at(-1);
+
+    // Try to update the last one. Otherwise, insert.
+    if (
+      lastFocus &&
+      (focus.clock - lastFocus.clock < 1 || (lastFocus.uri === focus.uri && lastFocus.number === focus.number))
+    ) {
+      const keys: Array<keyof t.Focus> = ['uri', 'number', 'text'];
+      const keyDiffs = keys.filter(k => focus[k] !== lastFocus[k]);
+      if (keyDiffs.length > 0) {
+        const update = _.pick(focus, keyDiffs);
+        const revUpdate = _.pick(lastFocus, keyDiffs);
+        const cmd: t.UpdateLastFocusSessionCmd = { type: 'updateLastFocus', update, revUpdate, coalescing: true };
+        this.applyUpdateLastFocus(cmd);
+        this.insertSessionCmd(cmd);
+      }
+    } else {
+      const cmd: t.InsertFocusSessionCmd = { type: 'insertFocus', focus, coalescing: true };
+      this.applyInsertFocus(cmd);
+      this.insertSessionCmd(cmd);
+    }
   }
 
-  private applyInsertLineFocus(cmd: t.InsertLineFocusSessionCmd) {
+  private applyInsertFocus(cmd: t.InsertFocusSessionCmd) {
     assert(this.session.isLoaded());
-    this.session.body.focusTimeline.lines.push(cmd.lineFocus);
+    this.session.body.focusTimeline.push(cmd.focus);
   }
 
-  private unapplyInsertLineFocus(cmd: t.InsertLineFocusSessionCmd) {
+  private unapplyInsertFocus(cmd: t.InsertFocusSessionCmd) {
     assert(this.session.isLoaded());
-    this.session.body.focusTimeline.lines.pop();
+    this.session.body.focusTimeline.pop();
   }
 
-  updateLineFocusAt(i: number, update: Partial<t.LineFocus>): t.SessionCmd {
+  private applyUpdateLastFocus(cmd: t.UpdateLastFocusSessionCmd) {
     assert(this.session.isLoaded());
-    const lineFocus = this.session.body.focusTimeline.lines.at(i);
-    assert(lineFocus);
-    const cmd: t.UpdateLineFocusSessionCmd = {
-      type: 'updateLineFocus',
-      index: i,
-      update,
-      revUpdate: _.pick(lineFocus, _.keys(update)),
-    };
-    this.applyUpdateLineFocus(cmd);
-    this.insertSessionCmd(cmd);
-    return cmd;
+    const lastFocus = this.session.body.focusTimeline.at(-1);
+    assert(lastFocus);
+    Object.assign(lastFocus, cmd.update);
   }
 
-  private applyUpdateLineFocus(cmd: t.UpdateLineFocusSessionCmd) {
+  private unapplyUpdateLastFocus(cmd: t.UpdateLastFocusSessionCmd) {
     assert(this.session.isLoaded());
-    Object.assign(this.session.body.focusTimeline.lines[cmd.index], cmd.update);
-  }
-
-  private unapplyUpdateLineFocus(cmd: t.UpdateLineFocusSessionCmd) {
-    assert(this.session.isLoaded());
-    Object.assign(this.session.body.focusTimeline.lines[cmd.index], cmd.revUpdate);
-  }
-
-  deleteLineFocusAt(i: number): t.SessionCmd {
-    assert(this.session.isLoaded());
-    const lineFocus = this.session.body.focusTimeline.lines.at(i);
-    assert(lineFocus);
-    const cmd: t.DeleteLineFocusSessionCmd = { type: 'deleteLineFocus', index: i, lineFocus };
-    this.applyDeleteLineFocus(cmd);
-    this.insertSessionCmd(cmd);
-    return cmd;
-  }
-
-  private applyDeleteLineFocus(cmd: t.DeleteLineFocusSessionCmd) {
-    assert(this.session.isLoaded());
-    this.session.body.focusTimeline.lines.splice(cmd.index, 1);
-  }
-
-  private unapplyDeleteLineFocus(cmd: t.DeleteLineFocusSessionCmd) {
-    assert(this.session.isLoaded());
-    this.session.body.focusTimeline.lines.splice(cmd.index, 0, cmd.lineFocus);
-  }
-
-  insertDocumentFocus(documentFocus: t.DocumentFocus): t.SessionCmd {
-    assert(this.session.isLoaded());
-    const cmd: t.InsertDocumentFocusSessionCmd = { type: 'insertDocumentFocus', documentFocus };
-    this.applyInsertDocumentFocus(cmd);
-    this.insertSessionCmd(cmd);
-    return cmd;
-  }
-
-  private applyInsertDocumentFocus(cmd: t.InsertDocumentFocusSessionCmd) {
-    assert(this.session.isLoaded());
-    this.session.body.focusTimeline.documents.push(cmd.documentFocus);
-  }
-
-  private unapplyInsertDocumentFocus(cmd: t.InsertDocumentFocusSessionCmd) {
-    assert(this.session.isLoaded());
-    this.session.body.focusTimeline.documents.pop();
-  }
-
-  updateDocumentFocusAt(i: number, update: Partial<t.DocumentFocus>): t.SessionCmd {
-    assert(this.session.isLoaded());
-    const documentFocus = this.session.body.focusTimeline.documents.at(i);
-    assert(documentFocus);
-    const cmd: t.UpdateDocumentFocusSessionCmd = {
-      type: 'updateDocumentFocus',
-      index: i,
-      update,
-      revUpdate: _.pick(documentFocus, _.keys(update)),
-    };
-    this.applyUpdateDocumentFocus(cmd);
-    this.insertSessionCmd(cmd);
-    return cmd;
-  }
-
-  private applyUpdateDocumentFocus(cmd: t.UpdateDocumentFocusSessionCmd) {
-    assert(this.session.isLoaded());
-    Object.assign(this.session.body.focusTimeline.documents[cmd.index], cmd.update);
-  }
-
-  private unapplyUpdateDocumentFocus(cmd: t.UpdateDocumentFocusSessionCmd) {
-    assert(this.session.isLoaded());
-    Object.assign(this.session.body.focusTimeline.documents[cmd.index], cmd.revUpdate);
-  }
-
-  deleteDocumentFocusAt(i: number): t.SessionCmd {
-    assert(this.session.isLoaded());
-    const documentFocus = this.session.body.focusTimeline.documents.at(i);
-    assert(documentFocus);
-    const cmd: t.DeleteDocumentFocusSessionCmd = { type: 'deleteDocumentFocus', index: i, documentFocus };
-    this.applyDeleteDocumentFocus(cmd);
-    this.insertSessionCmd(cmd);
-    return cmd;
-  }
-
-  private applyDeleteDocumentFocus(cmd: t.DeleteDocumentFocusSessionCmd) {
-    assert(this.session.isLoaded());
-    this.session.body.focusTimeline.documents.splice(cmd.index, 1);
-  }
-
-  private unapplyDeleteDocumentFocus(cmd: t.DeleteDocumentFocusSessionCmd) {
-    assert(this.session.isLoaded());
-    this.session.body.focusTimeline.documents.splice(cmd.index, 0, cmd.documentFocus);
+    const lastFocus = this.session.body.focusTimeline.at(-1);
+    assert(lastFocus);
+    Object.assign(lastFocus, cmd.revUpdate);
   }
 
   async insertAudioTrack(uri: t.Uri, clock: number): Promise<t.AudioTrack> {
@@ -341,11 +284,8 @@ export default class SessionEditor {
     body.eventContainer.reindexStableOrder();
 
     // Update focus timeline.
-    for (const focusItems of [body.focusTimeline.documents, body.focusTimeline.lines]) {
-      for (const f of focusItems) {
-        f.clockRange.start = calcClockAfterRangeSpeedChange(f.clockRange.start, range, factor);
-        f.clockRange.end = calcClockAfterRangeSpeedChange(f.clockRange.end, range, factor);
-      }
+    for (const f of body.focusTimeline) {
+      f.clock = calcClockAfterRangeSpeedChange(f.clock, range, factor);
     }
 
     // Update session duration.
@@ -373,11 +313,8 @@ export default class SessionEditor {
     body.eventContainer.reindexStableOrder();
 
     // Update focus timeline.
-    for (const focusItems of [body.focusTimeline.documents, body.focusTimeline.lines]) {
-      for (const f of focusItems) {
-        if (f.clockRange.start > clock) f.clockRange.start += dur;
-        if (f.clockRange.end > clock) f.clockRange.end += dur;
-      }
+    for (const f of body.focusTimeline) {
+      if (f.clock > clock) f.clock += dur;
     }
 
     // Update session duration.
@@ -423,20 +360,12 @@ export default class SessionEditor {
     switch (cmd.type) {
       case 'insertEvent':
         return this.applyInsertEvent(cmd);
-      case 'updateEvent':
-        return this.applyUpdateEvent(cmd);
-      case 'insertLineFocus':
-        return this.applyInsertLineFocus(cmd);
-      case 'updateLineFocus':
-        return this.applyUpdateLineFocus(cmd);
-      case 'deleteLineFocus':
-        return this.applyDeleteLineFocus(cmd);
-      case 'insertDocumentFocus':
-        return this.applyInsertDocumentFocus(cmd);
-      case 'updateDocumentFocus':
-        return this.applyUpdateDocumentFocus(cmd);
-      case 'deleteDocumentFocus':
-        return this.applyDeleteDocumentFocus(cmd);
+      case 'updateTrackLastEvent':
+        return this.applyUpdateTrackLastEvent(cmd);
+      case 'insertFocus':
+        return this.applyInsertFocus(cmd);
+      case 'updateLastFocus':
+        return this.applyUpdateLastFocus(cmd);
       default:
         throw new Error(`unknown cmd type: ${(cmd as any).type}`);
     }
@@ -446,20 +375,12 @@ export default class SessionEditor {
     switch (cmd.type) {
       case 'insertEvent':
         return this.unapplyInsertEvent(cmd);
-      case 'updateEvent':
-        return this.unapplyUpdateEvent(cmd);
-      case 'insertLineFocus':
-        return this.unapplyInsertLineFocus(cmd);
-      case 'updateLineFocus':
-        return this.unapplyUpdateLineFocus(cmd);
-      case 'deleteLineFocus':
-        return this.unapplyDeleteLineFocus(cmd);
-      case 'insertDocumentFocus':
-        return this.unapplyInsertDocumentFocus(cmd);
-      case 'updateDocumentFocus':
-        return this.unapplyUpdateDocumentFocus(cmd);
-      case 'deleteDocumentFocus':
-        return this.unapplyDeleteDocumentFocus(cmd);
+      case 'updateTrackLastEvent':
+        return this.unapplyUpdateTrackLastEvent(cmd);
+      case 'insertFocus':
+        return this.unapplyInsertFocus(cmd);
+      case 'updateLastFocus':
+        return this.unapplyUpdateLastFocus(cmd);
       default:
         throw new Error(`unknown cmd type: ${(cmd as any).type}`);
     }
