@@ -7,7 +7,7 @@ import * as misc from '../misc.js';
 import type { Context, ReadDirOptions } from '../types.js';
 import * as storage from '../storage.js';
 import Session from './session.js';
-import { defaultWorkspacePath } from '../paths.js';
+import { defaultWorkspaceBasePath } from '../paths.js';
 import fs from 'fs';
 import _ from 'lodash';
 import archiver from 'archiver';
@@ -20,31 +20,27 @@ export default class SessionCore {
 
   static async fromExisting(
     context: Context,
-    id: string,
-    opts?: { mustScan?: boolean; workspace?: t.AbsPath },
+    handle: string,
+    workspace: t.AbsPath,
+    opts?: { mustScan?: boolean },
   ): Promise<Session | undefined> {
-    const head = await SessionCore.headFromExisting(context, id);
-    if (head) {
-      const workspace = opts?.workspace ?? SessionCore.getWorkspace(context, head);
-      return new Session(context, workspace, head, { inStorage: true, mustScan: opts?.mustScan });
-    }
+    const head = await storage.readJSONOptional<t.SessionHead>(path.abs(workspace, '.codemic', handle, 'head.json'));
+    return head && new Session(context, workspace, head, { local: true, mustScan: opts?.mustScan });
   }
 
   static async fromNew(context: Context, workspace: t.AbsPath, head: t.SessionHead): Promise<Session> {
-    return new Session(context, workspace, head, { mustScan: true });
+    const temp = path.abs(context.userDataPath, 'temp');
+    await fs.promises.rm(temp, { recursive: true, force: true });
+    await fs.promises.mkdir(temp, { recursive: true });
+    return new Session(context, workspace, head, { mustScan: true, temp: true });
   }
 
-  static async headFromExisting(context: Context, id: string): Promise<t.SessionHead | undefined> {
-    const headPath = path.abs(context.userDataPath, 'sessions', id, 'head.json');
-    return storage.readJSONOptional<t.SessionHead>(headPath);
-  }
-
-  static getWorkspace(context: Context, head: t.SessionHead): t.AbsPath {
-    const history = context.settings.history[head.id];
-    if (history) return history.workspace;
-    assert(head.handle, 'Please select a handle');
-    return path.abs(defaultWorkspacePath, head.handle);
-  }
+  // static getWorkspace(context: Context, head: t.SessionHead): t.AbsPath {
+  //   const history = context.settings.history[head.id];
+  //   if (history) return history.workspace;
+  //   assert(head.handle, 'Please select a handle');
+  //   return path.abs(defaultWorkspaceBasePath, head.handle);
+  // }
 
   static makeNewHead(author?: t.UserSummary): t.SessionHead {
     return {
@@ -62,43 +58,43 @@ export default class SessionCore {
     };
   }
 
-  static async fromFork(
-    context: Context,
-    baseId: string,
-    options?: { author?: t.UserSummary },
-  ): Promise<Session | undefined> {
-    const base = await SessionCore.fromExisting(context, baseId);
-    if (base) {
-      const head = await base.core.fork(options);
-      return SessionCore.fromExisting(context, head.id);
-    }
-  }
+  // static async fromFork(
+  //   context: Context,
+  //   baseId: string,
+  //   options?: { author?: t.UserSummary },
+  // ): Promise<Session | undefined> {
+  //   const base = await SessionCore.fromExisting(context, baseId);
+  //   if (base) {
+  //     const head = await base.core.fork(options);
+  //     return SessionCore.fromExisting(context, head.id);
+  //   }
+  // }
 
-  async fork(options?: { author?: t.UserSummary }): Promise<t.SessionHead> {
-    await this.download({ skipIfExists: true });
-    const forkHead: t.SessionHead = {
-      id: uuid(),
-      title: `Fork: ${this.session.head.title}`,
-      handle: `fork_${this.session.head.handle}`,
-      description: this.session.head.description,
-      author: options?.author ?? this.session.head.author,
-      duration: this.session.head.duration,
-      views: 0,
-      likes: 0,
-      publishTimestamp: undefined,
-      modificationTimestamp: this.session.head.modificationTimestamp,
-      toc: this.session.head.toc,
-      forkedFrom: this.session.head.id,
-      hasCoverPhoto: this.session.head.hasCoverPhoto,
-    };
+  // async fork(options?: { author?: t.UserSummary }): Promise<t.SessionHead> {
+  //   await this.download({ skipIfExists: true });
+  //   const forkHead: t.SessionHead = {
+  //     id: uuid(),
+  //     title: `Fork: ${this.session.head.title}`,
+  //     handle: `fork_${this.session.head.handle}`,
+  //     description: this.session.head.description,
+  //     author: options?.author ?? this.session.head.author,
+  //     duration: this.session.head.duration,
+  //     views: 0,
+  //     likes: 0,
+  //     publishTimestamp: undefined,
+  //     modificationTimestamp: this.session.head.modificationTimestamp,
+  //     toc: this.session.head.toc,
+  //     forkedFrom: this.session.head.id,
+  //     hasCoverPhoto: this.session.head.hasCoverPhoto,
+  //   };
 
-    // Copy the entire session data, then rewrite the head.
-    const forkSessionDataPath = path.abs(this.session.context.userDataPath, 'sessions', forkHead.id);
-    await fs.promises.cp(this.sessionDataPath, forkSessionDataPath, { recursive: true });
-    await storage.writeJSON(path.abs(forkSessionDataPath, 'head.json'), forkHead);
+  //   // Copy the entire session data, then rewrite the head.
+  //   const forkSessionDataPath = path.abs(this.session.context.userDataPath, 'sessions', forkHead.id);
+  //   await fs.promises.cp(this.sessionDataPath, forkSessionDataPath, { recursive: true });
+  //   await storage.writeJSON(path.abs(forkSessionDataPath, 'head.json'), forkHead);
 
-    return forkHead;
-  }
+  //   return forkHead;
+  // }
 
   /**
    * Returns a sorted list of all files and directories.
@@ -121,6 +117,10 @@ export default class SessionCore {
 
     filenames.sort();
     for (const childname of filenames) {
+      // TODO ignore file
+      if (childname === '.codemic') continue;
+      if (childname === '.git') continue;
+
       const childRel = path.join(rel, childname);
       const childFull = path.join(this.session.workspace, childRel);
       const stat = await fs.promises.stat(childFull);
@@ -140,11 +140,29 @@ export default class SessionCore {
   }
 
   get sessionDataPath(): t.AbsPath {
-    return path.abs(this.session.context.userDataPath, 'sessions', this.session.head.id);
+    return this.session.temp ? this.sessionTempDataPath : this.sessionFinalDataPath;
+  }
+
+  get sessionTempDataPath(): t.AbsPath {
+    return path.abs(this.session.context.userDataPath, 'temp');
+  }
+
+  get sessionFinalDataPath(): t.AbsPath {
+    assert(this.session.workspace);
+    assert(this.session.head.handle);
+    return path.abs(this.session.workspace, '.codemic', this.session.head.handle);
   }
 
   resolveUri(uri: t.Uri): t.Uri {
     return path.resolveUri(this.session.workspace, uri);
+  }
+
+  /**
+   * Move the session from temp to its final data path and set temp = false.
+   */
+  async commitTemp() {
+    await fs.promises.cp(this.sessionTempDataPath, this.sessionFinalDataPath, { force: true, recursive: true });
+    this.session.temp = false;
   }
 
   async write() {
@@ -157,7 +175,7 @@ export default class SessionCore {
   async writeHead() {
     assert(this.session.head); // Sometimes head.json becomes blank. Maybe this'll catch the issue?
     await storage.writeJSON(path.abs(this.sessionDataPath, 'head.json'), this.session.head);
-    this.session.inStorage = true;
+    this.session.local = true;
   }
 
   async writeBody() {
@@ -166,15 +184,15 @@ export default class SessionCore {
       path.abs(this.sessionDataPath, 'body.json'),
       serializeSessionBodyJSON(this.session.body.toJSON()),
     );
-    this.session.inStorage = true;
+    this.session.local = true;
   }
 
   async writeHistory(update?: Partial<t.SessionHistory>) {
     const { id } = this.session.head;
     const { settings } = this.session.context;
-    settings.history[id] ??= { id, workspace: this.session.workspace };
+    settings.history[id] ??= { id, handle: this.session.head.handle, workspace: this.session.workspace };
     if (update) Object.assign(settings.history[id], update);
-    await storage.writeJSON(path.abs(this.session.context.userDataPath, 'settings.json'), settings);
+    await storage.writeJSON(this.session.context.userSettingsPath, settings);
   }
 
   async writeHistoryClock(options?: { ifDirtyForLong?: boolean }) {
@@ -247,10 +265,7 @@ export default class SessionCore {
   async delete() {
     await fs.promises.rm(this.sessionDataPath, { force: true, recursive: true });
     delete this.session.context.settings.history[this.session.head.id];
-    await storage.writeJSON(
-      path.abs(this.session.context.userDataPath, 'settings.json'),
-      this.session.context.settings,
-    );
+    await storage.writeJSON(this.session.context.userSettingsPath, this.session.context.settings);
   }
 
   async package() {

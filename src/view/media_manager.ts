@@ -10,9 +10,9 @@ export default class MediaManager {
   audioManager = new AudioManager();
   videoManager = new VideoManager();
 
-  updateResources(webviewUris: t.WebviewUris, audioTracks: t.AudioTrack[] = [], videoTracks: t.VideoTrack[] = []) {
-    this.audioManager.updateResources(webviewUris, audioTracks);
-    this.videoManager.updateResources(webviewUris, videoTracks);
+  updateResources(UriMap: t.UriMap, audioTracks: t.AudioTrack[] = [], videoTracks: t.VideoTrack[] = []) {
+    this.audioManager.updateResources(UriMap, audioTracks);
+    this.videoManager.updateResources(UriMap, videoTracks);
   }
 
   async prepare(videoElem: HTMLVideoElement) {

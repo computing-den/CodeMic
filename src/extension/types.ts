@@ -5,6 +5,7 @@ import _ from 'lodash';
 export type Context = {
   extension: ExtensionContext;
   userDataPath: t.AbsPath;
+  userSettingsPath: t.AbsPath;
   settings: t.Settings;
   postAudioMessage?: (req: t.BackendAudioRequest) => Promise<t.FrontendAudioResponse>;
   postVideoMessage?: (req: t.BackendVideoRequest) => Promise<t.FrontendVideoResponse>;
@@ -15,12 +16,16 @@ export type Context = {
 };
 
 export type RecorderRestoreState = {
-  workspace: t.AbsPath;
   mustScan: boolean;
   tabId: t.RecorderUITabId;
-  seekClock?: number;
-  cutClock?: number;
+  clock?: number;
 };
 
-export type WorkspaceChangeGlobalState = { screen: t.Screen; sessionId?: string; recorder?: RecorderRestoreState };
+export type WorkspaceChangeGlobalState = {
+  screen: t.Screen;
+  sessionId: string;
+  sessionHandle: string;
+  workspace: t.AbsPath;
+  recorder?: RecorderRestoreState;
+};
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };

@@ -56,4 +56,4 @@ function getOSPaths(name: string): OSPaths {
 }
 
 export const osPaths = getOSPaths('CodeMic');
-export const defaultWorkspacePath = path.abs(os.homedir(), 'CodeMic');
+export const defaultWorkspaceBasePath = path.abs(os.homedir(), 'CodeMic');

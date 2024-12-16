@@ -54,13 +54,13 @@ export default class Welcome extends React.Component<Props> {
           title="WORKSPACE"
           history={welcome.history}
           sessionHeads={welcome.workspace}
-          coverPhotosWebviewUris={welcome.coverPhotosWebviewUris}
+          coverPhotosUris={welcome.coverPhotosUris}
         />
         <SessionsSection
           title="FEATURED"
           history={welcome.history}
           sessionHeads={welcome.featured}
-          coverPhotosWebviewUris={welcome.coverPhotosWebviewUris}
+          coverPhotosUris={welcome.coverPhotosUris}
         />
       </Screen>
     );
@@ -72,7 +72,7 @@ type SessionsSectionProps = {
   sessionHeads: t.SessionHead[];
   history: t.SessionsHistory;
   bordered?: boolean;
-  coverPhotosWebviewUris: t.WebviewUris;
+  coverPhotosUris: t.UriMap;
 };
 
 type SessionAndHistory = { sessionHead: t.SessionHead; history?: t.SessionHistory };
@@ -94,7 +94,7 @@ class SessionsSection extends React.Component<SessionsSectionProps> {
           <SessionHeadList
             sessionHeads={this.props.sessionHeads}
             history={this.props.history}
-            coverPhotosWebviewUris={this.props.coverPhotosWebviewUris}
+            coverPhotosUris={this.props.coverPhotosUris}
           />
         </Section.Body>
       </Section>

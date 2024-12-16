@@ -7,7 +7,7 @@ import postMessage from './api.js';
 
 provideVSCodeDesignSystem().register(allComponents);
 setStoreListener(renderApp);
-postMessage({ type: 'getStore' }).catch(console.error);
+// postMessage({ type: 'getStore' }).catch(console.error);
 const root = createRoot(document.getElementById('app')!);
 
 function renderApp() {

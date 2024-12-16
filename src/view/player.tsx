@@ -95,9 +95,9 @@ export default class Player extends React.Component<Props> {
   };
 
   updateResources() {
-    const { audioTracks, videoTracks, blobsWebviewUris: webviewUris } = this.props.session;
-    if (webviewUris) {
-      this.mediaManager.updateResources(webviewUris, audioTracks, videoTracks);
+    const { audioTracks, videoTracks, blobsUriMap: UriMap } = this.props.session;
+    if (UriMap) {
+      this.mediaManager.updateResources(UriMap, audioTracks, videoTracks);
     }
   }
 
@@ -196,7 +196,7 @@ export default class Player extends React.Component<Props> {
               duration={head.duration}
             />
             <div id="cover-container" className="cover-container subsection">
-              {head.hasCoverPhoto && <img src={session.coverPhotoWebviewUri} />}
+              {head.hasCoverPhoto && <img src={session.coverPhotoUri} />}
               <video id="guide-video" />
             </div>
             <SessionDescription className="subsection subsection_spaced" sessionHead={head} />

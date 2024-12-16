@@ -26,14 +26,18 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     this.bus = new b.Bus(this.postParcel.bind(this), this.messageHandler);
     this.view = webviewView;
 
-    console.log('resolveWebviewView localResourceRoots', vscode.Uri.joinPath(this.context.extensionUri));
+    console.log('resolveWebviewView localResourceRoots', this.context.extensionUri);
 
+    // NOTE: Reassigning webview options causes the webview page to refresh!
+    // Also, cannot mutate localResourceRoots directly. Must reassign options.
+    // See https://github.com/microsoft/vscode-discussions/discussions/639
     webviewView.webview.options = {
       // Allow scripts in the webview
       enableScripts: true,
 
       // Allow access to files from these directories
-      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri), vscode.Uri.file(osPaths.data)],
+      // localResourceRoots: [this.context.extensionUri, vscode.Uri.file(osPaths.data)],
+      localResourceRoots: [vscode.Uri.file('/')],
     };
 
     webviewView.webview.html = this.getHtmlForWebview();

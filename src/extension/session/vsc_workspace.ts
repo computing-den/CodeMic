@@ -6,12 +6,13 @@ import { Position, Range, Selection, LineRange } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import * as misc from '../misc.js';
 import type { Context } from '../types.js';
-import { LoadedSession } from './session.js';
+import Session, { LoadedSession } from './session.js';
 import * as serverApi from '../server_api.js';
 import * as git from '../git';
 import fs from 'fs';
 import _ from 'lodash';
 import vscode from 'vscode';
+import SessionCore from './session_core.js';
 
 type TabWithInputText = Omit<vscode.Tab, 'input'> & {
   readonly input: vscode.TabInputText;
@@ -20,10 +21,14 @@ type TabWithInputText = Omit<vscode.Tab, 'input'> & {
 export default class VscWorkspace {
   constructor(public session: LoadedSession) {}
 
-  static getCoverPhotoWebviewUri(context: Context, id: string): t.Uri {
-    return context
-      .view!.webview.asWebviewUri(vscode.Uri.file(path.abs(context.userDataPath, 'sessions', id, 'cover_photo')))
-      .toString();
+  static getCoverPhotoUri(session: Session): t.Uri {
+    if (session.local || session.temp) {
+      return session.context
+        .view!.webview.asWebviewUri(vscode.Uri.file(path.abs(session.core.sessionDataPath, 'cover_photo')))
+        .toString();
+    }
+
+    return serverApi.getSessionCoverPhotoURLString(session.head.id);
   }
 
   static async getGitAPI(): Promise<git.API> {
@@ -376,6 +381,10 @@ export default class VscWorkspace {
   shouldRecordVscUri(vscUri: vscode.Uri): boolean {
     switch (vscUri.scheme) {
       case 'file':
+        // TODO ignore file
+        if (path.isBaseOf(path.abs(this.session.workspace, '.codemic'), path.abs(vscUri.path))) return false;
+        if (path.isBaseOf(path.abs(this.session.workspace, '.git'), path.abs(vscUri.path))) return false;
+
         return path.isBaseOf(this.session.workspace, path.abs(vscUri.path));
       case 'untitled':
         return true;
@@ -586,26 +595,22 @@ export default class VscWorkspace {
   //   await fs.promises.mkdir(this.workspace, { recursive: true });
   // }
 
-  getTrackFileWebviewUri(trackFile: t.RangedTrackFile): t.Uri {
+  getTrackFileUri(trackFile: t.RangedTrackFile): t.Uri {
     assert(trackFile.file.type === 'local');
     const vscUri = vscode.Uri.file(path.abs(this.session.core.sessionDataPath, 'blobs', trackFile.file.sha1));
     return this.session.context.view!.webview.asWebviewUri(vscUri).toString();
   }
 
-  getCoverPhotoWebviewUri(): string {
-    if (this.session.inStorage) {
-      return VscWorkspace.getCoverPhotoWebviewUri(this.session.context, this.session.head.id);
-    } else {
-      return serverApi.getSessionCoverPhotoURLString(this.session.head.id);
-    }
+  getCoverPhotoUri(): string {
+    return VscWorkspace.getCoverPhotoUri(this.session);
   }
 
-  getBlobsWebviewUris(): t.WebviewUris | undefined {
+  getBlobsUriMap(): t.UriMap | undefined {
     if (this.session.isLoaded()) {
       return Object.fromEntries(
         _.concat(
-          this.session.body.audioTracks.map(t => [t.id, this.getTrackFileWebviewUri(t)]),
-          this.session.body.videoTracks.map(t => [t.id, this.getTrackFileWebviewUri(t)]),
+          this.session.body.audioTracks.map(t => [t.id, this.getTrackFileUri(t)]),
+          this.session.body.videoTracks.map(t => [t.id, this.getTrackFileUri(t)]),
         ),
       );
     }

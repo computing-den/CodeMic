@@ -67,7 +67,7 @@ export default class SessionRecordAndReplay {
     return Boolean(this.running && !this.mode.recordingEditor);
   }
 
-  async load(options?: { seekClock?: number; cutClock?: number }) {
+  async load(options?: { clock?: number }) {
     // Create workspace directory.
     await this.session.core.createWorkspaceDir();
 
@@ -75,9 +75,9 @@ export default class SessionRecordAndReplay {
     this.internalWorkspace.restoreInitState();
 
     // Make sure cut and seek clocks are valid.
-    if (options?.cutClock && options?.seekClock) {
-      assert(options.cutClock >= options.seekClock);
-    }
+    // if (options?.cutClock && options?.clock) {
+    //   assert(options.cutClock >= options.clock);
+    // }
 
     // TODO
     // // Cut to cutClock.
@@ -88,11 +88,11 @@ export default class SessionRecordAndReplay {
     //   this.head.duration = options.cutClock;
     // }
 
-    // Seek to seekClock.
+    // Seek to clock.
     let targetUris: t.Uri[] | undefined;
-    if (options?.seekClock) {
+    if (options?.clock) {
       const uriSet: t.UriSet = new Set();
-      const seekData = this.internalWorkspace.getSeekData(options.seekClock);
+      const seekData = this.internalWorkspace.getSeekData(options.clock);
       await this.internalWorkspace.seek(seekData, uriSet);
       targetUris = Array.from(uriSet);
     }
@@ -126,6 +126,7 @@ export default class SessionRecordAndReplay {
     await this.internalWorkspace.restoreInitState();
 
     this.session.mustScan = false;
+    this.session.temp = false;
   }
 
   async play() {

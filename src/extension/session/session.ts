@@ -17,8 +17,12 @@ export class Session {
 
   context: Context;
   workspace: t.AbsPath;
-  inStorage: boolean;
+  local: boolean;
   mustScan: boolean;
+  // temp means that it's a new session and user is still editing workspace and handle and therefore session
+  // doesn't have a data path.
+  // temp is set to false right before possible vscode restart due to change of workspace when scan is requested.
+  temp: boolean;
   head: t.SessionHead;
   core: SessionCore;
   editor: SessionEditor;
@@ -33,13 +37,14 @@ export class Session {
     context: Context,
     workspace: t.AbsPath,
     head: t.SessionHead,
-    opts?: { inStorage?: boolean; mustScan?: boolean },
+    opts?: { local?: boolean; mustScan?: boolean; temp?: boolean },
   ) {
     this.context = context;
     this.workspace = workspace;
     this.head = head;
-    this.inStorage = Boolean(opts?.inStorage);
+    this.local = Boolean(opts?.local);
     this.mustScan = Boolean(opts?.mustScan);
+    this.temp = Boolean(opts?.temp);
     this.core = new SessionCore(this);
     this.editor = new SessionEditor(this as LoadedSession);
   }
@@ -48,7 +53,7 @@ export class Session {
     return Boolean(this.body);
   }
 
-  async prepare(options?: { seekClock?: number; cutClock?: number }) {
+  async prepare(options?: { clock?: number }) {
     if (this.mustScan) {
       await this.scan();
     } else {
@@ -56,9 +61,10 @@ export class Session {
     }
   }
 
-  private async load(options?: { seekClock?: number; cutClock?: number }) {
+  private async load(options?: { clock?: number }) {
     assert(!this.isLoaded(), 'Already loaded.');
     assert(!this.mustScan, 'Must be scanned, not loaded.');
+    assert(!this.temp, 'Cannot load a temp session.');
 
     const bodyJSON = await this.core.readBody({ download: true });
     this.body = new SessionBody(bodyJSON);

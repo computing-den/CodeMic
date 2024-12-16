@@ -161,7 +161,7 @@ export type SessionHeadListProps = {
   sessionHeads: t.SessionHead[];
   history: t.SessionsHistory;
   className?: string;
-  coverPhotosWebviewUris: t.WebviewUris;
+  coverPhotosUris: t.UriMap;
 };
 type SHPair = [t.SessionHead, t.SessionHistory];
 
@@ -179,7 +179,7 @@ export class SessionHeadList extends React.Component<SessionHeadListProps> {
           <SessionHeadListItem
             history={history}
             sessionHead={sessionHead}
-            coverPhotoUri={this.props.coverPhotosWebviewUris[sessionHead.id]}
+            coverPhotoUri={this.props.coverPhotosUris[sessionHead.id]}
           />
         ))}
       </div>

@@ -252,7 +252,7 @@ export type WelcomeUIState = {
   workspace: SessionHead[];
   featured: SessionHead[];
   history: SessionsHistory;
-  coverPhotosWebviewUris: WebviewUris;
+  coverPhotosUris: UriMap;
 };
 
 export type RecorderUIState = {
@@ -265,6 +265,7 @@ export type PlayerUIState = {
 };
 
 export type SessionUIState = {
+  temp: boolean;
   mustScan: boolean;
   loaded: boolean;
   playing: boolean;
@@ -274,12 +275,12 @@ export type SessionUIState = {
   head: SessionHead;
   clock: number;
   workspace: string;
-  coverPhotoWebviewUri: string;
+  coverPhotoUri: string;
   history?: SessionHistory;
   workspaceFocusTimeline?: Focus[];
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
-  blobsWebviewUris?: WebviewUris;
+  blobsUriMap?: UriMap;
   comments?: Comment[];
 };
 
@@ -287,7 +288,7 @@ export type LoadedSessionUIState = SessionUIState & {
   workspaceFocusTimeline: Focus[];
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
-  blobsWebviewUris: WebviewUris;
+  blobsUriMap: UriMap;
   comments: Comment[];
 };
 
@@ -390,7 +391,7 @@ export type AudioTrack = RangedTrackFile;
  */
 export type VideoTrack = RangedTrackFile;
 
-export type WebviewUris = { [key: string]: string };
+export type UriMap = { [key: string]: string };
 
 export type OpenDialogOptions = {
   canSelectFiles?: boolean;
@@ -693,8 +694,9 @@ export type SessionsHistory = { [key: string]: SessionHistory };
 
 export type SessionHistory = {
   id: string;
+  workspace: AbsPath;
+  handle: string;
   lastRecordedTimestamp?: string;
   lastWatchedTimestamp?: string;
   lastWatchedClock?: number;
-  workspace: AbsPath;
 };

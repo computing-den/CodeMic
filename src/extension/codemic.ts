@@ -4,7 +4,7 @@ import Session from './session/session.js';
 import * as storage from './storage.js';
 import * as serverApi from './server_api.js';
 import type { Context, RecorderRestoreState, WorkspaceChangeGlobalState } from './types.js';
-import { osPaths } from './paths.js';
+import { defaultWorkspaceBasePath, osPaths } from './paths.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
@@ -21,6 +21,7 @@ class CodeMic {
   recorder?: { tabId: t.RecorderUITabId };
   webviewProvider: WebviewProvider;
   test: any = 0;
+  // localResourceRootsCache: string[] = [];
 
   constructor(public context: Context) {
     context.extension.subscriptions.push(vscode.commands.registerCommand('codemic.openView', this.openView.bind(this)));
@@ -48,7 +49,7 @@ class CodeMic {
 
   async onStartUp() {
     await this.restoreStateAfterRestart();
-    await this.updateFrontend();
+    // await this.updateFrontend();
 
     await this.updateFeaturedAndUpdateFrontend();
     // await this.updateFrontend();
@@ -58,33 +59,31 @@ class CodeMic {
     // );
 
     // DEV
-    if (config.debug && this.webviewProvider.bus) {
-      try {
-        const sessionId = 'XXX';
-        if (await Session.Core.fromExisting(this.context, sessionId)) {
-          // Recorder
-          await this.messageHandler({ type: 'recorder/open', sessionId });
-          await this.messageHandler({ type: 'recorder/openTab', tabId: 'editor-view' });
-          await this.updateFrontend();
+    // if (config.debug && this.webviewProvider.bus) {
+    //   try {
+    //     const sessionId = 'XXX';
+    //     if (await Session.Core.fromExisting(this.context, sessionId)) {
+    //       // Recorder
+    //       await this.messageHandler({ type: 'recorder/open', sessionId });
+    //       await this.messageHandler({ type: 'recorder/openTab', tabId: 'editor-view' });
+    //       await this.updateFrontend();
 
-          // Player
-          // await this.messageHandler({ type: 'player/open', sessionId });
-          // await this.updateFrontend();
-        }
-      } catch (error) {
-        console.error('ERROR trying to open debug session:', error);
-      }
-    }
+    //       // Player
+    //       // await this.messageHandler({ type: 'player/open', sessionId });
+    //       // await this.updateFrontend();
+    //     }
+    //   } catch (error) {
+    //     console.error('ERROR trying to open debug session:', error);
+    //   }
+    // }
   }
 
   static async fromExtensionContext(extension: vscode.ExtensionContext): Promise<CodeMic> {
     const user = extension.globalState.get<t.User>('user');
     const userDataPath = path.abs(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
-    const settings = await storage.readJSON<t.Settings>(
-      path.abs(userDataPath, 'settings.json'),
-      CodeMic.makeDefaultSettings,
-    );
-    const context: Context = { extension, user, userDataPath, settings };
+    const userSettingsPath = path.abs(userDataPath, 'settings.json');
+    const settings = await storage.readJSON<t.Settings>(userSettingsPath, CodeMic.makeDefaultSettings);
+    const context: Context = { extension, user, userDataPath, userSettingsPath, settings };
     return new CodeMic(context);
   }
 
@@ -99,7 +98,10 @@ class CodeMic {
     return this.context.extension.globalState.get<WorkspaceChangeGlobalState>('workspaceChange');
   }
 
-  async setUpWorkspace(restoreState?: { recorder?: RecorderRestoreState }) {
+  /**
+   * Set this.session with proper workspace before calling this.
+   */
+  async setUpWorkspace(restoreState?: { recorder?: { tabId: t.RecorderUITabId; clock?: number } }) {
     assert(this.session);
 
     // Return if workspace is already up-to-date.
@@ -114,7 +116,9 @@ class CodeMic {
     await this.setWorkspaceChangeGlobalState({
       screen: this.screen,
       sessionId: this.session.head.id,
-      recorder: restoreState?.recorder,
+      sessionHandle: this.session.head.handle,
+      workspace: this.session.workspace,
+      recorder: restoreState?.recorder && { tabId: restoreState?.recorder.tabId, mustScan: this.session.mustScan },
     });
 
     // Change vscode's workspace folders.
@@ -146,13 +150,15 @@ class CodeMic {
 
       console.log('restoreStateAfterRestart(): ', workspaceChange);
 
-      const { screen, sessionId, recorder } = workspaceChange;
+      const { screen, sessionId, sessionHandle, recorder, workspace } = workspaceChange;
       this.setScreen(t.Screen.Loading);
 
       await this.setWorkspaceChangeGlobalState();
 
       if (sessionId) {
-        const session = await Session.Core.fromExisting(this.context, sessionId, recorder);
+        const session = await Session.Core.fromExisting(this.context, sessionHandle, workspace, {
+          mustScan: recorder?.mustScan,
+        });
         assert(session);
         assert(VscWorkspace.getDefaultVscWorkspace() === session.workspace);
 
@@ -244,8 +250,11 @@ class CodeMic {
         return this.respondWithStore();
       }
       case 'player/open': {
+        const history = this.context.settings.history[req.sessionId];
+        // TODO what about sessions that must be downloaded? Or find session id in featured.
+        assert(history, 'TODO session data must be downloaded');
         if (await this.closeCurrentScreen()) {
-          const session = await Session.Core.fromExisting(this.context, req.sessionId);
+          const session = await Session.Core.fromExisting(this.context, history.handle, history.workspace);
           if (!session) {
             this.showError(new Error(`Session files don't exist.`));
           } else {
@@ -285,89 +294,10 @@ class CodeMic {
       //   // return this.respondWithStore();
       // }
       case 'recorder/open': {
-        const user = this.context.user && lib.userToUserSummary(this.context.user);
-
         if (req.sessionId) {
-          let session: Session | undefined;
-          let seekClock: number | undefined;
-          let cutClock: number | undefined;
-
-          // TODO check if this.session already contains req.sessionId
-          if (req.fork) {
-            // Fork existing session.
-            session = await Session.Core.fromFork(this.context, req.sessionId, { author: user });
-            if (req.clock !== undefined && req.clock > 0) {
-              seekClock = req.clock;
-              cutClock = req.clock;
-            }
-            //
-            // let clock = setup.sessionHead.duration;
-            // if (setup.fork) {
-            //   clock = setup.fork.clock;
-            //   assert(setup.baseSessionHead);
-            //   await db.copySessionDir(setup.baseSessionHead, setup.sessionHead);
-            // }
-          } else {
-            // Edit existing session.
-            session = await Session.Core.fromExisting(this.context, req.sessionId);
-            if (req.clock !== undefined && req.clock > 0) {
-              seekClock = req.clock;
-            }
-          }
-
-          if (session) {
-            // await session.readBody({ download: true });
-
-            if (await this.closeCurrentScreen()) {
-              this.setSession(session);
-              this.setScreen(t.Screen.Recorder);
-              this.recorder = { tabId: 'details-view' };
-
-              // This might trigger a vscode restart in which case this.restoreStateAfterRestart() will be
-              // called and it will recreate the session, recorder, call recorder.load(), and set the screen.
-              await this.setUpWorkspace({
-                recorder: {
-                  mustScan: false,
-                  seekClock,
-                  cutClock,
-                  tabId: this.recorder.tabId,
-                  workspace: session.workspace,
-                },
-              });
-
-              // Must be called after this.setUpWorkspace()
-              await this.session!.prepare({ seekClock, cutClock });
-            }
-          }
+          await this.openRecorderExistingSession(req.sessionId, req.clock, req.fork);
         } else {
-          // Create new session.
-
-          // For new sessions, user will manually call recorder/load which will call setUpWorkspace().
-          const head = Session.Core.makeNewHead(user);
-          let workspace = VscWorkspace.getDefaultVscWorkspace();
-          if (!workspace) {
-            const options = {
-              canSelectFiles: false,
-              canSelectFolders: true,
-              canSelectMany: false,
-              title: 'Select a directory to start recording.',
-            };
-            const uris = await vscode.window.showOpenDialog(options);
-            if (uris?.length === 1) workspace = path.abs(uris[0].path);
-          }
-
-          if (workspace) {
-            const session = await Session.Core.fromNew(this.context, workspace, head);
-
-            if (await this.closeCurrentScreen()) {
-              // We want the files on disk so that we can add the cover photo there too.
-              await session.core.write();
-
-              this.setSession(session);
-              this.setScreen(t.Screen.Recorder);
-              this.recorder = { tabId: 'details-view' };
-            }
-          }
+          await this.openRecorderNewSession();
         }
 
         return this.respondWithStore();
@@ -376,28 +306,14 @@ class CodeMic {
         assert(this.session);
         assert(this.recorder);
         if (req.tabId === 'editor-view' && !this.session.isLoaded()) {
-          // This might trigger a vscode restart in which case this.restoreStateAfterRestart() will be
-          // called and it will recreate the session, prepare it, and set the screen.
-          await this.setUpWorkspace({
-            recorder: { mustScan: this.session.mustScan, tabId: 'editor-view', workspace: this.session.workspace },
-          });
-          await this.session.prepare();
+          await this.loadRecorder();
+        } else {
+          this.recorder.tabId = req.tabId;
         }
-        this.recorder.tabId = req.tabId;
         return this.respondWithStore();
       }
       case 'recorder/load': {
-        assert(this.session);
-        assert(this.recorder);
-
-        // This might trigger a vscode restart in which case this.restoreStateAfterRestart() will be
-        // called and it will recreate the session, recorder, call recorder.load(), and set the screen.
-        await this.setUpWorkspace({
-          recorder: { mustScan: this.session.mustScan, tabId: 'editor-view', workspace: this.session.workspace },
-        });
-
-        await this.session.prepare();
-        this.recorder.tabId = 'editor-view';
+        await this.loadRecorder();
         return this.respondWithStore();
       }
       case 'recorder/record': {
@@ -468,8 +384,9 @@ class CodeMic {
         return this.respondWithStore();
       }
       case 'recorder/update': {
-        assert(this.session?.isLoaded());
-        this.session.editor.updateHead(req.changes);
+        assert(this.session);
+        // assert(this.session?.isLoaded());
+        this.session.editor.updateFromUI(req.changes);
         return this.respondWithStore();
       }
       case 'recorder/insertAudio': {
@@ -509,7 +426,8 @@ class CodeMic {
         return this.respondWithStore();
       }
       case 'recorder/setCoverPhoto': {
-        assert(this.session?.isLoaded());
+        // assert(this.session?.isLoaded());
+        assert(this.session);
         await this.session.editor.setCoverPhoto(req.uri);
         return this.respondWithStore();
       }
@@ -575,17 +493,20 @@ class CodeMic {
         return { type: 'boolean', value: answer?.title === confirmTitle };
       }
       case 'deleteSession': {
-        const session = await Session.Core.fromExisting(this.context, req.sessionId);
-        if (session) {
-          const confirmTitle = 'Delete';
-          const answer = await vscode.window.showWarningMessage(
-            `Do you want to delete session "${session.head?.title || 'Untitled'}"?`,
-            { modal: true },
-            { title: 'Cancel', isCloseAffordance: true },
-            { title: confirmTitle },
-          );
-          if (answer?.title === confirmTitle) {
-            await session.core.delete();
+        const history = this.context.settings.history[req.sessionId];
+        if (history) {
+          const session = await Session.Core.fromExisting(this.context, history.handle, history.workspace);
+          if (session) {
+            const confirmTitle = 'Delete';
+            const answer = await vscode.window.showWarningMessage(
+              `Do you want to delete session "${session.head?.title || 'Untitled'}"?`,
+              { modal: true },
+              { title: 'Cancel', isCloseAffordance: true },
+              { title: confirmTitle },
+            );
+            if (answer?.title === confirmTitle) {
+              await session.core.delete();
+            }
           }
         }
 
@@ -609,6 +530,113 @@ class CodeMic {
         lib.unreachable(req);
       }
     }
+  }
+
+  async openRecorderExistingSession(sessionId: string, clock?: number, fork?: boolean) {
+    let session: Session | undefined;
+
+    if (fork) {
+      // Fork existing session.
+      // const user = this.context.user && lib.userToUserSummary(this.context.user);
+      // session = await Session.Core.fromFork(this.context, sessionId, { author: user });
+
+      // TODO we may need to download the session. Where to download it to?
+      //      what should the handle be? where to store the session data?
+      vscode.window.showErrorMessage('TODO: support forking session.');
+    } else {
+      // Edit existing session.
+      const history = this.context.settings.history[sessionId];
+      // TODO what about sessions that must be downloaded? Or find session id in featured.
+      assert(history, 'TODO session data must be downloaded');
+      session = await Session.Core.fromExisting(this.context, history.handle, history.workspace);
+    }
+
+    if (session) {
+      // await session.readBody({ download: true });
+
+      if (await this.closeCurrentScreen()) {
+        this.setSession(session);
+        this.setScreen(t.Screen.Recorder);
+        this.recorder = { tabId: 'details-view' };
+
+        // This might trigger a vscode restart in which case nothing after this line will run.
+        // After restart, this.restoreStateAfterRestart() will be called and it will recreate
+        // the session, call session.prepare(), and set the screen.
+        await this.setUpWorkspace({ recorder: { clock, tabId: this.recorder.tabId } });
+
+        // Must be called after this.setUpWorkspace()
+        await this.session!.prepare({ clock });
+      }
+    }
+  }
+
+  async openRecorderNewSession() {
+    const user = this.context.user && lib.userToUserSummary(this.context.user);
+    // For new sessions, user will manually call recorder/load which will call setUpWorkspace().
+    const head = Session.Core.makeNewHead(user);
+    const workspace =
+      VscWorkspace.getDefaultVscWorkspace() ??
+      path.abs(defaultWorkspaceBasePath, user?.username ?? 'anonym', 'new_session');
+
+    // if (!workspace) {
+    //   const options = {
+    //     canSelectFiles: false,
+    //     canSelectFolders: true,
+    //     canSelectMany: false,
+    //     title: 'Select a directory to start recording.',
+    //   };
+    //   const uris = await vscode.window.showOpenDialog(options);
+    //   if (uris?.length === 1) workspace = path.abs(uris[0].path);
+    // }
+
+    const session = await Session.Core.fromNew(this.context, workspace, head);
+
+    if (await this.closeCurrentScreen()) {
+      // // We want the files on disk so that we can add the cover photo there too.
+      // await session.core.write();
+
+      this.setSession(session);
+      this.setScreen(t.Screen.Recorder);
+      this.recorder = { tabId: 'details-view' };
+    }
+  }
+
+  async loadRecorder() {
+    assert(this.session);
+    assert(this.recorder);
+
+    if (!this.session.workspace) {
+      vscode.window.showErrorMessage('Please select a workspace for the session.');
+      return;
+    }
+    if (!this.session.head.handle) {
+      vscode.window.showErrorMessage('Please select a handle for the session.');
+      return;
+    }
+
+    if (this.session.temp) {
+      const confirmTitle = 'Continue';
+      const answer = await vscode.window.showWarningMessage(
+        `Everything inside ${this.session.workspace} may be overwritten.`,
+        { modal: true },
+        { title: 'Cancel', isCloseAffordance: true },
+        { title: confirmTitle },
+      );
+      if (answer?.title !== confirmTitle) return;
+    }
+
+    // Commit the temp session. Copies the temp session to its final destination based on workspace and handle.
+    if (this.session.temp) {
+      await this.session.core.commitTemp();
+    }
+
+    // This might trigger a vscode restart in which case nothing after this line will run.
+    // After restart, this.restoreStateAfterRestart() will be called and it will recreate
+    // the session, call session.prepare(), and set the screen.
+    await this.setUpWorkspace({ recorder: { tabId: 'editor-view' } });
+
+    await this.session.prepare();
+    this.recorder.tabId = 'editor-view';
   }
 
   updateViewTitle() {
@@ -709,13 +737,24 @@ class CodeMic {
   }
 
   async recorderWillClose(): Promise<boolean> {
-    if (await this.writeSession()) {
+    if (this.session?.mustScan) {
+      const cancel = 'Cancel';
+      const exit = 'Exit';
+      const answer = await vscode.window.showWarningMessage(
+        'Are you sure you want to exit the recorder?',
+        { modal: true, detail: 'Your changes will be lost if you exit.' },
+        { title: cancel, isCloseAffordance: true },
+        { title: exit },
+      );
+
+      return answer?.title === exit;
+    } else if (await this.writeSession()) {
       this.session = undefined;
       this.recorder = undefined;
       return true;
+    } else {
+      return false;
     }
-
-    return false;
   }
 
   async playerWillClose(): Promise<boolean> {
@@ -800,31 +839,31 @@ class CodeMic {
   /**
    * Returns [shouldSave, cancelled] booleans.
    */
-  async askToSaveSession(options: { forExit: boolean }): Promise<[boolean, boolean]> {
-    const saveTitle = 'Save';
-    const dontSaveTitle = "Don't Save";
-    const cancelTitle = 'Cancel';
-    let answer: vscode.MessageItem | undefined;
-    if (options.forExit) {
-      answer = await vscode.window.showWarningMessage(
-        'Do you want to save this session?',
-        { modal: true, detail: "Your changes will be lost if you don't save them." },
-        { title: saveTitle },
-        { title: cancelTitle, isCloseAffordance: true },
-        { title: dontSaveTitle },
-      );
-    } else {
-      answer = await vscode.window.showWarningMessage(
-        'Do you want to save this session?',
-        { modal: true },
-        { title: saveTitle },
-        { title: cancelTitle, isCloseAffordance: true },
-      );
-    }
-    const shouldSave = answer?.title === saveTitle;
-    const cancelled = answer?.title === cancelTitle;
-    return [shouldSave, cancelled];
-  }
+  // async askToSaveSession(options: { forExit: boolean }): Promise<[boolean, boolean]> {
+  //   const saveTitle = 'Save';
+  //   const dontSaveTitle = "Don't Save";
+  //   const cancelTitle = 'Cancel';
+  //   let answer: vscode.MessageItem | undefined;
+  //   if (options.forExit) {
+  //     answer = await vscode.window.showWarningMessage(
+  //       'Do you want to save this session?',
+  //       { modal: true, detail: "Your changes will be lost if you don't save them." },
+  //       { title: saveTitle },
+  //       { title: cancelTitle, isCloseAffordance: true },
+  //       { title: dontSaveTitle },
+  //     );
+  //   } else {
+  //     answer = await vscode.window.showWarningMessage(
+  //       'Do you want to save this session?',
+  //       { modal: true },
+  //       { title: saveTitle },
+  //       { title: cancelTitle, isCloseAffordance: true },
+  //     );
+  //   }
+  //   const shouldSave = answer?.title === saveTitle;
+  //   const cancelled = answer?.title === cancelTitle;
+  //   return [shouldSave, cancelled];
+  // }
 
   async updateFeatured() {
     try {
@@ -862,16 +901,15 @@ class CodeMic {
     // TODO ask user to convert anonymous sessions to the new user.
 
     const userDataPath = path.abs(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
-    const settings = await storage.readJSON<t.Settings>(
-      path.abs(userDataPath, 'settings.json'),
-      CodeMic.makeDefaultSettings,
-    );
+    const userSettingsPath = path.abs(userDataPath, 'settings.json');
+    const settings = await storage.readJSON<t.Settings>(userSettingsPath, CodeMic.makeDefaultSettings);
     // const cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(userDataPath.cachedSessionCoverPhotos);
 
     this.session = undefined;
     // this.cachedSessionCoverPhotos = cachedSessionCoverPhotos;
     this.context.user = user;
     this.context.userDataPath = userDataPath;
+    this.context.userSettingsPath = userSettingsPath;
     this.context.settings = settings;
     this.context.extension.globalState.update('user', user);
 
@@ -886,7 +924,32 @@ class CodeMic {
   }
 
   async updateFrontend() {
-    await this.context.postMessage?.({ type: 'updateStore', store: await this.getStore() });
+    const store = await this.getStore();
+    await this.context.postMessage?.({ type: 'updateStore', store });
+
+    // NOTE: Modifying localResourceRoots causes the webview page to refresh!
+    // if (this.context.view) {
+    //   const roots = this.getLocalResourceRoots();
+    //   if (!_.isEqual(this.localResourceRootsCache, roots)) {
+    //     // Must reassign options for webview to take effect.
+    //     // See https://github.com/microsoft/vscode-discussions/discussions/639
+    //     this.context.view!.webview.options = {
+    //       ...this.context.view!.webview.options,
+    //       localResourceRoots: _.map(roots, r => vscode.Uri.file(r)),
+    //     };
+    //     this.localResourceRootsCache = roots;
+    //   }
+    // }
+  }
+
+  getLocalResourceRoots(): string[] {
+    const roots = [
+      this.context.extension.extensionUri.path,
+      osPaths.data,
+      ..._.map(this.context.settings.history, history => history.workspace),
+    ];
+    if (this.session) roots.push(this.session.workspace);
+    return roots;
   }
 
   showError(error: Error) {
@@ -909,14 +972,14 @@ class CodeMic {
     return this.context.postMessage?.(req);
   }
 
-  // getCachedSessionCoverPhotoWebviewUri(id: string): t.Uri {
+  // getCachedSessionCoverPhotoUri(id: string): t.Uri {
   //   return this.context
   //     .view!.webview.asWebviewUri(vscode.Uri.file(this.context.userDataPath.cachedSessionCoverPhoto(id)))
   //     .toString();
   // }
 
-  // getCachedSessionCoverPhotosWebviewUris(): t.WebviewUris {
-  //   const pairs = this.featured?.map(s => [s.id, this.getCachedSessionCoverPhotoWebviewUri(s.id)]);
+  // getCachedSessionCoverPhotosUris(): t.UriMap {
+  //   const pairs = this.featured?.map(s => [s.id, this.getCachedSessionCoverPhotoUri(s.id)]);
   //   return Object.fromEntries(pairs ?? []);
   // }
 
@@ -924,6 +987,7 @@ class CodeMic {
     let session: t.SessionUIState | undefined;
     if (this.session) {
       session = {
+        temp: this.session.temp,
         mustScan: this.session.mustScan,
         loaded: this.session.isLoaded(),
         canUndo: this.session.editor.canUndo,
@@ -934,43 +998,42 @@ class CodeMic {
         clock: this.session.rr?.clock ?? 0,
         workspace: this.session.workspace,
         history: this.context.settings.history[this.session.head.id],
-        coverPhotoWebviewUri: VscWorkspace.getCoverPhotoWebviewUri(this.context, this.session.head.id),
+        coverPhotoUri: VscWorkspace.getCoverPhotoUri(this.session),
         workspaceFocusTimeline: this.session.body?.focusTimeline,
         audioTracks: this.session.body?.audioTracks,
         videoTracks: this.session.body?.videoTracks,
-        blobsWebviewUris: this.session.rr?.vscWorkspace.getBlobsWebviewUris(),
+        blobsUriMap: this.session.rr?.vscWorkspace.getBlobsUriMap(),
         comments: COMMENTS[this.session.head.id],
       };
     }
 
     let welcome: t.WelcomeUIState | undefined;
     if (this.screen === t.Screen.Welcome) {
-      const readHead = async (id: string) => {
+      const coverPhotosUris: t.UriMap = {};
+      const workspaceSessionHeads: t.SessionHead[] = [];
+
+      for (const history of Object.values(this.context.settings.history)) {
         try {
-          return await Session.Core.headFromExisting(this.context, id);
+          const session = await Session.Core.fromExisting(this.context, history.handle, history.workspace);
+          if (!session) continue;
+
+          const coverPhotoUri = VscWorkspace.getCoverPhotoUri(session);
+          coverPhotosUris[session.head.id] = coverPhotoUri;
+          workspaceSessionHeads.push(session.head);
         } catch (error) {
           console.error(error);
         }
-      };
-      const ids = Object.keys(this.context.settings.history);
-      const workspace = _.compact(await Promise.all(ids.map(readHead)));
+      }
 
-      const workspaceWebviewUriPairs = workspace.map(s => [
-        s.id,
-        VscWorkspace.getCoverPhotoWebviewUri(this.context, s.id),
-      ]);
-      const featuredWebviewUriPairs =
-        this.featured?.map(s => [s.id, serverApi.getSessionCoverPhotoURLString(s.id)]) ?? [];
-
-      const coverPhotosWebviewUris: t.WebviewUris = Object.fromEntries(
-        _.concat(workspaceWebviewUriPairs, featuredWebviewUriPairs),
-      );
+      for (const head of this.featured ?? []) {
+        coverPhotosUris[head.id] = serverApi.getSessionCoverPhotoURLString(head.id);
+      }
 
       welcome = {
-        workspace,
+        workspace: workspaceSessionHeads,
         featured: this.featured || [],
         history: this.context.settings.history,
-        coverPhotosWebviewUris,
+        coverPhotosUris,
       };
     }
 

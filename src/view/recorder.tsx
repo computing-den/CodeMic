@@ -65,9 +65,9 @@ export default class Recorder extends React.Component<Props> {
   };
 
   updateResources() {
-    const { audioTracks, videoTracks, blobsWebviewUris: webviewUris } = this.props.session;
-    if (webviewUris) {
-      this.mediaManager.updateResources(webviewUris, audioTracks, videoTracks);
+    const { audioTracks, videoTracks, blobsUriMap } = this.props.session;
+    if (blobsUriMap) {
+      this.mediaManager.updateResources(blobsUriMap, audioTracks, videoTracks);
     }
   }
 
@@ -108,7 +108,12 @@ class DetailsView extends React.Component<DetailsViewProps> {
   };
 
   handleChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
-    const changes = { handle: (e.target as HTMLInputElement).value };
+    const changes = { handle: (e.target as HTMLInputElement).value.replace(/[^A-Za-z0-9_]/g, '') };
+    await postMessage({ type: 'recorder/update', changes });
+  };
+
+  workspaceChanged = async (workspace: string) => {
+    const changes = { workspace };
     await postMessage({ type: 'recorder/update', changes });
   };
 
@@ -148,12 +153,12 @@ class DetailsView extends React.Component<DetailsViewProps> {
   render() {
     const { session, id, className, onLoadRecorder } = this.props;
     // const { coverPhotoKey } = this.state;
-    const { head } = session;
+    const { head, workspace, temp } = session;
 
     return (
       <div id={id} className={className}>
         <div className={cn('cover-photo-container', head.hasCoverPhoto && 'has-cover-photo')}>
-          {head.hasCoverPhoto ? <img src={session.coverPhotoWebviewUri} /> : <p>NO COVER PHOTO</p>}
+          {head.hasCoverPhoto ? <img src={session.coverPhotoUri} /> : <p>NO COVER PHOTO</p>}
           <div className="buttons">
             {head.hasCoverPhoto && (
               <VSCodeButton
@@ -184,12 +189,23 @@ class DetailsView extends React.Component<DetailsViewProps> {
         >
           Title
         </VSCodeTextArea>
+        <PathField
+          className="subsection"
+          placeholder="Workspace directory"
+          value={workspace}
+          onChange={this.workspaceChanged}
+          disabled={!temp}
+          pickTitle="Pick workpace directory"
+        >
+          Workspace
+        </PathField>
+        <p className="subsection help">WARNING: everything under workspace will be overwritten.</p>
         <VSCodeTextField
           className="subsection"
           placeholder="A-Z a-z 0-9 _ (e.g. my_project)"
           value={head.handle}
           onInput={this.handleChanged}
-          disabled={Boolean(head.publishTimestamp)}
+          disabled={!temp}
         >
           Handle
         </VSCodeTextField>

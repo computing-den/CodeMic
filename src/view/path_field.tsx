@@ -10,9 +10,10 @@ export type Props = {
   onChange: (value: string) => unknown;
   value?: string;
   autoFocus?: boolean;
-  label?: string;
   pickTitle: string;
   disabled?: boolean;
+  placeholder?: string;
+  children: React.ReactNode;
 };
 export default class PathField extends React.Component<Props> {
   changed = async (e: Event | React.FormEvent<HTMLElement>) =>
@@ -26,6 +27,7 @@ export default class PathField extends React.Component<Props> {
         canSelectFolders: true,
         canSelectFiles: false,
         title: this.props.pickTitle,
+        canSelectMany: false,
       },
     });
     if (uris?.length === 1) {
@@ -44,8 +46,9 @@ export default class PathField extends React.Component<Props> {
         value={this.props.value}
         autofocus={this.props.autoFocus}
         disabled={this.props.disabled}
+        placeholder={this.props.placeholder}
       >
-        {this.props.label}
+        {this.props.children}
         <VSCodeButton slot="end" appearance="icon" title="Pick" onClick={this.pick}>
           <span className="codicon codicon-search" />
         </VSCodeButton>

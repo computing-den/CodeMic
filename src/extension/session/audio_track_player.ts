@@ -27,7 +27,7 @@ export default class AudioTrackPlayer {
       // this.postAudioMessage({
       //   type: 'audio/load',
       //   id: this.audioTrack.id,
-      //   src: this.getSessionBlobWebviewUri(this.audioTrack.file.sha1),
+      //   src: this.getSessionBlobUri(this.audioTrack.file.sha1),
       // }).catch(this.gotError);
     }
   }

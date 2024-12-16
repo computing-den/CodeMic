@@ -14,14 +14,14 @@ import _ from 'lodash';
 
 export default class VideoManager {
   video?: HTMLVideoElement;
-  webviewUris?: t.WebviewUris;
+  UriMap?: t.UriMap;
   videoTracks?: t.VideoTrack[];
   curTrackId?: string;
   prepared = false;
   constructor() {}
 
-  updateResources(webviewUris: t.WebviewUris, videoTracks: t.VideoTrack[] = []) {
-    this.webviewUris = webviewUris;
+  updateResources(UriMap: t.UriMap, videoTracks: t.VideoTrack[] = []) {
+    this.UriMap = UriMap;
     this.videoTracks = videoTracks;
   }
 
@@ -54,7 +54,7 @@ export default class VideoManager {
     const track = this.videoTracks?.find(t => t.id === id);
     if (!track) return console.error('VideoManager loadTrack: track not found: ', id);
 
-    const uri = this.webviewUris?.[id];
+    const uri = this.UriMap?.[id];
     if (!uri) return console.error('VideoManager loadTrack: webview uri not found: ', id);
 
     this.video.src = uri;

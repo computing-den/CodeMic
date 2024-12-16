@@ -7,11 +7,11 @@ export default class AudioManager {
   trackManagers: { [key: string]: AudioTrackManager } = {};
   // videoManagers: { [key: string]: VideoManager } = {};
   audioContext?: AudioContext;
-  webviewUris?: t.WebviewUris;
+  UriMap?: t.UriMap;
   audioTracks?: t.AudioTrack[];
 
-  updateResources(webviewUris: t.WebviewUris, audioTracks: t.AudioTrack[] = []) {
-    this.webviewUris = webviewUris;
+  updateResources(UriMap: t.UriMap, audioTracks: t.AudioTrack[] = []) {
+    this.UriMap = UriMap;
     this.audioTracks = audioTracks;
 
     // Load or dispose audio tracks.
@@ -22,7 +22,7 @@ export default class AudioManager {
     const deletedIds = _.difference(oldIds, newIds);
 
     for (const id of addedIds) {
-      this.trackManagers[id] = new AudioTrackManager(id, webviewUris[id]);
+      this.trackManagers[id] = new AudioTrackManager(id, UriMap[id]);
     }
 
     for (const id of deletedIds) this.dispose(id);
@@ -73,10 +73,7 @@ export class AudioTrackManager {
   node?: MediaElementAudioSourceNode;
   prepared = false;
 
-  constructor(
-    public id: string,
-    src: string,
-  ) {
+  constructor(public id: string, src: string) {
     this.audio = new Audio();
     this.audio.addEventListener('volumechange', this.handleVolumeChange);
     this.audio.addEventListener('timeupdate', this.handleTimeUpdate);

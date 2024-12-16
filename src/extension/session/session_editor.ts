@@ -247,10 +247,16 @@ export default class SessionEditor {
   }
 
   updateHead(partial: Partial<t.SessionHead>) {
-    if (partial.title !== undefined) this.session.head.title = partial.title;
-    if (partial.handle !== undefined) this.session.head.handle = partial.handle;
-    if (partial.description !== undefined) this.session.head.description = partial.description;
-    if (partial.duration) this.session.head.duration = partial.duration;
+    Object.assign(this.session.head, partial);
+    this.changed();
+  }
+
+  updateFromUI(update: t.SessionUIStateUpdate) {
+    if (update.workspace !== undefined) this.session.workspace = path.abs(update.workspace);
+    if (update.title !== undefined) this.session.head.title = update.title;
+    if (update.description !== undefined) this.session.head.description = update.description;
+    if (update.duration !== undefined) this.session.head.duration = update.duration;
+    if (update.handle !== undefined) this.session.head.handle = update.handle;
 
     this.changed();
   }
