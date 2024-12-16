@@ -855,11 +855,7 @@ class CodeMic {
   }
 
   async deactivate() {
-    this.closeCurrentScreen();
-    // if (this.session) {
-    // await this.session.write();
-    // }
-    // await this.db.write();
+    await this.closeCurrentScreen();
   }
 
   async changeUser(user?: t.User) {

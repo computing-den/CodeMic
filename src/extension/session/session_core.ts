@@ -109,6 +109,8 @@ export default class SessionCore {
     rel: t.RelPath = path.CUR_DIR,
     res: [t.RelPath, fs.Stats][] = [],
   ): Promise<[t.RelPath, fs.Stats][]> {
+    assert(this.session.workspace && this.session.workspace !== '/', 'No workspace path is set.');
+
     let filenames: t.RelPath[] = [];
     try {
       filenames = (await fs.promises.readdir(path.join(this.session.workspace, rel))) as t.RelPath[];
