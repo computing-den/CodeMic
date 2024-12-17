@@ -36,8 +36,11 @@ class WebviewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
 
       // Allow access to files from these directories
-      // localResourceRoots: [this.context.extensionUri, vscode.Uri.file(osPaths.data)],
-      localResourceRoots: [vscode.Uri.file('/')],
+      localResourceRoots: [
+        this.context.extensionUri,
+        vscode.Uri.file(osPaths.data),
+        ...(vscode.workspace.workspaceFolders?.map(f => f.uri) ?? []),
+      ],
     };
 
     webviewView.webview.html = this.getHtmlForWebview();

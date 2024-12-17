@@ -19,7 +19,7 @@ export class Session {
   workspace: t.AbsPath;
   local: boolean;
   mustScan: boolean;
-  // temp means that it's a new session and user is still editing workspace and handle and therefore session
+  // temp means that it's a new session and user is still editing workspace and therefore session
   // doesn't have a data path.
   // temp is set to false right before possible vscode restart due to change of workspace when scan is requested.
   temp: boolean;

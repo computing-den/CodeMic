@@ -1,6 +1,5 @@
 import nodePath from 'path';
 import os from 'os';
-import fs from 'fs';
 import * as t from '../lib/types.js';
 import _ from 'lodash';
 import assert from 'assert';
@@ -18,16 +17,6 @@ export function shortenPath(p: string): string {
   } else {
     return nodePath.join('~', rel);
   }
-}
-
-export async function fileExists(p: t.AbsPath): Promise<boolean> {
-  try {
-    await fs.promises.access(p);
-    return true;
-  } catch (error: any) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-  }
-  return false;
 }
 
 export async function computeSHA1(data: Uint8Array): Promise<string> {

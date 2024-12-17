@@ -157,10 +157,14 @@ class DetailsView extends React.Component<DetailsViewProps> {
 
     return (
       <div id={id} className={className}>
-        <div className={cn('cover-photo-container', head.hasCoverPhoto && 'has-cover-photo')}>
-          {head.hasCoverPhoto ? <img src={session.coverPhotoUri} /> : <p>NO COVER PHOTO</p>}
+        <div className={cn('cover-photo-container', head.coverPhotoHash && 'has-cover-photo')}>
+          {head.coverPhotoHash ? (
+            <img src={session.coverPhotoUri + `?hash=${head.coverPhotoHash}`} />
+          ) : (
+            <p>NO COVER PHOTO</p>
+          )}
           <div className="buttons">
-            {head.hasCoverPhoto && (
+            {head.coverPhotoHash && (
               <VSCodeButton
                 className="delete"
                 appearance="secondary"
@@ -171,7 +175,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
               </VSCodeButton>
             )}
             <VSCodeButton className="pick" onClick={this.pickCoverPhoto}>
-              {head.hasCoverPhoto ? 'Change cover' : 'Pick cover'}
+              {head.coverPhotoHash ? 'Change cover' : 'Pick cover'}
             </VSCodeButton>
           </div>
         </div>

@@ -20,11 +20,10 @@ export default class SessionCore {
 
   static async fromExisting(
     context: Context,
-    handle: string,
     workspace: t.AbsPath,
     opts?: { mustScan?: boolean },
   ): Promise<Session | undefined> {
-    const head = await storage.readJSONOptional<t.SessionHead>(path.abs(workspace, '.codemic', handle, 'head.json'));
+    const head = await storage.readJSONOptional<t.SessionHead>(path.abs(workspace, '.codemic', 'head.json'));
     return head && new Session(context, workspace, head, { local: true, mustScan: opts?.mustScan });
   }
 
@@ -149,8 +148,7 @@ export default class SessionCore {
 
   get sessionFinalDataPath(): t.AbsPath {
     assert(this.session.workspace);
-    assert(this.session.head.handle);
-    return path.abs(this.session.workspace, '.codemic', this.session.head.handle);
+    return path.abs(this.session.workspace, '.codemic');
   }
 
   resolveUri(uri: t.Uri): t.Uri {
@@ -216,7 +214,7 @@ export default class SessionCore {
   }
 
   async download(options?: { skipIfExists: boolean }) {
-    if (options?.skipIfExists && (await misc.fileExists(path.abs(this.sessionDataPath, 'body.json')))) return;
+    if (options?.skipIfExists && (await storage.fileExists(path.abs(this.sessionDataPath, 'body.json')))) return;
 
     await serverApi.downloadSession(
       this.session.head.id,
@@ -237,7 +235,7 @@ export default class SessionCore {
   async writeFileIfNotExists(uri: t.Uri, text: string) {
     const absPath = path.getFileUriPath(this.resolveUri(uri));
 
-    if (!(await misc.fileExists(absPath))) {
+    if (!(await storage.fileExists(absPath))) {
       await fs.promises.writeFile(absPath, text);
     }
   }
@@ -269,7 +267,7 @@ export default class SessionCore {
   }
 
   async package() {
-    assert(await misc.fileExists(path.abs(this.sessionDataPath, 'body.json')), "Session body doesn't exist");
+    assert(await storage.fileExists(path.abs(this.sessionDataPath, 'body.json')), "Session body doesn't exist");
 
     return new Promise<t.AbsPath>((resolve, reject) => {
       // const packagePath = path.abs(os.tmpdir(), this.head.id + '.zip');

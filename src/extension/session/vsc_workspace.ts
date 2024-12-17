@@ -5,6 +5,7 @@ import * as lib from '../../lib/lib.js';
 import { Position, Range, Selection, LineRange } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import * as misc from '../misc.js';
+import * as storage from '../storage.js';
 import type { Context } from '../types.js';
 import Session, { LoadedSession } from './session.js';
 import * as serverApi from '../server_api.js';
@@ -22,13 +23,9 @@ export default class VscWorkspace {
   constructor(public session: LoadedSession) {}
 
   static getCoverPhotoUri(session: Session): t.Uri {
-    if (session.local || session.temp) {
-      return session.context
-        .view!.webview.asWebviewUri(vscode.Uri.file(path.abs(session.core.sessionDataPath, 'cover_photo')))
-        .toString();
-    }
-
-    return serverApi.getSessionCoverPhotoURLString(session.head.id);
+    return session.context
+      .view!.webview.asWebviewUri(vscode.Uri.file(path.abs(session.core.sessionDataPath, 'cover_photo')))
+      .toString();
   }
 
   static async getGitAPI(): Promise<git.API> {
@@ -139,7 +136,7 @@ export default class VscWorkspace {
       if (!this.shouldRecordVscUri(vscTextDocument.uri)) continue;
 
       // If file is deleted but the text editor is still there, ignore it.
-      if (vscTextDocument.uri.scheme === 'file' && !(await misc.fileExists(path.abs(vscTextDocument.uri.path)))) {
+      if (vscTextDocument.uri.scheme === 'file' && !(await storage.fileExists(path.abs(vscTextDocument.uri.path)))) {
         continue;
       }
 
@@ -290,8 +287,7 @@ export default class VscWorkspace {
           await fs.promises.mkdir(absPath, { recursive: true });
         } else {
           const data = await internalWorkspace.getContentByUri(targetUri);
-          await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
-          await fs.promises.writeFile(absPath, data);
+          await storage.writeBinary(absPath, data);
         }
       }
     }
@@ -599,10 +595,6 @@ export default class VscWorkspace {
     assert(trackFile.file.type === 'local');
     const vscUri = vscode.Uri.file(path.abs(this.session.core.sessionDataPath, 'blobs', trackFile.file.sha1));
     return this.session.context.view!.webview.asWebviewUri(vscUri).toString();
-  }
-
-  getCoverPhotoUri(): string {
-    return VscWorkspace.getCoverPhotoUri(this.session);
   }
 
   getBlobsUriMap(): t.UriMap | undefined {

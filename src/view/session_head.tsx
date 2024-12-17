@@ -102,10 +102,10 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
 
     return (
       <div className={cn('session-head-list-item', className)} onClick={this.clicked} tabIndex={0}>
-        {s.hasCoverPhoto && (
+        {s.coverPhotoHash && (
           <div className="cover-photo-container">
             {/*<div className="background" style={{ backgroundImage: `url(${coverPhotoUri})` }} />*/}
-            <img src={coverPhotoUri} />
+            <img src={coverPhotoUri + `?hash=${s.coverPhotoHash}`} />
           </div>
         )}
         <WithAvatar username={s.author?.username} className="caption" small>

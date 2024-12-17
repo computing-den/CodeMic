@@ -317,7 +317,7 @@ export type SessionHead = {
   modificationTimestamp: string;
   toc: TocItem[];
   forkedFrom?: string;
-  hasCoverPhoto: boolean;
+  coverPhotoHash?: string;
 };
 
 export type SessionHeadMap = { [key: string]: SessionHead | undefined };

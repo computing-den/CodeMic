@@ -196,7 +196,7 @@ export default class Player extends React.Component<Props> {
               duration={head.duration}
             />
             <div id="cover-container" className="cover-container subsection">
-              {head.hasCoverPhoto && <img src={session.coverPhotoUri} />}
+              {head.coverPhotoHash && <img src={session.coverPhotoUri + `?hash=${head.coverPhotoHash}`} />}
               <video id="guide-video" />
             </div>
             <SessionDescription className="subsection subsection_spaced" sessionHead={head} />

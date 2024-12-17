@@ -10,7 +10,9 @@ import _ from 'lodash';
 import assert from 'assert';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
+import * as misc from './misc.js';
 import * as path from '../lib/path.js';
+import * as fs from 'fs';
 import VscWorkspace from './session/vsc_workspace.js';
 
 class CodeMic {
@@ -150,13 +152,13 @@ class CodeMic {
 
       console.log('restoreStateAfterRestart(): ', workspaceChange);
 
-      const { screen, sessionId, sessionHandle, recorder, workspace } = workspaceChange;
+      const { screen, sessionId, recorder, workspace } = workspaceChange;
       this.setScreen(t.Screen.Loading);
 
       await this.setWorkspaceChangeGlobalState();
 
       if (sessionId) {
-        const session = await Session.Core.fromExisting(this.context, sessionHandle, workspace, {
+        const session = await Session.Core.fromExisting(this.context, workspace, {
           mustScan: recorder?.mustScan,
         });
         assert(session);
@@ -254,7 +256,7 @@ class CodeMic {
         // TODO what about sessions that must be downloaded? Or find session id in featured.
         assert(history, 'TODO session data must be downloaded');
         if (await this.closeCurrentScreen()) {
-          const session = await Session.Core.fromExisting(this.context, history.handle, history.workspace);
+          const session = await Session.Core.fromExisting(this.context, history.workspace);
           if (!session) {
             this.showError(new Error(`Session files don't exist.`));
           } else {
@@ -495,7 +497,7 @@ class CodeMic {
       case 'deleteSession': {
         const history = this.context.settings.history[req.sessionId];
         if (history) {
-          const session = await Session.Core.fromExisting(this.context, history.handle, history.workspace);
+          const session = await Session.Core.fromExisting(this.context, history.workspace);
           if (session) {
             const confirmTitle = 'Delete';
             const answer = await vscode.window.showWarningMessage(
@@ -548,7 +550,7 @@ class CodeMic {
       const history = this.context.settings.history[sessionId];
       // TODO what about sessions that must be downloaded? Or find session id in featured.
       assert(history, 'TODO session data must be downloaded');
-      session = await Session.Core.fromExisting(this.context, history.handle, history.workspace);
+      session = await Session.Core.fromExisting(this.context, history.workspace);
     }
 
     if (session) {
@@ -868,11 +870,37 @@ class CodeMic {
   async updateFeatured() {
     try {
       const res = await serverApi.send({ type: 'featured/get' }, this.context.user?.token);
+      await Promise.all(
+        res.sessionHeads.map(head =>
+          this.updateSessionCoverPhoto(head).catch(error =>
+            console.error(`Error downloading cover photo of sesstion ${head.id}`, error),
+          ),
+        ),
+      );
       this.featured = res.sessionHeads;
     } catch (error) {
       console.error(error);
       vscode.window.showErrorMessage('Failed to fetch featured items:', (error as Error).message);
     }
+  }
+
+  async updateSessionCoverPhoto(head: t.SessionHead) {
+    const p = this.getCoverPhotoCachePath(head.id);
+    if (await storage.fileExists(p)) {
+      const buffer = await fs.promises.readFile(p);
+      const hash = await misc.computeSHA1(buffer);
+      if (hash === head.coverPhotoHash) return;
+    }
+
+    await serverApi.downloadSessionCoverPhoto(head.id, p);
+  }
+
+  getCoverPhotoCachePath(id: string): t.AbsPath {
+    return path.abs(this.context.userDataPath, 'cover_photos_cache', id);
+  }
+
+  getCoverPhotoCacheUri(id: string): t.Uri {
+    return this.context.view!.webview.asWebviewUri(vscode.Uri.file(this.getCoverPhotoCachePath(id))).toString();
   }
 
   async updateFeaturedAndUpdateFrontend() {
@@ -1014,11 +1042,10 @@ class CodeMic {
 
       for (const history of Object.values(this.context.settings.history)) {
         try {
-          const session = await Session.Core.fromExisting(this.context, history.handle, history.workspace);
+          const session = await Session.Core.fromExisting(this.context, history.workspace);
           if (!session) continue;
 
-          const coverPhotoUri = VscWorkspace.getCoverPhotoUri(session);
-          coverPhotosUris[session.head.id] = coverPhotoUri;
+          coverPhotosUris[session.head.id] = this.getCoverPhotoCacheUri(session.head.id);
           workspaceSessionHeads.push(session.head);
         } catch (error) {
           console.error(error);
@@ -1026,7 +1053,7 @@ class CodeMic {
       }
 
       for (const head of this.featured ?? []) {
-        coverPhotosUris[head.id] = serverApi.getSessionCoverPhotoURLString(head.id);
+        coverPhotosUris[head.id] = this.getCoverPhotoCacheUri(head.id);
       }
 
       welcome = {

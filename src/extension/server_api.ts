@@ -2,6 +2,7 @@ import config from './config.js';
 import axios, { AxiosError } from 'axios';
 import * as t from '../lib/types.js';
 import * as path from '../lib/path.js';
+import * as storage from './storage.js';
 import fs from 'fs';
 import FormData from 'form-data'; // native FormData does not support appending streams
 import * as vscode from 'vscode';
@@ -78,6 +79,11 @@ function handleAxiosError(req: any, error: Error): never {
 
 export function getSessionCoverPhotoURLString(id: string): string {
   return getURLString('/session-cover-photo', { id });
+}
+
+export async function downloadSessionCoverPhoto(id: string, dst: t.AbsPath) {
+  const res = await axios.get(getSessionCoverPhotoURLString(id), { responseType: 'arraybuffer' });
+  await storage.writeBinary(dst, res.data);
 }
 
 function getURLString(pathname: string, paramsObj: Record<string, string | undefined>): string {

@@ -3,6 +3,7 @@ import { getMp3Duration, getVideoDuration } from '../get_audio_video_duration.js
 import * as misc from '../misc.js';
 import * as path from '../../lib/path.js';
 import * as t from '../../lib/types.js';
+import * as storage from '../storage.js';
 import assert from '../../lib/assert.js';
 import { Session } from './session.js';
 import _ from 'lodash';
@@ -262,14 +263,28 @@ export default class SessionEditor {
   }
 
   async setCoverPhoto(uri: t.Uri) {
-    await fs.promises.copyFile(path.getFileUriPath(uri), path.abs(this.session.core.sessionDataPath, 'cover_photo'));
-    this.session.head.hasCoverPhoto = true;
+    const p = path.getFileUriPath(uri);
+
+    // Caculate hash and set head.
+    const buffer = await fs.promises.readFile(p);
+    const hash = await misc.computeSHA1(buffer);
+    await fs.promises.copyFile(p, path.abs(this.session.core.sessionDataPath, 'cover_photo'));
+    this.session.head.coverPhotoHash = hash;
+
+    // Update cover photo cache.
+    const cachePath = path.abs(this.session.context.userDataPath, 'cover_photos_cache', this.session.head.id);
+    await storage.ensureContainingDir(cachePath);
+    await fs.promises.copyFile(p, cachePath);
+
     this.changed();
   }
 
   async deleteCoverPhoto() {
     await fs.promises.rm(path.abs(this.session.core.sessionDataPath, 'cover_photo'), { force: true });
-    this.session.head.hasCoverPhoto = false;
+    await fs.promises.rm(path.abs(this.session.context.userDataPath, 'cover_photos_cache', this.session.head.id), {
+      force: true,
+    });
+    this.session.head.coverPhotoHash = undefined;
     this.changed();
   }
 
