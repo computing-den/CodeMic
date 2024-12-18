@@ -1,8 +1,8 @@
 import * as t from '../lib/types.js';
-import * as path from '../lib/path.js';
 import fs from 'fs';
 import _ from 'lodash';
 import stringify from 'json-stringify-pretty-compact';
+import path from 'path';
 
 export async function readJSON<T>(p: string, defaultFn?: () => T): Promise<T> {
   try {

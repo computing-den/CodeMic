@@ -1,9 +1,10 @@
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
-import * as path from '../lib/path.js';
 import { cn } from './misc.js';
 import React, { useEffect, useRef, useState } from 'react';
 import Popover, { PointXY, PopoverProps, usePopover } from './popover.jsx';
+import { URI } from 'vscode-uri';
+import path from 'path';
 
 export type Props = {
   className?: string;
@@ -87,7 +88,9 @@ export default function ProgressBar(props: Props) {
         showOnAnchorHover
       >
         <div className="row">
-          <div className="document-focus">{underMouse?.focus ? path.getUriShortNameOpt(underMouse.focus.uri) : ''}</div>
+          <div className="document-focus">
+            {underMouse?.focus ? path.basename(URI.parse(underMouse.focus.uri).fsPath) : ''}
+          </div>
           <div className="clock">{lib.formatTimeSeconds(underMouse?.clock ?? 0)}</div>
         </div>
         <div className="line-focus">{underMouse?.focus?.text || ''}</div>

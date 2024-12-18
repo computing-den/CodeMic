@@ -5,19 +5,19 @@ import _ from 'lodash';
 import assert from 'assert';
 import crypto from 'crypto';
 
-/**
- * Given '/home/sean/abc/' will return '~/abc/'.
- * p must be absolute.
- */
-export function shortenPath(p: string): string {
-  assert(nodePath.isAbsolute(p));
-  const rel = nodePath.relative(os.homedir(), p);
-  if (rel.startsWith('..' + nodePath.sep)) {
-    return p;
-  } else {
-    return nodePath.join('~', rel);
-  }
-}
+// /**
+//  * Given '/home/sean/abc/' will return '~/abc/'.
+//  * p must be absolute.
+//  */
+// export function shortenPath(p: string): string {
+//   assert(nodePath.isAbsolute(p));
+//   const rel = nodePath.relative(os.homedir(), p);
+//   if (rel.startsWith('..' + nodePath.sep)) {
+//     return p;
+//   } else {
+//     return nodePath.join('~', rel);
+//   }
+// }
 
 export async function computeSHA1(data: Uint8Array): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-1', data);

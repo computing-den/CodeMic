@@ -1,9 +1,9 @@
 import * as t from '../lib/types.js';
-import * as path from '../lib/path.js';
 import { cn } from './misc.js';
 import postMessage from './api.js';
 import React from 'react';
 import { VSCodeButton, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
+import { URI } from 'vscode-uri';
 
 export type Props = {
   className?: string;
@@ -23,7 +23,7 @@ export default class PathField extends React.Component<Props> {
     const { uris } = await postMessage({
       type: 'showOpenDialog',
       options: {
-        defaultUri: this.props.value ? path.fileUriFromAbsPath(path.abs(this.props.value)) : undefined,
+        defaultUri: this.props.value ? URI.file(this.props.value).toString() : undefined,
         canSelectFolders: true,
         canSelectFiles: false,
         title: this.props.pickTitle,
@@ -31,10 +31,10 @@ export default class PathField extends React.Component<Props> {
       },
     });
     if (uris?.length === 1) {
-      if (!path.isFileUri(uris[0] as string)) {
+      if (URI.parse(uris[0]).scheme !== 'file') {
         throw new Error(`pick: only local paths are supported. Instead received ${uris[0]}`);
       }
-      this.props.onChange(path.getFileUriPath(uris[0] as string));
+      this.props.onChange(URI.parse(uris[0]).fsPath);
     }
   };
 

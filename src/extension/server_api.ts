@@ -1,8 +1,8 @@
 import config from './config.js';
 import axios, { AxiosError } from 'axios';
 import * as t from '../lib/types.js';
-import * as path from '../lib/path.js';
 import * as storage from './storage.js';
+import * as path from 'path';
 import fs from 'fs';
 import FormData from 'form-data'; // native FormData does not support appending streams
 import * as vscode from 'vscode';

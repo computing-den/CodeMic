@@ -1,7 +1,6 @@
 import fs from 'fs';
 import { getMp3Duration, getVideoDuration } from '../get_audio_video_duration.js';
 import * as misc from '../misc.js';
-import * as path from '../../lib/path.js';
 import * as t from '../../lib/types.js';
 import * as storage from '../storage.js';
 import assert from '../../lib/assert.js';
@@ -9,6 +8,8 @@ import { Session } from './session.js';
 import _ from 'lodash';
 import { v4 as uuid } from 'uuid';
 import { calcClockAfterRangeSpeedChange } from '../../lib/lib.js';
+import { URI } from 'vscode-uri';
+import * as path from 'path';
 
 export default class SessionEditor {
   dirty = false;
@@ -173,17 +174,17 @@ export default class SessionEditor {
 
   async insertAudioTrack(uri: string, clock: number): Promise<t.AudioTrack> {
     assert(this.session.isLoaded());
-    const absPath = path.getFileUriPath(uri);
-    const data = await fs.promises.readFile(absPath);
+    const fsPath = URI.parse(uri).fsPath;
+    const data = await fs.promises.readFile(fsPath);
     const duration = getMp3Duration(data);
     const sha1 = await misc.computeSHA1(data);
-    await this.session.core.copyToBlob(absPath, sha1);
+    await this.session.core.copyToBlob(fsPath, sha1);
     const audioTrack: t.AudioTrack = {
       id: uuid(),
       type: 'audio',
       clockRange: { start: clock, end: clock + duration },
       file: { type: 'local', sha1: sha1 },
-      title: path.basename(absPath, { omitExt: true }),
+      title: path.basename(fsPath),
     };
 
     this.session.body.audioTracks.push(audioTrack);
@@ -211,17 +212,17 @@ export default class SessionEditor {
 
   async insertVideoTrack(uri: string, clock: number): Promise<t.VideoTrack> {
     assert(this.session.isLoaded());
-    const absPath = path.getFileUriPath(uri);
-    const data = await fs.promises.readFile(absPath);
+    const fsPath = URI.parse(uri).fsPath;
+    const data = await fs.promises.readFile(fsPath);
     const duration = getVideoDuration(data);
     const sha1 = await misc.computeSHA1(data);
-    await this.session.core.copyToBlob(absPath, sha1);
+    await this.session.core.copyToBlob(fsPath, sha1);
     const videoTrack: t.VideoTrack = {
       id: uuid(),
       type: 'video',
       clockRange: { start: clock, end: clock + duration },
       file: { type: 'local', sha1: sha1 },
-      title: path.basename(absPath, { omitExt: true }),
+      title: path.basename(fsPath),
     };
 
     this.session.body.videoTracks.push(videoTrack);
@@ -253,7 +254,7 @@ export default class SessionEditor {
   }
 
   updateFromUI(update: t.SessionUIStateUpdate) {
-    if (update.workspace !== undefined) this.session.workspace = path.abs(update.workspace);
+    if (update.workspace !== undefined) this.session.workspace = update.workspace;
     if (update.title !== undefined) this.session.head.title = update.title;
     if (update.description !== undefined) this.session.head.description = update.description;
     if (update.duration !== undefined) this.session.head.duration = update.duration;
@@ -263,25 +264,25 @@ export default class SessionEditor {
   }
 
   async setCoverPhoto(uri: string) {
-    const p = path.getFileUriPath(uri);
+    const fsPath = URI.parse(uri).fsPath;
 
     // Caculate hash and set head.
-    const buffer = await fs.promises.readFile(p);
+    const buffer = await fs.promises.readFile(fsPath);
     const hash = await misc.computeSHA1(buffer);
-    await fs.promises.copyFile(p, path.abs(this.session.core.sessionDataPath, 'cover_photo'));
+    await fs.promises.copyFile(fsPath, path.join(this.session.core.sessionDataPath, 'cover_photo'));
     this.session.head.coverPhotoHash = hash;
 
     // Update cover photo cache.
-    const cachePath = path.abs(this.session.context.userDataPath, 'cover_photos_cache', this.session.head.id);
+    const cachePath = path.join(this.session.context.userDataPath, 'cover_photos_cache', this.session.head.id);
     await storage.ensureContainingDir(cachePath);
-    await fs.promises.copyFile(p, cachePath);
+    await fs.promises.copyFile(fsPath, cachePath);
 
     this.changed();
   }
 
   async deleteCoverPhoto() {
-    await fs.promises.rm(path.abs(this.session.core.sessionDataPath, 'cover_photo'), { force: true });
-    await fs.promises.rm(path.abs(this.session.context.userDataPath, 'cover_photos_cache', this.session.head.id), {
+    await fs.promises.rm(path.join(this.session.core.sessionDataPath, 'cover_photo'), { force: true });
+    await fs.promises.rm(path.join(this.session.context.userDataPath, 'cover_photos_cache', this.session.head.id), {
       force: true,
     });
     this.session.head.coverPhotoHash = undefined;

@@ -1,6 +1,6 @@
+import { URI } from 'vscode-uri';
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
-import * as path from '../../lib/path.js';
 import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
@@ -86,7 +86,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
   ) {
     if (uriSet) uriSet.add(uri);
 
-    assert(path.isUntitledUri(uri), 'Must only record closeTextDocument for untitled URIs');
+    assert(URI.parse(uri).scheme === 'untitled', 'Must only record closeTextDocument for untitled URIs');
 
     if (direction === t.Direction.Forwards) {
       this.internalWorkspace.closeAndRemoveTextDocumentByUri(uri);

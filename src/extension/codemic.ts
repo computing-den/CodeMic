@@ -11,8 +11,8 @@ import assert from 'assert';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import * as misc from './misc.js';
-import * as path from '../lib/path.js';
 import * as fs from 'fs';
+import * as path from 'path';
 import VscWorkspace from './session/vsc_workspace.js';
 
 class CodeMic {
@@ -82,8 +82,8 @@ class CodeMic {
 
   static async fromExtensionContext(extension: vscode.ExtensionContext): Promise<CodeMic> {
     const user = extension.globalState.get<t.User>('user');
-    const userDataPath = path.abs(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
-    const userSettingsPath = path.abs(userDataPath, 'settings.json');
+    const userDataPath = path.join(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
+    const userSettingsPath = path.join(userDataPath, 'settings.json');
     const settings = await storage.readJSON<t.Settings>(userSettingsPath, CodeMic.makeDefaultSettings);
     const context: Context = { extension, user, userDataPath, userSettingsPath, settings };
     return new CodeMic(context);
@@ -578,7 +578,7 @@ class CodeMic {
     const head = Session.Core.makeNewHead(user);
     const workspace =
       VscWorkspace.getDefaultVscWorkspace() ??
-      path.abs(defaultWorkspaceBasePath, user?.username ?? 'anonym', 'new_session');
+      path.join(defaultWorkspaceBasePath, user?.username ?? 'anonym', 'new_session');
 
     // if (!workspace) {
     //   const options = {
@@ -896,7 +896,7 @@ class CodeMic {
   }
 
   getCoverPhotoCachePath(id: string): string {
-    return path.abs(this.context.userDataPath, 'cover_photos_cache', id);
+    return path.join(this.context.userDataPath, 'cover_photos_cache', id);
   }
 
   getCoverPhotoCacheUri(id: string): string {
@@ -928,8 +928,8 @@ class CodeMic {
   async changeUser(user?: t.User) {
     // TODO ask user to convert anonymous sessions to the new user.
 
-    const userDataPath = path.abs(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
-    const userSettingsPath = path.abs(userDataPath, 'settings.json');
+    const userDataPath = path.join(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
+    const userSettingsPath = path.join(userDataPath, 'settings.json');
     const settings = await storage.readJSON<t.Settings>(userSettingsPath, CodeMic.makeDefaultSettings);
     // const cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(userDataPath.cachedSessionCoverPhotos);
 
@@ -954,30 +954,6 @@ class CodeMic {
   async updateFrontend() {
     const store = await this.getStore();
     await this.context.postMessage?.({ type: 'updateStore', store });
-
-    // NOTE: Modifying localResourceRoots causes the webview page to refresh!
-    // if (this.context.view) {
-    //   const roots = this.getLocalResourceRoots();
-    //   if (!_.isEqual(this.localResourceRootsCache, roots)) {
-    //     // Must reassign options for webview to take effect.
-    //     // See https://github.com/microsoft/vscode-discussions/discussions/639
-    //     this.context.view!.webview.options = {
-    //       ...this.context.view!.webview.options,
-    //       localResourceRoots: _.map(roots, r => vscode.Uri.file(r)),
-    //     };
-    //     this.localResourceRootsCache = roots;
-    //   }
-    // }
-  }
-
-  getLocalResourceRoots(): string[] {
-    const roots = [
-      this.context.extension.extensionUri.path,
-      osPaths.data,
-      ..._.map(this.context.settings.history, history => history.workspace),
-    ];
-    if (this.session) roots.push(this.session.workspace);
-    return roots;
   }
 
   showError(error: Error) {

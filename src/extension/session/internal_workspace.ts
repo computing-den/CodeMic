@@ -1,7 +1,8 @@
+import * as path from 'path';
+import { URI } from 'vscode-uri';
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
 import { LineRange, Selection } from '../../lib/lib.js';
-import * as path from '../../lib/path.js';
 import assert from '../../lib/assert.js';
 import { LoadedSession } from './session.js';
 import InternalWorkspaceStepper from './internal_workspace_stepper.js';
@@ -170,9 +171,9 @@ export default class InternalWorkspace {
     this.textEditors.push(textEditor);
   }
 
-  toWorkspaceUri(p: string): string {
-    return path.workspaceUriFromAbsPath(this.session.workspace, p);
-  }
+  // toWorkspaceUri(p: string): string {
+  //   return path.workspaceUriFromAbsPath(this.session.workspace, p);
+  // }
 
   closeAndRemoveTextDocumentByUri(uri: string) {
     this.closeTextEditorByUri(uri);

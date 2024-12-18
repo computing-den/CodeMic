@@ -1,5 +1,4 @@
 import * as t from '../../lib/types.js';
-import * as path from '../../lib/path.js';
 import InternalTextDocument from './internal_text_document.js';
 import * as lib from '../../lib/lib.js';
 import { Position, Range, Selection, LineRange } from '../../lib/lib.js';
@@ -14,6 +13,8 @@ import fs from 'fs';
 import _ from 'lodash';
 import vscode from 'vscode';
 import SessionCore from './session_core.js';
+import path from 'path';
+import { URI } from 'vscode-uri';
 
 type TabWithInputText = Omit<vscode.Tab, 'input'> & {
   readonly input: vscode.TabInputText;
@@ -24,7 +25,7 @@ export default class VscWorkspace {
 
   static getCoverPhotoUri(session: Session): string {
     return session.context
-      .view!.webview.asWebviewUri(vscode.Uri.file(path.abs(session.core.sessionDataPath, 'cover_photo')))
+      .view!.webview.asWebviewUri(vscode.Uri.file(path.join(session.core.sessionDataPath, 'cover_photo')))
       .toString();
   }
 
@@ -40,7 +41,7 @@ export default class VscWorkspace {
     // .uri can be undefined after user deletes the only folder from workspace
     // probably because it doesn't cause a vscode restart.
     const uri = vscode.workspace.workspaceFolders?.[0]?.uri;
-    return uri?.scheme === 'file' ? path.abs(uri.path) : undefined;
+    return uri?.scheme === 'file' ? uri.fsPath : undefined;
   }
 
   static toVscPosition(position: Position): vscode.Position {
@@ -105,7 +106,7 @@ export default class VscWorkspace {
     // TODO: ignore files in .codemicignore
     const pathsWithStats = await this.session.core.readDirRecursively({ includeFiles: true, includeDirs: true });
     for (const [p, stat] of pathsWithStats) {
-      const uri = path.workspaceUriFromRelPath(p);
+      const uri = lib.workspaceUri(p);
       if (stat.isDirectory()) {
         events.push({ uri, event: { type: 'init', clock: 0, file: { type: 'dir' } } });
       } else {
@@ -136,7 +137,7 @@ export default class VscWorkspace {
       if (!this.shouldRecordVscUri(vscTextDocument.uri)) continue;
 
       // If file is deleted but the text editor is still there, ignore it.
-      if (vscTextDocument.uri.scheme === 'file' && !(await storage.fileExists(path.abs(vscTextDocument.uri.path)))) {
+      if (vscTextDocument.uri.scheme === 'file' && !(await storage.fileExists(path.join(vscTextDocument.uri.fsPath)))) {
         continue;
       }
 
@@ -205,8 +206,8 @@ export default class VscWorkspace {
       // all files and directories in targetUris that are no longer in internalWorkspace's worktree should be deleted
       for (const targetUri of targetUris) {
         if (!internalWorkspace.doesUriExist(targetUri)) {
-          if (path.isWorkspaceUri(targetUri)) {
-            await fs.promises.rm(path.getFileUriPath(this.session.core.resolveUri(targetUri)), {
+          if (URI.parse(targetUri).scheme === 'workspace') {
+            await fs.promises.rm(URI.parse(this.session.core.resolveUri(targetUri)).fsPath, {
               force: true,
               recursive: true,
             });
@@ -220,7 +221,7 @@ export default class VscWorkspace {
         includeDirs: true,
       });
       for (const [p] of workspacePathsWithStats) {
-        const uri = path.workspaceUriFromRelPath(p);
+        const uri = lib.workspaceUri(p);
         if (!internalWorkspace.doesUriExist(uri)) {
           await fs.promises.rm(path.join(this.session.workspace, p), { force: true, recursive: true });
         }
@@ -260,8 +261,8 @@ export default class VscWorkspace {
 
         // Handle text documents that have an associated text editor or have untitled schema
         let vscTextDocument: vscode.TextDocument | undefined;
-        if (path.isUntitledUri(targetUri)) {
-          vscTextDocument = await this.openVscUntitledByName(path.getUntitledUriName(targetUri));
+        if (URI.parse(targetUri).scheme === 'untitled') {
+          vscTextDocument = await this.openVscUntitledByName(URI.parse(targetUri).path);
         } else if (this.findTabInputTextByUri(targetUri)) {
           vscTextDocument = this.findVscTextDocumentByUri(targetUri);
         }
@@ -281,13 +282,13 @@ export default class VscWorkspace {
 
       // untitled uris have been opened above and not included in targetUrisOutsideVsc.
       for (const targetUri of targetUrisOutsideVsc) {
-        assert(path.isWorkspaceUri(targetUri));
-        const absPath = path.getFileUriPath(this.session.core.resolveUri(targetUri));
+        assert(URI.parse(targetUri).scheme == 'workspace');
+        const fsPath = URI.parse(this.session.core.resolveUri(targetUri)).fsPath;
         if (internalWorkspace.isDirUri(targetUri)) {
-          await fs.promises.mkdir(absPath, { recursive: true });
+          await fs.promises.mkdir(fsPath, { recursive: true });
         } else {
           const data = await internalWorkspace.getContentByUri(targetUri);
-          await storage.writeBinary(absPath, data);
+          await storage.writeBinary(fsPath, data);
         }
       }
     }
@@ -378,10 +379,10 @@ export default class VscWorkspace {
     switch (vscUri.scheme) {
       case 'file':
         // TODO ignore file
-        if (path.isBaseOf(path.abs(this.session.workspace, '.codemic'), path.abs(vscUri.path))) return false;
-        if (path.isBaseOf(path.abs(this.session.workspace, '.git'), path.abs(vscUri.path))) return false;
+        if (lib.isBaseOfPath(path.join(this.session.workspace, '.codemic'), vscUri.fsPath)) return false;
+        if (lib.isBaseOfPath(path.join(this.session.workspace, '.git'), vscUri.fsPath)) return false;
 
-        return path.isBaseOf(this.session.workspace, path.abs(vscUri.path));
+        return lib.isBaseOfPath(this.session.workspace, vscUri.fsPath);
       case 'untitled':
         return true;
       default:
@@ -396,9 +397,9 @@ export default class VscWorkspace {
   uriFromVsc(vscUri: vscode.Uri): string {
     switch (vscUri.scheme) {
       case 'file':
-        return path.workspaceUriFromAbsPath(this.session.workspace, path.abs(vscUri.path));
+        return lib.workspaceUriFrom(this.session.workspace, vscUri.fsPath);
       case 'untitled':
-        return path.untitledUriFromName(vscUri.path);
+        return URI.from({ scheme: 'untitled', path: vscUri.path }).toString();
       default:
         throw new Error(`uriFromVsc: unknown scheme: ${vscUri.scheme}`);
     }
@@ -593,7 +594,7 @@ export default class VscWorkspace {
 
   getTrackFileUri(trackFile: t.RangedTrackFile): string {
     assert(trackFile.file.type === 'local');
-    const vscUri = vscode.Uri.file(path.abs(this.session.core.sessionDataPath, 'blobs', trackFile.file.sha1));
+    const vscUri = vscode.Uri.file(path.join(this.session.core.sessionDataPath, 'blobs', trackFile.file.sha1));
     return this.session.context.view!.webview.asWebviewUri(vscUri).toString();
   }
 

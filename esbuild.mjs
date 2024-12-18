@@ -47,6 +47,9 @@ const viewJs = await esbuild.context({
   entryPoints: ['src/view/webview.tsx'],
   outfile: 'dist/webview.js',
   target: browsers,
+  alias: {
+    path: 'path-browserify',
+  },
 });
 
 const viewCss = await esbuild.context({

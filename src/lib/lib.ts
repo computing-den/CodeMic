@@ -1,6 +1,8 @@
 import _ from 'lodash';
 import * as t from './types.js';
 import assert from './assert.js';
+import { URI, Utils } from 'vscode-uri';
+import * as path from 'path';
 
 export const ANONYM_USERNAME = '_'; // minimum valid username is 3 characters
 
@@ -347,4 +349,37 @@ export function findFocusByClock(focusTimeline: t.Focus[], clock: number): t.Foc
 
 export function indexOfFocusByClock(focusTimeline: t.Focus[], clock: number): number {
   return focusTimeline.findIndex((f, i) => clock >= f.clock && clock < (focusTimeline[i + 1]?.clock ?? Infinity));
+}
+
+export function resolveWorkspaceUri(workspace: string, uri: string): string {
+  const uriParsed = URI.parse(uri);
+
+  return uriParsed.scheme === 'workspace' ? URI.file(path.join(workspace, uriParsed.path)).toString() : uri;
+}
+
+export function workspaceUri(relPath: string): string {
+  // We can't use URI.file(relPath).path because URI.file() turns relative paths into absolute paths.
+  // Here, we follow the same logic as URI.file() but without forcing absolute path.
+
+  assert(!path.isAbsolute(relPath), 'workspace URI path must be relative');
+
+  // normalize to fwd-slashes on windows, on other systems bwd-slashes are valid filename character, eg /f\oo/ba\r.txt
+  if (process.platform === 'win32') {
+    relPath = relPath.replace(/\\/g, '/');
+  }
+
+  assert(relPath !== '..' && !relPath.startsWith('../'), 'workspace URI path must not start with ..');
+
+  return URI.from({ scheme: 'workspace', path: relPath }).toString();
+}
+
+export function workspaceUriFrom(workspace: string, absPath: string): string {
+  assert(path.isAbsolute(workspace));
+  assert(path.isAbsolute(absPath));
+
+  return workspaceUri(path.relative(workspace, absPath));
+}
+
+export function isBaseOfPath(base: string, p: string) {
+  return p.startsWith(base) && (base.length === p.length || p[base.length] === path.sep);
 }

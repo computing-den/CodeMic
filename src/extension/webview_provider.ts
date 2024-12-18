@@ -39,7 +39,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [
         this.context.extensionUri,
         vscode.Uri.file(osPaths.data),
-        ...(vscode.workspace.workspaceFolders?.map(f => f.uri) ?? []),
+        ...(vscode.workspace.workspaceFolders ?? []).map(f => f.uri),
       ],
     };
 

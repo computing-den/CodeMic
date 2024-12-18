@@ -1,5 +1,4 @@
 import * as t from '../../lib/types.js';
-import * as path from '../../lib/path.js';
 import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
@@ -9,6 +8,7 @@ import fs from 'fs';
 import _ from 'lodash';
 import { LoadedSession } from './session.js';
 import VscWorkspace from './vsc_workspace.js';
+import { URI } from 'vscode-uri';
 
 class VscWorkspaceStepper implements t.WorkspaceStepper {
   constructor(public session: LoadedSession, public vscWorkspace: VscWorkspace) {}
@@ -29,8 +29,8 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
   async applyInitEvent(e: t.InitEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     if (direction === t.Direction.Forwards) {
       if (e.file.type === 'dir') {
-        const absPath = path.getFileUriPath(this.session.core.resolveUri(uri));
-        await fs.promises.mkdir(absPath, { recursive: true });
+        const fsPath = URI.parse(this.session.core.resolveUri(uri)).fsPath;
+        await fs.promises.mkdir(fsPath, { recursive: true });
       }
     } else {
       throw new Error('Cannot reverse init event');
@@ -105,7 +105,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
   }
 
   async applyCloseTextDocumentEvent(e: t.CloseTextDocumentEvent, uri: string, direction: t.Direction) {
-    assert(path.isUntitledUri(uri), 'Must only record closeTextDocument for untitled URIs');
+    assert(URI.parse(uri).scheme === 'untitled', 'Must only record closeTextDocument for untitled URIs');
 
     if (direction === t.Direction.Forwards) {
       await this.vscWorkspace.closeVscTextEditorByUri(uri, true);
