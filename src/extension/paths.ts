@@ -6,11 +6,11 @@ import process from 'process';
 import _ from 'lodash';
 
 export type OSPaths = {
-  data: t.AbsPath;
-  config: t.AbsPath;
-  cache: t.AbsPath;
-  log: t.AbsPath;
-  temp: t.AbsPath;
+  data: string;
+  config: string;
+  cache: string;
+  log: string;
+  temp: string;
 };
 
 function macos(name: string): OSPaths {

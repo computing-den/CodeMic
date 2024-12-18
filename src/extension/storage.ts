@@ -4,7 +4,7 @@ import fs from 'fs';
 import _ from 'lodash';
 import stringify from 'json-stringify-pretty-compact';
 
-export async function readJSON<T>(p: t.AbsPath, defaultFn?: () => T): Promise<T> {
+export async function readJSON<T>(p: string, defaultFn?: () => T): Promise<T> {
   try {
     const str = await fs.promises.readFile(p, 'utf8');
     return JSON.parse(str) as T;
@@ -14,21 +14,21 @@ export async function readJSON<T>(p: t.AbsPath, defaultFn?: () => T): Promise<T>
   }
 }
 
-export async function readJSONOptional<T>(p: t.AbsPath): Promise<T | undefined> {
+export async function readJSONOptional<T>(p: string): Promise<T | undefined> {
   return readJSON(p, () => undefined);
 }
 
-export async function writeJSON(p: t.AbsPath, data: any) {
+export async function writeJSON(p: string, data: any) {
   await ensureContainingDir(p);
   await fs.promises.writeFile(p, stringify(data, { maxLength: 200, indent: 2 }), 'utf8');
 }
 
-export async function writeBinary(p: t.AbsPath, buffer: NodeJS.ArrayBufferView) {
+export async function writeBinary(p: string, buffer: NodeJS.ArrayBufferView) {
   await ensureContainingDir(p);
   await fs.promises.writeFile(p, buffer);
 }
 
-export async function fileExists(p: t.AbsPath): Promise<boolean> {
+export async function fileExists(p: string): Promise<boolean> {
   try {
     await fs.promises.access(p);
     return true;
@@ -38,7 +38,7 @@ export async function fileExists(p: t.AbsPath): Promise<boolean> {
   return false;
 }
 
-export async function stat(p: t.AbsPath): Promise<fs.Stats | undefined> {
+export async function stat(p: string): Promise<fs.Stats | undefined> {
   try {
     const stat = await fs.promises.stat(p);
     return stat;
@@ -47,6 +47,6 @@ export async function stat(p: t.AbsPath): Promise<fs.Stats | undefined> {
   }
 }
 
-export async function ensureContainingDir(p: t.AbsPath) {
+export async function ensureContainingDir(p: string) {
   await fs.promises.mkdir(path.dirname(p), { recursive: true });
 }

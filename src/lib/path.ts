@@ -2,17 +2,17 @@ import assert from './assert.js';
 import * as t from './types.js';
 import { URI } from 'vscode-uri';
 
-export function workspaceUriFromRelPath(p: t.RelPath): string {
+export function workspaceUriFromRelPath(p: string): string {
   return `workspace:${p}`;
 }
-export function workspaceUriFromAbsPath(base: t.AbsPath, p: t.AbsPath): string {
+export function workspaceUriFromAbsPath(base: string, p: string): string {
   return workspaceUriFromRelPath(relToBase(base, p));
 }
 export function untitledUriFromName(name: string): string {
   // assert(!name.includes('/'));
   return `untitled:${name}`;
 }
-export function fileUriFromAbsPath(p: t.AbsPath): string {
+export function fileUriFromAbsPath(p: string): string {
   return `file://${p}`;
 }
 
@@ -28,27 +28,27 @@ export function isUntitledUri(uri: string): boolean {
   return uri.startsWith('untitled:');
 }
 
-export function getWorkspaceUriPath(uri: string): t.RelPath {
+export function getWorkspaceUriPath(uri: string): string {
   const res = getWorkspaceUriPathOpt(uri);
   assert(res);
   return res;
 }
 
-export function getWorkspaceUriPathOpt(uri: string): t.RelPath | undefined {
-  if (isWorkspaceUri(uri)) return uri.slice('workspace:'.length) as t.RelPath;
+export function getWorkspaceUriPathOpt(uri: string): string | undefined {
+  if (isWorkspaceUri(uri)) return uri.slice('workspace:'.length) as string;
 }
 
-export function getFileUriPath(uri: string): t.AbsPath {
+export function getFileUriPath(uri: string): string {
   const res = getFileUriPathOpt(uri);
   assert(res);
   return res;
 }
 
-export function getFileUriPathOpt(uri: string): t.AbsPath | undefined {
-  if (isFileUri(uri)) return uri.slice('file://'.length) as t.AbsPath;
+export function getFileUriPathOpt(uri: string): string | undefined {
+  if (isFileUri(uri)) return uri.slice('file://'.length) as string;
 }
 
-export function getUriPathOpt(uri: string): t.Path | undefined {
+export function getUriPathOpt(uri: string): string | undefined {
   return getWorkspaceUriPathOpt(uri) ?? getFileUriPathOpt(uri);
 }
 
@@ -81,7 +81,7 @@ export function getUriShortNameOpt(uri: string): string | undefined {
 /**
  * Turns workspace URIs into file URIs. Doesn't touch other kinds of URIs.
  */
-export function resolveUri(base: t.AbsPath, uri: string): string {
+export function resolveUri(base: string, uri: string): string {
   if (isWorkspaceUri(uri)) return fileUriFromAbsPath(join(base, getWorkspaceUriPath(uri)));
   return uri;
 }
@@ -114,9 +114,9 @@ export function resolveUri(base: t.AbsPath, uri: string): string {
 //   }
 // }
 
-export const CUR_DIR = '.' as t.RelPath;
+export const CUR_DIR = '.' as string;
 
-export function rel(p: string, ...rest: string[]): t.RelPath {
+export function rel(p: string, ...rest: string[]): string {
   p = normalize(p);
   rest = rest.map(normalize);
   assert(isRel(p), `abs: first part is not relative: ${p}`);
@@ -124,7 +124,7 @@ export function rel(p: string, ...rest: string[]): t.RelPath {
   return join(p, ...rest);
 }
 
-export function abs(p: string, ...rest: string[]): t.AbsPath {
+export function abs(p: string, ...rest: string[]): string {
   p = normalize(p);
   rest = rest.map(normalize);
   assert(rest.every(isRel), `abs: remaining parts must be relative, instead got: ${rest.join(', ')}`);
@@ -132,11 +132,11 @@ export function abs(p: string, ...rest: string[]): t.AbsPath {
   return join(p, ...rest);
 }
 
-export function isRel(p: string): p is t.RelPath {
+export function isRel(p: string): p is string {
   return Boolean(p && p[0] !== '/');
 }
 
-export function isAbs(p: string): p is t.AbsPath {
+export function isAbs(p: string): p is string {
   return Boolean(p && p[0] === '/');
 }
 
@@ -145,14 +145,14 @@ export function isAbs(p: string): p is t.AbsPath {
  * Only valid use of '.' is for the entire path, not as path components.
  * Do not use '..' as they are not resolved and may cause issues when comparing two paths.
  */
-export function normalize(p: string): t.Path {
+export function normalize(p: string): string {
   p = p
     .replace('\\', '/')
     .replace(/\/+$/, '')
     .replace(/\/{2,}/, '/');
   const parts = p.split('/');
   assert(p && !parts.includes('..') && (p === CUR_DIR || !parts.includes(CUR_DIR)), `Invalid path: "${p}"`);
-  return p as t.Path;
+  return p as string;
 }
 
 export function toString(p: string, sep: '/' | '\\'): string {
@@ -162,13 +162,13 @@ export function toString(p: string, sep: '/' | '\\'): string {
 /**
  * Removes parts that are equal to '.' but the whole returned path may be '.'.
  */
-export function join(a: t.AbsPath, ...rest: t.RelPath[]): t.AbsPath;
-export function join(a: t.RelPath, ...rest: t.RelPath[]): t.RelPath;
-export function join(...parts: t.Path[]): t.Path {
+export function join(a: string, ...rest: string[]): string;
+export function join(a: string, ...rest: string[]): string;
+export function join(...parts: string[]): string {
   return (parts
     .filter(p => p !== CUR_DIR)
     .join('/')
-    .replace('//', '/') || CUR_DIR) as t.Path;
+    .replace('//', '/') || CUR_DIR) as string;
 }
 
 /**
@@ -178,7 +178,7 @@ export function join(...parts: t.Path[]): t.Path {
  * dirname('/a') => '/'
  * dirname('/a/b') => '/'
  */
-export function dirname<T extends t.Path>(p: T): T {
+export function dirname<T extends string>(p: T): T {
   assert(!isTopLevel(p));
   // 'abc':  i = -1
   // '/a':   i =  0
@@ -189,7 +189,7 @@ export function dirname<T extends t.Path>(p: T): T {
   return p.slice(0, i) as T;
 }
 
-export function basename(p: t.Path, options?: { omitExt: boolean }): string {
+export function basename(p: string, options?: { omitExt: boolean }): string {
   const pathComps = p.split('/');
   let base = pathComps[pathComps.length - 1];
 
@@ -202,7 +202,7 @@ export function basename(p: t.Path, options?: { omitExt: boolean }): string {
   return base;
 }
 
-export function isTopLevel(p: t.Path): boolean {
+export function isTopLevel(p: string): boolean {
   return p === '/' || p === CUR_DIR;
 }
 
@@ -216,7 +216,7 @@ export function isTopLevel(p: t.Path): boolean {
  * isBaseOf('a', 'b/c') => false
  * isBaseOf('/a', '/b/c') => false
  */
-export function isBaseOf<T extends t.Path>(base: T, p: T): boolean {
+export function isBaseOf<T extends string>(base: T, p: T): boolean {
   return p.startsWith(base) && (base.length === p.length || p[base.length] === '/');
 }
 
@@ -226,7 +226,7 @@ export function isBaseOf<T extends t.Path>(base: T, p: T): boolean {
  * relToBase('/a', '/a/b/c') => 'b/c'
  * relToBase('/a', '/b/c') => error
  */
-export function relToBase(base: t.AbsPath, p: t.AbsPath): t.RelPath {
+export function relToBase(base: string, p: string): string {
   assert(isBaseOf(base, p));
-  return (p.length === base.length ? CUR_DIR : p.slice(base.length + 1)) as t.RelPath;
+  return (p.length === base.length ? CUR_DIR : p.slice(base.length + 1)) as string;
 }

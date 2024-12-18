@@ -21,7 +21,7 @@ export async function send<Req extends t.BackendToServerRequest>(
 
 export async function publishSession(
   sessionHead: t.SessionHead,
-  filePath: t.AbsPath,
+  filePath: string,
   token?: string,
 ): Promise<t.SessionHead> {
   try {
@@ -41,7 +41,7 @@ export async function publishSession(
   }
 }
 
-export async function downloadSession(id: string, dst: t.AbsPath, token?: string) {
+export async function downloadSession(id: string, dst: string, token?: string) {
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
@@ -81,7 +81,7 @@ export function getSessionCoverPhotoURLString(id: string): string {
   return getURLString('/session-cover-photo', { id });
 }
 
-export async function downloadSessionCoverPhoto(id: string, dst: t.AbsPath) {
+export async function downloadSessionCoverPhoto(id: string, dst: string) {
   const res = await axios.get(getSessionCoverPhotoURLString(id), { responseType: 'arraybuffer' });
   await storage.writeBinary(dst, res.data);
 }

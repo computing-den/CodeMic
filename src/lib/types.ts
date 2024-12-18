@@ -1,10 +1,5 @@
 import type { Position, Range, LineRange, Selection, ContentChange } from './lib.js';
 
-// Type branding is a hack. The __brand__ property doesn't actually exist at runtime.
-export type Path = RelPath | AbsPath;
-export type RelPath = string & { readonly __brand__: 'rel' };
-export type AbsPath = string & { readonly __brand__: 'abs' };
-
 // /**
 //  * file:///home/sean/a    file path is always absolute.
 //  * workspace:a/b/c        workspace path is always relative.
@@ -698,7 +693,7 @@ export type SessionsHistory = { [key: string]: SessionHistory };
 
 export type SessionHistory = {
   id: string;
-  workspace: AbsPath;
+  workspace: string;
   handle: string;
   lastRecordedTimestamp?: string;
   lastWatchedTimestamp?: string;

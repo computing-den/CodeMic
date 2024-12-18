@@ -895,7 +895,7 @@ class CodeMic {
     await serverApi.downloadSessionCoverPhoto(head.id, p);
   }
 
-  getCoverPhotoCachePath(id: string): t.AbsPath {
+  getCoverPhotoCachePath(id: string): string {
     return path.abs(this.context.userDataPath, 'cover_photos_cache', id);
   }
 

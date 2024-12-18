@@ -170,7 +170,7 @@ export default class InternalWorkspace {
     this.textEditors.push(textEditor);
   }
 
-  toWorkspaceUri(p: t.AbsPath): string {
+  toWorkspaceUri(p: string): string {
     return path.workspaceUriFromAbsPath(this.session.workspace, p);
   }
 

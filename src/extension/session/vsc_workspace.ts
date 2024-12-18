@@ -36,7 +36,7 @@ export default class VscWorkspace {
     return git.getAPI(1);
   }
 
-  static getDefaultVscWorkspace(): t.AbsPath | undefined {
+  static getDefaultVscWorkspace(): string | undefined {
     // .uri can be undefined after user deletes the only folder from workspace
     // probably because it doesn't cause a vscode restart.
     const uri = vscode.workspace.workspaceFolders?.[0]?.uri;

@@ -16,7 +16,7 @@ export class Session {
   static Core = SessionCore;
 
   context: Context;
-  workspace: t.AbsPath;
+  workspace: string;
   local: boolean;
   mustScan: boolean;
   // temp means that it's a new session and user is still editing workspace and therefore session
@@ -35,7 +35,7 @@ export class Session {
 
   constructor(
     context: Context,
-    workspace: t.AbsPath,
+    workspace: string,
     head: t.SessionHead,
     opts?: { local?: boolean; mustScan?: boolean; temp?: boolean },
   ) {

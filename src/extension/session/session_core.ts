@@ -20,14 +20,14 @@ export default class SessionCore {
 
   static async fromExisting(
     context: Context,
-    workspace: t.AbsPath,
+    workspace: string,
     opts?: { mustScan?: boolean },
   ): Promise<Session | undefined> {
     const head = await storage.readJSONOptional<t.SessionHead>(path.abs(workspace, '.codemic', 'head.json'));
     return head && new Session(context, workspace, head, { local: true, mustScan: opts?.mustScan });
   }
 
-  static async fromNew(context: Context, workspace: t.AbsPath, head: t.SessionHead): Promise<Session> {
+  static async fromNew(context: Context, workspace: string, head: t.SessionHead): Promise<Session> {
     const temp = path.abs(context.userDataPath, 'temp');
     await fs.promises.rm(temp, { recursive: true, force: true });
     await fs.promises.mkdir(temp, { recursive: true });
@@ -100,14 +100,14 @@ export default class SessionCore {
    */
   async readDirRecursively(
     options: ReadDirOptions,
-    rel: t.RelPath = path.CUR_DIR,
-    res: [t.RelPath, fs.Stats][] = [],
-  ): Promise<[t.RelPath, fs.Stats][]> {
+    rel: string = path.CUR_DIR,
+    res: [string, fs.Stats][] = [],
+  ): Promise<[string, fs.Stats][]> {
     assert(this.session.workspace && this.session.workspace !== '/', 'No workspace path is set.');
 
-    let filenames: t.RelPath[] = [];
+    let filenames: string[] = [];
     try {
-      filenames = (await fs.promises.readdir(path.join(this.session.workspace, rel))) as t.RelPath[];
+      filenames = (await fs.promises.readdir(path.join(this.session.workspace, rel))) as string[];
     } catch (error) {
       const workspaceDoesntExist = (error as NodeJS.ErrnoException).code === 'ENOENT' && rel !== path.CUR_DIR;
       if (!workspaceDoesntExist) throw error;
@@ -137,15 +137,15 @@ export default class SessionCore {
     return res;
   }
 
-  get sessionDataPath(): t.AbsPath {
+  get sessionDataPath(): string {
     return this.session.temp ? this.sessionTempDataPath : this.sessionFinalDataPath;
   }
 
-  get sessionTempDataPath(): t.AbsPath {
+  get sessionTempDataPath(): string {
     return path.abs(this.session.context.userDataPath, 'temp');
   }
 
-  get sessionFinalDataPath(): t.AbsPath {
+  get sessionFinalDataPath(): string {
     assert(this.session.workspace);
     return path.abs(this.session.workspace, '.codemic');
   }
@@ -255,7 +255,7 @@ export default class SessionCore {
     }
   }
 
-  async copyToBlob(src: t.AbsPath, sha1: string) {
+  async copyToBlob(src: string, sha1: string) {
     await fs.promises.cp(src, path.abs(this.sessionDataPath, 'blobs', sha1), { recursive: true });
   }
 
@@ -268,7 +268,7 @@ export default class SessionCore {
   async package() {
     assert(await storage.fileExists(path.abs(this.sessionDataPath, 'body.json')), "Session body doesn't exist");
 
-    return new Promise<t.AbsPath>((resolve, reject) => {
+    return new Promise<string>((resolve, reject) => {
       // const packagePath = path.abs(os.tmpdir(), this.head.id + '.zip');
 
       const output = fs.createWriteStream(path.abs(this.sessionDataPath, 'body.zip'));
