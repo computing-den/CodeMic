@@ -5,21 +5,20 @@ export type Path = RelPath | AbsPath;
 export type RelPath = string & { readonly __brand__: 'rel' };
 export type AbsPath = string & { readonly __brand__: 'abs' };
 
-/**
- * file:///home/sean/a    file path is always absolute.
- * workspace:a/b/c        workspace path is always relative.
- * untitled:Untitled      untitled has a name, not an actual path (this is different from vscode's untitled Uris which can be either a path or a name)
- */
-export type Uri = string;
-
-export type ParsedUri =
-  | { scheme: 'file'; path: AbsPath }
-  | { scheme: 'workspace'; path: RelPath }
-  | { scheme: 'untitled'; name: string };
+// /**
+//  * file:///home/sean/a    file path is always absolute.
+//  * workspace:a/b/c        workspace path is always relative.
+//  * untitled:Untitled-1    untitled has a name, not an actual path (this is different from vscode's untitled Uris which can be either a path or a name).
+//  * file:///home/sean/abc%20def URIs are always encoded.
+//  */
+// export type ParsedUri =
+//   | { scheme: 'file'; path: AbsPath }
+//   | { scheme: 'workspace'; path: RelPath }
+//   | { scheme: 'untitled'; name: string };
 
 // Having the response types separately improves typescript error messages.
 export type StoreResponse = { type: 'store'; store: Store };
-export type UrisResponse = { type: 'uris'; uris?: Uri[] };
+export type UrisResponse = { type: 'uris'; uris?: string[] };
 export type BooleanResponse = { type: 'boolean'; value: boolean };
 export type OKResponse = { type: 'ok' };
 export type ErrorResponse = { type: 'error'; message?: string };
@@ -52,13 +51,13 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/undo' }; response: StoreResponse }
   | { request: { type: 'recorder/redo' }; response: StoreResponse }
   | { request: { type: 'recorder/update'; changes: SessionUIStateUpdate }; response: StoreResponse }
-  | { request: { type: 'recorder/insertAudio'; uri: Uri; clock: number }; response: StoreResponse }
+  | { request: { type: 'recorder/insertAudio'; uri: string; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/deleteAudio'; id: string }; response: StoreResponse }
   | { request: { type: 'recorder/updateAudio'; audio: Partial<AudioTrack> & { id: string } }; response: StoreResponse }
-  | { request: { type: 'recorder/insertVideo'; uri: Uri; clock: number }; response: StoreResponse }
+  | { request: { type: 'recorder/insertVideo'; uri: string; clock: number }; response: StoreResponse }
   | { request: { type: 'recorder/deleteVideo'; id: string }; response: StoreResponse }
   | { request: { type: 'recorder/updateVideo'; video: Partial<VideoTrack> & { id: string } }; response: StoreResponse }
-  | { request: { type: 'recorder/setCoverPhoto'; uri: Uri }; response: StoreResponse }
+  | { request: { type: 'recorder/setCoverPhoto'; uri: string }; response: StoreResponse }
   | { request: { type: 'recorder/deleteCoverPhoto' }; response: StoreResponse }
   | { request: { type: 'recorder/changeSpeed'; range: ClockRange; factor: number }; response: StoreResponse }
   | { request: { type: 'recorder/merge'; range: ClockRange }; response: StoreResponse }
@@ -355,18 +354,18 @@ export type SessionBodyCompact = {
   defaultEol: EndOfLine;
 };
 
-export type InternalEditorTracksJSON = Record<Uri, EditorEvent[]>;
-export type InternalEditorTracksCompact = Record<Uri, EditorEventCompact[]>;
+export type InternalEditorTracksJSON = Record<string, EditorEvent[]>;
+export type InternalEditorTracksCompact = Record<string, EditorEventCompact[]>;
 
 export type Focus = {
-  uri: Uri;
+  uri: string;
   number: number;
   text: string;
   clock: number;
 };
 
 export type FocusCompact = {
-  u: Uri;
+  u: string;
   t: string;
   n: number;
   c: number;
@@ -397,28 +396,33 @@ export type OpenDialogOptions = {
   canSelectFiles?: boolean;
   canSelectFolders?: boolean;
   canSelectMany?: boolean;
-  defaultUri?: Uri;
+  defaultUri?: string;
   filters?: { [name: string]: string[] };
   title?: string;
 };
 
 export interface WorkspaceStepper {
-  applyEditorEvent(e: EditorEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyInitEvent(e: InitEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyTextChangeEvent(e: TextChangeEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyOpenTextDocumentEvent(e: OpenTextDocumentEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyCloseTextDocumentEvent(
-    e: CloseTextDocumentEvent,
-    uri: Uri,
+  applyEditorEvent(e: EditorEvent, uri: string, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyInitEvent(e: InitEvent, uri: string, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyTextChangeEvent(e: TextChangeEvent, uri: string, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyOpenTextDocumentEvent(
+    e: OpenTextDocumentEvent,
+    uri: string,
     direction: Direction,
     uriSet?: UriSet,
   ): Promise<void>;
-  applyShowTextEditorEvent(e: ShowTextEditorEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyCloseTextEditorEvent(e: CloseTextEditorEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applySelectEvent(e: SelectEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyScrollEvent(e: ScrollEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applySaveEvent(e: SaveEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyTextInsertEvent(e: TextInsertEvent, uri: Uri, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyCloseTextDocumentEvent(
+    e: CloseTextDocumentEvent,
+    uri: string,
+    direction: Direction,
+    uriSet?: UriSet,
+  ): Promise<void>;
+  applyShowTextEditorEvent(e: ShowTextEditorEvent, uri: string, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyCloseTextEditorEvent(e: CloseTextEditorEvent, uri: string, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applySelectEvent(e: SelectEvent, uri: string, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyScrollEvent(e: ScrollEvent, uri: string, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applySaveEvent(e: SaveEvent, uri: string, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyTextInsertEvent(e: TextInsertEvent, uri: string, direction: Direction, uriSet?: UriSet): Promise<void>;
 }
 
 export type EditorEvent =
@@ -433,7 +437,7 @@ export type EditorEvent =
   | SaveEvent
   | TextInsertEvent;
 
-export type EditorEventWithUri = { event: EditorEvent; uri: Uri };
+export type EditorEventWithUri = { event: EditorEvent; uri: string };
 
 export type InitEvent = {
   type: 'init';
@@ -470,7 +474,7 @@ export type ShowTextEditorEvent = {
   preserveFocus: boolean;
   selections?: Selection[];
   visibleRange?: LineRange;
-  revUri?: Uri;
+  revUri?: string;
   revSelections?: Selection[];
   revVisibleRange?: LineRange;
   // revSelections: Selection[];
@@ -560,7 +564,7 @@ export type ShowTextEditorEventCompact = {
   p?: boolean; // undefined defaults to false
   s?: SelectionCompact[];
   v?: LineRangeCompact;
-  ru?: Uri;
+  ru?: string;
   rs?: SelectionCompact[];
   rv?: LineRangeCompact;
   // revSelections: Selection[];
@@ -613,7 +617,7 @@ export enum Direction {
   Backwards,
 }
 
-export type UriSet = Set<Uri>;
+export type UriSet = Set<string>;
 
 export type SessionCmd =
   | InsertEventSessionCmd
@@ -624,14 +628,14 @@ export type SessionCmd =
 export type InsertEventSessionCmd = {
   type: 'insertEvent';
   index: number;
-  uri: Uri;
+  uri: string;
   event: EditorEvent;
   coalescing: boolean;
 };
 
 export type UpdateTrackLastEventSessionCmd = {
   type: 'updateTrackLastEvent';
-  uri: Uri;
+  uri: string;
   update: Partial<EditorEvent>;
   revUpdate: Partial<EditorEvent>;
   coalescing: boolean;
@@ -677,7 +681,7 @@ export type GitFile = {
 };
 
 export type TextEditor = {
-  uri: Uri;
+  uri: string;
   selections: Selection[];
   visibleRange: LineRange;
   // = [{ anchor: { line: 0, character: 0 }, active: { line: 0, character: 0 } }],

@@ -1151,7 +1151,7 @@ class EditorTrackUI extends React.Component<EditorTrackUIProps> {
       lineFocusTimeline.push({ text: focus.text, offsetPx, clockRange: { start: focus.clock, end: nextFocusClock } });
     }
 
-    const documentFocusTimeline: { uri: t.Uri; clockRange: t.ClockRange }[] = [];
+    const documentFocusTimeline: { uri: string; clockRange: t.ClockRange }[] = [];
     for (const [i, focus] of (workspaceFocusTimeline ?? []).entries()) {
       const lastDocumentFocus = documentFocusTimeline.at(-1);
       const nextFocusClock = workspaceFocusTimeline?.[i + 1]?.clock ?? timelineDuration;

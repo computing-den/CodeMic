@@ -22,7 +22,7 @@ type TabWithInputText = Omit<vscode.Tab, 'input'> & {
 export default class VscWorkspace {
   constructor(public session: LoadedSession) {}
 
-  static getCoverPhotoUri(session: Session): t.Uri {
+  static getCoverPhotoUri(session: Session): string {
     return session.context
       .view!.webview.asWebviewUri(vscode.Uri.file(path.abs(session.core.sessionDataPath, 'cover_photo')))
       .toString();
@@ -184,7 +184,7 @@ export default class VscWorkspace {
     return events;
   }
 
-  async sync(targetUris?: t.Uri[]) {
+  async sync(targetUris?: string[]) {
     // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
 
     const { internalWorkspace } = this.session.rr;
@@ -248,7 +248,7 @@ export default class VscWorkspace {
     // NOTE: changing documents with WorkspaceEdit without immediately saving them causes them to be
     //       opened even if they did not have an associated editor.
     {
-      const targetUrisOutsideVsc: t.Uri[] = [];
+      const targetUrisOutsideVsc: string[] = [];
       const edit = new vscode.WorkspaceEdit();
       for (const targetUri of targetUris) {
         if (!internalWorkspace.doesUriExist(targetUri)) continue;
@@ -393,7 +393,7 @@ export default class VscWorkspace {
     return VscWorkspace.fromVscRange(document.validateRange(new vscode.Range(0, 0, document.lineCount, 0)));
   }
 
-  uriFromVsc(vscUri: vscode.Uri): t.Uri {
+  uriFromVsc(vscUri: vscode.Uri): string {
     switch (vscUri.scheme) {
       case 'file':
         return path.workspaceUriFromAbsPath(this.session.workspace, path.abs(vscUri.path));
@@ -404,7 +404,7 @@ export default class VscWorkspace {
     }
   }
 
-  uriToVsc(uri: t.Uri): vscode.Uri {
+  uriToVsc(uri: string): vscode.Uri {
     return vscode.Uri.parse(this.session.core.resolveUri(uri));
   }
 
@@ -412,7 +412,7 @@ export default class VscWorkspace {
   //   return vscode.workspace.textDocuments.find(d => d.uri.scheme === 'file' && d.uri.path === p);
   // }
 
-  findTabInputTextByUri(uri: t.Uri): TabWithInputText | undefined {
+  findTabInputTextByUri(uri: string): TabWithInputText | undefined {
     return this.findTabInputTextByVscUri(this.uriToVsc(uri));
   }
 
@@ -420,7 +420,7 @@ export default class VscWorkspace {
     return this.getTabsWithInputText().find(tab => tab.input.uri.toString() === uri.toString());
   }
 
-  findVscTextDocumentByUri(uri: t.Uri): vscode.TextDocument | undefined {
+  findVscTextDocumentByUri(uri: string): vscode.TextDocument | undefined {
     return this.findVscTextDocumentByVscUri(this.uriToVsc(uri));
   }
 
@@ -429,7 +429,7 @@ export default class VscWorkspace {
     return vscode.workspace.textDocuments.find(d => d.uri.toString() === uriStr);
   }
 
-  findVscTextEditorByUri(textEditors: readonly vscode.TextEditor[], uri: t.Uri): vscode.TextEditor | undefined {
+  findVscTextEditorByUri(textEditors: readonly vscode.TextEditor[], uri: string): vscode.TextEditor | undefined {
     return this.findVscTextEditorByVscUri(textEditors, this.uriToVsc(uri));
   }
 
@@ -438,7 +438,7 @@ export default class VscWorkspace {
     return textEditors.find(x => x.document.uri.toString() === uriStr);
   }
 
-  textDocumentFromVsc(vscTextDocument: vscode.TextDocument, uri: t.Uri): InternalTextDocument {
+  textDocumentFromVsc(vscTextDocument: vscode.TextDocument, uri: string): InternalTextDocument {
     return new InternalTextDocument(
       uri,
       _.times(vscTextDocument.lineCount, i => vscTextDocument.lineAt(i).text),
@@ -446,7 +446,7 @@ export default class VscWorkspace {
     );
   }
 
-  async closeVscTextEditorByUri(uri: t.Uri, skipConfirmation: boolean = false) {
+  async closeVscTextEditorByUri(uri: string, skipConfirmation: boolean = false) {
     uri = this.session.core.resolveUri(uri);
     for (const tab of this.getTabsWithInputText()) {
       if (tab.input.uri.toString() === uri) {
@@ -498,7 +498,7 @@ export default class VscWorkspace {
   //   );
   // }
 
-  getRelevantTabUris(): t.Uri[] {
+  getRelevantTabUris(): string[] {
     return this.getRelevantTabVscUris().map(this.uriFromVsc.bind(this));
   }
 
@@ -591,7 +591,7 @@ export default class VscWorkspace {
   //   await fs.promises.mkdir(this.workspace, { recursive: true });
   // }
 
-  getTrackFileUri(trackFile: t.RangedTrackFile): t.Uri {
+  getTrackFileUri(trackFile: t.RangedTrackFile): string {
     assert(trackFile.file.type === 'local');
     const vscUri = vscode.Uri.file(path.abs(this.session.core.sessionDataPath, 'blobs', trackFile.file.sha1));
     return this.session.context.view!.webview.asWebviewUri(vscUri).toString();

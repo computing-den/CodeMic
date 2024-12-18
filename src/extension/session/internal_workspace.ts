@@ -16,7 +16,7 @@ import InternalTextDocument from './internal_text_document.js';
  * it should always be retrieved from there.
  * Otherwise, its uri refers to the base file stored on disk.
  */
-type LiveWorktree = Map<t.Uri, LiveWorktreeItem>;
+type LiveWorktree = Map<string, LiveWorktreeItem>;
 type LiveWorktreeItem = { file: t.File; document?: t.InternalDocument; editor?: t.InternalEditor };
 
 export type SeekStep = t.EditorEventWithUri & { newEventIndex: number };
@@ -59,19 +59,19 @@ export default class InternalWorkspace {
     this.seek(this.getSeekData(0));
   }
 
-  doesUriExist(uri: t.Uri): boolean {
+  doesUriExist(uri: string): boolean {
     return Boolean(this.worktree.get(uri));
   }
 
-  getWorktreeUris(): t.Uri[] {
+  getWorktreeUris(): string[] {
     return Array.from(this.worktree.keys());
   }
 
-  isDirUri(uri: t.Uri): boolean {
+  isDirUri(uri: string): boolean {
     return Boolean(this.worktree.get(uri)?.file.type === 'dir');
   }
 
-  async getContentByUri(uri: t.Uri): Promise<Uint8Array> {
+  async getContentByUri(uri: string): Promise<Uint8Array> {
     const item = this.worktree.get(uri);
     assert(item);
 
@@ -90,29 +90,29 @@ export default class InternalWorkspace {
     throw new Error(`getContentByUri ${uri} type "${item.file}" not supported`);
   }
 
-  findTextDocumentByUri(uri: t.Uri): InternalTextDocument | undefined {
+  findTextDocumentByUri(uri: string): InternalTextDocument | undefined {
     const textDocument = this.worktree.get(uri)?.document;
     return textDocument instanceof InternalTextDocument ? textDocument : undefined;
   }
 
-  findTextEditorByUri(uri: t.Uri): InternalTextEditor | undefined {
+  findTextEditorByUri(uri: string): InternalTextEditor | undefined {
     const textEditor = this.worktree.get(uri)?.editor;
     return textEditor instanceof InternalTextEditor ? textEditor : undefined;
   }
 
-  getTextDocumentByUri(uri: t.Uri): InternalTextDocument {
+  getTextDocumentByUri(uri: string): InternalTextDocument {
     const textDocument = this.findTextDocumentByUri(uri);
     assert(textDocument);
     return textDocument;
   }
 
-  getTextEditorByUri(uri: t.Uri): InternalTextEditor {
+  getTextEditorByUri(uri: string): InternalTextEditor {
     const textEditor = this.findTextEditorByUri(uri);
     assert(textEditor);
     return textEditor;
   }
 
-  async openTextDocumentByUri(uri: t.Uri): Promise<InternalTextDocument> {
+  async openTextDocumentByUri(uri: string): Promise<InternalTextDocument> {
     const worktreeItem = this.worktree.get(uri);
     if (!worktreeItem) throw new Error(`file not found ${uri}`);
 
@@ -137,7 +137,7 @@ export default class InternalWorkspace {
   }
 
   async openTextEditorByUri(
-    uri: t.Uri,
+    uri: string,
     selections?: Selection[],
     visibleRange?: LineRange,
   ): Promise<InternalTextEditor> {
@@ -170,17 +170,17 @@ export default class InternalWorkspace {
     this.textEditors.push(textEditor);
   }
 
-  toWorkspaceUri(p: t.AbsPath): t.Uri {
+  toWorkspaceUri(p: t.AbsPath): string {
     return path.workspaceUriFromAbsPath(this.session.workspace, p);
   }
 
-  closeAndRemoveTextDocumentByUri(uri: t.Uri) {
+  closeAndRemoveTextDocumentByUri(uri: string) {
     this.closeTextEditorByUri(uri);
     this.textDocuments = this.textDocuments.filter(x => x.uri !== uri);
     this.worktree.delete(uri);
   }
 
-  closeTextEditorByUri(uri: t.Uri) {
+  closeTextEditorByUri(uri: string) {
     if (this.worktree.get(uri)?.editor) {
       this.worktree.get(uri)!.editor = undefined;
       this.textEditors = this.textEditors.filter(x => x.document.uri !== uri);

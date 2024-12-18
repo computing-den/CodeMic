@@ -17,11 +17,11 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     return this.session.rr.internalWorkspace;
   }
 
-  async applyEditorEvent(event: t.EditorEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyEditorEvent(event: t.EditorEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     await workspaceStepperDispatch(this, event, uri, direction, uriSet);
   }
 
-  async applyInitEvent(e: t.InitEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyInitEvent(e: t.InitEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(uri);
     if (direction === t.Direction.Forwards) {
       this.internalWorkspace.worktree.set(uri, { file: e.file });
@@ -31,7 +31,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyTextChangeEvent(e: t.TextChangeEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyTextChangeEvent(e: t.TextChangeEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(uri);
     const textDocument = await this.internalWorkspace.openTextDocumentByUri(uri);
     if (direction === t.Direction.Forwards) {
@@ -49,7 +49,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     // The document may or may not exist in the worktree.
     // The content must be matched if e.text is given.
 
@@ -80,7 +80,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
 
   async applyCloseTextDocumentEvent(
     e: t.CloseTextDocumentEvent,
-    uri: t.Uri,
+    uri: string,
     direction: t.Direction,
     uriSet?: t.UriSet,
   ) {
@@ -95,7 +95,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     if (direction === t.Direction.Forwards) {
       if (uriSet) uriSet.add(uri);
       const textEditor = await this.internalWorkspace.openTextEditorByUri(uri, e.selections, e.visibleRange);
@@ -111,7 +111,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyCloseTextEditorEvent(e: t.CloseTextEditorEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyCloseTextEditorEvent(e: t.CloseTextEditorEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(uri);
 
     if (direction === t.Direction.Forwards) {
@@ -121,7 +121,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applySelectEvent(e: t.SelectEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+  async applySelectEvent(e: t.SelectEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(uri);
     const textEditor = await this.internalWorkspace.openTextEditorByUri(uri);
     if (direction === t.Direction.Forwards) {
@@ -133,7 +133,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyScrollEvent(e: t.ScrollEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyScrollEvent(e: t.ScrollEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(uri);
     const textEditor = await this.internalWorkspace.openTextEditorByUri(uri);
     if (direction === t.Direction.Forwards) {
@@ -143,12 +143,12 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applySaveEvent(e: t.SaveEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+  async applySaveEvent(e: t.SaveEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(uri);
     // nothing
   }
 
-  async applyTextInsertEvent(e: t.TextInsertEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyTextInsertEvent(e: t.TextInsertEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     await this.applyTextChangeEvent(lib.getTextChangeEventFromTextInsertEvent(e), uri, direction, uriSet);
   }
 }

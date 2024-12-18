@@ -13,7 +13,7 @@ import VscWorkspace from './vsc_workspace.js';
 class VscWorkspaceStepper implements t.WorkspaceStepper {
   constructor(public session: LoadedSession, public vscWorkspace: VscWorkspace) {}
 
-  async applyEditorEvent(e: t.EditorEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyEditorEvent(e: t.EditorEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     await workspaceStepperDispatch(this, e, uri, direction, uriSet);
   }
 
@@ -26,7 +26,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     // this.eventIndex = seekData.steps.at(-1)?.newEventIndex ?? this.eventIndex;
   }
 
-  async applyInitEvent(e: t.InitEvent, uri: t.Uri, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyInitEvent(e: t.InitEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     if (direction === t.Direction.Forwards) {
       if (e.file.type === 'dir') {
         const absPath = path.getFileUriPath(this.session.core.resolveUri(uri));
@@ -37,7 +37,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyTextChangeEvent(e: t.TextChangeEvent, uri: t.Uri, direction: t.Direction) {
+  async applyTextChangeEvent(e: t.TextChangeEvent, uri: string, direction: t.Direction) {
     // We use WorkspaceEdit here because we don't necessarily want to focus on the text editor yet.
     // There will be a separate select event after this if the editor had focus during recording.
 
@@ -67,7 +67,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, uri: t.Uri, direction: t.Direction) {
+  async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, uri: string, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
       const vscUri = this.vscWorkspace.uriToVsc(uri);
 
@@ -104,7 +104,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyCloseTextDocumentEvent(e: t.CloseTextDocumentEvent, uri: t.Uri, direction: t.Direction) {
+  async applyCloseTextDocumentEvent(e: t.CloseTextDocumentEvent, uri: string, direction: t.Direction) {
     assert(path.isUntitledUri(uri), 'Must only record closeTextDocument for untitled URIs');
 
     if (direction === t.Direction.Forwards) {
@@ -121,7 +121,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, uri: t.Uri, direction: t.Direction) {
+  async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, uri: string, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
       const vscTextEditor = await vscode.window.showTextDocument(this.vscWorkspace.uriToVsc(uri), {
         preview: false,
@@ -147,7 +147,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyCloseTextEditorEvent(e: t.CloseTextEditorEvent, uri: t.Uri, direction: t.Direction) {
+  async applyCloseTextEditorEvent(e: t.CloseTextEditorEvent, uri: string, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
       await this.vscWorkspace.closeVscTextEditorByUri(uri, true);
     } else {
@@ -164,7 +164,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applySelectEvent(e: t.SelectEvent, uri: t.Uri, direction: t.Direction) {
+  async applySelectEvent(e: t.SelectEvent, uri: string, direction: t.Direction) {
     const vscTextEditor = await vscode.window.showTextDocument(this.vscWorkspace.uriToVsc(uri), {
       preview: false,
       preserveFocus: false,
@@ -179,7 +179,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applyScrollEvent(e: t.ScrollEvent, uri: t.Uri, direction: t.Direction) {
+  async applyScrollEvent(e: t.ScrollEvent, uri: string, direction: t.Direction) {
     await vscode.window.showTextDocument(this.vscWorkspace.uriToVsc(uri), { preview: false, preserveFocus: false });
 
     if (direction === t.Direction.Forwards) {
@@ -189,14 +189,14 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     }
   }
 
-  async applySaveEvent(e: t.SaveEvent, uri: t.Uri, direction: t.Direction) {
+  async applySaveEvent(e: t.SaveEvent, uri: string, direction: t.Direction) {
     const vscTextDocument = await vscode.workspace.openTextDocument(this.vscWorkspace.uriToVsc(uri));
     if (!(await vscTextDocument.save())) {
       throw new Error(`Could not save ${uri}`);
     }
   }
 
-  async applyTextInsertEvent(e: t.TextInsertEvent, uri: t.Uri, direction: t.Direction) {
+  async applyTextInsertEvent(e: t.TextInsertEvent, uri: string, direction: t.Direction) {
     await this.applyTextChangeEvent(lib.getTextChangeEventFromTextInsertEvent(e), uri, direction);
   }
 }

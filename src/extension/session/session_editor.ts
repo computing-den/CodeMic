@@ -64,7 +64,7 @@ export default class SessionEditor {
     this.changed();
   }
 
-  insertEvent(e: t.EditorEvent, uri: t.Uri, opts: { coalescing: boolean }) {
+  insertEvent(e: t.EditorEvent, uri: string, opts: { coalescing: boolean }) {
     assert(this.session.isLoaded());
     const i = this.session.body.eventContainer.getIndexAfterClock(e.clock);
     const cmd: t.InsertEventSessionCmd = {
@@ -89,7 +89,7 @@ export default class SessionEditor {
     this.session.body.eventContainer.deleteAt(cmd.index);
   }
 
-  updateTrackLastEvent<T extends t.EditorEvent>(uri: t.Uri, update: Partial<T>) {
+  updateTrackLastEvent<T extends t.EditorEvent>(uri: string, update: Partial<T>) {
     assert(this.session.isLoaded());
     const track = this.session.body.eventContainer.getTrack(uri);
     const lastEvent = track.at(-1);
@@ -171,7 +171,7 @@ export default class SessionEditor {
     Object.assign(lastFocus, cmd.revUpdate);
   }
 
-  async insertAudioTrack(uri: t.Uri, clock: number): Promise<t.AudioTrack> {
+  async insertAudioTrack(uri: string, clock: number): Promise<t.AudioTrack> {
     assert(this.session.isLoaded());
     const absPath = path.getFileUriPath(uri);
     const data = await fs.promises.readFile(absPath);
@@ -209,7 +209,7 @@ export default class SessionEditor {
     this.changed();
   }
 
-  async insertVideoTrack(uri: t.Uri, clock: number): Promise<t.VideoTrack> {
+  async insertVideoTrack(uri: string, clock: number): Promise<t.VideoTrack> {
     assert(this.session.isLoaded());
     const absPath = path.getFileUriPath(uri);
     const data = await fs.promises.readFile(absPath);
@@ -262,7 +262,7 @@ export default class SessionEditor {
     this.changed();
   }
 
-  async setCoverPhoto(uri: t.Uri) {
+  async setCoverPhoto(uri: string) {
     const p = path.getFileUriPath(uri);
 
     // Caculate hash and set head.

@@ -13,7 +13,7 @@
  *
  */
 
-import { EditorEvent, EditorEventWithUri, Uri, InternalEditorTracksJSON } from './types.js';
+import { EditorEvent, EditorEventWithUri, InternalEditorTracksJSON } from './types.js';
 import * as lib from './lib.js';
 import assert from './assert.js';
 import _ from 'lodash';
@@ -26,7 +26,7 @@ export type Iteratee = (value: EditorEventWithUri, i: number) => any;
 type Position = [number, number];
 
 export default class EventContainer {
-  private tracks: Map<Uri, EditorEvent[]> = new Map();
+  private tracks: Map<string, EditorEvent[]> = new Map();
   private buckets: EditorEventWithUri[][] = [];
   private size = 0;
 
@@ -39,19 +39,19 @@ export default class EventContainer {
   /**
    * Events must be sorted.
    */
-  insertManyForUri(uri: Uri, events: EditorEvent[]) {
+  insertManyForUri(uri: string, events: EditorEvent[]) {
     this.insertManyIntoTrack(uri, events);
     this.insertManyIntoBucket(uri, events);
     this.size += events.length;
   }
 
-  insert(uri: Uri, event: EditorEvent) {
+  insert(uri: string, event: EditorEvent) {
     this.insertIntoTrack(uri, event);
     this.insertIntoBucket(uri, event);
     this.size += 1;
   }
 
-  insertAt(uri: Uri, event: EditorEvent, i: number) {
+  insertAt(uri: string, event: EditorEvent, i: number) {
     this.insertIntoTrack(uri, event);
     this.insertIntoBucketAtIndex(uri, event, i);
     this.size += 1;
@@ -105,7 +105,7 @@ export default class EventContainer {
     }
   }
 
-  getTrack(uri: Uri): readonly EditorEvent[] {
+  getTrack(uri: string): readonly EditorEvent[] {
     return this.tracks.get(uri) ?? [];
   }
 
@@ -240,11 +240,11 @@ export default class EventContainer {
     while (this.buckets.length < i + 1) this.buckets.push([]);
   }
 
-  private getInitializedTrack(uri: Uri): EditorEvent[] {
+  private getInitializedTrack(uri: string): EditorEvent[] {
     return this.tracks.get(uri) ?? this.tracks.set(uri, []).get(uri)!;
   }
 
-  private insertManyIntoTrack(uri: Uri, events: EditorEvent[]) {
+  private insertManyIntoTrack(uri: string, events: EditorEvent[]) {
     const track = this.getInitializedTrack(uri);
     const pushAtEnd = track.length === 0 || events.length === 0 || events[0].clock >= track.at(-1)!.clock;
 
@@ -256,30 +256,30 @@ export default class EventContainer {
     }
   }
 
-  private insertIntoTrack(uri: Uri, event: EditorEvent) {
+  private insertIntoTrack(uri: string, event: EditorEvent) {
     const track = this.getInitializedTrack(uri);
     const i = lastSortedIndex(track, event.clock, getClockOfEditorEvent);
     track.splice(i, 0, event);
   }
 
-  private insertManyIntoBucket(uri: Uri, events: EditorEvent[]) {
+  private insertManyIntoBucket(uri: string, events: EditorEvent[]) {
     for (const event of events) {
       this.insertIntoBucket(uri, event);
     }
   }
 
-  private insertIntoBucket(uri: Uri, event: EditorEvent) {
+  private insertIntoBucket(uri: string, event: EditorEvent) {
     const pos = this.getInsertPosAfterClock(event.clock);
     this.insertIntoBucketAtPos(uri, event, pos);
   }
 
-  private insertIntoBucketAtIndex(uri: Uri, event: EditorEvent, index: number) {
+  private insertIntoBucketAtIndex(uri: string, event: EditorEvent, index: number) {
     const pos = this.posOfIndex(index);
     assert(pos, 'invalid index');
     this.insertIntoBucketAtPos(uri, event, pos);
   }
 
-  private insertIntoBucketAtPos(uri: Uri, event: EditorEvent, pos: Position) {
+  private insertIntoBucketAtPos(uri: string, event: EditorEvent, pos: Position) {
     this.ensureBucketAt(pos[0]);
     this.buckets[pos[0]].splice(pos[1], 0, { event, uri });
   }

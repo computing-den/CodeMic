@@ -31,10 +31,10 @@ export default class PathField extends React.Component<Props> {
       },
     });
     if (uris?.length === 1) {
-      if (!path.isFileUri(uris[0] as t.Uri)) {
+      if (!path.isFileUri(uris[0] as string)) {
         throw new Error(`pick: only local paths are supported. Instead received ${uris[0]}`);
       }
-      this.props.onChange(path.getFileUriPath(uris[0] as t.Uri));
+      this.props.onChange(path.getFileUriPath(uris[0] as string));
     }
   };
 

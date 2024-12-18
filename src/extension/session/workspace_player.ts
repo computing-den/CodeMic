@@ -78,7 +78,7 @@ class WorkspacePlayer {
     this.internalWorkspace.finalizeSeek(seekData);
   }
 
-  async applyEditorEvent(e: t.EditorEvent, uri: t.Uri, dir: t.Direction) {
+  async applyEditorEvent(e: t.EditorEvent, uri: string, dir: t.Direction) {
     await this.internalWorkspace.stepper.applyEditorEvent(e, uri, dir);
     await this.vscWorkspaceStepper.applyEditorEvent(e, uri, dir);
   }

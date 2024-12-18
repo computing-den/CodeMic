@@ -899,7 +899,7 @@ class CodeMic {
     return path.abs(this.context.userDataPath, 'cover_photos_cache', id);
   }
 
-  getCoverPhotoCacheUri(id: string): t.Uri {
+  getCoverPhotoCacheUri(id: string): string {
     return this.context.view!.webview.asWebviewUri(vscode.Uri.file(this.getCoverPhotoCachePath(id))).toString();
   }
 

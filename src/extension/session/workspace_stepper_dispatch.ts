@@ -3,7 +3,7 @@ import * as t from '../../lib/types';
 export default function workspaceStepperDispatch(
   stepper: t.WorkspaceStepper,
   e: t.EditorEvent,
-  uri: t.Uri,
+  uri: string,
   direction: t.Direction,
   uriSet?: t.UriSet,
 ): Promise<void> {

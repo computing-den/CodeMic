@@ -550,7 +550,7 @@ class WorkspaceRecorder {
     );
   }
 
-  private insertEvent(e: t.EditorEvent, uri: t.Uri, opts: { coalescing: boolean }) {
+  private insertEvent(e: t.EditorEvent, uri: string, opts: { coalescing: boolean }) {
     // if (e.type !== 'scroll') {
     //   this.scrolling = false;
     //   this.scrollStartRange = undefined;
@@ -573,7 +573,10 @@ class WorkspaceRecorder {
    *
    * Assumes a valid uri which has already been approved by this.vscWorkspace.shouldRecordVscUri().
    */
-  private async openTextDocumentByUri(vscTextDocument: vscode.TextDocument, uri: t.Uri): Promise<InternalTextDocument> {
+  private async openTextDocumentByUri(
+    vscTextDocument: vscode.TextDocument,
+    uri: string,
+  ): Promise<InternalTextDocument> {
     const isInWorktree = this.internalWorkspace.doesUriExist(uri);
     let irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
 
@@ -622,7 +625,7 @@ class WorkspaceRecorder {
    * It does not push a showTextEditor event but it might open the text document.
    * Then, it will create or update the internal text editor.
    */
-  private async openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: t.Uri): Promise<InternalTextEditor> {
+  private async openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: string): Promise<InternalTextEditor> {
     const selections = VscWorkspace.fromVscSelections(vscTextEditor.selections);
     const visibleRange = VscWorkspace.fromVscLineRange(vscTextEditor.visibleRanges[0]);
     const textDocument = await this.openTextDocumentByUri(vscTextEditor.document, uri);

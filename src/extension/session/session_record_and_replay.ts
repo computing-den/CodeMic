@@ -89,7 +89,7 @@ export default class SessionRecordAndReplay {
     // }
 
     // Seek to clock.
-    let targetUris: t.Uri[] | undefined;
+    let targetUris: string[] | undefined;
     if (options?.clock) {
       const uriSet: t.UriSet = new Set();
       const seekData = this.internalWorkspace.getSeekData(options.clock);

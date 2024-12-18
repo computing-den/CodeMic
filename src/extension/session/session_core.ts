@@ -53,7 +53,6 @@ export default class SessionCore {
       likes: 0,
       modificationTimestamp: new Date().toISOString(), // will be overwritten at the end
       toc: [],
-      hasCoverPhoto: false,
     };
   }
 
@@ -151,7 +150,7 @@ export default class SessionCore {
     return path.abs(this.session.workspace, '.codemic');
   }
 
-  resolveUri(uri: t.Uri): t.Uri {
+  resolveUri(uri: string): string {
     return path.resolveUri(this.session.workspace, uri);
   }
 
@@ -232,7 +231,7 @@ export default class SessionCore {
     await fs.promises.mkdir(this.session.workspace, { recursive: true });
   }
 
-  async writeFileIfNotExists(uri: t.Uri, text: string) {
+  async writeFileIfNotExists(uri: string, text: string) {
     const absPath = path.getFileUriPath(this.resolveUri(uri));
 
     if (!(await storage.fileExists(absPath))) {
@@ -292,7 +291,7 @@ export default class SessionCore {
       });
 
       archive.pipe(output);
-      if (this.session.head.hasCoverPhoto) {
+      if (this.session.head.coverPhotoHash) {
         archive.file(path.abs(this.sessionDataPath, 'cover_photo'), { name: 'cover_photo' });
       }
       archive.file(path.abs(this.sessionDataPath, 'body.json'), { name: 'body.json' });

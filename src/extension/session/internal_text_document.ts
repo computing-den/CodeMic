@@ -4,9 +4,9 @@ import { Range, Selection, Position, ContentChange } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 
 export default class InternalTextDocument implements t.InternalDocument {
-  constructor(public uri: t.Uri, public lines: string[], public eol: t.EndOfLine) {}
+  constructor(public uri: string, public lines: string[], public eol: t.EndOfLine) {}
 
-  static fromText(uri: t.Uri, text: string, defaultEol: t.EndOfLine): InternalTextDocument {
+  static fromText(uri: string, text: string, defaultEol: t.EndOfLine): InternalTextDocument {
     const eol = (text.match(/\r?\n/)?.[0] as t.EndOfLine) || defaultEol;
     const lines = text.split(/\r?\n/);
     return new InternalTextDocument(uri, lines, eol);

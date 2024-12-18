@@ -1,86 +1,87 @@
 import assert from './assert.js';
 import * as t from './types.js';
+import { URI } from 'vscode-uri';
 
-export function workspaceUriFromRelPath(p: t.RelPath): t.Uri {
+export function workspaceUriFromRelPath(p: t.RelPath): string {
   return `workspace:${p}`;
 }
-export function workspaceUriFromAbsPath(base: t.AbsPath, p: t.AbsPath): t.Uri {
+export function workspaceUriFromAbsPath(base: t.AbsPath, p: t.AbsPath): string {
   return workspaceUriFromRelPath(relToBase(base, p));
 }
-export function untitledUriFromName(name: string): t.Uri {
+export function untitledUriFromName(name: string): string {
   // assert(!name.includes('/'));
   return `untitled:${name}`;
 }
-export function fileUriFromAbsPath(p: t.AbsPath): t.Uri {
+export function fileUriFromAbsPath(p: t.AbsPath): string {
   return `file://${p}`;
 }
 
-export function isWorkspaceUri(uri: t.Uri): boolean {
+export function isWorkspaceUri(uri: string): boolean {
   return uri.startsWith('workspace:');
 }
 
-export function isFileUri(uri: t.Uri): boolean {
+export function isFileUri(uri: string): boolean {
   return uri.startsWith('file://');
 }
 
-export function isUntitledUri(uri: t.Uri): boolean {
+export function isUntitledUri(uri: string): boolean {
   return uri.startsWith('untitled:');
 }
 
-export function getWorkspaceUriPath(uri: t.Uri): t.RelPath {
+export function getWorkspaceUriPath(uri: string): t.RelPath {
   const res = getWorkspaceUriPathOpt(uri);
   assert(res);
   return res;
 }
 
-export function getWorkspaceUriPathOpt(uri: t.Uri): t.RelPath | undefined {
+export function getWorkspaceUriPathOpt(uri: string): t.RelPath | undefined {
   if (isWorkspaceUri(uri)) return uri.slice('workspace:'.length) as t.RelPath;
 }
 
-export function getFileUriPath(uri: t.Uri): t.AbsPath {
+export function getFileUriPath(uri: string): t.AbsPath {
   const res = getFileUriPathOpt(uri);
   assert(res);
   return res;
 }
 
-export function getFileUriPathOpt(uri: t.Uri): t.AbsPath | undefined {
+export function getFileUriPathOpt(uri: string): t.AbsPath | undefined {
   if (isFileUri(uri)) return uri.slice('file://'.length) as t.AbsPath;
 }
 
-export function getUriPathOpt(uri: t.Uri): t.Path | undefined {
+export function getUriPathOpt(uri: string): t.Path | undefined {
   return getWorkspaceUriPathOpt(uri) ?? getFileUriPathOpt(uri);
 }
 
-export function getUntitledUriName(uri: t.Uri): string {
+export function getUntitledUriName(uri: string): string {
   const res = getUntitledUriNameOpt(uri);
   assert(res);
   return res;
 }
 
-export function getUntitledUriNameOpt(uri: t.Uri): string | undefined {
+export function getUntitledUriNameOpt(uri: string): string | undefined {
   if (isUntitledUri(uri)) return uri.slice('untitled:'.length);
 }
 
-export function getUriShortNameOpt(uri: t.Uri): string | undefined {
+export function getUriShortNameOpt(uri: string): string | undefined {
   const p = getUriPathOpt(uri);
   return p ? basename(p) : getUntitledUriNameOpt(uri);
 }
 
-export function parseUri(uri: t.Uri): t.ParsedUri {
-  if (uri.startsWith('workspace:')) {
-    return { scheme: 'workspace', path: uri.slice('workspace:'.length) as t.RelPath };
-  } else if (uri.startsWith('file://')) {
-    return { scheme: 'file', path: uri.slice('file://'.length) as t.AbsPath };
-  } else if (uri.startsWith('untitled:')) {
-    return { scheme: 'untitled', name: uri.slice('untitled:'.length) };
-  }
-  throw new Error(`parseUri: unknown URI scheme: ${uri}`);
-}
+// export function parseUri(uri: string): t.ParsedUri {
+//   if (uri.startsWith('workspace:')) {
+//     return { scheme: 'workspace', path: uri.slice('workspace:'.length) as t.RelPath };
+//   } else if (uri.startsWith('file://')) {
+//     return { scheme: 'file', path: uri.slice('file://'.length) as t.AbsPath };
+//   } else if (uri.startsWith('untitled:')) {
+//     return { scheme: 'untitled', name: uri.slice('untitled:'.length) };
+//   }
+//   throw new Error(`parseUri: unknown URI scheme: ${uri}`);
+// }
 
 /**
  * Turns workspace URIs into file URIs. Doesn't touch other kinds of URIs.
  */
-export function resolveUri(base: t.AbsPath, uri: t.Uri): t.Uri {
+export function resolveUri(base: t.AbsPath, uri: string): string {
   if (isWorkspaceUri(uri)) return fileUriFromAbsPath(join(base, getWorkspaceUriPath(uri)));
   return uri;
 }
