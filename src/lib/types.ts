@@ -1,16 +1,5 @@
 import type { Position, Range, LineRange, Selection, ContentChange } from './lib.js';
 
-// /**
-//  * file:///home/sean/a    file path is always absolute.
-//  * workspace:a/b/c        workspace path is always relative.
-//  * untitled:Untitled-1    untitled has a name, not an actual path (this is different from vscode's untitled Uris which can be either a path or a name).
-//  * file:///home/sean/abc%20def URIs are always encoded.
-//  */
-// export type ParsedUri =
-//   | { scheme: 'file'; path: AbsPath }
-//   | { scheme: 'workspace'; path: RelPath }
-//   | { scheme: 'untitled'; name: string };
-
 // Having the response types separately improves typescript error messages.
 export type StoreResponse = { type: 'store'; store: Store };
 export type UrisResponse = { type: 'uris'; uris?: string[] };
@@ -243,13 +232,16 @@ export type AccountUIState = AccountState;
 export type AccountUpdate = Partial<AccountState>;
 
 export type WelcomeUIState = {
-  workspace: SessionHead[];
+  workspace?: string;
+  current?: SessionHead;
+  recent: SessionHead[];
   featured: SessionHead[];
   history: SessionsHistory;
   coverPhotosUris: UriMap;
 };
 
 export type RecorderUIState = {
+  workspace?: string;
   tabId: RecorderUITabId;
 };
 export type RecorderUITabId = 'editor-view' | 'details-view';

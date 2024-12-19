@@ -29,6 +29,10 @@ export default class SessionCore {
     return head && new Session(context, workspace, head, { local: true, mustScan: opts?.mustScan });
   }
 
+  static async sessionExists(workspace: string): Promise<boolean> {
+    return storage.pathExists(path.join(workspace, '.codemic'));
+  }
+
   static async fromNew(context: Context, workspace: string, head: t.SessionHead): Promise<Session> {
     const temp = path.join(context.userDataPath, 'temp');
     await fs.promises.rm(temp, { recursive: true, force: true });
@@ -162,6 +166,10 @@ export default class SessionCore {
    * Move the session from temp to its final data path and set temp = false.
    */
   async commitTemp() {
+    if (await Session.Core.sessionExists(this.session.workspace)) {
+      const old = await Session.Core.fromExisting(this.session.context, this.session.workspace);
+      if (old) await old.core.delete();
+    }
     await fs.promises.cp(this.sessionTempDataPath, this.sessionFinalDataPath, { force: true, recursive: true });
     this.session.temp = false;
   }
@@ -217,7 +225,7 @@ export default class SessionCore {
   }
 
   async download(options?: { skipIfExists: boolean }) {
-    if (options?.skipIfExists && (await storage.fileExists(path.join(this.sessionDataPath, 'body.json')))) return;
+    if (options?.skipIfExists && (await storage.pathExists(path.join(this.sessionDataPath, 'body.json')))) return;
 
     await serverApi.downloadSession(
       this.session.head.id,
@@ -238,7 +246,7 @@ export default class SessionCore {
   async writeFileIfNotExists(uri: string, text: string) {
     const fsPath = URI.parse(this.resolveUri(uri)).fsPath;
 
-    if (!(await storage.fileExists(fsPath))) {
+    if (!(await storage.pathExists(fsPath))) {
       await fs.promises.writeFile(fsPath, text);
     }
   }
@@ -270,7 +278,7 @@ export default class SessionCore {
   }
 
   async package() {
-    assert(await storage.fileExists(path.join(this.sessionDataPath, 'body.json')), "Session body doesn't exist");
+    assert(await storage.pathExists(path.join(this.sessionDataPath, 'body.json')), "Session body doesn't exist");
 
     return new Promise<string>((resolve, reject) => {
       // const packagePath = path.abs(os.tmpdir(), this.head.id + '.zip');

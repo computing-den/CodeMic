@@ -617,18 +617,27 @@ class CodeMic {
     }
 
     if (this.session.temp) {
-      const confirmTitle = 'Continue';
-      const answer = await vscode.window.showWarningMessage(
-        `Everything inside ${this.session.workspace} may be overwritten.`,
-        { modal: true },
-        { title: 'Cancel', isCloseAffordance: true },
-        { title: confirmTitle },
-      );
-      if (answer?.title !== confirmTitle) return;
-    }
+      if (await Session.Core.sessionExists(this.session.workspace)) {
+        const confirmTitle = 'Overwrite';
+        const answer = await vscode.window.showWarningMessage(
+          `A session already exists at ${this.session.workspace}. Do you want to overwrite it?`,
+          { modal: true },
+          { title: 'Cancel', isCloseAffordance: true },
+          { title: confirmTitle },
+        );
+        if (answer?.title !== confirmTitle) return;
+      } else {
+        const confirmTitle = 'Continue';
+        const answer = await vscode.window.showWarningMessage(
+          `Everything inside ${this.session.workspace} may be overwritten.`,
+          { modal: true },
+          { title: 'Cancel', isCloseAffordance: true },
+          { title: confirmTitle },
+        );
+        if (answer?.title !== confirmTitle) return;
+      }
 
-    // Commit the temp session. Copies the temp session to its final destination based on workspace and handle.
-    if (this.session.temp) {
+      // Commit the temp session. Copies the temp session to its final destination based on workspace and handle.
       await this.session.core.commitTemp();
     }
 
@@ -886,7 +895,7 @@ class CodeMic {
 
   async updateSessionCoverPhoto(head: t.SessionHead) {
     const p = this.getCoverPhotoCachePath(head.id);
-    if (await storage.fileExists(p)) {
+    if (await storage.pathExists(p)) {
       const buffer = await fs.promises.readFile(p);
       const hash = await misc.computeSHA1(buffer);
       if (hash === head.coverPhotoHash) return;
@@ -1014,7 +1023,16 @@ class CodeMic {
     let welcome: t.WelcomeUIState | undefined;
     if (this.screen === t.Screen.Welcome) {
       const coverPhotosUris: t.UriMap = {};
-      const workspaceSessionHeads: t.SessionHead[] = [];
+      const recent: t.SessionHead[] = [];
+
+      const workspace = VscWorkspace.getDefaultVscWorkspace();
+      let current: t.SessionHead | undefined;
+      if (workspace) {
+        current = (await Session.Core.fromExisting(this.context, workspace))?.head;
+        if (current) {
+          coverPhotosUris[current.id] = this.getCoverPhotoCacheUri(current.id);
+        }
+      }
 
       for (const history of Object.values(this.context.settings.history)) {
         try {
@@ -1022,7 +1040,7 @@ class CodeMic {
           if (!session) continue;
 
           coverPhotosUris[session.head.id] = this.getCoverPhotoCacheUri(session.head.id);
-          workspaceSessionHeads.push(session.head);
+          recent.push(session.head);
         } catch (error) {
           console.error(error);
         }
@@ -1033,7 +1051,8 @@ class CodeMic {
       }
 
       welcome = {
-        workspace: workspaceSessionHeads,
+        current,
+        recent,
         featured: this.featured || [],
         history: this.context.settings.history,
         coverPhotosUris,

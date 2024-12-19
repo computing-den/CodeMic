@@ -1,5 +1,3 @@
-import * as path from 'path';
-import { URI } from 'vscode-uri';
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
 import { LineRange, Selection } from '../../lib/lib.js';

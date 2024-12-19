@@ -137,7 +137,7 @@ export default class VscWorkspace {
       if (!this.shouldRecordVscUri(vscTextDocument.uri)) continue;
 
       // If file is deleted but the text editor is still there, ignore it.
-      if (vscTextDocument.uri.scheme === 'file' && !(await storage.fileExists(path.join(vscTextDocument.uri.fsPath)))) {
+      if (vscTextDocument.uri.scheme === 'file' && !(await storage.pathExists(path.join(vscTextDocument.uri.fsPath)))) {
         continue;
       }
 

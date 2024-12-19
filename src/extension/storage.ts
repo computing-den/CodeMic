@@ -28,7 +28,7 @@ export async function writeBinary(p: string, buffer: NodeJS.ArrayBufferView) {
   await fs.promises.writeFile(p, buffer);
 }
 
-export async function fileExists(p: string): Promise<boolean> {
+export async function pathExists(p: string): Promise<boolean> {
   try {
     await fs.promises.access(p);
     return true;

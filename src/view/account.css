@@ -18,9 +18,8 @@
     & vscode-text-field + vscode-text-field {
       margin-top: 0.25rem;
     }
-    p.error {
+    p {
       margin: 0.25rem 0 0 0;
-      color: var(--vscode-errorForeground);
     }
   }
 

@@ -161,7 +161,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
           {head.coverPhotoHash ? (
             <img src={session.coverPhotoUri + `?hash=${head.coverPhotoHash}`} />
           ) : (
-            <p>NO COVER PHOTO</p>
+            <p className="text-weak">NO COVER PHOTO</p>
           )}
           <div className="buttons">
             {head.coverPhotoHash && (
@@ -203,7 +203,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
         >
           Workspace
         </PathField>
-        <p className="subsection help">WARNING: everything under workspace will be overwritten.</p>
+        <p className="subsection help text-error">WARNING: everything under workspace will be overwritten.</p>
         <VSCodeTextField
           className="subsection"
           placeholder="A-Z a-z 0-9 _ (e.g. my_project)"

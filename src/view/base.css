@@ -203,3 +203,11 @@ button {
   transform-origin: center;
   transform: rotate(90deg);
 }
+
+.text-error {
+  color: var(--vscode-errorForeground);
+}
+
+.text-weak {
+  color: var(--text-weak);
+}

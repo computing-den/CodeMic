@@ -25,6 +25,10 @@ export default class Welcome extends React.Component<Props> {
 
   render() {
     const { welcome } = this.props;
+    const recent = welcome.recent.filter(h => h.id !== welcome.current?.id);
+    const featured = welcome.featured.filter(
+      h => h.id !== welcome.current?.id && !welcome.recent.some(r => r.id === h.id),
+    );
     return (
       <Screen className="welcome">
         {/*<LatencyTest store={this.props.store} />*/}
@@ -50,16 +54,26 @@ export default class Welcome extends React.Component<Props> {
             )}
           </Section.Body>
         </Section>
-        <SessionsSection
-          title="WORKSPACE"
-          history={welcome.history}
-          sessionHeads={welcome.workspace}
-          coverPhotosUris={welcome.coverPhotosUris}
-        />
+        {welcome.current && (
+          <SessionsSection
+            title="WORKSPACE"
+            history={welcome.history}
+            sessionHeads={[welcome.current]}
+            coverPhotosUris={welcome.coverPhotosUris}
+          />
+        )}
+        {recent.length > 0 && (
+          <SessionsSection
+            title="RECENT"
+            history={welcome.history}
+            sessionHeads={recent}
+            coverPhotosUris={welcome.coverPhotosUris}
+          />
+        )}
         <SessionsSection
           title="FEATURED"
           history={welcome.history}
-          sessionHeads={welcome.featured}
+          sessionHeads={featured}
           coverPhotosUris={welcome.coverPhotosUris}
         />
       </Screen>

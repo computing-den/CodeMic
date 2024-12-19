@@ -110,7 +110,7 @@ export default class Account extends React.Component<Props> {
               Email
             </VSCodeTextField>
           )}
-          {error && <p className="error">{error}</p>}
+          {error && <p className="text-error">{error}</p>}
         </div>
         <div className="buttons-subsection subsection">
           <VSCodeButton appearance={join ? 'primary' : 'secondary'} onClick={this.join}>
