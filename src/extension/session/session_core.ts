@@ -20,13 +20,17 @@ import { resolveWorkspaceUri } from '../../lib/lib.js';
 export default class SessionCore {
   constructor(public session: Session) {}
 
+  static LATEST_FORMAT_VERSION = 1;
+
   static async fromLocal(
     context: Context,
     workspace: string,
     opts?: { mustScan?: boolean },
   ): Promise<Session | undefined> {
     const head = await storage.readJSONOptional<t.SessionHead>(path.join(workspace, '.codemic', 'head.json'));
-    return head && new Session(context, workspace, head, { local: true, mustScan: opts?.mustScan });
+    if (head) {
+      return new Session(context, workspace, head, { local: true, mustScan: opts?.mustScan });
+    }
   }
 
   static async fromRemote(context: Context, head: t.SessionHead): Promise<Session> {
@@ -66,6 +70,7 @@ export default class SessionCore {
       likes: 0,
       modificationTimestamp: new Date().toISOString(), // will be overwritten at the end
       toc: [],
+      formatVersion: SessionCore.LATEST_FORMAT_VERSION,
     };
   }
 
@@ -229,12 +234,16 @@ export default class SessionCore {
   }
 
   async readBody(options?: { download: boolean }): Promise<t.SessionBodyJSON> {
+    this.assertFormatVersionSupport();
+
     if (options?.download) await this.download({ skipIfExists: true });
     const compact = await storage.readJSON<t.SessionBodyCompact>(path.join(this.sessionDataPath, 'body.json'));
     return deserializeSessionBody(compact);
   }
 
   async download(options?: { skipIfExists: boolean }) {
+    this.assertFormatVersionSupport();
+
     if (options?.skipIfExists && (await storage.pathExists(path.join(this.sessionDataPath, 'body.json')))) return;
 
     await serverApi.downloadSession(
@@ -327,5 +336,11 @@ export default class SessionCore {
     const res = await serverApi.publishSession(this.session.head, zip, this.session.context.user?.token);
     this.session.head = res;
     await this.write();
+  }
+
+  assertFormatVersionSupport() {
+    if (this.session.head.formatVersion > SessionCore.LATEST_FORMAT_VERSION) {
+      throw new Error('You need a more recent version of CodeMic to load this session. Please update CodeMic.');
+    }
   }
 }

@@ -304,6 +304,7 @@ export type SessionHead = {
   toc: TocItem[];
   forkedFrom?: string;
   coverPhotoHash?: string;
+  formatVersion: number;
 };
 
 export type SessionHeadMap = { [key: string]: SessionHead | undefined };

@@ -300,6 +300,7 @@ class CodeMic {
       }
       case 'player/load': {
         assert(this.session);
+        this.session.core.assertFormatVersionSupport();
         await this.setUpWorkspace();
         await this.session.prepare();
         this.enqueueFrontendUpdate();
@@ -616,6 +617,7 @@ class CodeMic {
       session = await Session.Core.fromLocal(this.context, history.workspace);
     } else if (featured) {
       session = await Session.Core.fromRemote(this.context, featured);
+      session.core.assertFormatVersionSupport();
       await session.core.download({ skipIfExists: true });
     }
 
