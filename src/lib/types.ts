@@ -8,51 +8,51 @@ export type OKResponse = { type: 'ok' };
 export type ErrorResponse = { type: 'error'; message?: string };
 
 export type FrontendToBackendReqRes =
-  | { request: { type: 'account/open'; join?: boolean }; response: StoreResponse }
-  | { request: { type: 'account/update'; changes: AccountUpdate }; response: StoreResponse }
-  | { request: { type: 'account/join' }; response: StoreResponse }
-  | { request: { type: 'account/login' }; response: StoreResponse }
-  | { request: { type: 'account/logout' }; response: StoreResponse }
-  | { request: { type: 'welcome/open' }; response: StoreResponse }
-  | { request: { type: 'player/open'; sessionId: string }; response: StoreResponse }
-  | { request: { type: 'player/load' }; response: StoreResponse }
-  | { request: { type: 'player/play' }; response: StoreResponse }
-  | { request: { type: 'player/pause' }; response: StoreResponse }
-  | { request: { type: 'player/seek'; clock: number }; response: StoreResponse }
-  // | { request: { type: 'player/update'; changes: PlayerUpdate }; response: StoreResponse }
+  | { request: { type: 'account/open'; join?: boolean }; response: OKResponse }
+  | { request: { type: 'account/update'; changes: AccountUpdate }; response: OKResponse }
+  | { request: { type: 'account/join' }; response: OKResponse }
+  | { request: { type: 'account/login' }; response: OKResponse }
+  | { request: { type: 'account/logout' }; response: OKResponse }
+  | { request: { type: 'welcome/open' }; response: OKResponse }
+  | { request: { type: 'player/open'; sessionId: string }; response: OKResponse }
+  | { request: { type: 'player/load' }; response: OKResponse }
+  | { request: { type: 'player/play' }; response: OKResponse }
+  | { request: { type: 'player/pause' }; response: OKResponse }
+  | { request: { type: 'player/seek'; clock: number }; response: OKResponse }
+  // | { request: { type: 'player/update'; changes: PlayerUpdate }; response: OKResponse }
   | {
       request: { type: 'recorder/open'; sessionId?: string; clock?: number; fork?: boolean };
-      response: StoreResponse;
+      response: OKResponse;
     }
-  | { request: { type: 'recorder/openTab'; tabId: RecorderUITabId }; response: StoreResponse }
-  | { request: { type: 'recorder/load' }; response: StoreResponse }
-  | { request: { type: 'recorder/play' }; response: StoreResponse }
-  | { request: { type: 'recorder/record' }; response: StoreResponse }
-  | { request: { type: 'recorder/pause' }; response: StoreResponse }
-  | { request: { type: 'recorder/seek'; clock: number }; response: StoreResponse }
-  | { request: { type: 'recorder/save' }; response: StoreResponse }
-  | { request: { type: 'recorder/publish' }; response: StoreResponse }
-  | { request: { type: 'recorder/undo' }; response: StoreResponse }
-  | { request: { type: 'recorder/redo' }; response: StoreResponse }
-  | { request: { type: 'recorder/update'; changes: SessionUIStateUpdate }; response: StoreResponse }
-  | { request: { type: 'recorder/insertAudio'; uri: string; clock: number }; response: StoreResponse }
-  | { request: { type: 'recorder/deleteAudio'; id: string }; response: StoreResponse }
-  | { request: { type: 'recorder/updateAudio'; audio: Partial<AudioTrack> & { id: string } }; response: StoreResponse }
-  | { request: { type: 'recorder/insertVideo'; uri: string; clock: number }; response: StoreResponse }
-  | { request: { type: 'recorder/deleteVideo'; id: string }; response: StoreResponse }
-  | { request: { type: 'recorder/updateVideo'; video: Partial<VideoTrack> & { id: string } }; response: StoreResponse }
-  | { request: { type: 'recorder/setCoverPhoto'; uri: string }; response: StoreResponse }
-  | { request: { type: 'recorder/deleteCoverPhoto' }; response: StoreResponse }
-  | { request: { type: 'recorder/changeSpeed'; range: ClockRange; factor: number }; response: StoreResponse }
-  | { request: { type: 'recorder/merge'; range: ClockRange }; response: StoreResponse }
-  | { request: { type: 'recorder/insertGap'; clock: number; dur: number }; response: StoreResponse }
-  // | { request: { type: 'toggleRecorderStudio' }; response: StoreResponse }
-  | { request: { type: 'deleteSession'; sessionId: string }; response: StoreResponse }
+  | { request: { type: 'recorder/openTab'; tabId: RecorderUITabId }; response: OKResponse }
+  | { request: { type: 'recorder/load' }; response: OKResponse }
+  | { request: { type: 'recorder/play' }; response: OKResponse }
+  | { request: { type: 'recorder/record' }; response: OKResponse }
+  | { request: { type: 'recorder/pause' }; response: OKResponse }
+  | { request: { type: 'recorder/seek'; clock: number }; response: OKResponse }
+  | { request: { type: 'recorder/save' }; response: OKResponse }
+  | { request: { type: 'recorder/publish' }; response: OKResponse }
+  | { request: { type: 'recorder/undo' }; response: OKResponse }
+  | { request: { type: 'recorder/redo' }; response: OKResponse }
+  | { request: { type: 'recorder/update'; changes: SessionUIStateUpdate }; response: OKResponse }
+  | { request: { type: 'recorder/insertAudio'; uri: string; clock: number }; response: OKResponse }
+  | { request: { type: 'recorder/deleteAudio'; id: string }; response: OKResponse }
+  | { request: { type: 'recorder/updateAudio'; audio: Partial<AudioTrack> & { id: string } }; response: OKResponse }
+  | { request: { type: 'recorder/insertVideo'; uri: string; clock: number }; response: OKResponse }
+  | { request: { type: 'recorder/deleteVideo'; id: string }; response: OKResponse }
+  | { request: { type: 'recorder/updateVideo'; video: Partial<VideoTrack> & { id: string } }; response: OKResponse }
+  | { request: { type: 'recorder/setCoverPhoto'; uri: string }; response: OKResponse }
+  | { request: { type: 'recorder/deleteCoverPhoto' }; response: OKResponse }
+  | { request: { type: 'recorder/changeSpeed'; range: ClockRange; factor: number }; response: OKResponse }
+  | { request: { type: 'recorder/merge'; range: ClockRange }; response: OKResponse }
+  | { request: { type: 'recorder/insertGap'; clock: number; dur: number }; response: OKResponse }
+  // | { request: { type: 'toggleRecorderStudio' }; response: OKResponse }
+  | { request: { type: 'deleteSession'; sessionId: string }; response: OKResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
   | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }
-  | { request: { type: 'confirmForkFromPlayer'; clock: number }; response: BooleanResponse }
+  | { request: { type: 'confirmForkFromPlayer' }; response: BooleanResponse }
   | { request: { type: 'confirmEditFromPlayer'; clock: number }; response: BooleanResponse }
-  | { request: { type: 'test'; value: any }; response: StoreResponse }
+  | { request: { type: 'test'; value: any }; response: OKResponse }
   | { request: { type: 'audio'; event: FrontendMediaEvent }; response: OKResponse }
   | { request: { type: 'video'; event: FrontendMediaEvent }; response: OKResponse };
 

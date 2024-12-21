@@ -60,7 +60,7 @@ export default class Player extends React.Component<Props> {
   };
 
   fork = async () => {
-    const res = await postMessage({ type: 'confirmForkFromPlayer', clock: this.props.session.clock });
+    const res = await postMessage({ type: 'confirmForkFromPlayer' });
     if (res.value) {
       await postMessage({
         type: 'recorder/open',
@@ -136,11 +136,7 @@ export default class Player extends React.Component<Props> {
 
     const toolbarActions = [
       {
-        title: session.playing
-          ? `Fork: create a new project starting at this point`
-          : session.clock > 0
-          ? `Fork: create a new project starting at ${lib.formatTimeSeconds(session.clock)}`
-          : `Fork: create a new project based on this one`,
+        title: 'Fork: create a new project based on this one',
         icon: 'codicon-repo-forked',
         onClick: this.fork,
       },

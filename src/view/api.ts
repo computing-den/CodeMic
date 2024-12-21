@@ -1,7 +1,7 @@
 import * as t from '../lib/types.js';
 import * as b from '../lib/bus.js';
 import * as lib from '../lib/lib.js';
-import { updateStore } from './store.js';
+import { updateStore, getStore } from './store.js';
 import type MediaManager from './media_manager.js';
 
 const vscode = acquireVsCodeApi();
@@ -12,10 +12,6 @@ window.addEventListener('message', event => bus.handleParcel(event.data));
 // type Listener = (req: t.BackendRequest) => Promise<t.FrontendResponse>;
 // type ListenerMap = { [key in t.BackendRequest['type']]?: Listener };
 // const listeners: ListenerMap = {};
-
-export type PostMessageOptions = {
-  performDefaultActions: boolean;
-};
 
 // export type MediaEventListener = (req: t.BackendMediaEvent) => Promise<t.FrontendResponse>;
 // let mediaEventListener: MediaEventListener | undefined;
@@ -30,25 +26,11 @@ export function setMediaManager(m: MediaManager) {
 
 export default async function postMessage<Req extends t.FrontendRequest>(
   req: Req,
-  options?: PostMessageOptions,
 ): Promise<t.ExtractResponse<t.FrontendToBackendReqRes, Req>> {
-  const performDefaultActions = options?.performDefaultActions ?? true;
-
   const res = (await bus.post(req)) as t.BackendResponse;
 
   if (res.type === 'error') {
-    throw new Error(`Got error for request ${JSON.stringify(req)}`);
-  }
-
-  if (performDefaultActions) {
-    switch (res.type) {
-      case 'store': {
-        updateStore(() => res.store);
-        break;
-      }
-      default:
-        break;
-    }
+    throw new Error(`Error: ${res.message || 'UNKNOWN'} \n | in response to request ${JSON.stringify(req)}`);
   }
 
   return res as any;
@@ -60,7 +42,9 @@ export default async function postMessage<Req extends t.FrontendRequest>(
 // }
 
 async function messageHandler(req: t.BackendRequest): Promise<t.FrontendResponse> {
-  console.log('webview received: ', req);
+  if (getStore().debug) {
+    console.log('webview received: ', req);
+  }
 
   switch (req.type) {
     case 'updateStore': {

@@ -15,6 +15,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import VscWorkspace from './session/vsc_workspace.js';
 
+const SAVE_TIMEOUT_MS = 5_000;
+
 class CodeMic {
   screen: t.Screen = t.Screen.Welcome;
   account?: t.AccountState;
@@ -22,6 +24,10 @@ class CodeMic {
   featured?: t.SessionHead[];
   recorder?: { tabId: t.RecorderUITabId };
   webviewProvider: WebviewProvider;
+
+  isFrontendUpdateBlocked = false;
+  isFrontendDirty = true;
+
   test: any = 0;
   // localResourceRootsCache: string[] = [];
 
@@ -36,7 +42,7 @@ class CodeMic {
 
     this.webviewProvider = new WebviewProvider(
       context.extension,
-      this.messageHandler.bind(this),
+      this.handleMessage.bind(this),
       this.viewOpened.bind(this),
     );
 
@@ -66,12 +72,12 @@ class CodeMic {
     //     const sessionId = 'XXX';
     //     if (await Session.Core.fromExisting(this.context, sessionId)) {
     //       // Recorder
-    //       await this.messageHandler({ type: 'recorder/open', sessionId });
-    //       await this.messageHandler({ type: 'recorder/openTab', tabId: 'editor-view' });
+    //       await this.handleMessage({ type: 'recorder/open', sessionId });
+    //       await this.handleMessage({ type: 'recorder/openTab', tabId: 'editor-view' });
     //       await this.updateFrontend();
 
     //       // Player
-    //       // await this.messageHandler({ type: 'player/open', sessionId });
+    //       // await this.handleMessage({ type: 'player/open', sessionId });
     //       // await this.updateFrontend();
     //     }
     //   } catch (error) {
@@ -191,18 +197,32 @@ class CodeMic {
     }
   }
 
-  async messageHandler(req: t.FrontendRequest): Promise<t.BackendResponse> {
+  async handleMessage(req: t.FrontendRequest): Promise<t.BackendResponse> {
+    try {
+      this.blockFrontendUpdate();
+      return await this.handleMessageInner(req);
+    } catch (error) {
+      this.showError(error as Error);
+      throw error;
+    } finally {
+      await this.flushFrontendUpdate();
+    }
+  }
+  async handleMessageInner(req: t.FrontendRequest): Promise<t.BackendResponse> {
     // console.log('extension received: ', req);
+    const ok = { type: 'ok' } as t.OKResponse;
 
     switch (req.type) {
       case 'account/open': {
         await this.openAccount(req);
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'account/update': {
         assert(this.account);
         this.account = { ...this.account, ...req.changes };
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'account/join': {
         assert(this.account);
@@ -221,7 +241,8 @@ class CodeMic {
           await this.changeUser(user);
         }
 
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'account/login': {
         assert(this.account);
@@ -241,15 +262,18 @@ class CodeMic {
           await this.changeUser(user);
         }
 
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'account/logout': {
         await this.changeUser();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'welcome/open': {
         await this.openWelcome();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'player/open': {
         const history = this.context.settings.history[req.sessionId];
@@ -264,36 +288,41 @@ class CodeMic {
             this.setScreen(t.Screen.Player);
           }
         }
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'player/load': {
         assert(this.session);
         await this.setUpWorkspace();
         await this.session.prepare();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'player/play': {
         assert(this.session?.isLoaded());
         await this.session.rr.play();
         await this.session?.core.writeHistoryOpenClose();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'player/pause': {
         assert(this.session?.isLoaded());
         this.session.rr.pause();
         await this.session?.core.writeHistoryClock();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'player/seek': {
         assert(this.session?.isLoaded());
         this.session.rr.seek(req.clock);
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       // case 'player/update': {
       //   throw new Error('DELETE THIS');
       //   // assert(this.session.isLoaded())
       //   // this.player.updateState(req.changes);
-      //   // return this.respondWithStore();
+      //   // return ok
       // }
       case 'recorder/open': {
         if (req.sessionId) {
@@ -302,7 +331,8 @@ class CodeMic {
           await this.openRecorderNewSession();
         }
 
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/openTab': {
         assert(this.session);
@@ -312,52 +342,59 @@ class CodeMic {
         } else {
           this.recorder.tabId = req.tabId;
         }
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/load': {
         await this.loadRecorder();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/record': {
         assert(this.session?.isLoaded());
         await this.session.rr.record();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/play': {
         assert(this.session?.isLoaded());
         await this.session.rr.play();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/pause': {
         assert(this.session?.isLoaded());
         this.session.rr.pause();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/seek': {
         assert(this.session?.isLoaded());
         await this.session.rr.seek(req.clock);
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/save': {
         assert(this.session?.isLoaded());
-        await this.writeSession();
-        return this.respondWithStore();
+        await this.writeSession({ pause: true });
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/publish': {
         try {
           assert(this.session?.isLoaded());
           // let sessionHead: t.SessionHead;
-          if (await this.writeSession()) {
-            await this.session.core.publish();
-            vscode.window.showInformationMessage('Published session.');
-          }
+          await this.writeSession({ pause: true });
+          await this.session.core.publish();
+          vscode.window.showInformationMessage('Published session.');
         } catch (error) {
           this.showError(error as Error);
         }
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'getStore': {
-        return this.respondWithStore();
+        return { type: 'store', store: await this.getStore() };
       }
       case 'showOpenDialog': {
         const options = {
@@ -376,84 +413,98 @@ class CodeMic {
         const cmds = this.session.editor.undo();
         await this.session.rr.unapplySessionCmds(cmds);
         console.log('Undo: ', cmds);
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/redo': {
         assert(this.session?.isLoaded());
         const cmds = this.session.editor.redo();
         await this.session.rr.applySessionCmds(cmds);
         console.log('Redo: ', cmds);
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/update': {
         assert(this.session);
         // assert(this.session?.isLoaded());
         this.session.editor.updateFromUI(req.changes);
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/insertAudio': {
         assert(this.session?.isLoaded());
         const track = await this.session.editor.insertAudioTrack(req.uri, req.clock);
         this.session.rr.loadAudioTrack(track);
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/deleteAudio': {
         assert(this.session?.isLoaded());
         this.session.editor.deleteAudioTrack(req.id);
         await this.session.rr.fastSync();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/updateAudio': {
         assert(this.session?.isLoaded());
         this.session.editor.updateAudioTrack(req.audio);
         await this.session.rr.fastSync();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/insertVideo': {
         assert(this.session?.isLoaded());
         const track = await this.session.editor.insertVideoTrack(req.uri, req.clock);
         this.session.rr.loadVideoTrack(track);
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/deleteVideo': {
         assert(this.session?.isLoaded());
         this.session.editor.deleteVideoTrack(req.id);
         await this.session.rr.fastSync();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/updateVideo': {
         assert(this.session?.isLoaded());
         this.session.editor.updateVideoTrack(req.video);
         await this.session.rr.fastSync();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/setCoverPhoto': {
         // assert(this.session?.isLoaded());
         assert(this.session);
         await this.session.editor.setCoverPhoto(req.uri);
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/deleteCoverPhoto': {
         assert(this.session?.isLoaded());
         await this.session.editor.deleteCoverPhoto();
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/changeSpeed': {
         assert(this.session?.isLoaded());
         await this.session.editor.changeSpeed(req.range, req.factor);
         await this.session.rr.seek(lib.calcClockAfterRangeSpeedChange(this.session.rr.clock, req.range, req.factor));
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/merge': {
         assert(this.session?.isLoaded());
         await this.session.editor.merge(req.range);
         await this.session.rr.seek(Math.min(req.range.start, req.range.end));
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'recorder/insertGap': {
         assert(this.session?.isLoaded());
         this.session.editor.insertGap(req.clock, req.dur);
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'confirmForkFromPlayer': {
         if (!this.session?.isLoaded() || !this.session.rr.playing) {
@@ -465,7 +516,7 @@ class CodeMic {
 
         const confirmTitle = 'Fork';
         const answer = await vscode.window.showWarningMessage(
-          `Do you want to stop playing and fork the current session at ${lib.formatTimeSeconds(req.clock)}?`,
+          `Do you want to stop playing and fork the current session?`,
           { modal: true },
           { title: 'Cancel', isCloseAffordance: true },
           { title: confirmTitle },
@@ -473,6 +524,7 @@ class CodeMic {
         if (answer?.title != confirmTitle && wasRunning) {
           await this.session.rr.play();
         }
+        this.enqueueFrontendUpdate();
         return { type: 'boolean', value: answer?.title === confirmTitle };
       }
       case 'confirmEditFromPlayer': {
@@ -492,6 +544,7 @@ class CodeMic {
         if (answer?.title != confirmTitle && wasRunning) {
           await this.session.rr.play();
         }
+        this.enqueueFrontendUpdate();
         return { type: 'boolean', value: answer?.title === confirmTitle };
       }
       case 'deleteSession': {
@@ -512,21 +565,22 @@ class CodeMic {
           }
         }
 
-        return this.respondWithStore();
+        this.enqueueFrontendUpdate();
+        return ok;
       }
       case 'audio': {
         assert(this.session?.isLoaded());
         this.session.rr.handleFrontendAudioEvent(req.event);
-        return this.respondWithStore();
+        return ok;
       }
       case 'video': {
         assert(this.session?.isLoaded());
         this.session.rr.handleFrontendVideoEvent(req.event);
-        return this.respondWithStore();
+        return ok;
       }
       case 'test': {
         this.test = req.value;
-        return this.respondWithStore();
+        return ok;
       }
       default: {
         lib.unreachable(req);
@@ -683,6 +737,7 @@ class CodeMic {
 
   async handleSessionChange() {
     await this.updateFrontend();
+    this.writeSessionThrottled();
   }
 
   async openWelcome() {
@@ -759,13 +814,12 @@ class CodeMic {
       );
 
       return answer?.title === exit;
-    } else if (await this.writeSession()) {
-      this.session = undefined;
-      this.recorder = undefined;
-      return true;
-    } else {
-      return false;
     }
+
+    await this.writeSession({ pause: true });
+    this.session = undefined;
+    this.recorder = undefined;
+    return true;
   }
 
   async playerWillClose(): Promise<boolean> {
@@ -777,104 +831,28 @@ class CodeMic {
   }
 
   /**
-   * Returns true if successfull and false if cancelled.
-   * In verbose mode, it'll show a message even when there are no changes to save.
+   * Session may not be loaded in which case only its head is written.
    */
-  async writeSession(): Promise<boolean> {
-    assert(this.session?.isLoaded());
+  async writeSession(opts?: { pause?: boolean; ifDirty?: boolean }) {
+    assert(this.session);
+    this.writeSessionThrottled.cancel();
 
-    if (this.session.rr.running) {
+    if (opts?.pause && this.session.rr?.running) {
       this.session.rr.pause();
     }
-    await this.session.core.write();
-    await this.session?.core.writeHistoryRecording();
-    return true;
 
-    // let cancelled = false;
-    // let shouldSave = false;
-    // let dirty: boolean;
-    // assert(this.session?.isLoaded())
-    // const wasPlaying = this.recorder.playing;
-    // const wasRecording = this.recorder.recording;
-    // // Pause the frontend while we figure out if we should save the session.
-    // if (wasPlaying || wasRecording) {
-    //   this.recorder.pause();
-    //   this.updateFrontend();
-    // }
-    // dirty = this.recorder.dirty;
-    // if (dirty) {
-    //   if (options.ask) {
-    //     [shouldSave, cancelled] = await this.askToSaveSession(options);
-    //   } else {
-    //     shouldSave = true;
-    //   }
-    // }
-    // // If we want to exit recorder, stop recording and intercepting editor events.
-    // // Otherwise, resume recording if we were initially recording.
-    // if (!cancelled) {
-    //   this.recorder.pause();
-    // } else if (wasRecording) {
-    //   this.recorder.record();
-    //   await this.updateFrontend();
-    // } else if (wasPlaying) {
-    //   this.recorder.play();
-    //   await this.updateFrontend();
-    // }
-    // // Save
-    // if (shouldSave) {
-    //   await this.recorder.save();
-    // }
-    // // assert(this.setup);
-    // // dirty = Boolean(this.setup.dirty);
-    // // if (dirty) {
-    // //   if (options.ask) {
-    // //     [shouldSave, cancelled] = await this.askToSaveSession(options);
-    // //   } else {
-    // //     shouldSave = true;
-    // //   }
-    // // }
-    // // if (shouldSave) {
-    // //   // const sessionStorage = this.context.storage.createSessionStorage(this.setup.sessionHead.id);
-    // //   await this.session.write();
-    // //   // await sessionStorage.writeSessionHead(this.setup.sessionHead);
-    // //   this.setup.dirty = false;
-    // // }
-    // if (!dirty && options.verbose) {
-    //   vscode.window.showInformationMessage('Nothing to save.');
-    // } else if (shouldSave) {
-    //   vscode.window.showInformationMessage('Saved session.');
-    // }
-    // return !cancelled;
+    if (!opts?.ifDirty || this.session.editor.dirty) {
+      await this.session.core.write();
+      await this.session.core.writeHistoryRecording();
+    }
   }
 
-  /**
-   * Returns [shouldSave, cancelled] booleans.
-   */
-  // async askToSaveSession(options: { forExit: boolean }): Promise<[boolean, boolean]> {
-  //   const saveTitle = 'Save';
-  //   const dontSaveTitle = "Don't Save";
-  //   const cancelTitle = 'Cancel';
-  //   let answer: vscode.MessageItem | undefined;
-  //   if (options.forExit) {
-  //     answer = await vscode.window.showWarningMessage(
-  //       'Do you want to save this session?',
-  //       { modal: true, detail: "Your changes will be lost if you don't save them." },
-  //       { title: saveTitle },
-  //       { title: cancelTitle, isCloseAffordance: true },
-  //       { title: dontSaveTitle },
-  //     );
-  //   } else {
-  //     answer = await vscode.window.showWarningMessage(
-  //       'Do you want to save this session?',
-  //       { modal: true },
-  //       { title: saveTitle },
-  //       { title: cancelTitle, isCloseAffordance: true },
-  //     );
-  //   }
-  //   const shouldSave = answer?.title === saveTitle;
-  //   const cancelled = answer?.title === cancelTitle;
-  //   return [shouldSave, cancelled];
-  // }
+  // Defined as arrow function to preserve the value of "this" for _.throttle().
+  writeSessionThrottledCommit = () => {
+    this.writeSession({ ifDirty: true }).catch(console.error);
+  };
+
+  writeSessionThrottled = _.throttle(this.writeSessionThrottledCommit, SAVE_TIMEOUT_MS, { leading: false });
 
   async updateFeatured() {
     try {
@@ -956,13 +934,31 @@ class CodeMic {
     await this.openWelcome();
   }
 
-  async respondWithStore(): Promise<t.BackendResponse> {
-    return { type: 'store', store: await this.getStore() };
-  }
-
   async updateFrontend() {
+    if (this.isFrontendUpdateBlocked) {
+      this.isFrontendDirty = true;
+      return;
+    }
     const store = await this.getStore();
     await this.context.postMessage?.({ type: 'updateStore', store });
+    this.isFrontendDirty = false;
+  }
+
+  blockFrontendUpdate() {
+    this.isFrontendUpdateBlocked = true;
+  }
+
+  enqueueFrontendUpdate() {
+    assert(
+      this.isFrontendUpdateBlocked,
+      'It does not make much sense to call enqueueFrontendUpdate() when frontend update is not blocked. Call updateFrontend() directly.',
+    );
+    this.isFrontendDirty = true;
+  }
+
+  async flushFrontendUpdate() {
+    this.isFrontendUpdateBlocked = false;
+    if (this.isFrontendDirty) await this.updateFrontend();
   }
 
   showError(error: Error) {

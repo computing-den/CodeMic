@@ -178,13 +178,14 @@ export default class SessionCore {
     await this.writeHead();
     if (this.session.isLoaded()) await this.writeBody();
 
-    this.session.editor?.saved();
+    this.session.editor.saved();
   }
 
   async writeHead() {
     assert(this.session.head); // Sometimes head.json becomes blank. Maybe this'll catch the issue?
     await storage.writeJSON(path.join(this.sessionDataPath, 'head.json'), this.session.head);
     this.session.local = true;
+    console.log('Wrote session head');
   }
 
   async writeBody() {
@@ -194,6 +195,7 @@ export default class SessionCore {
       serializeSessionBodyJSON(this.session.body.toJSON()),
     );
     this.session.local = true;
+    console.log('Wrote session body');
   }
 
   async writeHistory(update?: Partial<t.SessionHistory>) {
@@ -202,6 +204,7 @@ export default class SessionCore {
     settings.history[id] ??= { id, handle: this.session.head.handle, workspace: this.session.workspace };
     if (update) Object.assign(settings.history[id], update);
     await storage.writeJSON(this.session.context.userSettingsPath, settings);
+    console.log('Wrote session history');
   }
 
   async writeHistoryClock(options?: { ifDirtyForLong?: boolean }) {

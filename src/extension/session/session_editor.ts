@@ -77,6 +77,7 @@ export default class SessionEditor {
     };
     this.applyInsertEvent(cmd);
     this.insertSessionCmd(cmd);
+    this.changed();
     return cmd;
   }
 
@@ -107,6 +108,7 @@ export default class SessionEditor {
     };
     this.applyUpdateTrackLastEvent(cmd);
     this.insertSessionCmd(cmd);
+    this.changed();
   }
 
   private applyUpdateTrackLastEvent(cmd: t.UpdateTrackLastEventSessionCmd) {
@@ -146,6 +148,7 @@ export default class SessionEditor {
       this.applyInsertFocus(cmd);
       this.insertSessionCmd(cmd);
     }
+    this.changed();
   }
 
   private applyInsertFocus(cmd: t.InsertFocusSessionCmd) {
@@ -365,11 +368,16 @@ export default class SessionEditor {
     //   this.cutFocusItems(this.editorTrack.focusTimeline.documents, clock);
     //   this.cutFocusItems(this.editorTrack.focusTimeline.lines, clock);
     // }
+
+    // this.changed();
   }
 
+  /**
+   * Called by Session.Core when session is saved.
+   */
   saved() {
     this.dirty = false;
-    this.session.onChange?.();
+    // this.session.onChange?.();
   }
 
   private insertSessionCmd(cmd: t.SessionCmd) {
