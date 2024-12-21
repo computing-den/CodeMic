@@ -67,16 +67,16 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
         title: 'Delete',
         onClick: () => postMessage({ type: 'deleteSession', sessionId: this.props.sessionHead.id }),
       },
-      {
-        icon: 'codicon-repo-forked',
-        title: 'Fork: create a new project based on this one',
-        onClick: () =>
-          postMessage({
-            type: 'recorder/open',
-            sessionId: this.props.sessionHead.id,
-            fork: true,
-          }),
-      },
+      // {
+      //   icon: 'codicon-repo-forked',
+      //   title: 'Fork: create a new project based on this one',
+      //   onClick: () =>
+      //     postMessage({
+      //       type: 'recorder/open',
+      //       sessionId: this.props.sessionHead.id,
+      //       fork: true,
+      //     }),
+      // },
       {
         icon: 'codicon-edit',
         title: 'Edit: open this project in the Studio',

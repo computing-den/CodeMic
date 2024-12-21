@@ -135,23 +135,23 @@ export default class Player extends React.Component<Props> {
     }
 
     const toolbarActions = [
-      {
-        title: 'Fork: create a new project based on this one',
-        icon: 'codicon-repo-forked',
-        onClick: this.fork,
-      },
+      // {
+      //   title: 'Fork: create a new project based on this one',
+      //   icon: 'codicon-repo-forked',
+      //   onClick: this.fork,
+      // },
       {
         title: 'Edit: open this project in the Studio',
         icon: 'codicon-edit',
         onClick: this.edit,
       },
-      {
-        title: 'Bookmark at this point',
-        icon: 'codicon-bookmark',
-        onClick: () => {
-          console.log('TODO');
-        },
-      },
+      // {
+      //   title: 'Bookmark at this point',
+      //   icon: 'codicon-bookmark',
+      //   onClick: () => {
+      //     console.log('TODO');
+      //   },
+      // },
       {
         title: 'Like',
         icon: 'codicon-heart-filled',
