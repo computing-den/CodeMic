@@ -20,8 +20,9 @@ export class Session {
   local: boolean;
   mustScan: boolean;
   // temp means that it's a new session and user is still editing workspace and therefore session
-  // doesn't have a data path.
-  // temp is set to false right before possible vscode restart due to change of workspace when scan is requested.
+  // doesn't have a final data path yet.
+  // core.commitTemp() will finalize its data path, write it to disk and set temp to false. This is done
+  // before possible vscode restart due to change of workspace.
   temp: boolean;
   head: t.SessionHead;
   core: SessionCore;

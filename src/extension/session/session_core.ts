@@ -20,13 +20,20 @@ import { resolveWorkspaceUri } from '../../lib/lib.js';
 export default class SessionCore {
   constructor(public session: Session) {}
 
-  static async fromExisting(
+  static async fromLocal(
     context: Context,
     workspace: string,
     opts?: { mustScan?: boolean },
   ): Promise<Session | undefined> {
     const head = await storage.readJSONOptional<t.SessionHead>(path.join(workspace, '.codemic', 'head.json'));
     return head && new Session(context, workspace, head, { local: true, mustScan: opts?.mustScan });
+  }
+
+  static async fromRemote(context: Context, head: t.SessionHead): Promise<Session> {
+    assert(head.author?.username, 'Session has no author');
+    assert(head.handle, 'Session has no handle');
+    const workspace = path.join(defaultWorkspaceBasePath, head.author.username, head.handle);
+    return new Session(context, workspace, head);
   }
 
   static async sessionExists(workspace: string): Promise<boolean> {
@@ -67,10 +74,10 @@ export default class SessionCore {
   //   baseId: string,
   //   options?: { author?: t.UserSummary },
   // ): Promise<Session | undefined> {
-  //   const base = await SessionCore.fromExisting(context, baseId);
+  //   const base = await SessionCore.fromLocal(context, baseId);
   //   if (base) {
   //     const head = await base.core.fork(options);
-  //     return SessionCore.fromExisting(context, head.id);
+  //     return SessionCore.fromLocal(context, head.id);
   //   }
   // }
 
@@ -167,7 +174,7 @@ export default class SessionCore {
    */
   async commitTemp() {
     if (await Session.Core.sessionExists(this.session.workspace)) {
-      const old = await Session.Core.fromExisting(this.session.context, this.session.workspace);
+      const old = await Session.Core.fromLocal(this.session.context, this.session.workspace);
       if (old) await old.core.delete();
     }
     await fs.promises.cp(this.sessionTempDataPath, this.sessionFinalDataPath, { force: true, recursive: true });

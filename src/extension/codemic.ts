@@ -70,7 +70,7 @@ class CodeMic {
     // if (config.debug && this.webviewProvider.bus) {
     //   try {
     //     const sessionId = 'XXX';
-    //     if (await Session.Core.fromExisting(this.context, sessionId)) {
+    //     if (await Session.Core.fromLocal(this.context, sessionId)) {
     //       // Recorder
     //       await this.handleMessage({ type: 'recorder/open', sessionId });
     //       await this.handleMessage({ type: 'recorder/openTab', tabId: 'editor-view' });
@@ -164,7 +164,7 @@ class CodeMic {
       await this.setWorkspaceChangeGlobalState();
 
       if (sessionId) {
-        const session = await Session.Core.fromExisting(this.context, workspace, {
+        const session = await Session.Core.fromLocal(this.context, workspace, {
           mustScan: recorder?.mustScan,
         });
         assert(session);
@@ -277,17 +277,24 @@ class CodeMic {
       }
       case 'player/open': {
         const history = this.context.settings.history[req.sessionId];
-        // TODO what about sessions that must be downloaded? Or find session id in featured.
-        assert(history, 'TODO session data must be downloaded');
-        if (await this.closeCurrentScreen()) {
-          const session = await Session.Core.fromExisting(this.context, history.workspace);
-          if (!session) {
-            this.showError(new Error(`Session files don't exist.`));
-          } else {
+        const featured = this.featured?.find(s => s.id === req.sessionId);
+        let session: Session | undefined;
+
+        if (history) {
+          session = await Session.Core.fromLocal(this.context, history.workspace);
+        } else if (featured) {
+          session = await Session.Core.fromRemote(this.context, featured);
+        }
+
+        if (session) {
+          if (await this.closeCurrentScreen()) {
             this.setSession(session);
             this.setScreen(t.Screen.Player);
           }
+        } else {
+          this.showError(new Error(`Could not find requested session.`));
         }
+
         this.enqueueFrontendUpdate();
         return ok;
       }
@@ -550,7 +557,7 @@ class CodeMic {
       case 'deleteSession': {
         const history = this.context.settings.history[req.sessionId];
         if (history) {
-          const session = await Session.Core.fromExisting(this.context, history.workspace);
+          const session = await Session.Core.fromLocal(this.context, history.workspace);
           if (session) {
             const confirmTitle = 'Delete';
             const answer = await vscode.window.showWarningMessage(
@@ -589,8 +596,6 @@ class CodeMic {
   }
 
   async openRecorderExistingSession(sessionId: string, clock?: number, fork?: boolean) {
-    let session: Session | undefined;
-
     if (fork) {
       // Fork existing session.
       // const user = this.context.user && lib.userToUserSummary(this.context.user);
@@ -599,17 +604,22 @@ class CodeMic {
       // TODO we may need to download the session. Where to download it to?
       //      what should the handle be? where to store the session data?
       vscode.window.showErrorMessage('TODO: support forking session.');
-    } else {
-      // Edit existing session.
-      const history = this.context.settings.history[sessionId];
-      // TODO what about sessions that must be downloaded? Or find session id in featured.
-      assert(history, 'TODO session data must be downloaded');
-      session = await Session.Core.fromExisting(this.context, history.workspace);
+      return;
+    }
+
+    // Edit existing session.
+    const history = this.context.settings.history[sessionId];
+    const featured = this.featured?.find(s => s.id === sessionId);
+    let session: Session | undefined;
+
+    if (history) {
+      session = await Session.Core.fromLocal(this.context, history.workspace);
+    } else if (featured) {
+      session = await Session.Core.fromRemote(this.context, featured);
+      await session.core.download({ skipIfExists: true });
     }
 
     if (session) {
-      // await session.readBody({ download: true });
-
       if (await this.closeCurrentScreen()) {
         this.setSession(session);
         this.setScreen(t.Screen.Recorder);
@@ -623,6 +633,8 @@ class CodeMic {
         // Must be called after this.setUpWorkspace()
         await this.session!.prepare({ clock });
       }
+    } else {
+      this.showError(new Error(`Could not find requested session.`));
     }
   }
 
@@ -1007,7 +1019,7 @@ class CodeMic {
         clock: this.session.rr?.clock ?? 0,
         workspace: this.session.workspace,
         history: this.context.settings.history[this.session.head.id],
-        coverPhotoUri: VscWorkspace.getCoverPhotoUri(this.session),
+        coverPhotoUri: this.getCoverPhotoCacheUri(this.session.head.id),
         workspaceFocusTimeline: this.session.body?.focusTimeline,
         audioTracks: this.session.body?.audioTracks,
         videoTracks: this.session.body?.videoTracks,
@@ -1024,7 +1036,7 @@ class CodeMic {
       const workspace = VscWorkspace.getDefaultVscWorkspace();
       let current: t.SessionHead | undefined;
       if (workspace) {
-        current = (await Session.Core.fromExisting(this.context, workspace))?.head;
+        current = (await Session.Core.fromLocal(this.context, workspace))?.head;
         if (current) {
           coverPhotosUris[current.id] = this.getCoverPhotoCacheUri(current.id);
         }
@@ -1032,7 +1044,7 @@ class CodeMic {
 
       for (const history of Object.values(this.context.settings.history)) {
         try {
-          const session = await Session.Core.fromExisting(this.context, history.workspace);
+          const session = await Session.Core.fromLocal(this.context, history.workspace);
           if (!session) continue;
 
           coverPhotosUris[session.head.id] = this.getCoverPhotoCacheUri(session.head.id);
