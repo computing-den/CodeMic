@@ -55,7 +55,7 @@ export default class InternalWorkspace {
     this.textEditors = [];
 
     // Apply all events whose clock is 0.
-    this.seek(this.getSeekData(0));
+    await this.seek(this.getSeekData(0));
   }
 
   doesUriExist(uri: string): boolean {
