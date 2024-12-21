@@ -42,9 +42,7 @@ export default async function postMessage<Req extends t.FrontendRequest>(
 // }
 
 async function messageHandler(req: t.BackendRequest): Promise<t.FrontendResponse> {
-  if (getStore().debug) {
-    console.log('webview received: ', req);
-  }
+  // console.log('webview received: ', req);
 
   switch (req.type) {
     case 'updateStore': {
