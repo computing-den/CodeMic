@@ -888,12 +888,19 @@ class CodeMic {
   async updateSessionCoverPhoto(head: t.SessionHead) {
     const p = this.getCoverPhotoCachePath(head.id);
     if (await storage.pathExists(p)) {
+      if (!head.coverPhotoHash) {
+        await fs.promises.rm(p, { force: true });
+        return;
+      }
+
       const buffer = await fs.promises.readFile(p);
       const hash = await misc.computeSHA1(buffer);
       if (hash === head.coverPhotoHash) return;
     }
 
-    await serverApi.downloadSessionCoverPhoto(head.id, p);
+    if (head.coverPhotoHash) {
+      await serverApi.downloadSessionCoverPhoto(head.id, p);
+    }
   }
 
   getCoverPhotoCachePath(id: string): string {
