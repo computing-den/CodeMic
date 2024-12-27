@@ -1,19 +1,20 @@
-import config from './config.js';
+import './config.js'; // Init config
 import WebviewProvider from './webview_provider.js';
 import Session from './session/session.js';
 import * as storage from './storage.js';
 import * as serverApi from './server_api.js';
 import type { Context, RecorderRestoreState, WorkspaceChangeGlobalState } from './types.js';
-import { defaultWorkspaceBasePath, osPaths } from './paths.js';
+import osPaths from './os_paths.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
 import assert from 'assert';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
+import * as paths from '../lib/paths.js';
 import * as misc from './misc.js';
-import * as fs from 'fs';
-import * as path from 'path';
 import VscWorkspace from './session/vsc_workspace.js';
+import Cache from './cache.js';
+import path from 'path';
 
 const SAVE_TIMEOUT_MS = 5_000;
 
@@ -29,7 +30,6 @@ class CodeMic {
   isFrontendDirty = true;
 
   test: any = 0;
-  // localResourceRootsCache: string[] = [];
 
   constructor(public context: Context) {
     context.extension.subscriptions.push(vscode.commands.registerCommand('codemic.openView', this.openView.bind(this)));
@@ -40,11 +40,7 @@ class CodeMic {
       vscode.commands.registerCommand('codemic.account', this.openAccountCommand.bind(this)),
     );
 
-    this.webviewProvider = new WebviewProvider(
-      context.extension,
-      this.handleMessage.bind(this),
-      this.viewOpened.bind(this),
-    );
+    this.webviewProvider = new WebviewProvider(context, this.handleMessage.bind(this), this.viewOpened.bind(this));
 
     context.extension.subscriptions.push(
       vscode.window.registerWebviewViewProvider(WebviewProvider.viewType, this.webviewProvider, {
@@ -52,19 +48,16 @@ class CodeMic {
       }),
     );
 
+    // context.cache.onChange = this.cacheChanged.bind(this);
+
     this.onStartUp().catch(console.error);
   }
 
   async onStartUp() {
     await this.restoreStateAfterRestart();
-    // await this.updateFrontend();
+    await this.updateFrontend();
 
-    await this.updateFeaturedAndUpdateFrontend();
-    // await this.updateFrontend();
-
-    // this.cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(
-    //   this.context.userDataPath.cachedSessionCoverPhotos,
-    // );
+    this.updateFeaturedAndCache().finally(this.updateFrontend.bind(this));
 
     // DEV
     // if (config.debug && this.webviewProvider.bus) {
@@ -91,7 +84,8 @@ class CodeMic {
     const userDataPath = path.join(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
     const userSettingsPath = path.join(userDataPath, 'settings.json');
     const settings = await storage.readJSON<t.Settings>(userSettingsPath, CodeMic.makeDefaultSettings);
-    const context: Context = { extension, user, userDataPath, userSettingsPath, settings };
+    const cache = new Cache();
+    const context: Context = { extension, user, userDataPath, userSettingsPath, settings, cache };
     return new CodeMic(context);
   }
 
@@ -646,7 +640,7 @@ class CodeMic {
     const head = Session.Core.makeNewHead(user);
     const workspace =
       VscWorkspace.getDefaultVscWorkspace() ??
-      path.join(defaultWorkspaceBasePath, user?.username ?? 'anonym', 'new_session');
+      path.join(paths.getDefaultWorkspaceBasePath(osPaths.home), user?.username ?? 'anonym', 'new_session');
 
     // if (!workspace) {
     //   const options = {
@@ -697,7 +691,7 @@ class CodeMic {
       } else {
         const confirmTitle = 'Continue';
         const answer = await vscode.window.showWarningMessage(
-          `Everything inside ${this.session.workspace} may be overwritten.`,
+          `Contents of ${this.session.workspace} will be overwritten during recording and playback.`,
           { modal: true },
           { title: 'Cancel', isCloseAffordance: true },
           { title: confirmTitle },
@@ -872,11 +866,10 @@ class CodeMic {
     try {
       const res = await serverApi.send({ type: 'featured/get' }, this.context.user?.token);
       await Promise.all(
-        res.sessionHeads.map(head =>
-          this.updateSessionCoverPhoto(head).catch(error =>
-            console.error(`Error downloading cover photo of sesstion ${head.id}`, error),
-          ),
-        ),
+        res.sessionHeads.flatMap(head => [
+          this.context.cache.updateCoverPhoto(head),
+          head.author && this.context.cache.updateAvatar(head.author.username),
+        ]),
       );
       this.featured = res.sessionHeads;
     } catch (error) {
@@ -885,44 +878,31 @@ class CodeMic {
     }
   }
 
-  async updateSessionCoverPhoto(head: t.SessionHead) {
-    const p = this.getCoverPhotoCachePath(head.id);
-    if (await storage.pathExists(p)) {
-      if (!head.coverPhotoHash) {
-        await fs.promises.rm(p, { force: true });
-        return;
-      }
+  async updateWorkspaceCache() {
+    try {
+      const workspace = VscWorkspace.getDefaultVscWorkspace();
+      const session = workspace && (await Session.Core.fromLocal(this.context, workspace));
+      if (!session) return;
 
-      const buffer = await fs.promises.readFile(p);
-      const hash = await misc.computeSHA1(buffer);
-      if (hash === head.coverPhotoHash) return;
-    }
-
-    if (head.coverPhotoHash) {
-      await serverApi.downloadSessionCoverPhoto(head.id, p);
+      await Promise.all([
+        session.head.author && this.context.cache.updateAvatar(session.head.author.username),
+        this.context.cache.updateCoverPhotoFromLocal(session.head.id, session.core.dataPath),
+      ]);
+    } catch (error) {
+      console.error(error);
     }
   }
 
-  getCoverPhotoCachePath(id: string): string {
-    return path.join(this.context.userDataPath, 'cover_photos_cache', id);
+  async updateFeaturedAndCache() {
+    Promise.all([
+      this.context.user && this.context.cache.updateAvatar(this.context.user.username),
+      this.updateFeatured(),
+      this.updateWorkspaceCache(),
+    ]);
   }
 
-  getCoverPhotoCacheUri(id: string): string {
-    return this.context.view!.webview.asWebviewUri(vscode.Uri.file(this.getCoverPhotoCachePath(id))).toString();
-  }
-
-  async updateFeaturedAndUpdateFrontend() {
-    await this.updateFeatured();
-    await this.updateFrontend();
-  }
-
-  // async showOpenSessionDialog(): Promise<t.Uri | undefined> {
-  //   const uris = await vscode.window.showOpenDialog({
-  //     canSelectFiles: true,
-  //     canSelectMany: false,
-  //     filters: { CodeMic: ['codemic'] },
-  //   });
-  //   return uris?.[0] && misc.uriFromVsc(uris?.[0]);
+  // async cacheChanged(version: number) {
+  //   await this.context.postMessage?.({ type: 'updateCacheVersion', version });
   // }
 
   openView() {
@@ -949,8 +929,7 @@ class CodeMic {
     this.context.settings = settings;
     this.context.extension.globalState.update('user', user);
 
-    // Don't await.
-    this.updateFeaturedAndUpdateFrontend().catch(console.error);
+    this.updateFeaturedAndCache().finally(this.updateFrontend.bind(this));
 
     await this.openWelcome();
   }
@@ -1002,15 +981,10 @@ class CodeMic {
     return this.context.postMessage?.(req);
   }
 
-  // getCachedSessionCoverPhotoUri(id: string): t.Uri {
+  // getCoverPhotoCacheUri(id: string): string {
   //   return this.context
-  //     .view!.webview.asWebviewUri(vscode.Uri.file(this.context.userDataPath.cachedSessionCoverPhoto(id)))
+  //     .view!.webview.asWebviewUri(vscode.Uri.file(this.context.cache.getCoverPhotoPath(id)))
   //     .toString();
-  // }
-
-  // getCachedSessionCoverPhotosUris(): t.UriMap {
-  //   const pairs = this.featured?.map(s => [s.id, this.getCachedSessionCoverPhotoUri(s.id)]);
-  //   return Object.fromEntries(pairs ?? []);
   // }
 
   async getStore(): Promise<t.Store> {
@@ -1027,28 +1001,31 @@ class CodeMic {
         head: this.session.head,
         clock: this.session.rr?.clock ?? 0,
         workspace: this.session.workspace,
+        dataPath: this.session.core.dataPath,
         history: this.context.settings.history[this.session.head.id],
-        coverPhotoUri: this.getCoverPhotoCacheUri(this.session.head.id),
+        // Get cover photo from cache because session may not be on disk.
+        // coverPhotoUri: this.getCoverPhotoCacheUri(this.session.head.id),
         workspaceFocusTimeline: this.session.body?.focusTimeline,
         audioTracks: this.session.body?.audioTracks,
         videoTracks: this.session.body?.videoTracks,
-        blobsUriMap: this.session.rr?.vscWorkspace.getBlobsUriMap(),
+        // blobsUriMap: this.session.rr?.vscWorkspace.getBlobsUriMap(),
         comments: COMMENTS[this.session.head.id],
       };
     }
 
     let welcome: t.WelcomeUIState | undefined;
     if (this.screen === t.Screen.Welcome) {
-      const coverPhotosUris: t.UriMap = {};
+      // const coverPhotosUris: t.UriMap = {};
+      // const avatarsUris: t.UriMap = {};
       const recent: t.SessionHead[] = [];
 
       const workspace = VscWorkspace.getDefaultVscWorkspace();
       let current: t.SessionHead | undefined;
       if (workspace) {
         current = (await Session.Core.fromLocal(this.context, workspace))?.head;
-        if (current) {
-          coverPhotosUris[current.id] = this.getCoverPhotoCacheUri(current.id);
-        }
+        // if (current) {
+        //   coverPhotosUris[current.id] = this.getCoverPhotoCacheUri(current.id);
+        // }
       }
 
       for (const history of Object.values(this.context.settings.history)) {
@@ -1056,23 +1033,23 @@ class CodeMic {
           const session = await Session.Core.fromLocal(this.context, history.workspace);
           if (!session) continue;
 
-          coverPhotosUris[session.head.id] = this.getCoverPhotoCacheUri(session.head.id);
+          // coverPhotosUris[session.head.id] = this.getCoverPhotoCacheUri(session.head.id);
           recent.push(session.head);
         } catch (error) {
           console.error(error);
         }
       }
 
-      for (const head of this.featured ?? []) {
-        coverPhotosUris[head.id] = this.getCoverPhotoCacheUri(head.id);
-      }
+      // for (const head of this.featured ?? []) {
+      //   coverPhotosUris[head.id] = this.getCoverPhotoCacheUri(head.id);
+      // }
 
       welcome = {
         current,
         recent,
         featured: this.featured || [],
         history: this.context.settings.history,
-        coverPhotosUris,
+        // coverPhotosUris,
       };
     }
 
@@ -1085,10 +1062,11 @@ class CodeMic {
       player: {},
       session,
       test: this.test,
-
-      // The followig values must not change.
-      debug: config.debug,
-      server: config.server,
+      cache: {
+        avatarsPath: this.context.cache.avatarsPath,
+        coverPhotosPath: this.context.cache.coverPhotosPath,
+        version: this.context.cache.version,
+      },
     };
   }
 }

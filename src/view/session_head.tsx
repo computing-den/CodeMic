@@ -4,12 +4,13 @@ import * as lib from '../lib/lib.js';
 import TextToParagraphs from './text_to_paragraphs.jsx';
 import TimeFromNow from './time_from_now.jsx';
 import WithAvatar from './with_avatar.jsx';
-import { cn } from './misc.js';
+import { cn, getCoverPhotoUri } from './misc.js';
 import React from 'react';
 // import Selectable, * as SL from './selectable_li.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
+import { AppContext } from './app_context.jsx';
 
 export type CommonProps = {
   className?: string;
@@ -17,7 +18,6 @@ export type CommonProps = {
 };
 export type ForListProps = CommonProps & {
   history?: t.SessionHistory;
-  coverPhotoUri: string;
 };
 export type ListItemProps = ForListProps & {
   // onOpen: (id: string) => unknown;
@@ -45,6 +45,9 @@ export function SessionHead({ className, withAuthor, sessionHead: s }: NormalPro
 
 export type Action = { icon: string; title: string; onClick: () => unknown };
 export class SessionHeadListItem extends React.Component<ListItemProps> {
+  static contextType = AppContext;
+  declare context: React.ContextType<typeof AppContext>;
+
   clicked = () => postMessage({ type: 'player/open', sessionId: this.props.sessionHead.id });
   actionClicked = (e: React.MouseEvent, a: Action) => {
     e.preventDefault();
@@ -53,7 +56,8 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
   };
 
   render() {
-    const { className, history, sessionHead: s, coverPhotoUri } = this.props;
+    const { cache } = this.context;
+    const { className, history, sessionHead: s } = this.props;
     const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
 
     const actions = _.compact<Action>([
@@ -105,7 +109,7 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
         {s.coverPhotoHash && (
           <div className="cover-photo-container">
             {/*<div className="background" style={{ backgroundImage: `url(${coverPhotoUri})` }} />*/}
-            <img src={coverPhotoUri + `?hash=${s.coverPhotoHash}`} />
+            <img src={getCoverPhotoUri(s.id, cache).toString()} />
           </div>
         )}
         <WithAvatar username={s.author?.username} className="caption" small>
@@ -161,7 +165,6 @@ export type SessionHeadListProps = {
   sessionHeads: t.SessionHead[];
   history: t.SessionsHistory;
   className?: string;
-  coverPhotosUris: t.UriMap;
 };
 type SHPair = [t.SessionHead, t.SessionHistory];
 
@@ -176,11 +179,7 @@ export class SessionHeadList extends React.Component<SessionHeadListProps> {
     return (
       <div className={cn('session-head-list', this.props.className)}>
         {pairs.map(([sessionHead, history]) => (
-          <SessionHeadListItem
-            history={history}
-            sessionHead={sessionHead}
-            coverPhotoUri={this.props.coverPhotosUris[sessionHead.id]}
-          />
+          <SessionHeadListItem history={history} sessionHead={sessionHead} />
         ))}
       </div>
     );

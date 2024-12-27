@@ -15,10 +15,11 @@ import Section from './section.jsx';
 import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
 import Toolbar from './toolbar.jsx';
-import { cn } from './misc.js';
+import { cn, getCoverPhotoUri } from './misc.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeTextArea, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 import Popover, { PopoverProps, usePopover } from './popover.jsx';
+import { AppContext } from './app_context.jsx';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -65,10 +66,7 @@ export default class Recorder extends React.Component<Props> {
   };
 
   updateResources() {
-    const { audioTracks, videoTracks, blobsUriMap } = this.props.session;
-    if (blobsUriMap) {
-      this.mediaManager.updateResources(blobsUriMap, audioTracks, videoTracks);
-    }
+    this.mediaManager.updateResources(this.props.session);
   }
 
   componentDidUpdate() {
@@ -99,6 +97,9 @@ export default class Recorder extends React.Component<Props> {
 type DetailsViewProps = Props & TabViewProps & { onLoadRecorder: () => any };
 
 class DetailsView extends React.Component<DetailsViewProps> {
+  static contextType = AppContext;
+  declare context: React.ContextType<typeof AppContext>;
+
   state = {
     // coverPhotoKey: 0,
   };
@@ -151,6 +152,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
   };
 
   render() {
+    const { cache } = this.context;
     const { session, id, className, onLoadRecorder } = this.props;
     // const { coverPhotoKey } = this.state;
     const { head, workspace, temp } = session;
@@ -159,7 +161,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
       <div id={id} className={className}>
         <div className={cn('cover-photo-container', head.coverPhotoHash && 'has-cover-photo')}>
           {head.coverPhotoHash ? (
-            <img src={session.coverPhotoUri + `?hash=${head.coverPhotoHash}`} />
+            <img src={getCoverPhotoUri(head.id, cache).toString()} />
           ) : (
             <p className="text-weak">NO COVER PHOTO</p>
           )}
@@ -203,7 +205,9 @@ class DetailsView extends React.Component<DetailsViewProps> {
         >
           Workspace
         </PathField>
-        <p className="subsection help text-error">WARNING: everything under workspace will be overwritten.</p>
+        <p className="subsection help">
+          WARNING: workspace contents will be overwritten during recording and playback.
+        </p>
         <VSCodeTextField
           className="subsection"
           placeholder="A-Z a-z 0-9 _ (e.g. my_project)"

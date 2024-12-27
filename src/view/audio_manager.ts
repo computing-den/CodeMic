@@ -2,17 +2,19 @@ import * as t from '../lib/types.js';
 import assert from '../lib/assert.js';
 import postMessage from './api.js';
 import _ from 'lodash';
+import * as misc from './misc.js';
 
 export default class AudioManager {
   trackManagers: { [key: string]: AudioTrackManager } = {};
   // videoManagers: { [key: string]: VideoManager } = {};
   audioContext?: AudioContext;
-  UriMap?: t.UriMap;
+  // UriMap?: t.UriMap;
   audioTracks?: t.AudioTrack[];
+  sessionDataPath?: string;
 
-  updateResources(UriMap: t.UriMap, audioTracks: t.AudioTrack[] = []) {
-    this.UriMap = UriMap;
+  updateResources(audioTracks: t.AudioTrack[] = [], sessionDataPath: string) {
     this.audioTracks = audioTracks;
+    this.sessionDataPath = sessionDataPath;
 
     // Load or dispose audio tracks.
     const newIds = audioTracks.map(a => a.id);
@@ -22,7 +24,7 @@ export default class AudioManager {
     const deletedIds = _.difference(oldIds, newIds);
 
     for (const id of addedIds) {
-      this.trackManagers[id] = new AudioTrackManager(id, UriMap[id]);
+      this.trackManagers[id] = new AudioTrackManager(id, sessionDataPath);
     }
 
     for (const id of deletedIds) this.dispose(id);
@@ -73,7 +75,10 @@ export class AudioTrackManager {
   node?: MediaElementAudioSourceNode;
   prepared = false;
 
-  constructor(public id: string, src: string) {
+  constructor(
+    public id: string,
+    public sessionDataPath: string,
+  ) {
     this.audio = new Audio();
     this.audio.addEventListener('volumechange', this.handleVolumeChange);
     this.audio.addEventListener('timeupdate', this.handleTimeUpdate);
@@ -83,9 +88,9 @@ export class AudioTrackManager {
       this.audio.addEventListener(type, this.handleGenericEvent);
     }
 
-    this.audio.src = src;
+    this.audio.src = misc.asWebviewUri(sessionDataPath, 'blobs', id).toString();
     this.audio.preload = 'auto';
-    console.log(`AudioTrackManager: created audio: ${id} (${src})`);
+    console.log(`AudioTrackManager: created audio: ${id} (${this.audio.src})`);
   }
 
   /**

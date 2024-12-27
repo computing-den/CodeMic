@@ -1,4 +1,5 @@
 import type { ExtensionContext, WebviewView } from 'vscode';
+import type Cache from './cache.js';
 import * as t from '../lib/types.js';
 import _ from 'lodash';
 
@@ -7,6 +8,7 @@ export type Context = {
   userDataPath: string;
   userSettingsPath: string;
   settings: t.Settings;
+  cache: Cache;
   postAudioMessage?: (req: t.BackendAudioRequest) => Promise<t.FrontendAudioResponse>;
   postVideoMessage?: (req: t.BackendVideoRequest) => Promise<t.FrontendVideoResponse>;
   updateFrontend?: () => any;

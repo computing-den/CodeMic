@@ -82,6 +82,7 @@ export type FrontendMediaEvent =
 
 export type BackendToFrontendReqRes =
   | { request: { type: 'updateStore'; store: Store }; response: OKResponse }
+  // | { request: { type: 'updateCacheVersion'; version: number }; response: OKResponse }
   | { request: { type: 'todo' }; response: OKResponse }
   | BackendAudioToFrontendReqRes
   | BackendVideoToFrontendReqRes;
@@ -184,6 +185,12 @@ export enum Screen {
   Loading,
 }
 
+export type WebviewConfig = {
+  webviewUriBase: string;
+  debug: boolean;
+  extensionWebviewUri: string;
+};
+
 export type Store = {
   screen: Screen;
   user?: User;
@@ -192,11 +199,15 @@ export type Store = {
   recorder?: RecorderUIState;
   player?: PlayerUIState;
   session?: SessionUIState;
+  // webviewUriBase: string;
   test?: any;
+  cache: CacheUIState;
+};
 
-  // The followig values must not change.
-  debug: boolean;
-  server: string;
+export type CacheUIState = {
+  avatarsPath: string;
+  coverPhotosPath: string;
+  version: number;
 };
 
 export type User = {
@@ -237,7 +248,7 @@ export type WelcomeUIState = {
   recent: SessionHead[];
   featured: SessionHead[];
   history: SessionsHistory;
-  coverPhotosUris: UriMap;
+  // coverPhotosUris: UriMap;
 };
 
 export type RecorderUIState = {
@@ -261,12 +272,13 @@ export type SessionUIState = {
   head: SessionHead;
   clock: number;
   workspace: string;
-  coverPhotoUri: string;
+  dataPath: string;
+  // coverPhotoUri: string;
   history?: SessionHistory;
   workspaceFocusTimeline?: Focus[];
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
-  blobsUriMap?: UriMap;
+  // blobsUriMap?: UriMap;
   comments?: Comment[];
 };
 
@@ -274,7 +286,7 @@ export type LoadedSessionUIState = SessionUIState & {
   workspaceFocusTimeline: Focus[];
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
-  blobsUriMap: UriMap;
+  // blobsUriMap: UriMap;
   comments: Comment[];
 };
 
@@ -378,7 +390,7 @@ export type AudioTrack = RangedTrackFile;
  */
 export type VideoTrack = RangedTrackFile;
 
-export type UriMap = { [key: string]: string };
+// export type UriMap = { [key: string]: string };
 
 export type OpenDialogOptions = {
   canSelectFiles?: boolean;
@@ -691,4 +703,13 @@ export type SessionHistory = {
   lastRecordedTimestamp?: string;
   lastWatchedTimestamp?: string;
   lastWatchedClock?: number;
+};
+
+export type OSPaths = {
+  home: string;
+  data: string;
+  config: string;
+  cache: string;
+  log: string;
+  temp: string;
 };

@@ -6,6 +6,7 @@ import Recorder from './recorder.jsx';
 import Player from './player.jsx';
 import Loading from './loading.jsx';
 import { PopoverProvider } from './popover.jsx';
+import { AppContextProvider } from './app_context.jsx';
 import _ from 'lodash';
 
 type AppProps = {
@@ -21,5 +22,9 @@ export default function App({ store }: AppProps) {
     [t.Screen.Loading]: <Loading />,
   };
 
-  return <PopoverProvider>{renderers[store.screen]}</PopoverProvider>;
+  return (
+    <AppContextProvider store={store}>
+      <PopoverProvider>{renderers[store.screen]}</PopoverProvider>
+    </AppContextProvider>
+  );
 }

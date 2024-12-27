@@ -23,11 +23,11 @@ type TabWithInputText = Omit<vscode.Tab, 'input'> & {
 export default class VscWorkspace {
   constructor(public session: LoadedSession) {}
 
-  static getCoverPhotoUri(session: Session): string {
-    return session.context
-      .view!.webview.asWebviewUri(vscode.Uri.file(path.join(session.core.sessionDataPath, 'cover_photo')))
-      .toString();
-  }
+  // static getCoverPhotoUri(session: Session): string {
+  //   return session.context
+  //     .view!.webview.asWebviewUri(vscode.Uri.file(path.join(session.core.sessionDataPath, 'cover_photo')))
+  //     .toString();
+  // }
 
   static async getGitAPI(): Promise<git.API> {
     const extension = vscode.extensions.getExtension('vscode.git') as vscode.Extension<git.GitExtension>;
@@ -379,7 +379,7 @@ export default class VscWorkspace {
     switch (vscUri.scheme) {
       case 'file':
         // TODO ignore file
-        if (lib.isBaseOfPath(path.join(this.session.workspace, '.codemic'), vscUri.fsPath)) return false;
+        if (lib.isBaseOfPath(path.join(this.session.workspace, '.CodeMic'), vscUri.fsPath)) return false;
         if (lib.isBaseOfPath(path.join(this.session.workspace, '.git'), vscUri.fsPath)) return false;
 
         return lib.isBaseOfPath(this.session.workspace, vscUri.fsPath);
@@ -527,7 +527,7 @@ export default class VscWorkspace {
       `"${this.session.workspace}" is not empty. Do you want to overwrite it?`,
       {
         modal: true,
-        detail: 'All files in the folder will be overwritten except for those specified in .codemicignore.',
+        detail: 'All files in the folder will be overwritten except for those specified in the ignore file.',
       },
       { title: overwriteTitle },
       { title: 'Cancel', isCloseAffordance: true },
@@ -592,20 +592,20 @@ export default class VscWorkspace {
   //   await fs.promises.mkdir(this.workspace, { recursive: true });
   // }
 
-  getTrackFileUri(trackFile: t.RangedTrackFile): string {
-    assert(trackFile.file.type === 'local');
-    const vscUri = vscode.Uri.file(path.join(this.session.core.sessionDataPath, 'blobs', trackFile.file.sha1));
-    return this.session.context.view!.webview.asWebviewUri(vscUri).toString();
-  }
+  // getTrackFileUri(trackFile: t.RangedTrackFile): string {
+  //   assert(trackFile.file.type === 'local');
+  //   const vscUri = vscode.Uri.file(path.join(this.session.core.sessionDataPath, 'blobs', trackFile.file.sha1));
+  //   return this.session.context.view!.webview.asWebviewUri(vscUri).toString();
+  // }
 
-  getBlobsUriMap(): t.UriMap | undefined {
-    if (this.session.isLoaded()) {
-      return Object.fromEntries(
-        _.concat(
-          this.session.body.audioTracks.map(t => [t.id, this.getTrackFileUri(t)]),
-          this.session.body.videoTracks.map(t => [t.id, this.getTrackFileUri(t)]),
-        ),
-      );
-    }
-  }
+  // getBlobsUriMap(): t.UriMap | undefined {
+  //   if (this.session.isLoaded()) {
+  //     return Object.fromEntries(
+  //       _.concat(
+  //         this.session.body.audioTracks.map(t => [t.id, this.getTrackFileUri(t)]),
+  //         this.session.body.videoTracks.map(t => [t.id, this.getTrackFileUri(t)]),
+  //       ),
+  //     );
+  //   }
+  // }
 }

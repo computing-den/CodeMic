@@ -77,12 +77,13 @@ function handleAxiosError(req: any, error: Error): never {
   }
 }
 
-export function getSessionCoverPhotoURLString(id: string): string {
-  return getURLString('/session-cover-photo', { id });
+export async function downloadSessionCoverPhoto(id: string, dst: string) {
+  const res = await axios.get(getURLString('/session-cover-photo', { id }), { responseType: 'arraybuffer' });
+  await storage.writeBinary(dst, res.data);
 }
 
-export async function downloadSessionCoverPhoto(id: string, dst: string) {
-  const res = await axios.get(getSessionCoverPhotoURLString(id), { responseType: 'arraybuffer' });
+export async function downloadAvatar(username: string, dst: string) {
+  const res = await axios.get(getURLString('/avatar', { username }), { responseType: 'arraybuffer' });
   await storage.writeBinary(dst, res.data);
 }
 

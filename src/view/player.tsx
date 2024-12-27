@@ -12,12 +12,16 @@ import Screen from './screen.jsx';
 import Section from './section.jsx';
 import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
-import { cn } from './misc.js';
+import { cn, getCoverPhotoUri } from './misc.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeDropdown, VSCodeOption, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
+import { AppContext } from './app_context.jsx';
 
 type Props = { user?: t.User; player: t.PlayerUIState; session: t.SessionUIState };
 export default class Player extends React.Component<Props> {
+  static contextType = AppContext;
+  declare context: React.ContextType<typeof AppContext>;
+
   seeking = false;
   mediaManager = new MediaManager();
 
@@ -95,10 +99,7 @@ export default class Player extends React.Component<Props> {
   };
 
   updateResources() {
-    const { audioTracks, videoTracks, blobsUriMap: UriMap } = this.props.session;
-    if (UriMap) {
-      this.mediaManager.updateResources(UriMap, audioTracks, videoTracks);
-    }
+    this.mediaManager.updateResources(this.props.session);
   }
 
   componentDidUpdate() {
@@ -119,6 +120,7 @@ export default class Player extends React.Component<Props> {
   }
 
   render() {
+    const { cache } = this.context;
     const { session, user } = this.props;
     const { head } = session;
 
@@ -192,7 +194,7 @@ export default class Player extends React.Component<Props> {
               duration={head.duration}
             />
             <div id="cover-container" className="cover-container subsection">
-              {head.coverPhotoHash && <img src={session.coverPhotoUri + `?hash=${head.coverPhotoHash}`} />}
+              {head.coverPhotoHash && <img src={getCoverPhotoUri(head.id, cache).toString()} />}
               <video id="guide-video" />
             </div>
             <SessionDescription className="subsection subsection_spaced" sessionHead={head} />

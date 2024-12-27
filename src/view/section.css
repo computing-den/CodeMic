@@ -56,7 +56,7 @@
 .subsection.help {
   color: var(--input-placeholder-foreground);
   margin-top: var(--spacing-small);
-  margin-bottom: var(--spacing-large);
+  margin-bottom: var(--spacing-small);
   font-size: 0.9em;
   & code {
     font-size: inherit;

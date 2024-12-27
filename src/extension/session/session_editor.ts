@@ -272,22 +272,18 @@ export default class SessionEditor {
     // Caculate hash and set head.
     const buffer = await fs.promises.readFile(fsPath);
     const hash = await misc.computeSHA1(buffer);
-    await fs.promises.copyFile(fsPath, path.join(this.session.core.sessionDataPath, 'cover_photo'));
+    await fs.promises.copyFile(fsPath, path.join(this.session.core.dataPath, 'cover_photo'));
     this.session.head.coverPhotoHash = hash;
 
     // Update cover photo cache.
-    const cachePath = path.join(this.session.context.userDataPath, 'cover_photos_cache', this.session.head.id);
-    await storage.ensureContainingDir(cachePath);
-    await fs.promises.copyFile(fsPath, cachePath);
+    await this.session.context.cache.updateCoverPhotoFromLocal(this.session.head.id, this.session.core.dataPath);
 
     this.changed();
   }
 
   async deleteCoverPhoto() {
-    await fs.promises.rm(path.join(this.session.core.sessionDataPath, 'cover_photo'), { force: true });
-    await fs.promises.rm(path.join(this.session.context.userDataPath, 'cover_photos_cache', this.session.head.id), {
-      force: true,
-    });
+    await fs.promises.rm(path.join(this.session.core.dataPath, 'cover_photo'), { force: true });
+    await this.session.context.cache.deleteCoverPhoto(this.session.head.id);
     this.session.head.coverPhotoHash = undefined;
     this.changed();
   }

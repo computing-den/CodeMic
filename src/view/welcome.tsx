@@ -55,27 +55,10 @@ export default class Welcome extends React.Component<Props> {
           </Section.Body>
         </Section>
         {welcome.current && (
-          <SessionsSection
-            title="WORKSPACE"
-            history={welcome.history}
-            sessionHeads={[welcome.current]}
-            coverPhotosUris={welcome.coverPhotosUris}
-          />
+          <SessionsSection title="WORKSPACE" history={welcome.history} sessionHeads={[welcome.current]} />
         )}
-        {recent.length > 0 && (
-          <SessionsSection
-            title="RECENT"
-            history={welcome.history}
-            sessionHeads={recent}
-            coverPhotosUris={welcome.coverPhotosUris}
-          />
-        )}
-        <SessionsSection
-          title="FEATURED"
-          history={welcome.history}
-          sessionHeads={featured}
-          coverPhotosUris={welcome.coverPhotosUris}
-        />
+        {recent.length > 0 && <SessionsSection title="RECENT" history={welcome.history} sessionHeads={recent} />}
+        <SessionsSection title="FEATURED" history={welcome.history} sessionHeads={featured} />
       </Screen>
     );
   }
@@ -86,7 +69,6 @@ type SessionsSectionProps = {
   sessionHeads: t.SessionHead[];
   history: t.SessionsHistory;
   bordered?: boolean;
-  coverPhotosUris: t.UriMap;
 };
 
 type SessionAndHistory = { sessionHead: t.SessionHead; history?: t.SessionHistory };
@@ -105,11 +87,7 @@ class SessionsSection extends React.Component<SessionsSectionProps> {
       <Section className="sessions-section" bordered={this.props.bordered}>
         <Section.Header title={this.props.title} collapsible />
         <Section.Body>
-          <SessionHeadList
-            sessionHeads={this.props.sessionHeads}
-            history={this.props.history}
-            coverPhotosUris={this.props.coverPhotosUris}
-          />
+          <SessionHeadList sessionHeads={this.props.sessionHeads} history={this.props.history} />
         </Section.Body>
       </Section>
     );

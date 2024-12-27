@@ -10,6 +10,9 @@
     display: flex;
     align-items: flex-start;
     flex-shrink: 0;
+    /* background-size: contain; */
+    /* background-position: left center; */
+    /* background-repeat: no-repeat; */
 
     & img {
       width: 42px;

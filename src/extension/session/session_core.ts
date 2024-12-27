@@ -1,12 +1,13 @@
 import { deserializeSessionBody, serializeSessionBodyJSON } from './serialization.js';
+import * as lib from '../../lib/lib.js';
 import * as t from '../../lib/types.js';
 import assert from '../../lib/assert.js';
+import * as paths from '../../lib/paths.js';
 import * as serverApi from '../server_api.js';
-import * as misc from '../misc.js';
 import type { Context, ReadDirOptions } from '../types.js';
 import * as storage from '../storage.js';
+import osPaths from '../os_paths.js';
 import Session from './session.js';
-import { defaultWorkspaceBasePath } from '../paths.js';
 import fs from 'fs';
 import _ from 'lodash';
 import archiver from 'archiver';
@@ -14,8 +15,7 @@ import unzipper from 'unzipper';
 import stream from 'stream';
 import { v4 as uuid } from 'uuid';
 import * as path from 'path';
-import { URI, Utils } from 'vscode-uri';
-import { resolveWorkspaceUri } from '../../lib/lib.js';
+import { URI } from 'vscode-uri';
 
 export default class SessionCore {
   constructor(public session: Session) {}
@@ -27,7 +27,7 @@ export default class SessionCore {
     workspace: string,
     opts?: { mustScan?: boolean },
   ): Promise<Session | undefined> {
-    const head = await storage.readJSONOptional<t.SessionHead>(path.join(workspace, '.codemic', 'head.json'));
+    const head = await storage.readJSONOptional<t.SessionHead>(path.join(workspace, '.CodeMic', 'head.json'));
     if (head) {
       return new Session(context, workspace, head, { local: true, mustScan: opts?.mustScan });
     }
@@ -36,16 +36,16 @@ export default class SessionCore {
   static async fromRemote(context: Context, head: t.SessionHead): Promise<Session> {
     assert(head.author?.username, 'Session has no author');
     assert(head.handle, 'Session has no handle');
-    const workspace = path.join(defaultWorkspaceBasePath, head.author.username, head.handle);
+    const workspace = path.join(paths.getDefaultWorkspaceBasePath(osPaths.home), head.author.username, head.handle);
     return new Session(context, workspace, head);
   }
 
   static async sessionExists(workspace: string): Promise<boolean> {
-    return storage.pathExists(path.join(workspace, '.codemic'));
+    return storage.pathExists(path.join(workspace, '.CodeMic'));
   }
 
   static async fromNew(context: Context, workspace: string, head: t.SessionHead): Promise<Session> {
-    const temp = path.join(context.userDataPath, 'temp');
+    const temp = path.join(context.userDataPath, 'new_session');
     await fs.promises.rm(temp, { recursive: true, force: true });
     await fs.promises.mkdir(temp, { recursive: true });
     return new Session(context, workspace, head, { mustScan: true, temp: true });
@@ -55,7 +55,7 @@ export default class SessionCore {
   //   const history = context.settings.history[head.id];
   //   if (history) return history.workspace;
   //   assert(head.handle, 'Please select a handle');
-  //   return path.abs(defaultWorkspaceBasePath, head.handle);
+  //   return path.abs(paths.getDefaultWorkspaceBasePath(os.homedir()), head.handle);
   // }
 
   static makeNewHead(author?: t.UserSummary): t.SessionHead {
@@ -136,7 +136,7 @@ export default class SessionCore {
     filenames.sort();
     for (const childname of filenames) {
       // TODO ignore file
-      if (childname === '.codemic') continue;
+      if (childname === '.CodeMic') continue;
       if (childname === '.git') continue;
 
       const childRel = path.join(rel, childname);
@@ -157,21 +157,21 @@ export default class SessionCore {
     return res;
   }
 
-  get sessionDataPath(): string {
-    return this.session.temp ? this.sessionTempDataPath : this.sessionFinalDataPath;
+  get dataPath(): string {
+    return this.session.temp ? this.tempDataPath : this.finalDataPath;
   }
 
-  get sessionTempDataPath(): string {
-    return path.join(this.session.context.userDataPath, 'temp');
+  get tempDataPath(): string {
+    return path.join(this.session.context.userDataPath, 'new_session');
   }
 
-  get sessionFinalDataPath(): string {
+  get finalDataPath(): string {
     assert(this.session.workspace);
-    return path.join(this.session.workspace, '.codemic');
+    return path.join(this.session.workspace, '.CodeMic');
   }
 
   resolveUri(uri: string): string {
-    return resolveWorkspaceUri(this.session.workspace, uri);
+    return lib.resolveWorkspaceUri(this.session.workspace, uri);
   }
 
   /**
@@ -182,7 +182,7 @@ export default class SessionCore {
       const old = await Session.Core.fromLocal(this.session.context, this.session.workspace);
       if (old) await old.core.delete();
     }
-    await fs.promises.cp(this.sessionTempDataPath, this.sessionFinalDataPath, { force: true, recursive: true });
+    await fs.promises.cp(this.tempDataPath, this.finalDataPath, { force: true, recursive: true });
     this.session.temp = false;
   }
 
@@ -195,7 +195,7 @@ export default class SessionCore {
 
   async writeHead() {
     assert(this.session.head); // Sometimes head.json becomes blank. Maybe this'll catch the issue?
-    await storage.writeJSON(path.join(this.sessionDataPath, 'head.json'), this.session.head);
+    await storage.writeJSON(path.join(this.dataPath, 'head.json'), this.session.head);
     this.session.local = true;
     console.log('Wrote session head');
   }
@@ -203,7 +203,7 @@ export default class SessionCore {
   async writeBody() {
     assert(this.session.isLoaded(), 'writeBody: body is not yet loaded.');
     await storage.writeJSON(
-      path.join(this.sessionDataPath, 'body.json'),
+      path.join(this.dataPath, 'body.json'),
       serializeSessionBodyJSON(this.session.body.toJSON()),
     );
     this.session.local = true;
@@ -237,24 +237,24 @@ export default class SessionCore {
     this.assertFormatVersionSupport();
 
     if (options?.download) await this.download({ skipIfExists: true });
-    const compact = await storage.readJSON<t.SessionBodyCompact>(path.join(this.sessionDataPath, 'body.json'));
+    const compact = await storage.readJSON<t.SessionBodyCompact>(path.join(this.dataPath, 'body.json'));
     return deserializeSessionBody(compact);
   }
 
   async download(options?: { skipIfExists: boolean }) {
     this.assertFormatVersionSupport();
 
-    if (options?.skipIfExists && (await storage.pathExists(path.join(this.sessionDataPath, 'body.json')))) return;
+    if (options?.skipIfExists && (await storage.pathExists(path.join(this.dataPath, 'body.json')))) return;
 
     await serverApi.downloadSession(
       this.session.head.id,
-      path.join(this.sessionDataPath, 'body.zip'),
+      path.join(this.dataPath, 'body.zip'),
       this.session.context.user?.token,
     );
     // For some reason when stream.pipeline() resolves, the extracted files have not
     // yet been written. So we have to wait on out.promise().
-    const out = unzipper.Extract({ path: this.sessionDataPath, verbose: true });
-    await stream.promises.pipeline(fs.createReadStream(path.join(this.sessionDataPath, 'body.zip')), out);
+    const out = unzipper.Extract({ path: this.dataPath, verbose: true });
+    await stream.promises.pipeline(fs.createReadStream(path.join(this.dataPath, 'body.zip')), out);
     await out.promise();
   }
 
@@ -271,11 +271,11 @@ export default class SessionCore {
   }
 
   async readBlob(sha1: string): Promise<Uint8Array> {
-    return fs.promises.readFile(path.join(this.sessionDataPath, 'blobs', sha1));
+    return fs.promises.readFile(path.join(this.dataPath, 'blobs', sha1));
   }
 
   async writeBlob(sha1: string, data: string | NodeJS.ArrayBufferView) {
-    await fs.promises.writeFile(path.join(this.sessionDataPath, 'blobs', sha1), data, 'utf8');
+    await fs.promises.writeFile(path.join(this.dataPath, 'blobs', sha1), data, 'utf8');
   }
 
   async readFile(file: t.File): Promise<Uint8Array> {
@@ -287,27 +287,27 @@ export default class SessionCore {
   }
 
   async copyToBlob(src: string, sha1: string) {
-    await fs.promises.cp(src, path.join(this.sessionDataPath, 'blobs', sha1), { recursive: true });
+    await fs.promises.cp(src, path.join(this.dataPath, 'blobs', sha1), { recursive: true });
   }
 
   async delete() {
-    await fs.promises.rm(this.sessionDataPath, { force: true, recursive: true });
+    await fs.promises.rm(this.dataPath, { force: true, recursive: true });
     delete this.session.context.settings.history[this.session.head.id];
     await storage.writeJSON(this.session.context.userSettingsPath, this.session.context.settings);
   }
 
   async package() {
-    assert(await storage.pathExists(path.join(this.sessionDataPath, 'body.json')), "Session body doesn't exist");
+    assert(await storage.pathExists(path.join(this.dataPath, 'body.json')), "Session body doesn't exist");
 
     return new Promise<string>((resolve, reject) => {
       // const packagePath = path.abs(os.tmpdir(), this.head.id + '.zip');
 
-      const output = fs.createWriteStream(path.join(this.sessionDataPath, 'body.zip'));
+      const output = fs.createWriteStream(path.join(this.dataPath, 'body.zip'));
       const archive = archiver('zip', { zlib: { level: 9 } });
 
       // 'close' event is fired only when a file descriptor is involved
       output.on('close', () => {
-        resolve(path.join(this.sessionDataPath, 'body.zip'));
+        resolve(path.join(this.dataPath, 'body.zip'));
       });
 
       // This event is fired when the data source is drained no matter what was the data source.
@@ -323,10 +323,10 @@ export default class SessionCore {
 
       archive.pipe(output);
       if (this.session.head.coverPhotoHash) {
-        archive.file(path.join(this.sessionDataPath, 'cover_photo'), { name: 'cover_photo' });
+        archive.file(path.join(this.dataPath, 'cover_photo'), { name: 'cover_photo' });
       }
-      archive.file(path.join(this.sessionDataPath, 'body.json'), { name: 'body.json' });
-      archive.directory(path.join(this.sessionDataPath, 'blobs'), 'blobs');
+      archive.file(path.join(this.dataPath, 'body.json'), { name: 'body.json' });
+      archive.directory(path.join(this.dataPath, 'blobs'), 'blobs');
       archive.finalize();
     });
   }

@@ -2,6 +2,7 @@ import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import assert from '../lib/assert.js';
 import postMessage from './api.js';
+import * as misc from './misc.js';
 import _ from 'lodash';
 
 // export enum MediaStatus {
@@ -14,15 +15,15 @@ import _ from 'lodash';
 
 export default class VideoManager {
   video?: HTMLVideoElement;
-  UriMap?: t.UriMap;
   videoTracks?: t.VideoTrack[];
   curTrackId?: string;
   prepared = false;
+  sessionDataPath?: string;
   constructor() {}
 
-  updateResources(UriMap: t.UriMap, videoTracks: t.VideoTrack[] = []) {
-    this.UriMap = UriMap;
+  updateResources(videoTracks: t.VideoTrack[] = [], sessionDataPath: string) {
     this.videoTracks = videoTracks;
+    this.sessionDataPath = sessionDataPath;
   }
 
   prepare(video: HTMLVideoElement) {
@@ -54,10 +55,8 @@ export default class VideoManager {
     const track = this.videoTracks?.find(t => t.id === id);
     if (!track) return console.error('VideoManager loadTrack: track not found: ', id);
 
-    const uri = this.UriMap?.[id];
-    if (!uri) return console.error('VideoManager loadTrack: webview uri not found: ', id);
-
-    this.video.src = uri;
+    assert(this.sessionDataPath);
+    this.video.src = misc.asWebviewUri(this.sessionDataPath, 'blobs', id).toString();
   }
 
   async play() {

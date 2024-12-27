@@ -1,19 +1,12 @@
-import * as t from '../lib/types.js';
 import * as path from 'path';
 import os from 'os';
 import process from 'process';
 import _ from 'lodash';
-
-export type OSPaths = {
-  data: string;
-  config: string;
-  cache: string;
-  log: string;
-  temp: string;
-};
+import { OSPaths } from '../lib/types';
 
 function macos(name: string): OSPaths {
   return {
+    home: os.homedir(),
     data: path.join(os.homedir(), 'Library', 'Application Support', name),
     config: path.join(os.homedir(), 'Library', 'Preferences', name),
     cache: path.join(os.homedir(), 'Library', 'Caches', name),
@@ -28,6 +21,7 @@ function windows(name: string): OSPaths {
 
   return {
     // Data/config/cache/log are invented by me as Windows isn't opinionated about this
+    home: os.homedir(),
     data: path.join(localAppData, name, 'Data'),
     config: path.join(appData, name, 'Config'),
     cache: path.join(localAppData, name, 'Cache'),
@@ -39,6 +33,7 @@ function windows(name: string): OSPaths {
 // https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 function linux(name: string): OSPaths {
   return {
+    home: os.homedir(),
     data: path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share'), name),
     config: path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), name),
     cache: path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), name),
@@ -54,5 +49,4 @@ function getOSPaths(name: string): OSPaths {
   return linux(name);
 }
 
-export const osPaths = getOSPaths('CodeMic');
-export const defaultWorkspaceBasePath = path.join(os.homedir(), 'CodeMic');
+export default getOSPaths('CodeMic');
