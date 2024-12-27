@@ -71,6 +71,7 @@ export default class SessionCore {
       modificationTimestamp: new Date().toISOString(), // will be overwritten at the end
       toc: [],
       formatVersion: SessionCore.LATEST_FORMAT_VERSION,
+      hasCover: false,
     };
   }
 

@@ -10,6 +10,7 @@ import { v4 as uuid } from 'uuid';
 import { calcClockAfterRangeSpeedChange } from '../../lib/lib.js';
 import { URI } from 'vscode-uri';
 import * as path from 'path';
+import cache from '../cache.js';
 
 export default class SessionEditor {
   dirty = false;
@@ -272,14 +273,14 @@ export default class SessionEditor {
     this.session.head.hasCover = true;
 
     // Update cover cache.
-    await this.session.context.cache.updateCoverFromLocal(this.session.head.id, this.session.core.dataPath);
+    await cache.copyCover(this.session.core.dataPath, this.session.head.id);
 
     this.changed();
   }
 
   async deleteCover() {
     await fs.promises.rm(path.join(this.session.core.dataPath, 'cover'), { force: true });
-    await this.session.context.cache.deleteCover(this.session.head.id);
+    await cache.deleteCover(this.session.head.id);
     this.session.head.hasCover = false;
     this.changed();
   }

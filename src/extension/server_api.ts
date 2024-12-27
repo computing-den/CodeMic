@@ -1,3 +1,4 @@
+import cache from './cache.js';
 import config from './config.js';
 import axios, { AxiosError } from 'axios';
 import * as t from '../lib/types.js';
@@ -15,7 +16,7 @@ export async function send<Req extends t.BackendToServerRequest>(
   try {
     return (await axios.post(getURLString('/api', { token }).toString(), req)).data;
   } catch (error) {
-    handleAxiosError(req, error as Error);
+    handleAxiosError(JSON.stringify(req), error as Error);
   }
 }
 
@@ -37,7 +38,7 @@ export async function publishSession(
       })
     ).data;
   } catch (error) {
-    handleAxiosError('publish_session', error as Error);
+    handleAxiosError('publish session', error as Error);
   }
 }
 
@@ -45,14 +46,24 @@ export async function downloadSession(id: string, dst: string, token?: string) {
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      cancellable: false,
+      cancellable: true,
       title: 'Downloading session',
     },
-    async progress => {
+    async (progress, cancellationToken) => {
       try {
+        const controller = new AbortController();
+        cancellationToken.onCancellationRequested(controller.abort);
+        let lastReportedProgress = 0;
         const res = await axios.get(getURLString('/session', { token, id }), {
+          signal: controller.signal,
           responseType: 'stream',
           maxContentLength: Infinity,
+          onDownloadProgress: e => {
+            if (e.progress !== undefined) {
+              progress.report({ increment: (e.progress - lastReportedProgress) * 100 });
+              lastReportedProgress = e.progress;
+            }
+          },
         });
 
         // const contentLength = res.headers['Content-Length'];
@@ -61,14 +72,14 @@ export async function downloadSession(id: string, dst: string, token?: string) {
         await fs.promises.mkdir(path.dirname(dst), { recursive: true });
         await stream.promises.pipeline(res.data, fs.createWriteStream(dst));
       } catch (error) {
-        handleAxiosError('download_session', error as Error);
+        handleAxiosError('download session', error as Error);
       }
     },
   );
 }
 
-function handleAxiosError(req: any, error: Error): never {
-  console.error('Error for request ', JSON.stringify(req), error);
+function handleAxiosError(label: string, error: Error): never {
+  console.error('Error for request: ', label, error);
   if (error instanceof AxiosError && error.response) {
     console.error(error.response.data);
     throw new Error(error.response.data);
@@ -77,14 +88,14 @@ function handleAxiosError(req: any, error: Error): never {
   }
 }
 
-export async function downloadSessionCover(id: string, dst: string) {
+export async function downloadSessionCover(id: string) {
   const res = await axios.get(getURLString('/session-cover', { id }), { responseType: 'arraybuffer' });
-  await storage.writeBinary(dst, res.data);
+  await cache.writeCover(id, res.data);
 }
 
-export async function downloadAvatar(username: string, dst: string) {
+export async function downloadAvatar(username: string) {
   const res = await axios.get(getURLString('/avatar', { username }), { responseType: 'arraybuffer' });
-  await storage.writeBinary(dst, res.data);
+  await cache.writeAvatar(username, res.data);
 }
 
 function getURLString(pathname: string, paramsObj: Record<string, string | undefined>): string {

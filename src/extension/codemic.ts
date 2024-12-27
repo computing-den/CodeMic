@@ -15,6 +15,7 @@ import * as misc from './misc.js';
 import VscWorkspace from './session/vsc_workspace.js';
 import Cache from './cache.js';
 import path from 'path';
+import cache from './cache.js';
 
 const SAVE_TIMEOUT_MS = 5_000;
 
@@ -84,8 +85,7 @@ class CodeMic {
     const userDataPath = path.join(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
     const userSettingsPath = path.join(userDataPath, 'settings.json');
     const settings = await storage.readJSON<t.Settings>(userSettingsPath, CodeMic.makeDefaultSettings);
-    const cache = new Cache();
-    const context: Context = { extension, user, userDataPath, userSettingsPath, settings, cache };
+    const context: Context = { extension, user, userDataPath, userSettingsPath, settings };
     return new CodeMic(context);
   }
 
@@ -862,12 +862,14 @@ class CodeMic {
   async updateFeatured() {
     try {
       const res = await serverApi.send({ type: 'featured/get' }, this.context.user?.token);
-      await Promise.all(
+
+      await Promise.allSettled(
         res.sessionHeads.flatMap(head => [
-          this.context.cache.updateCover(head),
-          head.author && this.context.cache.updateAvatar(head.author.username),
+          serverApi.downloadSessionCover(head.id),
+          head.author && serverApi.downloadAvatar(head.author.username),
         ]),
-      );
+      ).then(lib.logRejectedPromises);
+
       this.featured = res.sessionHeads;
     } catch (error) {
       console.error(error);
@@ -876,26 +878,22 @@ class CodeMic {
   }
 
   async updateWorkspaceCache() {
-    try {
-      const workspace = VscWorkspace.getDefaultVscWorkspace();
-      const session = workspace && (await Session.Core.fromLocal(this.context, workspace));
-      if (!session) return;
+    const workspace = VscWorkspace.getDefaultVscWorkspace();
+    const session = workspace && (await Session.Core.fromLocal(this.context, workspace));
+    if (!session) return;
 
-      await Promise.all([
-        session.head.author && this.context.cache.updateAvatar(session.head.author.username),
-        this.context.cache.updateCoverFromLocal(session.head.id, session.core.dataPath),
-      ]);
-    } catch (error) {
-      console.error(error);
-    }
+    await Promise.allSettled([
+      session.head.author && serverApi.downloadAvatar(session.head.author.username),
+      cache.copyCover(session.core.dataPath, session.head.id),
+    ]).then(lib.logRejectedPromises);
   }
 
   async updateFeaturedAndCache() {
-    Promise.all([
-      this.context.user && this.context.cache.updateAvatar(this.context.user.username),
+    await Promise.allSettled([
+      this.context.user && serverApi.downloadAvatar(this.context.user.username),
       this.updateFeatured(),
       this.updateWorkspaceCache(),
-    ]);
+    ]).then(lib.logRejectedPromises);
   }
 
   // async cacheChanged(version: number) {
@@ -1058,9 +1056,9 @@ class CodeMic {
       session,
       test: this.test,
       cache: {
-        avatarsPath: this.context.cache.avatarsPath,
-        coversPath: this.context.cache.coversPath,
-        version: this.context.cache.version,
+        avatarsPath: cache.avatarsPath,
+        coversPath: cache.coversPath,
+        version: cache.version,
       },
     };
   }
