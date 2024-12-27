@@ -101,7 +101,7 @@ export default class SessionCore {
   //     modificationTimestamp: this.session.head.modificationTimestamp,
   //     toc: this.session.head.toc,
   //     forkedFrom: this.session.head.id,
-  //     hasCoverPhoto: this.session.head.hasCoverPhoto,
+  //     hasCover: this.session.head.hasCover,
   //   };
 
   //   // Copy the entire session data, then rewrite the head.
@@ -322,8 +322,8 @@ export default class SessionCore {
       });
 
       archive.pipe(output);
-      if (this.session.head.coverPhotoHash) {
-        archive.file(path.join(this.dataPath, 'cover_photo'), { name: 'cover_photo' });
+      if (this.session.head.hasCover) {
+        archive.file(path.join(this.dataPath, 'cover'), { name: 'cover' });
       }
       archive.file(path.join(this.dataPath, 'body.json'), { name: 'body.json' });
       archive.directory(path.join(this.dataPath, 'blobs'), 'blobs');

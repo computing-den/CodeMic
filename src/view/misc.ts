@@ -10,8 +10,8 @@ export function asWebviewUri(...paths: string[]): URI {
   return Utils.joinPath(URI.parse(config.webviewUriBase), ...paths);
 }
 
-export function getCoverPhotoUri(sessionId: string, cache: CacheUIState): URI {
-  return asWebviewUri(cache.coverPhotosPath, sessionId).with({ query: `v=${cache.version}` });
+export function getCoverUri(sessionId: string, cache: CacheUIState): URI {
+  return asWebviewUri(cache.coversPath, sessionId).with({ query: `v=${cache.version}` });
 }
 
 export function getAvatarUri(username: string, cache: CacheUIState): URI {

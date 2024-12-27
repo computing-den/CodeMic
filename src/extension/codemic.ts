@@ -475,16 +475,16 @@ class CodeMic {
         this.enqueueFrontendUpdate();
         return ok;
       }
-      case 'recorder/setCoverPhoto': {
+      case 'recorder/setCover': {
         // assert(this.session?.isLoaded());
         assert(this.session);
-        await this.session.editor.setCoverPhoto(req.uri);
+        await this.session.editor.setCover(req.uri);
         this.enqueueFrontendUpdate();
         return ok;
       }
-      case 'recorder/deleteCoverPhoto': {
+      case 'recorder/deleteCover': {
         assert(this.session?.isLoaded());
-        await this.session.editor.deleteCoverPhoto();
+        await this.session.editor.deleteCover();
         this.enqueueFrontendUpdate();
         return ok;
       }
@@ -656,9 +656,6 @@ class CodeMic {
     const session = await Session.Core.fromNew(this.context, workspace, head);
 
     if (await this.closeCurrentScreen()) {
-      // // We want the files on disk so that we can add the cover photo there too.
-      // await session.core.write();
-
       this.setSession(session);
       this.setScreen(t.Screen.Recorder);
       this.recorder = { tabId: 'details-view' };
@@ -867,7 +864,7 @@ class CodeMic {
       const res = await serverApi.send({ type: 'featured/get' }, this.context.user?.token);
       await Promise.all(
         res.sessionHeads.flatMap(head => [
-          this.context.cache.updateCoverPhoto(head),
+          this.context.cache.updateCover(head),
           head.author && this.context.cache.updateAvatar(head.author.username),
         ]),
       );
@@ -886,7 +883,7 @@ class CodeMic {
 
       await Promise.all([
         session.head.author && this.context.cache.updateAvatar(session.head.author.username),
-        this.context.cache.updateCoverPhotoFromLocal(session.head.id, session.core.dataPath),
+        this.context.cache.updateCoverFromLocal(session.head.id, session.core.dataPath),
       ]);
     } catch (error) {
       console.error(error);
@@ -919,10 +916,8 @@ class CodeMic {
     const userDataPath = path.join(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
     const userSettingsPath = path.join(userDataPath, 'settings.json');
     const settings = await storage.readJSON<t.Settings>(userSettingsPath, CodeMic.makeDefaultSettings);
-    // const cachedSessionCoverPhotos = await storage.readCachedSessionCoverPhotos(userDataPath.cachedSessionCoverPhotos);
 
     this.session = undefined;
-    // this.cachedSessionCoverPhotos = cachedSessionCoverPhotos;
     this.context.user = user;
     this.context.userDataPath = userDataPath;
     this.context.userSettingsPath = userSettingsPath;
@@ -981,9 +976,9 @@ class CodeMic {
     return this.context.postMessage?.(req);
   }
 
-  // getCoverPhotoCacheUri(id: string): string {
+  // getCoverCacheUri(id: string): string {
   //   return this.context
-  //     .view!.webview.asWebviewUri(vscode.Uri.file(this.context.cache.getCoverPhotoPath(id)))
+  //     .view!.webview.asWebviewUri(vscode.Uri.file(this.context.cache.getCoverPath(id)))
   //     .toString();
   // }
 
@@ -1003,8 +998,8 @@ class CodeMic {
         workspace: this.session.workspace,
         dataPath: this.session.core.dataPath,
         history: this.context.settings.history[this.session.head.id],
-        // Get cover photo from cache because session may not be on disk.
-        // coverPhotoUri: this.getCoverPhotoCacheUri(this.session.head.id),
+        // Get cover from cache because session may not be on disk.
+        // coverUri: this.getCoverCacheUri(this.session.head.id),
         workspaceFocusTimeline: this.session.body?.focusTimeline,
         audioTracks: this.session.body?.audioTracks,
         videoTracks: this.session.body?.videoTracks,
@@ -1015,7 +1010,7 @@ class CodeMic {
 
     let welcome: t.WelcomeUIState | undefined;
     if (this.screen === t.Screen.Welcome) {
-      // const coverPhotosUris: t.UriMap = {};
+      // const coversUris: t.UriMap = {};
       // const avatarsUris: t.UriMap = {};
       const recent: t.SessionHead[] = [];
 
@@ -1024,7 +1019,7 @@ class CodeMic {
       if (workspace) {
         current = (await Session.Core.fromLocal(this.context, workspace))?.head;
         // if (current) {
-        //   coverPhotosUris[current.id] = this.getCoverPhotoCacheUri(current.id);
+        //   coversUris[current.id] = this.getCoverCacheUri(current.id);
         // }
       }
 
@@ -1033,7 +1028,7 @@ class CodeMic {
           const session = await Session.Core.fromLocal(this.context, history.workspace);
           if (!session) continue;
 
-          // coverPhotosUris[session.head.id] = this.getCoverPhotoCacheUri(session.head.id);
+          // coversUris[session.head.id] = this.getCoverCacheUri(session.head.id);
           recent.push(session.head);
         } catch (error) {
           console.error(error);
@@ -1041,7 +1036,7 @@ class CodeMic {
       }
 
       // for (const head of this.featured ?? []) {
-      //   coverPhotosUris[head.id] = this.getCoverPhotoCacheUri(head.id);
+      //   coversUris[head.id] = this.getCoverCacheUri(head.id);
       // }
 
       welcome = {
@@ -1049,7 +1044,7 @@ class CodeMic {
         recent,
         featured: this.featured || [],
         history: this.context.settings.history,
-        // coverPhotosUris,
+        // coversUris,
       };
     }
 
@@ -1064,7 +1059,7 @@ class CodeMic {
       test: this.test,
       cache: {
         avatarsPath: this.context.cache.avatarsPath,
-        coverPhotosPath: this.context.cache.coverPhotosPath,
+        coversPath: this.context.cache.coversPath,
         version: this.context.cache.version,
       },
     };

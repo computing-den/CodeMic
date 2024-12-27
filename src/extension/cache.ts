@@ -18,65 +18,51 @@ export default class Cache {
 
   constructor() {}
 
-  async updateCoverPhoto(head: t.SessionHead) {
+  async updateCover(head: t.SessionHead) {
     try {
-      const p = this.getCoverPhotoPath(head.id);
-      if (await storage.pathExists(p)) {
-        if (!head.coverPhotoHash) {
-          await fs.promises.rm(p, { force: true });
-          this.changed();
-          return;
-        }
-
-        const buffer = await fs.promises.readFile(p);
-        const hash = await misc.computeSHA1(buffer);
-        if (hash === head.coverPhotoHash) return;
-      }
-
-      if (head.coverPhotoHash) {
-        await serverApi.downloadSessionCoverPhoto(head.id, p);
+      if (head.hasCover) {
+        await serverApi.downloadSessionCover(head.id, this.getCoverPath(head.id));
         this.changed();
       }
     } catch (error) {
-      console.error(`Error downloading cover photo of sesstion ${head.id}`, error);
+      console.error(`Error downloading cover of sesstion ${head.id}`, error);
     }
   }
 
-  async updateCoverPhotoFromLocal(id: string, sessionDataPath: string) {
-    const src = path.join(sessionDataPath, 'cover_photo');
+  async updateCoverFromLocal(id: string, sessionDataPath: string) {
+    const src = path.join(sessionDataPath, 'cover');
     if (await storage.pathExists(src)) {
-      const dst = this.getCoverPhotoPath(id);
+      const dst = this.getCoverPath(id);
       await storage.ensureContainingDir(dst);
       await fs.promises.copyFile(src, dst);
       this.changed();
     }
   }
 
-  async deleteCoverPhoto(id: string) {
-    await fs.promises.rm(this.getCoverPhotoPath(id), { force: true });
+  async deleteCover(id: string) {
+    await fs.promises.rm(this.getCoverPath(id), { force: true });
     this.changed();
   }
 
   async updateAvatar(username: string) {
     try {
-      const p = this.getAvatarPath(username);
-      await serverApi.downloadAvatar(username, p);
+      await serverApi.downloadAvatar(username, this.getAvatarPath(username));
       this.changed();
     } catch (error) {
       console.error(`Error downloading avatar of user ${username}`, error);
     }
   }
 
-  get coverPhotosPath(): string {
-    return path.join(osPaths.cache, 'cover_photos_cache');
+  get coversPath(): string {
+    return path.join(osPaths.cache, 'covers');
   }
 
   get avatarsPath(): string {
     return path.join(osPaths.cache, 'avatars_cache');
   }
 
-  getCoverPhotoPath(id: string): string {
-    return path.join(this.coverPhotosPath, id);
+  getCoverPath(id: string): string {
+    return path.join(this.coversPath, id);
   }
 
   getAvatarPath(username: string): string {

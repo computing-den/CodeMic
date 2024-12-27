@@ -4,7 +4,7 @@ import * as lib from '../lib/lib.js';
 import TextToParagraphs from './text_to_paragraphs.jsx';
 import TimeFromNow from './time_from_now.jsx';
 import WithAvatar from './with_avatar.jsx';
-import { cn, getCoverPhotoUri } from './misc.js';
+import { cn, getCoverUri } from './misc.js';
 import React from 'react';
 // import Selectable, * as SL from './selectable_li.jsx';
 import postMessage from './api.js';
@@ -99,17 +99,17 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
     //   <SessionHeadForList
     //     sessionHead={this.props.sessionHead}
     //     history={this.props.history}
-    //     coverPhotoUri={this.props.coverPhotoUri}
+    //     coverUri={this.props.coverUri}
     //   />
     // );
     // }
 
     return (
       <div className={cn('session-head-list-item', className)} onClick={this.clicked} tabIndex={0}>
-        {s.coverPhotoHash && (
-          <div className="cover-photo-container">
-            {/*<div className="background" style={{ backgroundImage: `url(${coverPhotoUri})` }} />*/}
-            <img src={getCoverPhotoUri(s.id, cache).toString()} />
+        {s.hasCover && (
+          <div className="cover-container">
+            {/*<div className="background" style={{ backgroundImage: `url(${coverUri})` }} />*/}
+            <img src={getCoverUri(s.id, cache).toString()} />
           </div>
         )}
         <WithAvatar username={s.author?.username} className="caption" small>

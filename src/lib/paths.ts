@@ -7,7 +7,7 @@ export function getDefaultWorkspaceBasePath(home: string): string {
   return path.join(home, 'CodeMic');
 }
 
-// export type SessionDataPathOpts = 'head.json' | 'body.json' | 'body.zip' | 'cover_photo' | 'blobs' | { blob: string };
+// export type SessionDataPathOpts = 'head.json' | 'body.json' | 'body.zip' | 'cover' | 'blobs' | { blob: string };
 
 // export function fromWorkspace(opts?: SessionDataPathOpts): string[] {
 //   return ['.CodeMic', ...fromSessionData(opts)];
@@ -18,7 +18,7 @@ export function getDefaultWorkspaceBasePath(home: string): string {
 //   if (opts === 'head.json') return ['head.json'];
 //   if (opts === 'body.json') return ['body.json'];
 //   if (opts === 'body.zip') return ['body.zip'];
-//   if (opts === 'cover_photo') return ['cover_photo'];
+//   if (opts === 'cover') return ['cover'];
 //   if (opts === 'blobs') return ['blobs'];
 //   if ('blob' in opts) return ['blobs', opts.blob];
 

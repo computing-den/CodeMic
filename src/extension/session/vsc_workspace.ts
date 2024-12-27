@@ -23,9 +23,9 @@ type TabWithInputText = Omit<vscode.Tab, 'input'> & {
 export default class VscWorkspace {
   constructor(public session: LoadedSession) {}
 
-  // static getCoverPhotoUri(session: Session): string {
+  // static getCoverUri(session: Session): string {
   //   return session.context
-  //     .view!.webview.asWebviewUri(vscode.Uri.file(path.join(session.core.sessionDataPath, 'cover_photo')))
+  //     .view!.webview.asWebviewUri(vscode.Uri.file(path.join(session.core.sessionDataPath, 'cover')))
   //     .toString();
   // }
 

@@ -4,7 +4,7 @@
 
     &:has(video:not([src])),
     &:has(video[src='']) {
-      .cover-photo-container {
+      .cover-container {
         display: flex;
       }
     }
@@ -12,7 +12,7 @@
     .media-toolbar {
     }
 
-    /* .cover-photo-container { */
+    /* .cover-container { */
     /*   border-radius: 5px; */
     /*   /\* display: flex; *\/ */
     /*   justify-content: center; */

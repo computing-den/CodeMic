@@ -266,25 +266,21 @@ export default class SessionEditor {
     this.changed();
   }
 
-  async setCoverPhoto(uri: string) {
-    const fsPath = URI.parse(uri).fsPath;
+  async setCover(uri: string) {
+    // Copy file and set head.
+    await fs.promises.copyFile(URI.parse(uri).fsPath, path.join(this.session.core.dataPath, 'cover'));
+    this.session.head.hasCover = true;
 
-    // Caculate hash and set head.
-    const buffer = await fs.promises.readFile(fsPath);
-    const hash = await misc.computeSHA1(buffer);
-    await fs.promises.copyFile(fsPath, path.join(this.session.core.dataPath, 'cover_photo'));
-    this.session.head.coverPhotoHash = hash;
-
-    // Update cover photo cache.
-    await this.session.context.cache.updateCoverPhotoFromLocal(this.session.head.id, this.session.core.dataPath);
+    // Update cover cache.
+    await this.session.context.cache.updateCoverFromLocal(this.session.head.id, this.session.core.dataPath);
 
     this.changed();
   }
 
-  async deleteCoverPhoto() {
-    await fs.promises.rm(path.join(this.session.core.dataPath, 'cover_photo'), { force: true });
-    await this.session.context.cache.deleteCoverPhoto(this.session.head.id);
-    this.session.head.coverPhotoHash = undefined;
+  async deleteCover() {
+    await fs.promises.rm(path.join(this.session.core.dataPath, 'cover'), { force: true });
+    await this.session.context.cache.deleteCover(this.session.head.id);
+    this.session.head.hasCover = false;
     this.changed();
   }
 

@@ -7,7 +7,7 @@ export type AppContextValue = {
 };
 
 export const AppContext = createContext<AppContextValue>({
-  cache: { avatarsPath: '', coverPhotosPath: '', version: 0 },
+  cache: { avatarsPath: '', coversPath: '', version: 0 },
 });
 
 export function AppContextProvider(props: { store: t.Store; children: React.ReactNode }) {

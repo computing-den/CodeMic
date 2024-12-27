@@ -12,7 +12,7 @@ import Screen from './screen.jsx';
 import Section from './section.jsx';
 import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
-import { cn, getCoverPhotoUri } from './misc.js';
+import { cn, getCoverUri } from './misc.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeDropdown, VSCodeOption, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 import { AppContext } from './app_context.jsx';
@@ -194,7 +194,7 @@ export default class Player extends React.Component<Props> {
               duration={head.duration}
             />
             <div id="cover-container" className="cover-container subsection">
-              {head.coverPhotoHash && <img src={getCoverPhotoUri(head.id, cache).toString()} />}
+              {head.hasCover && <img src={getCoverUri(head.id, cache).toString()} />}
               <video id="guide-video" />
             </div>
             <SessionDescription className="subsection subsection_spaced" sessionHead={head} />

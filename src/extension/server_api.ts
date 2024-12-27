@@ -77,8 +77,8 @@ function handleAxiosError(req: any, error: Error): never {
   }
 }
 
-export async function downloadSessionCoverPhoto(id: string, dst: string) {
-  const res = await axios.get(getURLString('/session-cover-photo', { id }), { responseType: 'arraybuffer' });
+export async function downloadSessionCover(id: string, dst: string) {
+  const res = await axios.get(getURLString('/session-cover', { id }), { responseType: 'arraybuffer' });
   await storage.writeBinary(dst, res.data);
 }
 

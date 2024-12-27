@@ -15,7 +15,7 @@ import Section from './section.jsx';
 import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
 import Toolbar from './toolbar.jsx';
-import { cn, getCoverPhotoUri } from './misc.js';
+import { cn, getCoverUri } from './misc.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeTextArea, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 import Popover, { PopoverProps, usePopover } from './popover.jsx';
@@ -101,7 +101,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
   declare context: React.ContextType<typeof AppContext>;
 
   state = {
-    // coverPhotoKey: 0,
+    // coverKey: 0,
   };
   titleChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
     const changes = { title: (e.target as HTMLInputElement).value };
@@ -131,7 +131,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
     await postMessage({ type: 'recorder/publish' });
   };
 
-  pickCoverPhoto = async (e: React.MouseEvent) => {
+  pickCover = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const { uris } = await postMessage({
@@ -142,42 +142,42 @@ class DetailsView extends React.Component<DetailsViewProps> {
       },
     });
     if (uris?.length === 1) {
-      await postMessage({ type: 'recorder/setCoverPhoto', uri: uris[0] });
-      // this.setState({ coverPhotoKey: this.state.coverPhotoKey + 1 });
+      await postMessage({ type: 'recorder/setCover', uri: uris[0] });
+      // this.setState({ coverKey: this.state.coverKey + 1 });
     }
   };
 
-  deleteCoverPhoto = async () => {
-    await postMessage({ type: 'recorder/deleteCoverPhoto' });
+  deleteCover = async () => {
+    await postMessage({ type: 'recorder/deleteCover' });
   };
 
   render() {
     const { cache } = this.context;
     const { session, id, className, onLoadRecorder } = this.props;
-    // const { coverPhotoKey } = this.state;
+    // const { coverKey } = this.state;
     const { head, workspace, temp } = session;
 
     return (
       <div id={id} className={className}>
-        <div className={cn('cover-photo-container', head.coverPhotoHash && 'has-cover-photo')}>
-          {head.coverPhotoHash ? (
-            <img src={getCoverPhotoUri(head.id, cache).toString()} />
+        <div className={cn('cover-container', head.hasCover && 'has-cover')}>
+          {head.hasCover ? (
+            <img src={getCoverUri(head.id, cache).toString()} />
           ) : (
             <p className="text-weak">NO COVER PHOTO</p>
           )}
           <div className="buttons">
-            {head.coverPhotoHash && (
+            {head.hasCover && (
               <VSCodeButton
                 className="delete"
                 appearance="secondary"
                 title="Delete cover photo"
-                onClick={this.deleteCoverPhoto}
+                onClick={this.deleteCover}
               >
                 Delete cover
               </VSCodeButton>
             )}
-            <VSCodeButton className="pick" onClick={this.pickCoverPhoto}>
-              {head.coverPhotoHash ? 'Change cover' : 'Pick cover'}
+            <VSCodeButton className="pick" onClick={this.pickCover}>
+              {head.hasCover ? 'Change cover' : 'Pick cover'}
             </VSCodeButton>
           </div>
         </div>

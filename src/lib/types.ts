@@ -41,8 +41,8 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/insertVideo'; uri: string; clock: number }; response: OKResponse }
   | { request: { type: 'recorder/deleteVideo'; id: string }; response: OKResponse }
   | { request: { type: 'recorder/updateVideo'; video: Partial<VideoTrack> & { id: string } }; response: OKResponse }
-  | { request: { type: 'recorder/setCoverPhoto'; uri: string }; response: OKResponse }
-  | { request: { type: 'recorder/deleteCoverPhoto' }; response: OKResponse }
+  | { request: { type: 'recorder/setCover'; uri: string }; response: OKResponse }
+  | { request: { type: 'recorder/deleteCover' }; response: OKResponse }
   | { request: { type: 'recorder/changeSpeed'; range: ClockRange; factor: number }; response: OKResponse }
   | { request: { type: 'recorder/merge'; range: ClockRange }; response: OKResponse }
   | { request: { type: 'recorder/insertGap'; clock: number; dur: number }; response: OKResponse }
@@ -206,7 +206,7 @@ export type Store = {
 
 export type CacheUIState = {
   avatarsPath: string;
-  coverPhotosPath: string;
+  coversPath: string;
   version: number;
 };
 
@@ -248,7 +248,7 @@ export type WelcomeUIState = {
   recent: SessionHead[];
   featured: SessionHead[];
   history: SessionsHistory;
-  // coverPhotosUris: UriMap;
+  // coversUris: UriMap;
 };
 
 export type RecorderUIState = {
@@ -273,7 +273,7 @@ export type SessionUIState = {
   clock: number;
   workspace: string;
   dataPath: string;
-  // coverPhotoUri: string;
+  // coverUri: string;
   history?: SessionHistory;
   workspaceFocusTimeline?: Focus[];
   audioTracks?: AudioTrack[];
@@ -315,7 +315,7 @@ export type SessionHead = {
   modificationTimestamp: string;
   toc: TocItem[];
   forkedFrom?: string;
-  coverPhotoHash?: string;
+  hasCover: boolean;
   formatVersion: number;
 };
 

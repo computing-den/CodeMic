@@ -7,7 +7,7 @@
     #details-view {
       padding: var(--container-padding-ver) var(--container-padding-hor);
 
-      .cover-photo-container {
+      .cover-container {
         border: var(--cover-container-border);
         border-radius: var(--card-border-radius);
         margin-bottom: 0;
@@ -19,7 +19,7 @@
         background: var(--background-secondary);
         min-height: 150px;
 
-        &.has-cover-photo {
+        &.has-cover {
           background: #1f1f1f;
         }
 
