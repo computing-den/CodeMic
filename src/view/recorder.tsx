@@ -105,22 +105,22 @@ class DetailsView extends React.Component<DetailsViewProps> {
   };
   titleChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
     const changes = { title: (e.target as HTMLInputElement).value };
-    await postMessage({ type: 'recorder/update', changes });
+    await postMessage({ type: 'recorder/updateDetails', changes });
   };
 
   handleChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
     const changes = { handle: (e.target as HTMLInputElement).value.replace(/[^A-Za-z0-9_]/g, '') };
-    await postMessage({ type: 'recorder/update', changes });
+    await postMessage({ type: 'recorder/updateDetails', changes });
   };
 
   workspaceChanged = async (workspace: string) => {
     const changes = { workspace };
-    await postMessage({ type: 'recorder/update', changes });
+    await postMessage({ type: 'recorder/updateDetails', changes });
   };
 
   descriptionChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
     const changes = { description: (e.target as HTMLInputElement).value };
-    await postMessage({ type: 'recorder/update', changes });
+    await postMessage({ type: 'recorder/updateDetails', changes });
   };
 
   save = async () => {
@@ -731,9 +731,9 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     console.log('trackDragged', track, clock, clockDiff);
 
     if (this.trackDragStart.type === 'audio') {
-      await postMessage({ type: 'recorder/updateAudio', audio: { id: track.id, clockRange } });
+      await postMessage({ type: 'recorder/updateAudio', update: { id: track.id, clockRange } });
     } else if (this.trackDragStart.type === 'video') {
-      await postMessage({ type: 'recorder/updateVideo', video: { id: track.id, clockRange } });
+      await postMessage({ type: 'recorder/updateVideo', update: { id: track.id, clockRange } });
     }
   };
 
@@ -756,7 +756,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     const clock = this.getClockUnderMouse(e.nativeEvent);
     if (clock !== undefined && this.markerDragStart?.type === 'end') {
       const duration = Math.max(0, clock);
-      await postMessage({ type: 'recorder/update', changes: { duration } });
+      await postMessage({ type: 'recorder/updateDuration', duration });
     }
   };
 

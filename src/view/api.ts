@@ -81,7 +81,7 @@ async function messageHandler(req: t.BackendRequest): Promise<t.FrontendResponse
       return { type: 'ok' };
     }
     case 'video/loadTrack': {
-      mediaManager?.videoManager.loadTrack(req.id);
+      mediaManager?.videoManager.loadTrack(req.track);
       return { type: 'ok' };
     }
     case 'video/play': {

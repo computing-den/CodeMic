@@ -12,7 +12,7 @@ export default class MediaManager {
 
   updateResources(session: t.SessionUIState) {
     this.audioManager.updateResources(session.audioTracks, session.dataPath);
-    this.videoManager.updateResources(session.videoTracks, session.dataPath);
+    this.videoManager.updateResources(session.dataPath);
   }
 
   async prepare(videoElem: HTMLVideoElement) {

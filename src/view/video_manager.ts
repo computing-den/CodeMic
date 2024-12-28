@@ -15,14 +15,14 @@ import _ from 'lodash';
 
 export default class VideoManager {
   video?: HTMLVideoElement;
-  videoTracks?: t.VideoTrack[];
+  // videoTracks?: t.VideoTrack[];
   curTrackId?: string;
   prepared = false;
   sessionDataPath?: string;
   constructor() {}
 
-  updateResources(videoTracks: t.VideoTrack[] = [], sessionDataPath: string) {
-    this.videoTracks = videoTracks;
+  updateResources(sessionDataPath: string) {
+    // this.videoTracks = videoTracks;
     this.sessionDataPath = sessionDataPath;
   }
 
@@ -48,15 +48,16 @@ export default class VideoManager {
     }
   }
 
-  loadTrack(id: string) {
-    console.log(`VideoManager loadTrack`, id);
+  loadTrack(videoTrack: t.VideoTrack) {
+    console.log(`VideoManager loadTrack`, videoTrack);
     if (!this.video) return console.error('VideoManager loadTrack: video is not set');
 
-    const track = this.videoTracks?.find(t => t.id === id);
-    if (!track) return console.error('VideoManager loadTrack: track not found: ', id);
+    // const track = this.videoTracks?.find(t => t.id === id);
+    // if (!track) return console.error('VideoManager loadTrack: track not found: ', id);
 
     assert(this.sessionDataPath);
-    this.video.src = misc.asWebviewUri(this.sessionDataPath, 'blobs', id).toString();
+    assert(videoTrack.file.type === 'local');
+    this.video.src = misc.asWebviewUri(this.sessionDataPath, 'blobs', videoTrack.file.sha1).toString();
   }
 
   async play() {

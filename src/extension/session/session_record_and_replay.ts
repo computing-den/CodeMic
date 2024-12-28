@@ -211,7 +211,7 @@ export default class SessionRecordAndReplay {
     // nothing.
   }
 
-  unloadVideo(id: string) {
+  unloadVideoTrack(id: string) {
     this.videoTrackPlayer.stop();
     // this.onChange?.();
   }
@@ -240,10 +240,50 @@ export default class SessionRecordAndReplay {
           break;
         }
         case 'updateTrackLastEvent':
-          // TODO
           break;
         case 'insertFocus':
+          break;
         case 'updateLastFocus':
+          break;
+        case 'insertAudioTrack':
+          {
+            this.loadAudioTrack(cmd.audioTrack);
+          }
+          break;
+
+        case 'deleteAudioTrack':
+          {
+            this.unloadAudioTrack(cmd.audioTrack.id);
+          }
+          break;
+        case 'updateAudioTrack':
+          {
+            await this.fastSync();
+          }
+          break;
+        case 'insertVideoTrack':
+          {
+            this.loadVideoTrack(cmd.videoTrack);
+            await this.fastSync();
+          }
+          break;
+        case 'deleteVideoTrack':
+          {
+            this.unloadVideoTrack(cmd.videoTrack.id);
+            await this.fastSync();
+          }
+          break;
+        case 'updateVideoTrack':
+          {
+            await this.fastSync();
+          }
+          break;
+        case 'changeSpeed':
+          {
+            await this.seek(lib.calcClockAfterRangeSpeedChange(this.clock, cmd.range, cmd.factor));
+          }
+          break;
+        case 'insertGap':
           break;
         default:
           throw new Error(`unknown cmd type: ${(cmd as any).type}`);
@@ -262,10 +302,60 @@ export default class SessionRecordAndReplay {
           break;
         }
         case 'updateTrackLastEvent':
-          // TODO
           break;
         case 'insertFocus':
+          break;
         case 'updateLastFocus':
+          break;
+        case 'insertAudioTrack':
+          {
+            this.unloadAudioTrack(cmd.audioTrack.id);
+          }
+          break;
+
+        case 'deleteAudioTrack':
+          {
+            this.loadAudioTrack(cmd.audioTrack);
+          }
+          break;
+        case 'updateAudioTrack':
+          {
+            await this.fastSync();
+          }
+          break;
+        case 'insertVideoTrack':
+          {
+            this.unloadVideoTrack(cmd.videoTrack.id);
+            await this.fastSync();
+          }
+          break;
+        case 'deleteVideoTrack':
+          {
+            this.loadVideoTrack(cmd.videoTrack);
+            await this.fastSync();
+          }
+          break;
+        case 'updateVideoTrack':
+          {
+            await this.fastSync();
+          }
+          break;
+        case 'changeSpeed':
+          {
+            if (Number.isFinite(cmd.factor)) {
+              const factor = 1 / cmd.factor;
+              const range: t.ClockRange = {
+                start: cmd.range.start,
+                end: lib.calcClockAfterRangeSpeedChange(cmd.range.end, cmd.range, cmd.factor),
+              };
+
+              await this.seek(lib.calcClockAfterRangeSpeedChange(this.clock, range, factor));
+            }
+          }
+          break;
+        case 'insertGap':
+          break;
+        case 'updateDuration':
           break;
         default:
           throw new Error(`unknown cmd type: ${(cmd as any).type}`);
@@ -416,7 +506,7 @@ export default class SessionRecordAndReplay {
           )}`,
         );
       }
-      this.session.editor.updateHead({ duration: Math.max(this.session.head.duration, this.clock) });
+      this.session.editor.updateDuration(Math.max(this.session.head.duration, this.clock), { coalescing: true });
     } else {
       this.clock = Math.min(this.session.head.duration, this.clock);
     }

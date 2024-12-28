@@ -32,7 +32,7 @@ export default class VideoTrackPlayer {
       this.loaded = false;
       this.loading = true;
       this.videoTrack = videoTrack;
-      this.session.context.postVideoMessage?.({ type: 'video/loadTrack', id: videoTrack.id }).catch(this.gotError);
+      this.session.context.postVideoMessage?.({ type: 'video/loadTrack', track: videoTrack }).catch(this.gotError);
     }
   }
 

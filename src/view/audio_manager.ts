@@ -16,18 +16,23 @@ export default class AudioManager {
     this.audioTracks = audioTracks;
     this.sessionDataPath = sessionDataPath;
 
-    // Load or dispose audio tracks.
-    const newIds = audioTracks.map(a => a.id);
-    const oldIds = Object.keys(this.trackManagers);
-
-    const addedIds = _.difference(newIds, oldIds);
-    const deletedIds = _.difference(oldIds, newIds);
-
-    for (const id of addedIds) {
-      this.trackManagers[id] = new AudioTrackManager(id, sessionDataPath);
+    // Load new or update existing tracks.
+    for (const track of audioTracks) {
+      const trackManager = this.trackManagers[track.id];
+      if (trackManager) {
+        trackManager.track = track;
+        trackManager.sessionDataPath = sessionDataPath;
+      } else {
+        this.trackManagers[track.id] = new AudioTrackManager(track, sessionDataPath);
+      }
     }
 
-    for (const id of deletedIds) this.dispose(id);
+    // Dispose deleted tracks.
+    for (const trackManager of Object.values(this.trackManagers)) {
+      if (!audioTracks.some(t => t.id === trackManager.track.id)) {
+        this.dispose(trackManager.track.id);
+      }
+    }
   }
 
   async prepare() {
@@ -75,10 +80,7 @@ export class AudioTrackManager {
   node?: MediaElementAudioSourceNode;
   prepared = false;
 
-  constructor(
-    public id: string,
-    public sessionDataPath: string,
-  ) {
+  constructor(public track: t.AudioTrack, public sessionDataPath: string) {
     this.audio = new Audio();
     this.audio.addEventListener('volumechange', this.handleVolumeChange);
     this.audio.addEventListener('timeupdate', this.handleTimeUpdate);
@@ -88,9 +90,10 @@ export class AudioTrackManager {
       this.audio.addEventListener(type, this.handleGenericEvent);
     }
 
-    this.audio.src = misc.asWebviewUri(sessionDataPath, 'blobs', id).toString();
+    assert(track.file.type === 'local');
+    this.audio.src = misc.asWebviewUri(sessionDataPath, 'blobs', track.file.sha1).toString();
     this.audio.preload = 'auto';
-    console.log(`AudioTrackManager: created audio: ${id} (${this.audio.src})`);
+    console.log(`AudioTrackManager: created audio: ${track.id} (${this.audio.src})`);
   }
 
   /**
@@ -100,7 +103,7 @@ export class AudioTrackManager {
    */
   async prepare(audioContext: AudioContext) {
     if (!this.prepared) {
-      console.log(`AudioTrackManager: preparing audio ${this.id} (${this.audio.src})`);
+      console.log(`AudioTrackManager: preparing audio ${this.track.id} (${this.audio.src})`);
 
       assert(audioContext.state === 'suspended');
       this.node = audioContext.createMediaElementSource(this.audio);
@@ -108,7 +111,7 @@ export class AudioTrackManager {
       await this.audio.play();
       this.audio.pause();
       this.prepared = true;
-      console.log(`AudioTrackManager: prepared audio ${this.id}`);
+      console.log(`AudioTrackManager: prepared audio ${this.track.id}`);
     }
   }
 
@@ -150,31 +153,31 @@ export class AudioTrackManager {
   }
 
   handleGenericEvent = async (e: Event) => {
-    await postAudioEvent({ type: e.type as (typeof genericEventTypes)[number], id: this.id });
+    await postAudioEvent({ type: e.type as (typeof genericEventTypes)[number], id: this.track.id });
   };
 
   handleVolumeChange = async () => {
     console.log('handleVolumeChange');
     // The volumechange event signifies that the volume has changed; that includes being muted.
-    await postAudioEvent({ type: 'volumechange', volume: this.audio.volume, id: this.id });
+    await postAudioEvent({ type: 'volumechange', volume: this.audio.volume, id: this.track.id });
   };
 
   handleRateChange = async () => {
     console.log('handleRateChange');
-    await postAudioEvent({ type: 'ratechange', rate: this.audio.playbackRate, id: this.id });
+    await postAudioEvent({ type: 'ratechange', rate: this.audio.playbackRate, id: this.track.id });
   };
 
   handleTimeUpdate = async () => {
     console.log('handleTimeUpdate');
     // The timeupdate event is triggered every time the currentTime property changes. In practice, this occurs every 250 milliseconds. This event can be used to trigger the displaying of playback progress.
-    await postAudioEvent({ type: 'timeupdate', clock: this.audio.currentTime, id: this.id });
+    await postAudioEvent({ type: 'timeupdate', clock: this.audio.currentTime, id: this.track.id });
   };
 
   handleError = async (e: ErrorEvent) => {
     // An error is encountered while media data is being downloaded.
     console.error(e.error);
     console.error(e.message);
-    await postAudioEvent({ type: 'error', error: e.message, id: this.id });
+    await postAudioEvent({ type: 'error', error: e.message, id: this.track.id });
   };
 }
 

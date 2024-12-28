@@ -2,7 +2,6 @@ import fs from 'fs';
 import { getMp3Duration, getVideoDuration } from '../get_audio_video_duration.js';
 import * as misc from '../misc.js';
 import * as t from '../../lib/types.js';
-import * as storage from '../storage.js';
 import assert from '../../lib/assert.js';
 import { Session } from './session.js';
 import _ from 'lodash';
@@ -29,9 +28,10 @@ export default class SessionEditor {
     return this.undoHistoryIndex < this.undoHistory.length - 1;
   }
 
-  undo(): t.SessionCmd[] {
+  async undo(): Promise<t.SessionCmd[]> {
     const cmds: t.SessionCmd[] = [];
 
+    // Collect session commands.
     while (this.canUndo && this.undoHistory[this.undoHistoryIndex].coalescing) {
       cmds.push(this.undoHistory[this.undoHistoryIndex--]);
     }
@@ -39,13 +39,17 @@ export default class SessionEditor {
       cmds.push(this.undoHistory[this.undoHistoryIndex--]);
     }
 
-    for (const cmd of cmds) this.unapplyCmd(cmd);
+    // Unapply session commands.
+    for (const cmd of cmds) await this.unapplyCmd(cmd);
+
+    this.changed();
     return cmds;
   }
 
-  redo(): t.SessionCmd[] {
+  async redo(): Promise<t.SessionCmd[]> {
     const cmds: t.SessionCmd[] = [];
 
+    // Collect session commands.
     while (this.canRedo && this.undoHistory[this.undoHistoryIndex + 1].coalescing) {
       cmds.push(this.undoHistory[++this.undoHistoryIndex]);
     }
@@ -53,7 +57,10 @@ export default class SessionEditor {
       cmds.push(this.undoHistory[++this.undoHistoryIndex]);
     }
 
-    for (const cmd of cmds) this.applyCmd(cmd);
+    // Apply session commands.
+    for (const cmd of cmds) await this.applyCmd(cmd);
+
+    this.changed();
     return cmds;
   }
 
@@ -157,7 +164,7 @@ export default class SessionEditor {
     this.session.body.focusTimeline.push(cmd.focus);
   }
 
-  private unapplyInsertFocus(cmd: t.InsertFocusSessionCmd) {
+  private unapplyInsertFocus(_cmd: t.InsertFocusSessionCmd) {
     assert(this.session.isLoaded());
     this.session.body.focusTimeline.pop();
   }
@@ -176,7 +183,7 @@ export default class SessionEditor {
     Object.assign(lastFocus, cmd.revUpdate);
   }
 
-  async insertAudioTrack(uri: string, clock: number): Promise<t.AudioTrack> {
+  async insertAudioTrack(uri: string, clock: number): Promise<t.InsertAudioTrackSessionCmd> {
     assert(this.session.isLoaded());
     const fsPath = URI.parse(uri).fsPath;
     const data = await fs.promises.readFile(fsPath);
@@ -191,30 +198,91 @@ export default class SessionEditor {
       title: path.basename(fsPath),
     };
 
-    this.session.body.audioTracks.push(audioTrack);
-    this.session.head.duration = Math.max(this.session.head.duration, audioTrack.clockRange.end);
+    const cmd: t.InsertAudioTrackSessionCmd = {
+      type: 'insertAudioTrack',
+      coalescing: false,
+      audioTrack,
+      sessionDuration: Math.max(this.session.head.duration, audioTrack.clockRange.end),
+      revSessionDuration: this.session.head.duration,
+    };
+
+    this.applyInsertAudioTrack(cmd);
+    this.insertSessionCmd(cmd);
     this.changed();
-    return audioTrack;
+    return cmd;
   }
 
-  deleteAudioTrack(id: string) {
+  private applyInsertAudioTrack(cmd: t.InsertAudioTrackSessionCmd) {
     assert(this.session.isLoaded());
-    const i = this.session.body.audioTracks.findIndex(t => t.id === id);
-    if (i !== -1) this.session.body.audioTracks.splice(i, 1);
-    this.changed();
+    this.session.body.audioTracks.push(cmd.audioTrack);
+    this.session.head.duration = cmd.sessionDuration;
   }
 
-  updateAudioTrack(partial: Partial<t.AudioTrack>) {
+  private unapplyInsertAudioTrack(cmd: t.InsertAudioTrackSessionCmd) {
     assert(this.session.isLoaded());
-    const audioTrack = this.session.body.audioTracks.find(t => t.id == partial.id);
-    if (!audioTrack) return;
-
-    if (partial.title !== undefined) audioTrack.title = partial.title;
-    if (partial.clockRange !== undefined) audioTrack.clockRange = partial.clockRange;
-    this.changed();
+    const i = this.session.body.audioTracks.findIndex(t => t.id === cmd.audioTrack.id);
+    assert(i !== -1);
+    this.session.body.audioTracks.splice(i, 1);
+    this.session.head.duration = cmd.sessionDuration;
   }
 
-  async insertVideoTrack(uri: string, clock: number): Promise<t.VideoTrack> {
+  deleteAudioTrack(id: string): t.DeleteAudioTrackSessionCmd {
+    assert(this.session.isLoaded());
+    const audioTrack = this.session.body.audioTracks.find(t => t.id === id);
+    assert(audioTrack);
+    const cmd: t.DeleteAudioTrackSessionCmd = { type: 'deleteAudioTrack', coalescing: false, audioTrack };
+    this.applyDeleteAudioTrack(cmd);
+    this.insertSessionCmd(cmd);
+    this.changed();
+    return cmd;
+  }
+
+  private applyDeleteAudioTrack(cmd: t.DeleteAudioTrackSessionCmd) {
+    assert(this.session.isLoaded());
+    const i = this.session.body.audioTracks.findIndex(t => t.id === cmd.audioTrack.id);
+    assert(i !== -1);
+    this.session.body.audioTracks.splice(i, 1);
+  }
+
+  private unapplyDeleteAudioTrack(cmd: t.DeleteAudioTrackSessionCmd) {
+    assert(this.session.isLoaded());
+    this.session.body.audioTracks.push(cmd.audioTrack);
+  }
+
+  updateAudioTrack(update: Partial<t.AudioTrack>): t.UpdateAudioTrackSessionCmd | undefined {
+    assert(this.session.isLoaded());
+    assert(update.id);
+    const id = update.id;
+    const audioTrack = this.session.body.audioTracks.find(t => t.id === id);
+    assert(audioTrack);
+    const keys = ['clockRange', 'title'] as const;
+    const keyDiffs = keys.filter(k => k in update && update[k] !== audioTrack[k]);
+    if (keyDiffs.length > 0) {
+      update = _.pick(update, keyDiffs);
+      const revUpdate = _.pick(audioTrack, keyDiffs);
+      const cmd: t.UpdateAudioTrackSessionCmd = { type: 'updateAudioTrack', coalescing: false, id, update, revUpdate };
+      this.applyUpdateAudioTrack(cmd);
+      this.insertSessionCmd(cmd);
+      this.changed();
+      return cmd;
+    }
+  }
+
+  private applyUpdateAudioTrack(cmd: t.UpdateAudioTrackSessionCmd) {
+    assert(this.session.isLoaded());
+    const audioTrack = this.session.body.audioTracks.find(t => t.id === cmd.id);
+    assert(audioTrack);
+    Object.assign(audioTrack, cmd.update);
+  }
+
+  private unapplyUpdateAudioTrack(cmd: t.UpdateAudioTrackSessionCmd) {
+    assert(this.session.isLoaded());
+    const audioTrack = this.session.body.audioTracks.find(t => t.id === cmd.id);
+    assert(audioTrack);
+    Object.assign(audioTrack, cmd.revUpdate);
+  }
+
+  async insertVideoTrack(uri: string, clock: number): Promise<t.InsertVideoTrackSessionCmd> {
     assert(this.session.isLoaded());
     const fsPath = URI.parse(uri).fsPath;
     const data = await fs.promises.readFile(fsPath);
@@ -228,28 +296,87 @@ export default class SessionEditor {
       file: { type: 'local', sha1: sha1 },
       title: path.basename(fsPath),
     };
-
-    this.session.body.videoTracks.push(videoTrack);
-    this.session.head.duration = Math.max(this.session.head.duration, videoTrack.clockRange.end);
+    const cmd: t.InsertVideoTrackSessionCmd = {
+      type: 'insertVideoTrack',
+      coalescing: false,
+      videoTrack,
+      sessionDuration: Math.max(this.session.head.duration, videoTrack.clockRange.end),
+      revSessionDuration: this.session.head.duration,
+    };
+    this.applyInsertVideoTrack(cmd);
+    this.insertSessionCmd(cmd);
     this.changed();
-    return videoTrack;
+    return cmd;
   }
 
-  deleteVideoTrack(id: string) {
+  private applyInsertVideoTrack(cmd: t.InsertVideoTrackSessionCmd) {
     assert(this.session.isLoaded());
-    const i = this.session.body.videoTracks.findIndex(t => t.id === id);
-    if (i !== -1) this.session.body.videoTracks.splice(i, 1);
-    this.changed();
+    this.session.body.videoTracks.push(cmd.videoTrack);
+    this.session.head.duration = cmd.sessionDuration;
   }
 
-  updateVideoTrack(partial: Partial<t.VideoTrack>) {
+  private unapplyInsertVideoTrack(cmd: t.InsertVideoTrackSessionCmd) {
     assert(this.session.isLoaded());
-    const videoTrack = this.session.body.videoTracks.find(t => t.id == partial.id);
-    if (!videoTrack) return;
+    const i = this.session.body.videoTracks.findIndex(t => t.id === cmd.videoTrack.id);
+    assert(i !== -1);
+    this.session.body.videoTracks.splice(i, 1);
+    this.session.head.duration = cmd.revSessionDuration;
+  }
 
-    if (partial.title !== undefined) videoTrack.title = partial.title;
-    if (partial.clockRange !== undefined) videoTrack.clockRange = partial.clockRange;
+  deleteVideoTrack(id: string): t.DeleteVideoTrackSessionCmd {
+    assert(this.session.isLoaded());
+    const videoTrack = this.session.body.videoTracks.find(t => t.id === id);
+    assert(videoTrack);
+    const cmd: t.DeleteVideoTrackSessionCmd = { type: 'deleteVideoTrack', coalescing: false, videoTrack };
+    this.applyDeleteVideoTrack(cmd);
+    this.insertSessionCmd(cmd);
     this.changed();
+    return cmd;
+  }
+
+  private applyDeleteVideoTrack(cmd: t.DeleteVideoTrackSessionCmd) {
+    assert(this.session.isLoaded());
+    const i = this.session.body.videoTracks.findIndex(t => t.id === cmd.videoTrack.id);
+    assert(i !== -1);
+    this.session.body.videoTracks.splice(i, 1);
+  }
+
+  private unapplyDeleteVideoTrack(cmd: t.DeleteVideoTrackSessionCmd) {
+    assert(this.session.isLoaded());
+    this.session.body.videoTracks.push(cmd.videoTrack);
+  }
+
+  updateVideoTrack(update: Partial<t.VideoTrack>): t.UpdateVideoTrackSessionCmd | undefined {
+    assert(this.session.isLoaded());
+    assert(update.id);
+    const id = update.id;
+    const videoTrack = this.session.body.videoTracks.find(t => t.id === id);
+    assert(videoTrack);
+    const keys = ['clockRange', 'title'] as const;
+    const keyDiffs = keys.filter(k => k in update && update[k] !== videoTrack[k]);
+    if (keyDiffs.length > 0) {
+      update = _.pick(update, keyDiffs);
+      const revUpdate = _.pick(videoTrack, keyDiffs);
+      const cmd: t.UpdateVideoTrackSessionCmd = { type: 'updateVideoTrack', coalescing: false, id, update, revUpdate };
+      this.applyUpdateVideoTrack(cmd);
+      this.insertSessionCmd(cmd);
+      this.changed();
+      return cmd;
+    }
+  }
+
+  private applyUpdateVideoTrack(cmd: t.UpdateVideoTrackSessionCmd) {
+    assert(this.session.isLoaded());
+    const videoTrack = this.session.body.videoTracks.find(t => t.id === cmd.id);
+    assert(videoTrack);
+    Object.assign(videoTrack, cmd.update);
+  }
+
+  private unapplyUpdateVideoTrack(cmd: t.UpdateVideoTrackSessionCmd) {
+    assert(this.session.isLoaded());
+    const videoTrack = this.session.body.videoTracks.find(t => t.id === cmd.id);
+    assert(videoTrack);
+    Object.assign(videoTrack, cmd.revUpdate);
   }
 
   updateHead(partial: Partial<t.SessionHead>) {
@@ -257,14 +384,38 @@ export default class SessionEditor {
     this.changed();
   }
 
-  updateFromUI(update: t.SessionUIStateUpdate) {
+  updateFromUI(update: t.SessionDetailsUpdate) {
     if (update.workspace !== undefined) this.session.workspace = update.workspace;
     if (update.title !== undefined) this.session.head.title = update.title;
     if (update.description !== undefined) this.session.head.description = update.description;
-    if (update.duration !== undefined) this.session.head.duration = update.duration;
     if (update.handle !== undefined) this.session.head.handle = update.handle;
 
     this.changed();
+  }
+
+  updateDuration(duration: number, opts?: { coalescing?: boolean }) {
+    const lastCmd = this.undoHistory[this.undoHistoryIndex];
+    // const replace = lastCmd?.type === 'updateDuration';
+
+    const cmd: t.UpdateDurationSessionCmd = {
+      type: 'updateDuration',
+      coalescing: Boolean(opts?.coalescing),
+      duration,
+      revDuration: this.session.head.duration,
+      // revDuration: replace ? lastCmd.revDuration : this.session.head.duration,
+    };
+    this.applyUpdateDuration(cmd);
+    this.insertSessionCmd(cmd /*, { replace }*/);
+    this.changed();
+    return cmd;
+  }
+
+  private applyUpdateDuration(cmd: t.UpdateDurationSessionCmd) {
+    this.session.head.duration = cmd.duration;
+  }
+
+  private unapplyUpdateDuration(cmd: t.UpdateDurationSessionCmd) {
+    this.session.head.duration = cmd.revDuration;
   }
 
   async setCover(uri: string) {
@@ -285,46 +436,136 @@ export default class SessionEditor {
     this.changed();
   }
 
-  async changeSpeed(range: t.ClockRange, factor: number) {
+  changeSpeed(range: t.ClockRange, factor: number): t.ChangeSpeedSessionCmd {
+    assert(this.session.isLoaded());
+    const { body } = this.session;
+
+    // Store the original clocks of events within range. Event though events
+    // after the range will be affected too, it's only a simple addition or
+    // subtraction without much loss of precision.
+    const firstEventIndex = body.eventContainer.getIndexAfterClock(range.start);
+    const endEventIndex = body.eventContainer.getIndexAfterClock(range.end);
+    const revEventClocksInRange = body.eventContainer
+      .collectExc(firstEventIndex, endEventIndex)
+      .map(e => e.event.clock);
+
+    // Store original clocks of focus items within range.
+    const firstFocusIndex = Math.max(
+      0,
+      body.focusTimeline.findIndex(f => f.clock >= range.start),
+    );
+    const endFocusIndex = Math.max(
+      0,
+      body.focusTimeline.findIndex(f => f.clock >= range.end),
+    );
+    const revFocusClocksInRange: number[] = body.focusTimeline.slice(firstFocusIndex, endFocusIndex).map(f => f.clock);
+
+    const cmd: t.ChangeSpeedSessionCmd = {
+      type: 'changeSpeed',
+      coalescing: false,
+      range,
+      factor,
+      firstEventIndex,
+      firstFocusIndex,
+      revEventClocksInRange,
+      revFocusClocksInRange,
+    };
+
+    this.applyChangeSpeed(cmd);
+    this.insertSessionCmd(cmd);
+    this.changed();
+    return cmd;
+  }
+
+  private applyChangeSpeed(cmd: t.ChangeSpeedSessionCmd) {
     assert(this.session.isLoaded());
     const { head, body } = this.session;
 
     // Update events.
-    body.eventContainer.forEachExc(
-      body.eventContainer.getIndexAfterClock(range.start),
-      body.eventContainer.getSize(),
-      (e, i) => {
-        e.event.clock = calcClockAfterRangeSpeedChange(e.event.clock, range, factor);
-      },
-    );
+    body.eventContainer.forEachExc(cmd.firstEventIndex, body.eventContainer.getSize(), e => {
+      e.event.clock = calcClockAfterRangeSpeedChange(e.event.clock, cmd.range, cmd.factor);
+    });
 
     // Reindex the event container.
     body.eventContainer.reindexStableOrder();
 
     // Update focus timeline.
-    for (const f of body.focusTimeline) {
-      f.clock = calcClockAfterRangeSpeedChange(f.clock, range, factor);
+    for (const f of body.focusTimeline.slice(cmd.firstFocusIndex)) {
+      f.clock = calcClockAfterRangeSpeedChange(f.clock, cmd.range, cmd.factor);
+    }
+
+    // Update session duration.
+    head.duration = calcClockAfterRangeSpeedChange(head.duration, cmd.range, cmd.factor);
+  }
+
+  private unapplyChangeSpeed(cmd: t.ChangeSpeedSessionCmd) {
+    assert(this.session.isLoaded());
+    const { head, body } = this.session;
+
+    const factor = 1 / cmd.factor;
+    const range: t.ClockRange = {
+      start: cmd.range.start,
+      end: calcClockAfterRangeSpeedChange(cmd.range.end, cmd.range, cmd.factor),
+    };
+
+    // Update events.
+    body.eventContainer.forEachExc(cmd.firstEventIndex, body.eventContainer.getSize(), (e, i) => {
+      e.event.clock =
+        cmd.revEventClocksInRange[i - cmd.firstEventIndex] ??
+        calcClockAfterRangeSpeedChange(e.event.clock, range, factor);
+    });
+
+    // Reindex the event container.
+    body.eventContainer.reindexStableOrder();
+
+    // Update focus timeline.
+    for (const [i, f] of body.focusTimeline.slice(cmd.firstFocusIndex).entries()) {
+      f.clock = cmd.revFocusClocksInRange[i] ?? calcClockAfterRangeSpeedChange(f.clock, range, factor);
     }
 
     // Update session duration.
     head.duration = calcClockAfterRangeSpeedChange(head.duration, range, factor);
+  }
 
+  merge(range: t.ClockRange): t.ChangeSpeedSessionCmd {
+    throw new Error('TODO');
+    // return this.changeSpeed(range, Infinity);
+  }
+
+  insertGap(clock: number, duration: number): t.InsertGapSessionCmd {
+    assert(this.session.isLoaded());
+    // const { head, body } = this.session;
+
+    // const firstEventIndex = body.eventContainer.getIndexAfterClock(clock);
+    // const firstFocusIndex = Math.max(
+    //   0,
+    //   body.focusTimeline.findIndex(f => f.clock >= clock),
+    // );
+
+    const cmd: t.InsertGapSessionCmd = {
+      type: 'insertGap',
+      coalescing: false,
+      clock,
+      duration,
+      // firstEventIndex,
+      // firstFocusIndex,
+    };
+
+    this.applyInsertGap(cmd);
+    this.insertSessionCmd(cmd);
     this.changed();
+    return cmd;
   }
 
-  async merge(range: t.ClockRange) {
-    await this.changeSpeed(range, Infinity);
-  }
-
-  insertGap(clock: number, dur: number) {
+  private applyInsertGap(cmd: t.InsertGapSessionCmd) {
     assert(this.session.isLoaded());
     const { head, body } = this.session;
 
     // Update events.
     body.eventContainer.forEachExc(
-      body.eventContainer.getIndexAfterClock(clock),
+      body.eventContainer.getIndexAfterClock(cmd.clock),
       body.eventContainer.getSize(),
-      e => void (e.event.clock += dur),
+      e => void (e.event.clock += cmd.duration),
     );
 
     // Reindex the event container.
@@ -332,13 +573,34 @@ export default class SessionEditor {
 
     // Update focus timeline.
     for (const f of body.focusTimeline) {
-      if (f.clock > clock) f.clock += dur;
+      if (f.clock > cmd.clock) f.clock += cmd.duration;
     }
 
     // Update session duration.
-    head.duration += dur;
+    head.duration += cmd.duration;
+  }
 
-    this.changed();
+  private unapplyInsertGap(cmd: t.InsertGapSessionCmd) {
+    assert(this.session.isLoaded());
+    const { head, body } = this.session;
+
+    // Update events.
+    body.eventContainer.forEachExc(
+      body.eventContainer.getIndexAfterClock(cmd.clock),
+      body.eventContainer.getSize(),
+      e => void (e.event.clock -= cmd.duration),
+    );
+
+    // Reindex the event container.
+    body.eventContainer.reindexStableOrder();
+
+    // Update focus timeline.
+    for (const f of body.focusTimeline) {
+      if (f.clock > cmd.clock) f.clock -= cmd.duration;
+    }
+
+    // Update session duration.
+    head.duration -= cmd.duration;
   }
 
   /**
@@ -373,13 +635,14 @@ export default class SessionEditor {
     // this.session.onChange?.();
   }
 
-  private insertSessionCmd(cmd: t.SessionCmd) {
+  private insertSessionCmd(cmd: t.SessionCmd /*, opts?: { replace?: boolean }*/) {
+    // if (!opts?.replace)
     this.undoHistoryIndex++;
     this.undoHistory.length = this.undoHistoryIndex;
     this.undoHistory.push(cmd);
   }
 
-  private applyCmd(cmd: t.SessionCmd) {
+  private async applyCmd(cmd: t.SessionCmd) {
     switch (cmd.type) {
       case 'insertEvent':
         return this.applyInsertEvent(cmd);
@@ -389,12 +652,33 @@ export default class SessionEditor {
         return this.applyInsertFocus(cmd);
       case 'updateLastFocus':
         return this.applyUpdateLastFocus(cmd);
+      case 'insertAudioTrack':
+        return this.applyInsertAudioTrack(cmd);
+      case 'deleteAudioTrack':
+        return this.applyDeleteAudioTrack(cmd);
+      case 'updateAudioTrack':
+        return this.applyUpdateAudioTrack(cmd);
+      case 'insertVideoTrack':
+        return this.applyInsertVideoTrack(cmd);
+      case 'deleteVideoTrack':
+        return this.applyDeleteVideoTrack(cmd);
+      case 'updateVideoTrack':
+        return this.applyUpdateVideoTrack(cmd);
+      case 'changeSpeed':
+        return this.applyChangeSpeed(cmd);
+      // case 'merge':
+      // return this.applyMerge(cmd);
+      case 'insertGap':
+        return this.applyInsertGap(cmd);
+      case 'updateDuration':
+        return this.applyUpdateDuration(cmd);
+
       default:
         throw new Error(`unknown cmd type: ${(cmd as any).type}`);
     }
   }
 
-  private unapplyCmd(cmd: t.SessionCmd) {
+  private async unapplyCmd(cmd: t.SessionCmd) {
     switch (cmd.type) {
       case 'insertEvent':
         return this.unapplyInsertEvent(cmd);
@@ -404,6 +688,26 @@ export default class SessionEditor {
         return this.unapplyInsertFocus(cmd);
       case 'updateLastFocus':
         return this.unapplyUpdateLastFocus(cmd);
+      case 'insertAudioTrack':
+        return this.unapplyInsertAudioTrack(cmd);
+      case 'deleteAudioTrack':
+        return this.unapplyDeleteAudioTrack(cmd);
+      case 'updateAudioTrack':
+        return this.unapplyUpdateAudioTrack(cmd);
+      case 'insertVideoTrack':
+        return this.unapplyInsertVideoTrack(cmd);
+      case 'deleteVideoTrack':
+        return this.unapplyDeleteVideoTrack(cmd);
+      case 'updateVideoTrack':
+        return this.unapplyUpdateVideoTrack(cmd);
+      case 'changeSpeed':
+        return this.unapplyChangeSpeed(cmd);
+      // case 'merge':
+      // return this.unapplyMerge(cmd);
+      case 'insertGap':
+        return this.unapplyInsertGap(cmd);
+      case 'updateDuration':
+        return this.unapplyUpdateDuration(cmd);
       default:
         throw new Error(`unknown cmd type: ${(cmd as any).type}`);
     }

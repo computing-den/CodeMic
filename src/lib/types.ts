@@ -34,13 +34,14 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/publish' }; response: OKResponse }
   | { request: { type: 'recorder/undo' }; response: OKResponse }
   | { request: { type: 'recorder/redo' }; response: OKResponse }
-  | { request: { type: 'recorder/update'; changes: SessionUIStateUpdate }; response: OKResponse }
+  | { request: { type: 'recorder/updateDetails'; changes: SessionDetailsUpdate }; response: OKResponse }
+  | { request: { type: 'recorder/updateDuration'; duration: number }; response: OKResponse }
   | { request: { type: 'recorder/insertAudio'; uri: string; clock: number }; response: OKResponse }
   | { request: { type: 'recorder/deleteAudio'; id: string }; response: OKResponse }
-  | { request: { type: 'recorder/updateAudio'; audio: Partial<AudioTrack> & { id: string } }; response: OKResponse }
+  | { request: { type: 'recorder/updateAudio'; update: Partial<AudioTrack> }; response: OKResponse }
   | { request: { type: 'recorder/insertVideo'; uri: string; clock: number }; response: OKResponse }
   | { request: { type: 'recorder/deleteVideo'; id: string }; response: OKResponse }
-  | { request: { type: 'recorder/updateVideo'; video: Partial<VideoTrack> & { id: string } }; response: OKResponse }
+  | { request: { type: 'recorder/updateVideo'; update: Partial<VideoTrack> }; response: OKResponse }
   | { request: { type: 'recorder/setCover'; uri: string }; response: OKResponse }
   | { request: { type: 'recorder/deleteCover' }; response: OKResponse }
   | { request: { type: 'recorder/changeSpeed'; range: ClockRange; factor: number }; response: OKResponse }
@@ -96,7 +97,7 @@ export type BackendAudioToFrontendReqRes =
   | { request: { type: 'audio/setPlaybackRate'; id: string; rate: number }; response: OKResponse };
 
 export type BackendVideoToFrontendReqRes =
-  | { request: { type: 'video/loadTrack'; id: string }; response: OKResponse }
+  | { request: { type: 'video/loadTrack'; track: VideoTrack }; response: OKResponse }
   | { request: { type: 'video/play' }; response: OKResponse }
   | { request: { type: 'video/pause' }; response: OKResponse }
   | { request: { type: 'video/stop' }; response: OKResponse }
@@ -290,12 +291,11 @@ export type LoadedSessionUIState = SessionUIState & {
   comments: Comment[];
 };
 
-export type SessionUIStateUpdate = {
+export type SessionDetailsUpdate = {
   title?: string;
   handle?: string;
   description?: string;
   workspace?: string;
-  duration?: number;
 };
 
 export type TocItem = { title: string; clock: number };
@@ -623,35 +623,114 @@ export type SessionCmd =
   | InsertEventSessionCmd
   | UpdateTrackLastEventSessionCmd
   | InsertFocusSessionCmd
-  | UpdateLastFocusSessionCmd;
+  | UpdateLastFocusSessionCmd
+  | InsertAudioTrackSessionCmd
+  | DeleteAudioTrackSessionCmd
+  | UpdateAudioTrackSessionCmd
+  | InsertVideoTrackSessionCmd
+  | DeleteVideoTrackSessionCmd
+  | UpdateVideoTrackSessionCmd
+  // | UpdateHeadSessionCmd
+  // | UpdateFromUISessionCmd
+  | ChangeSpeedSessionCmd
+  // | MergeSessionCmd
+  | InsertGapSessionCmd
+  | UpdateDurationSessionCmd;
 
 export type InsertEventSessionCmd = {
   type: 'insertEvent';
+  coalescing: boolean;
   index: number;
   uri: string;
   event: EditorEvent;
-  coalescing: boolean;
 };
 
 export type UpdateTrackLastEventSessionCmd = {
   type: 'updateTrackLastEvent';
+  coalescing: boolean;
   uri: string;
   update: Partial<EditorEvent>;
   revUpdate: Partial<EditorEvent>;
-  coalescing: boolean;
 };
 
 export type InsertFocusSessionCmd = {
   type: 'insertFocus';
-  focus: Focus;
   coalescing: boolean;
+  focus: Focus;
 };
 
 export type UpdateLastFocusSessionCmd = {
   type: 'updateLastFocus';
+  coalescing: boolean;
   update: Partial<Focus>;
   revUpdate: Partial<Focus>;
+};
+
+export type InsertAudioTrackSessionCmd = {
+  type: 'insertAudioTrack';
   coalescing: boolean;
+  audioTrack: AudioTrack;
+  sessionDuration: number;
+  revSessionDuration: number;
+};
+export type DeleteAudioTrackSessionCmd = {
+  type: 'deleteAudioTrack';
+  coalescing: boolean;
+  audioTrack: AudioTrack;
+};
+export type UpdateAudioTrackSessionCmd = {
+  type: 'updateAudioTrack';
+  coalescing: boolean;
+  id: string;
+  update: Partial<AudioTrack>;
+  revUpdate: Partial<AudioTrack>;
+};
+export type InsertVideoTrackSessionCmd = {
+  type: 'insertVideoTrack';
+  coalescing: boolean;
+  videoTrack: VideoTrack;
+  sessionDuration: number;
+  revSessionDuration: number;
+};
+export type DeleteVideoTrackSessionCmd = {
+  type: 'deleteVideoTrack';
+  coalescing: boolean;
+  videoTrack: VideoTrack;
+};
+export type UpdateVideoTrackSessionCmd = {
+  type: 'updateVideoTrack';
+  coalescing: boolean;
+  id: string;
+  update: Partial<VideoTrack>;
+  revUpdate: Partial<VideoTrack>;
+};
+export type ChangeSpeedSessionCmd = {
+  type: 'changeSpeed';
+  coalescing: boolean;
+  range: ClockRange;
+  factor: number;
+  firstEventIndex: number;
+  firstFocusIndex: number;
+  revEventClocksInRange: number[];
+  revFocusClocksInRange: number[];
+};
+// export type MergeSessionCmd = {
+//   type: 'merge';
+//   coalescing: boolean;
+// };
+export type InsertGapSessionCmd = {
+  type: 'insertGap';
+  coalescing: boolean;
+  clock: number;
+  duration: number;
+  // firstEventIndex: number;
+  // firstFocusIndex: number;
+};
+export type UpdateDurationSessionCmd = {
+  type: 'updateDuration';
+  coalescing: boolean;
+  duration: number;
+  revDuration: number;
 };
 
 export interface InternalEditor {
