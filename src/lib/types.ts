@@ -639,7 +639,7 @@ export type SessionCmd =
 
 export type InsertEventSessionCmd = {
   type: 'insertEvent';
-  coalescing: boolean;
+  // coalescing: boolean;
   index: number;
   uri: string;
   event: EditorEvent;
@@ -647,7 +647,7 @@ export type InsertEventSessionCmd = {
 
 export type UpdateTrackLastEventSessionCmd = {
   type: 'updateTrackLastEvent';
-  coalescing: boolean;
+  // coalescing: boolean;
   uri: string;
   update: Partial<EditorEvent>;
   revUpdate: Partial<EditorEvent>;
@@ -655,58 +655,58 @@ export type UpdateTrackLastEventSessionCmd = {
 
 export type InsertFocusSessionCmd = {
   type: 'insertFocus';
-  coalescing: boolean;
+  // coalescing: boolean;
   focus: Focus;
 };
 
 export type UpdateLastFocusSessionCmd = {
   type: 'updateLastFocus';
-  coalescing: boolean;
+  // coalescing: boolean;
   update: Partial<Focus>;
   revUpdate: Partial<Focus>;
 };
 
 export type InsertAudioTrackSessionCmd = {
   type: 'insertAudioTrack';
-  coalescing: boolean;
+  // coalescing: boolean;
   audioTrack: AudioTrack;
   sessionDuration: number;
   revSessionDuration: number;
 };
 export type DeleteAudioTrackSessionCmd = {
   type: 'deleteAudioTrack';
-  coalescing: boolean;
+  // coalescing: boolean;
   audioTrack: AudioTrack;
 };
 export type UpdateAudioTrackSessionCmd = {
   type: 'updateAudioTrack';
-  coalescing: boolean;
+  // coalescing: boolean;
   id: string;
   update: Partial<AudioTrack>;
   revUpdate: Partial<AudioTrack>;
 };
 export type InsertVideoTrackSessionCmd = {
   type: 'insertVideoTrack';
-  coalescing: boolean;
+  // coalescing: boolean;
   videoTrack: VideoTrack;
   sessionDuration: number;
   revSessionDuration: number;
 };
 export type DeleteVideoTrackSessionCmd = {
   type: 'deleteVideoTrack';
-  coalescing: boolean;
+  // coalescing: boolean;
   videoTrack: VideoTrack;
 };
 export type UpdateVideoTrackSessionCmd = {
   type: 'updateVideoTrack';
-  coalescing: boolean;
+  // coalescing: boolean;
   id: string;
   update: Partial<VideoTrack>;
   revUpdate: Partial<VideoTrack>;
 };
 export type ChangeSpeedSessionCmd = {
   type: 'changeSpeed';
-  coalescing: boolean;
+  // coalescing: boolean;
   range: ClockRange;
   factor: number;
   firstEventIndex: number;
@@ -720,7 +720,7 @@ export type ChangeSpeedSessionCmd = {
 // };
 export type InsertGapSessionCmd = {
   type: 'insertGap';
-  coalescing: boolean;
+  // coalescing: boolean;
   clock: number;
   duration: number;
   // firstEventIndex: number;
@@ -728,7 +728,7 @@ export type InsertGapSessionCmd = {
 };
 export type UpdateDurationSessionCmd = {
   type: 'updateDuration';
-  coalescing: boolean;
+  // coalescing: boolean;
   duration: number;
   revDuration: number;
 };

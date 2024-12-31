@@ -27,7 +27,7 @@ class CodeMic {
   recorder?: { tabId: t.RecorderUITabId };
   webviewProvider: WebviewProvider;
 
-  isFrontendUpdateBlocked = false;
+  frontendUpdateBlockCounter = 0;
   isFrontendDirty = true;
 
   test: any = 0;
@@ -193,13 +193,13 @@ class CodeMic {
 
   async handleMessage(req: t.FrontendRequest): Promise<t.BackendResponse> {
     try {
-      this.blockFrontendUpdate();
+      this.frontendUpdateBlockInc();
       return await this.handleMessageInner(req);
     } catch (error) {
       this.showError(error as Error);
       throw error;
     } finally {
-      await this.flushFrontendUpdate();
+      await this.frontendUpdateBlockDec();
     }
   }
   async handleMessageInner(req: t.FrontendRequest): Promise<t.BackendResponse> {
@@ -412,7 +412,7 @@ class CodeMic {
       }
       case 'recorder/undo': {
         assert(this.session?.isLoaded());
-        const cmds = await this.session.editor.undo();
+        const cmds = this.session.editor.undo();
         await this.session.rr.unapplySessionCmds(cmds);
         console.log('Undo: ', cmds);
         this.enqueueFrontendUpdate();
@@ -420,7 +420,7 @@ class CodeMic {
       }
       case 'recorder/redo': {
         assert(this.session?.isLoaded());
-        const cmds = await this.session.editor.redo();
+        const cmds = this.session.editor.redo();
         await this.session.rr.applySessionCmds(cmds);
         console.log('Redo: ', cmds);
         this.enqueueFrontendUpdate();
@@ -937,7 +937,7 @@ class CodeMic {
   }
 
   async updateFrontend() {
-    if (this.isFrontendUpdateBlocked) {
+    if (this.frontendUpdateBlockCounter > 0) {
       this.isFrontendDirty = true;
       return;
     }
@@ -946,21 +946,21 @@ class CodeMic {
     this.isFrontendDirty = false;
   }
 
-  blockFrontendUpdate() {
-    this.isFrontendUpdateBlocked = true;
-  }
-
   enqueueFrontendUpdate() {
     assert(
-      this.isFrontendUpdateBlocked,
+      this.frontendUpdateBlockCounter > 0,
       'It does not make much sense to call enqueueFrontendUpdate() when frontend update is not blocked. Call updateFrontend() directly.',
     );
     this.isFrontendDirty = true;
   }
 
-  async flushFrontendUpdate() {
-    this.isFrontendUpdateBlocked = false;
-    if (this.isFrontendDirty) await this.updateFrontend();
+  frontendUpdateBlockInc() {
+    this.frontendUpdateBlockCounter++;
+  }
+  async frontendUpdateBlockDec() {
+    if (--this.frontendUpdateBlockCounter === 0) {
+      if (this.isFrontendDirty) await this.updateFrontend();
+    }
   }
 
   showError(error: Error) {

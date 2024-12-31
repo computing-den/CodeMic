@@ -11,54 +11,46 @@ import { URI } from 'vscode-uri';
 import * as path from 'path';
 import cache from '../cache.js';
 
+// type HistoryPosition = [number, number];
+
 export default class SessionEditor {
   dirty = false;
 
-  private undoHistory: t.SessionCmd[] = [];
-  // The index of the last SessionCmd whose effects are visible.
-  private undoHistoryIndex: number = -1;
+  private undoHistory: t.SessionCmd[][] = [];
+  // The index of the last SessionCmd group whose effects are visible.
+  private undoIndex: number = -1;
 
   constructor(public session: Session) {}
 
   get canUndo(): boolean {
-    return this.undoHistoryIndex > -1;
+    return this.undoIndex > -1;
   }
 
   get canRedo(): boolean {
-    return this.undoHistoryIndex < this.undoHistory.length - 1;
+    return this.undoIndex < this.undoHistory.length - 1;
   }
 
-  async undo(): Promise<t.SessionCmd[]> {
-    const cmds: t.SessionCmd[] = [];
+  get curUndoHistoryGroup(): t.SessionCmd[] | undefined {
+    return this.undoHistory[this.undoIndex];
+  }
 
-    // Collect session commands.
-    while (this.canUndo && this.undoHistory[this.undoHistoryIndex].coalescing) {
-      cmds.push(this.undoHistory[this.undoHistoryIndex--]);
-    }
-    if (this.canUndo) {
-      cmds.push(this.undoHistory[this.undoHistoryIndex--]);
-    }
+  undo(): t.SessionCmd[] {
+    if (!this.canUndo) return [];
 
-    // Unapply session commands.
-    for (const cmd of cmds) await this.unapplyCmd(cmd);
+    // Collect session commands and unapply them in reverse order.
+    const cmds = Array.from(this.undoHistory[this.undoIndex--]).reverse();
+    for (const cmd of cmds) this.unapplyCmd(cmd);
 
     this.changed();
     return cmds;
   }
 
-  async redo(): Promise<t.SessionCmd[]> {
-    const cmds: t.SessionCmd[] = [];
+  redo(): t.SessionCmd[] {
+    if (!this.canRedo) return [];
 
-    // Collect session commands.
-    while (this.canRedo && this.undoHistory[this.undoHistoryIndex + 1].coalescing) {
-      cmds.push(this.undoHistory[++this.undoHistoryIndex]);
-    }
-    if (this.canRedo) {
-      cmds.push(this.undoHistory[++this.undoHistoryIndex]);
-    }
-
-    // Apply session commands.
-    for (const cmd of cmds) await this.applyCmd(cmd);
+    // Collect session commands and apply them.
+    const cmds = Array.from(this.undoHistory[++this.undoIndex]);
+    for (const cmd of cmds) this.applyCmd(cmd);
 
     this.changed();
     return cmds;
@@ -73,20 +65,10 @@ export default class SessionEditor {
     this.changed();
   }
 
-  insertEvent(e: t.EditorEvent, uri: string, opts: { coalescing: boolean }) {
+  insertEvent(e: t.EditorEvent, uri: string, opts: { coalescing: boolean }): t.SessionCmd {
     assert(this.session.isLoaded());
     const i = this.session.body.eventContainer.getIndexAfterClock(e.clock);
-    const cmd: t.InsertEventSessionCmd = {
-      type: 'insertEvent',
-      index: i,
-      uri,
-      event: e,
-      coalescing: opts.coalescing,
-    };
-    this.applyInsertEvent(cmd);
-    this.insertSessionCmd(cmd);
-    this.changed();
-    return cmd;
+    return this.applyAndInsertSessionCmd({ type: 'insertEvent', index: i, uri, event: e }, opts);
   }
 
   private applyInsertEvent(cmd: t.InsertEventSessionCmd) {
@@ -107,16 +89,8 @@ export default class SessionEditor {
 
     if (_.isEqual({ ...lastEvent, ...update }, lastEvent)) return;
 
-    const cmd: t.UpdateTrackLastEventSessionCmd = {
-      type: 'updateTrackLastEvent',
-      uri,
-      update,
-      revUpdate: _.pick(lastEvent, _.keys(update)),
-      coalescing: true,
-    };
-    this.applyUpdateTrackLastEvent(cmd);
-    this.insertSessionCmd(cmd);
-    this.changed();
+    const revUpdate = _.pick(lastEvent, _.keys(update));
+    this.applyAndInsertSessionCmd({ type: 'updateTrackLastEvent', uri, update, revUpdate }, { coalescing: true });
   }
 
   private applyUpdateTrackLastEvent(cmd: t.UpdateTrackLastEventSessionCmd) {
@@ -137,7 +111,7 @@ export default class SessionEditor {
     assert(this.session.isLoaded());
     const lastFocus = this.session.body.focusTimeline.at(-1);
 
-    // Try to update the last one. Otherwise, insert.
+    // Try to update the last one. Otherwise, insert a new focus.
     if (
       lastFocus &&
       (focus.clock - lastFocus.clock < 1 || (lastFocus.uri === focus.uri && lastFocus.number === focus.number))
@@ -147,16 +121,11 @@ export default class SessionEditor {
       if (keyDiffs.length > 0) {
         const update = _.pick(focus, keyDiffs);
         const revUpdate = _.pick(lastFocus, keyDiffs);
-        const cmd: t.UpdateLastFocusSessionCmd = { type: 'updateLastFocus', update, revUpdate, coalescing: true };
-        this.applyUpdateLastFocus(cmd);
-        this.insertSessionCmd(cmd);
+        this.applyAndInsertSessionCmd({ type: 'updateLastFocus', update, revUpdate }, { coalescing: true });
       }
     } else {
-      const cmd: t.InsertFocusSessionCmd = { type: 'insertFocus', focus, coalescing: true };
-      this.applyInsertFocus(cmd);
-      this.insertSessionCmd(cmd);
+      this.applyAndInsertSessionCmd({ type: 'insertFocus', focus }, { coalescing: true });
     }
-    this.changed();
   }
 
   private applyInsertFocus(cmd: t.InsertFocusSessionCmd) {
@@ -183,7 +152,7 @@ export default class SessionEditor {
     Object.assign(lastFocus, cmd.revUpdate);
   }
 
-  async insertAudioTrack(uri: string, clock: number): Promise<t.InsertAudioTrackSessionCmd> {
+  async insertAudioTrack(uri: string, clock: number): Promise<t.SessionCmd> {
     assert(this.session.isLoaded());
     const fsPath = URI.parse(uri).fsPath;
     const data = await fs.promises.readFile(fsPath);
@@ -198,18 +167,12 @@ export default class SessionEditor {
       title: path.basename(fsPath),
     };
 
-    const cmd: t.InsertAudioTrackSessionCmd = {
+    return this.applyAndInsertSessionCmd({
       type: 'insertAudioTrack',
-      coalescing: false,
       audioTrack,
       sessionDuration: Math.max(this.session.head.duration, audioTrack.clockRange.end),
       revSessionDuration: this.session.head.duration,
-    };
-
-    this.applyInsertAudioTrack(cmd);
-    this.insertSessionCmd(cmd);
-    this.changed();
-    return cmd;
+    });
   }
 
   private applyInsertAudioTrack(cmd: t.InsertAudioTrackSessionCmd) {
@@ -226,15 +189,11 @@ export default class SessionEditor {
     this.session.head.duration = cmd.sessionDuration;
   }
 
-  deleteAudioTrack(id: string): t.DeleteAudioTrackSessionCmd {
+  deleteAudioTrack(id: string): t.SessionCmd {
     assert(this.session.isLoaded());
     const audioTrack = this.session.body.audioTracks.find(t => t.id === id);
     assert(audioTrack);
-    const cmd: t.DeleteAudioTrackSessionCmd = { type: 'deleteAudioTrack', coalescing: false, audioTrack };
-    this.applyDeleteAudioTrack(cmd);
-    this.insertSessionCmd(cmd);
-    this.changed();
-    return cmd;
+    return this.applyAndInsertSessionCmd({ type: 'deleteAudioTrack', audioTrack });
   }
 
   private applyDeleteAudioTrack(cmd: t.DeleteAudioTrackSessionCmd) {
@@ -249,7 +208,7 @@ export default class SessionEditor {
     this.session.body.audioTracks.push(cmd.audioTrack);
   }
 
-  updateAudioTrack(update: Partial<t.AudioTrack>): t.UpdateAudioTrackSessionCmd | undefined {
+  updateAudioTrack(update: Partial<t.AudioTrack>): t.SessionCmd | undefined {
     assert(this.session.isLoaded());
     assert(update.id);
     const id = update.id;
@@ -260,11 +219,8 @@ export default class SessionEditor {
     if (keyDiffs.length > 0) {
       update = _.pick(update, keyDiffs);
       const revUpdate = _.pick(audioTrack, keyDiffs);
-      const cmd: t.UpdateAudioTrackSessionCmd = { type: 'updateAudioTrack', coalescing: false, id, update, revUpdate };
-      this.applyUpdateAudioTrack(cmd);
-      this.insertSessionCmd(cmd);
-      this.changed();
-      return cmd;
+      // const coalescing = this.curUndoHistoryGroup?.at(-1)?.type === 'updateAudioTrack';
+      return this.applyAndInsertSessionCmd({ type: 'updateAudioTrack', id, update, revUpdate });
     }
   }
 
@@ -282,7 +238,7 @@ export default class SessionEditor {
     Object.assign(audioTrack, cmd.revUpdate);
   }
 
-  async insertVideoTrack(uri: string, clock: number): Promise<t.InsertVideoTrackSessionCmd> {
+  async insertVideoTrack(uri: string, clock: number): Promise<t.SessionCmd> {
     assert(this.session.isLoaded());
     const fsPath = URI.parse(uri).fsPath;
     const data = await fs.promises.readFile(fsPath);
@@ -296,17 +252,12 @@ export default class SessionEditor {
       file: { type: 'local', sha1: sha1 },
       title: path.basename(fsPath),
     };
-    const cmd: t.InsertVideoTrackSessionCmd = {
+    return this.applyAndInsertSessionCmd({
       type: 'insertVideoTrack',
-      coalescing: false,
       videoTrack,
       sessionDuration: Math.max(this.session.head.duration, videoTrack.clockRange.end),
       revSessionDuration: this.session.head.duration,
-    };
-    this.applyInsertVideoTrack(cmd);
-    this.insertSessionCmd(cmd);
-    this.changed();
-    return cmd;
+    });
   }
 
   private applyInsertVideoTrack(cmd: t.InsertVideoTrackSessionCmd) {
@@ -323,15 +274,11 @@ export default class SessionEditor {
     this.session.head.duration = cmd.revSessionDuration;
   }
 
-  deleteVideoTrack(id: string): t.DeleteVideoTrackSessionCmd {
+  deleteVideoTrack(id: string): t.SessionCmd {
     assert(this.session.isLoaded());
     const videoTrack = this.session.body.videoTracks.find(t => t.id === id);
     assert(videoTrack);
-    const cmd: t.DeleteVideoTrackSessionCmd = { type: 'deleteVideoTrack', coalescing: false, videoTrack };
-    this.applyDeleteVideoTrack(cmd);
-    this.insertSessionCmd(cmd);
-    this.changed();
-    return cmd;
+    return this.applyAndInsertSessionCmd({ type: 'deleteVideoTrack', videoTrack });
   }
 
   private applyDeleteVideoTrack(cmd: t.DeleteVideoTrackSessionCmd) {
@@ -346,7 +293,7 @@ export default class SessionEditor {
     this.session.body.videoTracks.push(cmd.videoTrack);
   }
 
-  updateVideoTrack(update: Partial<t.VideoTrack>): t.UpdateVideoTrackSessionCmd | undefined {
+  updateVideoTrack(update: Partial<t.VideoTrack>): t.SessionCmd | undefined {
     assert(this.session.isLoaded());
     assert(update.id);
     const id = update.id;
@@ -357,11 +304,8 @@ export default class SessionEditor {
     if (keyDiffs.length > 0) {
       update = _.pick(update, keyDiffs);
       const revUpdate = _.pick(videoTrack, keyDiffs);
-      const cmd: t.UpdateVideoTrackSessionCmd = { type: 'updateVideoTrack', coalescing: false, id, update, revUpdate };
-      this.applyUpdateVideoTrack(cmd);
-      this.insertSessionCmd(cmd);
-      this.changed();
-      return cmd;
+      // const coalescing = this.curUndoHistoryGroup?.at(-1)?.type === 'updateVideoTrack';
+      return this.applyAndInsertSessionCmd({ type: 'updateVideoTrack', id, update, revUpdate });
     }
   }
 
@@ -393,21 +337,12 @@ export default class SessionEditor {
     this.changed();
   }
 
-  updateDuration(duration: number, opts?: { coalescing?: boolean }) {
-    const lastCmd = this.undoHistory[this.undoHistoryIndex];
-    // const replace = lastCmd?.type === 'updateDuration';
-
-    const cmd: t.UpdateDurationSessionCmd = {
-      type: 'updateDuration',
-      coalescing: Boolean(opts?.coalescing),
-      duration,
-      revDuration: this.session.head.duration,
-      // revDuration: replace ? lastCmd.revDuration : this.session.head.duration,
-    };
-    this.applyUpdateDuration(cmd);
-    this.insertSessionCmd(cmd /*, { replace }*/);
-    this.changed();
-    return cmd;
+  updateDuration(duration: number, opts?: { coalescing?: boolean }): t.SessionCmd {
+    // const coalescing = opts?.coalescing || this.curUndoHistoryGroup?.at(-1)?.type === 'updateDuration';
+    return this.applyAndInsertSessionCmd(
+      { type: 'updateDuration', duration, revDuration: this.session.head.duration },
+      opts,
+    );
   }
 
   private applyUpdateDuration(cmd: t.UpdateDurationSessionCmd) {
@@ -436,7 +371,7 @@ export default class SessionEditor {
     this.changed();
   }
 
-  changeSpeed(range: t.ClockRange, factor: number): t.ChangeSpeedSessionCmd {
+  changeSpeed(range: t.ClockRange, factor: number): t.SessionCmd {
     assert(this.session.isLoaded());
     const { body } = this.session;
 
@@ -460,21 +395,15 @@ export default class SessionEditor {
     );
     const revFocusClocksInRange: number[] = body.focusTimeline.slice(firstFocusIndex, endFocusIndex).map(f => f.clock);
 
-    const cmd: t.ChangeSpeedSessionCmd = {
+    return this.applyAndInsertSessionCmd({
       type: 'changeSpeed',
-      coalescing: false,
       range,
       factor,
       firstEventIndex,
       firstFocusIndex,
       revEventClocksInRange,
       revFocusClocksInRange,
-    };
-
-    this.applyChangeSpeed(cmd);
-    this.insertSessionCmd(cmd);
-    this.changed();
-    return cmd;
+    });
   }
 
   private applyChangeSpeed(cmd: t.ChangeSpeedSessionCmd) {
@@ -532,29 +461,9 @@ export default class SessionEditor {
     // return this.changeSpeed(range, Infinity);
   }
 
-  insertGap(clock: number, duration: number): t.InsertGapSessionCmd {
+  insertGap(clock: number, duration: number): t.SessionCmd {
     assert(this.session.isLoaded());
-    // const { head, body } = this.session;
-
-    // const firstEventIndex = body.eventContainer.getIndexAfterClock(clock);
-    // const firstFocusIndex = Math.max(
-    //   0,
-    //   body.focusTimeline.findIndex(f => f.clock >= clock),
-    // );
-
-    const cmd: t.InsertGapSessionCmd = {
-      type: 'insertGap',
-      coalescing: false,
-      clock,
-      duration,
-      // firstEventIndex,
-      // firstFocusIndex,
-    };
-
-    this.applyInsertGap(cmd);
-    this.insertSessionCmd(cmd);
-    this.changed();
-    return cmd;
+    return this.applyAndInsertSessionCmd({ type: 'insertGap', clock, duration });
   }
 
   private applyInsertGap(cmd: t.InsertGapSessionCmd) {
@@ -635,14 +544,7 @@ export default class SessionEditor {
     // this.session.onChange?.();
   }
 
-  private insertSessionCmd(cmd: t.SessionCmd /*, opts?: { replace?: boolean }*/) {
-    // if (!opts?.replace)
-    this.undoHistoryIndex++;
-    this.undoHistory.length = this.undoHistoryIndex;
-    this.undoHistory.push(cmd);
-  }
-
-  private async applyCmd(cmd: t.SessionCmd) {
+  private applyCmd(cmd: t.SessionCmd) {
     switch (cmd.type) {
       case 'insertEvent':
         return this.applyInsertEvent(cmd);
@@ -678,7 +580,7 @@ export default class SessionEditor {
     }
   }
 
-  private async unapplyCmd(cmd: t.SessionCmd) {
+  private unapplyCmd(cmd: t.SessionCmd) {
     switch (cmd.type) {
       case 'insertEvent':
         return this.unapplyInsertEvent(cmd);
@@ -711,6 +613,24 @@ export default class SessionEditor {
       default:
         throw new Error(`unknown cmd type: ${(cmd as any).type}`);
     }
+  }
+
+  private insertSessionCmd(cmd: t.SessionCmd, opts?: { coalescing?: boolean }) {
+    if (!opts?.coalescing || this.undoIndex === -1) {
+      this.undoIndex++;
+      this.undoHistory.length = this.undoIndex;
+      this.undoHistory.push([cmd]);
+    } else {
+      this.undoHistory.length = this.undoIndex + 1;
+      this.curUndoHistoryGroup!.push(cmd);
+    }
+  }
+
+  private applyAndInsertSessionCmd(cmd: t.SessionCmd, opts?: { coalescing?: boolean }): t.SessionCmd {
+    this.applyCmd(cmd);
+    this.insertSessionCmd(cmd, opts);
+    this.changed();
+    return cmd;
   }
 
   private changed() {

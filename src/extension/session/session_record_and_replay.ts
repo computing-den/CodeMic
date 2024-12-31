@@ -490,11 +490,16 @@ export default class SessionRecordAndReplay {
   private async update() {
     this.clearTimeout();
     this.timeoutTimestamp = performance.now();
-    await this.updateStep();
+    await this.updateStep(this.timeoutTimestamp);
   }
 
-  private updateStep = async () => {
-    const timeAtUpdate = performance.now();
+  /**
+   * When called immediately (from this.fastSync() for example), we pass the
+   * timestamp so that the few nanosecond difference won't cause the clock to
+   * change from 0. Because the frontend has special logic for clock === 0.
+   */
+  private updateStep = async (now?: number) => {
+    const timeAtUpdate = now ?? performance.now();
     this.clock += (timeAtUpdate - this.timeoutTimestamp) / 1000;
 
     if (this.mode.recordingEditor) {
