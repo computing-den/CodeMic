@@ -416,6 +416,11 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
     });
   }
 
+  async function crop() {
+    assert(state.focus);
+    await postMessage({ type: 'recorder/crop', clock: state.focus.clock });
+  }
+
   const insertGapPopover = usePopover();
   const insertGapButtonRef = useRef(null);
 
@@ -482,6 +487,13 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
       icon="fa-solid fa-arrows-left-right-to-line icon-rotate-cw-90"
       disabled={session.playing || session.recording || hasRangeSelection || !state.focus}
       onClick={insertGapPopover.toggle}
+    />,
+    <Toolbar.Button
+      ref={insertGapButtonRef}
+      title="Crop"
+      icon="fa-solid fa-crop-simple"
+      disabled={session.playing || session.recording || hasRangeSelection || !state.focus}
+      onClick={crop}
     />,
   ];
 

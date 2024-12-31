@@ -47,6 +47,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/changeSpeed'; range: ClockRange; factor: number }; response: OKResponse }
   | { request: { type: 'recorder/merge'; range: ClockRange }; response: OKResponse }
   | { request: { type: 'recorder/insertGap'; clock: number; dur: number }; response: OKResponse }
+  | { request: { type: 'recorder/crop'; clock: number }; response: OKResponse }
   // | { request: { type: 'toggleRecorderStudio' }; response: OKResponse }
   | { request: { type: 'deleteSession'; sessionId: string }; response: OKResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
@@ -635,6 +636,7 @@ export type SessionCmd =
   | ChangeSpeedSessionCmd
   // | MergeSessionCmd
   | InsertGapSessionCmd
+  | CropSessionCmd
   | UpdateDurationSessionCmd;
 
 export type InsertEventSessionCmd = {
@@ -725,6 +727,10 @@ export type InsertGapSessionCmd = {
   duration: number;
   // firstEventIndex: number;
   // firstFocusIndex: number;
+};
+export type CropSessionCmd = {
+  type: 'crop';
+  clock: number;
 };
 export type UpdateDurationSessionCmd = {
   type: 'updateDuration';

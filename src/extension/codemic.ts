@@ -517,6 +517,13 @@ class CodeMic {
         this.enqueueFrontendUpdate();
         return ok;
       }
+      case 'recorder/crop': {
+        assert(this.session?.isLoaded());
+        const cmd = this.session.editor.crop(req.clock);
+        this.session.rr.applySessionCmds([cmd]);
+        this.enqueueFrontendUpdate();
+        return ok;
+      }
       case 'confirmForkFromPlayer': {
         if (!this.session?.isLoaded() || !this.session.rr.playing) {
           return { type: 'boolean', value: true };

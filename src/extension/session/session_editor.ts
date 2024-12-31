@@ -513,9 +513,21 @@ export default class SessionEditor {
   }
 
   /**
-   * Cuts the sessions at clock.
-   * Current clock must be < cut clock.
+   * Crops the session to clock.
    */
+  crop(clock: number): t.SessionCmd {
+    assert(this.session.isLoaded());
+    return this.applyAndInsertSessionCmd({ type: 'crop', clock });
+  }
+
+  private applyCrop(cmd: t.CropSessionCmd) {
+    // TODO
+  }
+
+  private unapplyCrop(cmd: t.CropSessionCmd) {
+    // TODO
+  }
+
   cut(clock: number) {
     assert(this.session.isLoaded());
 
@@ -572,6 +584,8 @@ export default class SessionEditor {
       // return this.applyMerge(cmd);
       case 'insertGap':
         return this.applyInsertGap(cmd);
+      case 'crop':
+        return this.applyCrop(cmd);
       case 'updateDuration':
         return this.applyUpdateDuration(cmd);
 
@@ -608,6 +622,8 @@ export default class SessionEditor {
       // return this.unapplyMerge(cmd);
       case 'insertGap':
         return this.unapplyInsertGap(cmd);
+      case 'crop':
+        return this.unapplyCrop(cmd);
       case 'updateDuration':
         return this.unapplyUpdateDuration(cmd);
       default:
