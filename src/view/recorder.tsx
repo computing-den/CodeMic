@@ -376,20 +376,14 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
   async function changeSpeed(factor: number) {
     assert(state.anchor && state.focus);
     // TODO disable speed control popover buttons till done.
-    await postMessage({
-      type: 'recorder/changeSpeed',
-      range: getClockRangeOfSelection(state.anchor, state.focus),
-      factor,
-    });
+    const range = getClockRangeOfSelection(state.anchor, state.focus);
+    await postMessage({ type: 'recorder/changeSpeed', range, factor });
 
     updateState(state => {
       if (state.anchor && state.focus) {
-        const dur = Math.abs(state.anchor.clock - state.focus.clock);
-        if (state.anchor.clock < state.focus.clock) {
-          state.focus.clock = state.anchor.clock + dur / factor;
-        } else {
-          state.anchor.clock = state.focus.clock + dur / factor;
-        }
+        // const dur = Math.abs(state.anchor.clock - state.focus.clock);
+        state.focus.clock = lib.calcClockAfterRangeSpeedChange(state.focus.clock, range, factor);
+        state.anchor.clock = lib.calcClockAfterRangeSpeedChange(state.anchor.clock, range, factor);
       }
     });
 

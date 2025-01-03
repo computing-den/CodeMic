@@ -189,6 +189,12 @@ export default class SessionRecordAndReplay {
     if (!noUpdate) await this.update(); // Will clear previous timeouts.
   }
 
+  setClock(clock: number) {
+    this.clock = clock;
+    this.workspaceRecorder.setClock(this.clock);
+    this.workspacePlayer.setClock(this.clock);
+  }
+
   loadAudioTrack(audioTrack: t.AudioTrack) {
     const audioTrackPlayer = new AudioTrackPlayer(this.session, audioTrack);
     this.audioTrackPlayers.push(audioTrackPlayer);
@@ -229,146 +235,19 @@ export default class SessionRecordAndReplay {
     this.videoTrackPlayer.handleVideoEvent(e);
   }
 
-  async applySessionCmds(cmds: t.SessionCmd[]) {
-    for (const cmd of cmds) {
-      switch (cmd.type) {
-        case 'insertEvent': {
-          if (this.internalWorkspace.eventIndex === cmd.index - 1) {
-            this.internalWorkspace.eventIndex++;
-            await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Forwards);
-          }
-          break;
-        }
-        case 'updateTrackLastEvent':
-          break;
-        case 'insertFocus':
-          break;
-        case 'updateLastFocus':
-          break;
-        case 'insertAudioTrack':
-          {
-            this.loadAudioTrack(cmd.audioTrack);
-          }
-          break;
-
-        case 'deleteAudioTrack':
-          {
-            this.unloadAudioTrack(cmd.audioTrack.id);
-          }
-          break;
-        case 'updateAudioTrack':
-          {
-            await this.fastSync();
-          }
-          break;
-        case 'insertVideoTrack':
-          {
-            this.loadVideoTrack(cmd.videoTrack);
-            await this.fastSync();
-          }
-          break;
-        case 'deleteVideoTrack':
-          {
-            this.unloadVideoTrack(cmd.videoTrack.id);
-            await this.fastSync();
-          }
-          break;
-        case 'updateVideoTrack':
-          {
-            await this.fastSync();
-          }
-          break;
-        case 'changeSpeed':
-          {
-            await this.seek(lib.calcClockAfterRangeSpeedChange(this.clock, cmd.range, cmd.factor));
-          }
-          break;
-        case 'insertGap':
-          break;
-        default:
-          throw new Error(`unknown cmd type: ${(cmd as any).type}`);
-      }
+  async applyInsertEvent(cmd: t.InsertEventSessionCmd) {
+    if (this.internalWorkspace.eventIndex === cmd.index - 1) {
+      this.internalWorkspace.eventIndex++;
+      await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Forwards);
     }
   }
 
-  async unapplySessionCmds(cmds: t.SessionCmd[]) {
-    for (const cmd of cmds) {
-      switch (cmd.type) {
-        case 'insertEvent': {
-          if (this.internalWorkspace.eventIndex === cmd.index) {
-            this.internalWorkspace.eventIndex--;
-            await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Backwards);
-          }
-          break;
-        }
-        case 'updateTrackLastEvent':
-          break;
-        case 'insertFocus':
-          break;
-        case 'updateLastFocus':
-          break;
-        case 'insertAudioTrack':
-          {
-            this.unloadAudioTrack(cmd.audioTrack.id);
-          }
-          break;
-
-        case 'deleteAudioTrack':
-          {
-            this.loadAudioTrack(cmd.audioTrack);
-          }
-          break;
-        case 'updateAudioTrack':
-          {
-            await this.fastSync();
-          }
-          break;
-        case 'insertVideoTrack':
-          {
-            this.unloadVideoTrack(cmd.videoTrack.id);
-            await this.fastSync();
-          }
-          break;
-        case 'deleteVideoTrack':
-          {
-            this.loadVideoTrack(cmd.videoTrack);
-            await this.fastSync();
-          }
-          break;
-        case 'updateVideoTrack':
-          {
-            await this.fastSync();
-          }
-          break;
-        case 'changeSpeed':
-          {
-            if (Number.isFinite(cmd.factor)) {
-              const factor = 1 / cmd.factor;
-              const range: t.ClockRange = {
-                start: cmd.range.start,
-                end: lib.calcClockAfterRangeSpeedChange(cmd.range.end, cmd.range, cmd.factor),
-              };
-
-              await this.seek(lib.calcClockAfterRangeSpeedChange(this.clock, range, factor));
-            }
-          }
-          break;
-        case 'insertGap':
-          break;
-        case 'updateDuration':
-          break;
-        default:
-          throw new Error(`unknown cmd type: ${(cmd as any).type}`);
-      }
+  async unapplyInsertEvent(cmd: t.InsertEventSessionCmd) {
+    if (this.internalWorkspace.eventIndex === cmd.index) {
+      this.internalWorkspace.eventIndex--;
+      await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Backwards);
     }
   }
-
-  // async insertGap(clock: number, dur: number) {
-  //   this.internalWorkspace.insertGap(clock, dur);
-  //   const e = this.internalWorkspace.getCurrentEvent();
-  //   if (e) await this.seek(e.event.clock);
-  //   this.onChange?.();
-  // }
 
   private initAudioPlayer(c: AudioTrackPlayer) {
     c.onError = this.gotError.bind(this);

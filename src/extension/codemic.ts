@@ -3,7 +3,7 @@ import WebviewProvider from './webview_provider.js';
 import Session from './session/session.js';
 import * as storage from './storage.js';
 import * as serverApi from './server_api.js';
-import type { Context, RecorderRestoreState, WorkspaceChangeGlobalState } from './types.js';
+import type { Context, WorkspaceChangeGlobalState } from './types.js';
 import osPaths from './os_paths.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
@@ -11,9 +11,7 @@ import assert from 'assert';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import * as paths from '../lib/paths.js';
-import * as misc from './misc.js';
 import VscWorkspace from './session/vsc_workspace.js';
-import Cache from './cache.js';
 import path from 'path';
 import cache from './cache.js';
 
@@ -412,74 +410,80 @@ class CodeMic {
       }
       case 'recorder/undo': {
         assert(this.session?.isLoaded());
-        const cmds = this.session.editor.undo();
-        await this.session.rr.unapplySessionCmds(cmds);
-        console.log('Undo: ', cmds);
+        await this.session.commander.undo();
+        // const cmds = this.session.editor.undo();
+        // await this.session.rr.unapplySessionCmds(cmds);
+        // console.log('Undo: ', cmds);
         this.enqueueFrontendUpdate();
         return ok;
       }
       case 'recorder/redo': {
         assert(this.session?.isLoaded());
-        const cmds = this.session.editor.redo();
-        await this.session.rr.applySessionCmds(cmds);
-        console.log('Redo: ', cmds);
+        await this.session.commander.redo();
+        // const cmds = this.session.editor.redo();
+        // await this.session.rr.applySessionCmds(cmds);
+        // console.log('Redo: ', cmds);
         this.enqueueFrontendUpdate();
         return ok;
       }
       case 'recorder/updateDetails': {
         assert(this.session);
-        // assert(this.session?.isLoaded());
         this.session.editor.updateFromUI(req.changes);
         this.enqueueFrontendUpdate();
         return ok;
       }
-      case 'recorder/updateDuration': {
-        assert(this.session);
-        // assert(this.session?.isLoaded());
-        const cmd = this.session.editor.updateDuration(req.duration);
-        await this.session.rr?.applySessionCmds([cmd]);
-        this.enqueueFrontendUpdate();
-        return ok;
-      }
+      // case 'recorder/updateDuration': {
+      //   assert(this.session);
+      //   this.session.editor.updateDuration(req.duration);
+      //   // await this.session.rr?.applySessionCmds([cmd]);
+      //   this.enqueueFrontendUpdate();
+      //   return ok;
+      // }
       case 'recorder/insertAudio': {
         assert(this.session?.isLoaded());
-        const cmd = await this.session.editor.insertAudioTrack(req.uri, req.clock);
-        await this.session.rr.applySessionCmds([cmd]);
+        // await this.session.commander.insertAudioTrack(req.uri, req.clock);
+        const cmd = await this.session.editor.createInsertAudioTrack(req.uri, req.clock);
+        await this.session.commander.applyInsertAudioTrack(cmd);
         this.enqueueFrontendUpdate();
         return ok;
       }
       case 'recorder/deleteAudio': {
         assert(this.session?.isLoaded());
-        const cmd = this.session.editor.deleteAudioTrack(req.id);
-        await this.session.rr.applySessionCmds([cmd]);
+        // await this.session.commander.deleteAudioTrack(req.id);
+        const cmd = this.session.editor.createDeleteAudioTrack(req.id);
+        await this.session.commander.applyDeleteAudioTrack(cmd);
         this.enqueueFrontendUpdate();
         return ok;
       }
       case 'recorder/updateAudio': {
         assert(this.session?.isLoaded());
-        const cmd = this.session.editor.updateAudioTrack(req.update);
-        if (cmd) await this.session.rr.applySessionCmds([cmd]);
+        // await this.session.commander.updateAudioTrack(req.update);
+        const cmd = this.session.editor.createUpdateAudioTrack(req.update);
+        if (cmd) await this.session.commander.applyUpdateAudioTrack(cmd);
         this.enqueueFrontendUpdate();
         return ok;
       }
       case 'recorder/insertVideo': {
         assert(this.session?.isLoaded());
-        const cmd = await this.session.editor.insertVideoTrack(req.uri, req.clock);
-        this.session.rr.applySessionCmds([cmd]);
+        // await this.session.commander.insertVideoTrack(req.uri, req.clock);
+        const cmd = await this.session.editor.createInsertVideoTrack(req.uri, req.clock);
+        await this.session.commander.applyInsertVideoTrack(cmd);
         this.enqueueFrontendUpdate();
         return ok;
       }
       case 'recorder/deleteVideo': {
         assert(this.session?.isLoaded());
-        const cmd = this.session.editor.deleteVideoTrack(req.id);
-        this.session.rr.applySessionCmds([cmd]);
+        // await this.session.commander.deleteVideoTrack(req.id);
+        const cmd = this.session.editor.createDeleteVideoTrack(req.id);
+        await this.session.commander.applyDeleteVideoTrack(cmd);
         this.enqueueFrontendUpdate();
         return ok;
       }
       case 'recorder/updateVideo': {
         assert(this.session?.isLoaded());
-        const cmd = this.session.editor.updateVideoTrack(req.update);
-        if (cmd) await this.session.rr.applySessionCmds([cmd]);
+        // await this.session.commander.updateVideoTrack(req.update);
+        const cmd = this.session.editor.createUpdateVideoTrack(req.update);
+        if (cmd) await this.session.commander.applyUpdateVideoTrack(cmd);
         this.enqueueFrontendUpdate();
         return ok;
       }
@@ -498,29 +502,33 @@ class CodeMic {
       }
       case 'recorder/changeSpeed': {
         assert(this.session?.isLoaded());
-        const cmd = this.session.editor.changeSpeed(req.range, req.factor);
-        this.session.rr.applySessionCmds([cmd]);
+        // await this.session.commander.changeSpeed(req.range, req.factor);
+        const cmd = this.session.editor.createChangeSpeed(req.range, req.factor);
+        await this.session.commander.applyChangeSpeed(cmd);
         this.enqueueFrontendUpdate();
         return ok;
       }
       case 'recorder/merge': {
         assert(this.session?.isLoaded());
-        const cmd = this.session.editor.merge(req.range);
-        this.session.rr.applySessionCmds([cmd]);
+        // await this.session.commander.merge(req.range);
+        const cmd = this.session.editor.createMerge(req.range);
+        await this.session.commander.applyMerge(cmd);
         this.enqueueFrontendUpdate();
         return ok;
       }
       case 'recorder/insertGap': {
         assert(this.session?.isLoaded());
-        const cmd = this.session.editor.insertGap(req.clock, req.dur);
-        this.session.rr.applySessionCmds([cmd]);
+        // await this.session.commander.insertGap(req.clock, req.dur);
+        const cmd = this.session.editor.createInsertGap(req.clock, req.dur);
+        await this.session.commander.applyInsertGap(cmd);
         this.enqueueFrontendUpdate();
         return ok;
       }
       case 'recorder/crop': {
         assert(this.session?.isLoaded());
-        const cmd = this.session.editor.crop(req.clock);
-        this.session.rr.applySessionCmds([cmd]);
+        // await this.session.commander.crop(req.clock);
+        const cmd = this.session.editor.createCrop(req.clock);
+        await this.session.commander.applyCrop(cmd);
         this.enqueueFrontendUpdate();
         return ok;
       }

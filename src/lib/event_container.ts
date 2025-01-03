@@ -248,7 +248,7 @@ export default class EventContainer {
     const track = this.getInitializedTrack(uri);
     const pushAtEnd = track.length === 0 || events.length === 0 || events[0].clock >= track.at(-1)!.clock;
 
-    lib.insertIntoArray(track, events, track.length);
+    lib.insertIntoArray(track, events);
     if (!pushAtEnd) {
       // Array.sort does a stable sort. So because we first pushed the events at the end,
       // the new items will always be after existing items when their clocks are the same.

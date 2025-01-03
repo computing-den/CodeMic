@@ -35,7 +35,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/undo' }; response: OKResponse }
   | { request: { type: 'recorder/redo' }; response: OKResponse }
   | { request: { type: 'recorder/updateDetails'; changes: SessionDetailsUpdate }; response: OKResponse }
-  | { request: { type: 'recorder/updateDuration'; duration: number }; response: OKResponse }
+  // | { request: { type: 'recorder/updateDuration'; duration: number }; response: OKResponse }
   | { request: { type: 'recorder/insertAudio'; uri: string; clock: number }; response: OKResponse }
   | { request: { type: 'recorder/deleteAudio'; id: string }; response: OKResponse }
   | { request: { type: 'recorder/updateAudio'; update: Partial<AudioTrack> }; response: OKResponse }
@@ -634,6 +634,7 @@ export type SessionCmd =
   // | UpdateHeadSessionCmd
   // | UpdateFromUISessionCmd
   | ChangeSpeedSessionCmd
+  | MergeSessionCmd
   // | MergeSessionCmd
   | InsertGapSessionCmd
   | CropSessionCmd
@@ -715,6 +716,17 @@ export type ChangeSpeedSessionCmd = {
   firstFocusIndex: number;
   revEventClocksInRange: number[];
   revFocusClocksInRange: number[];
+  revRrClock: number;
+};
+export type MergeSessionCmd = {
+  type: 'merge';
+  // coalescing: boolean;
+  range: ClockRange;
+  firstEventIndex: number;
+  firstFocusIndex: number;
+  revEventClocksInRange: number[];
+  revFocusClocksInRange: number[];
+  revRrClock: number;
 };
 // export type MergeSessionCmd = {
 //   type: 'merge';
@@ -731,6 +743,12 @@ export type InsertGapSessionCmd = {
 export type CropSessionCmd = {
   type: 'crop';
   clock: number;
+  firstEventIndex: number;
+  firstFocusIndex: number;
+  revEvents: EditorEventWithUri[];
+  revFocusTimeline: Focus[];
+  revDuration: number;
+  revRrClock: number;
 };
 export type UpdateDurationSessionCmd = {
   type: 'updateDuration';

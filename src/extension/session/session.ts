@@ -5,11 +5,13 @@ import SessionCore from './session_core.js';
 import SessionBody from './session_body.js';
 import SessionRecordAndReplay from './session_record_and_replay.js';
 import SessionEditor from './session_editor.js';
+import SessionCommander from './session_commander.js';
 import _ from 'lodash';
 
 export type LoadedSession = Session & {
   body: SessionBody;
   rr: SessionRecordAndReplay;
+  commander: SessionCommander;
 };
 
 export class Session {
@@ -29,6 +31,7 @@ export class Session {
   editor: SessionEditor;
   body?: SessionBody;
   rr?: SessionRecordAndReplay;
+  commander?: SessionCommander;
 
   onChange?: () => any;
   onProgress?: () => any;
@@ -70,6 +73,7 @@ export class Session {
     const bodyJSON = await this.core.readBody({ download: true });
     this.body = new SessionBody(bodyJSON);
     this.rr = new SessionRecordAndReplay(this as LoadedSession);
+    this.commander = new SessionCommander(this as LoadedSession);
     await this.rr.load(options);
   }
 
@@ -79,6 +83,7 @@ export class Session {
 
     this.body = new SessionBody();
     this.rr = new SessionRecordAndReplay(this as LoadedSession);
+    this.commander = new SessionCommander(this as LoadedSession);
     await this.rr.scan();
   }
 }

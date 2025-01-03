@@ -145,6 +145,12 @@ export function calcClockAfterRangeSpeedChange(clock: number, range: t.ClockRang
   return clock + getClockRangeOverlapDur(range, { start: 0, end: clock }) * (1 / factor - 1);
 }
 
+export function calcClockAfterMerge(clock: number, range: t.ClockRange): number {
+  if (clock < range.start) return clock;
+  if (clock > range.end) return clock - getClockRangeDur(range);
+  return range.start;
+}
+
 export function userToUserSummary(user: t.User): t.UserSummary {
   return _.pick(user, 'username', 'email', 'joinTimestamp');
 }
@@ -157,7 +163,7 @@ export function userToUserSummary(user: t.User): t.UserSummary {
 /**
  * Use this instead of splice to support large number of inserts without hitting the stack limit.
  */
-export function insertIntoArray<T>(array: T[], newItems: T[], at: number) {
+export function insertIntoArray<T>(array: T[], newItems: T[], at: number = array.length) {
   array.length += newItems.length;
   array.copyWithin(at + newItems.length, at);
   for (let i = 0; i < newItems.length; i++) {
@@ -172,22 +178,14 @@ export function isLoadedSession(session: t.SessionUIState): session is t.LoadedS
 }
 
 export class Vec2 {
-  constructor(
-    public x: number,
-    public y: number,
-  ) {}
+  constructor(public x: number, public y: number) {}
   sub(p: Vec2): Vec2 {
     return new Vec2(this.x - p.x, this.y - p.y);
   }
 }
 
 export class Rect {
-  constructor(
-    public top: number,
-    public right: number,
-    public bottom: number,
-    public left: number,
-  ) {}
+  constructor(public top: number, public right: number, public bottom: number, public left: number) {}
 
   get height(): number {
     return this.bottom - this.top;
@@ -215,10 +213,7 @@ export class Rect {
 }
 
 export class Position {
-  constructor(
-    public line: number,
-    public character: number,
-  ) {
+  constructor(public line: number, public character: number) {
     assert(line >= 0, 'Position line must be >= 0');
     assert(character >= 0, 'Position character must be >= 0');
   }
@@ -253,10 +248,7 @@ export class Position {
 }
 
 export class Range {
-  constructor(
-    public start: Position,
-    public end: Position,
-  ) {}
+  constructor(public start: Position, public end: Position) {}
 
   isEqual(other: Range) {
     return this.start.isEqual(other.start) && this.end.isEqual(other.end);
@@ -264,10 +256,7 @@ export class Range {
 }
 
 export class Selection {
-  constructor(
-    public anchor: Position,
-    public active: Position,
-  ) {}
+  constructor(public anchor: Position, public active: Position) {}
 
   get start(): Position {
     return this.anchor.isBeforeOrEqual(this.active) ? this.anchor : this.active;
@@ -290,17 +279,11 @@ export class Selection {
 }
 
 export class ContentChange {
-  constructor(
-    public text: string,
-    public range: Range,
-  ) {}
+  constructor(public text: string, public range: Range) {}
 }
 
 export class LineRange {
-  constructor(
-    public start: number,
-    public end: number,
-  ) {}
+  constructor(public start: number, public end: number) {}
   isEqual(other: LineRange) {
     return this.start === other.start && this.end === other.end;
   }
