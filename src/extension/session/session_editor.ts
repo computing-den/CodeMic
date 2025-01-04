@@ -11,7 +11,6 @@ import {
   calcClockAfterRangeSpeedChange,
   getClockRangeDur,
   insertIntoArray,
-  isClockInRange,
   unreachable,
 } from '../../lib/lib.js';
 import { URI } from 'vscode-uri';
@@ -199,6 +198,7 @@ export default class SessionEditor {
 
     return this.insertCmd({
       type: 'insertAudioTrack',
+      index: this.session.body.audioTracks.length,
       audioTrack,
       sessionDuration: Math.max(this.session.head.duration, audioTrack.clockRange.end),
       revSessionDuration: this.session.head.duration,
@@ -207,38 +207,38 @@ export default class SessionEditor {
 
   applyInsertAudioTrack(cmd: t.InsertAudioTrackCmd) {
     assert(this.session.isLoaded());
-    this.session.body.audioTracks.push(cmd.audioTrack);
+    assert(cmd.index <= this.session.body.audioTracks.length);
+    this.session.body.audioTracks.splice(cmd.index, 0, cmd.audioTrack);
     this.session.head.duration = cmd.sessionDuration;
     this.changed();
   }
 
   unapplyInsertAudioTrack(cmd: t.InsertAudioTrackCmd) {
     assert(this.session.isLoaded());
-    const i = this.session.body.audioTracks.findIndex(t => t.id === cmd.audioTrack.id);
-    assert(i !== -1);
-    this.session.body.audioTracks.splice(i, 1);
+    assert(cmd.index <= this.session.body.audioTracks.length);
+    this.session.body.audioTracks.splice(cmd.index, 1);
     this.session.head.duration = cmd.sessionDuration;
     this.changed();
   }
 
   createDeleteAudioTrack(id: string): t.DeleteAudioTrackCmd {
     assert(this.session.isLoaded());
-    const audioTrack = this.session.body.audioTracks.find(t => t.id === id);
-    assert(audioTrack);
-    return this.insertCmd({ type: 'deleteAudioTrack', audioTrack });
+    const index = this.session.body.audioTracks.findIndex(t => t.id === id);
+    assert(index !== -1);
+    return this.insertCmd({ type: 'deleteAudioTrack', index, audioTrack: this.session.body.audioTracks[index] });
   }
 
   applyDeleteAudioTrack(cmd: t.DeleteAudioTrackCmd) {
     assert(this.session.isLoaded());
-    const i = this.session.body.audioTracks.findIndex(t => t.id === cmd.audioTrack.id);
-    assert(i !== -1);
-    this.session.body.audioTracks.splice(i, 1);
+    assert(cmd.index < this.session.body.audioTracks.length);
+    this.session.body.audioTracks.splice(cmd.index, 1);
     this.changed();
   }
 
   unapplyDeleteAudioTrack(cmd: t.DeleteAudioTrackCmd) {
     assert(this.session.isLoaded());
-    this.session.body.audioTracks.push(cmd.audioTrack);
+    assert(cmd.index <= this.session.body.audioTracks.length);
+    this.session.body.audioTracks.splice(cmd.index, 0, cmd.audioTrack);
     this.changed();
   }
 
@@ -292,6 +292,7 @@ export default class SessionEditor {
     };
     return this.insertCmd({
       type: 'insertVideoTrack',
+      index: this.session.body.videoTracks.length,
       videoTrack,
       sessionDuration: Math.max(this.session.head.duration, videoTrack.clockRange.end),
       revSessionDuration: this.session.head.duration,
@@ -300,38 +301,38 @@ export default class SessionEditor {
 
   applyInsertVideoTrack(cmd: t.InsertVideoTrackCmd) {
     assert(this.session.isLoaded());
-    this.session.body.videoTracks.push(cmd.videoTrack);
+    assert(cmd.index <= this.session.body.videoTracks.length);
+    this.session.body.videoTracks.splice(cmd.index, 0, cmd.videoTrack);
     this.session.head.duration = cmd.sessionDuration;
     this.changed();
   }
 
   unapplyInsertVideoTrack(cmd: t.InsertVideoTrackCmd) {
     assert(this.session.isLoaded());
-    const i = this.session.body.videoTracks.findIndex(t => t.id === cmd.videoTrack.id);
-    assert(i !== -1);
-    this.session.body.videoTracks.splice(i, 1);
-    this.session.head.duration = cmd.revSessionDuration;
+    assert(cmd.index <= this.session.body.videoTracks.length);
+    this.session.body.videoTracks.splice(cmd.index, 1);
+    this.session.head.duration = cmd.sessionDuration;
     this.changed();
   }
 
   createDeleteVideoTrack(id: string): t.DeleteVideoTrackCmd {
     assert(this.session.isLoaded());
-    const videoTrack = this.session.body.videoTracks.find(t => t.id === id);
-    assert(videoTrack);
-    return this.insertCmd({ type: 'deleteVideoTrack', videoTrack });
+    const index = this.session.body.videoTracks.findIndex(t => t.id === id);
+    assert(index !== -1);
+    return this.insertCmd({ type: 'deleteVideoTrack', index, videoTrack: this.session.body.videoTracks[index] });
   }
 
   applyDeleteVideoTrack(cmd: t.DeleteVideoTrackCmd) {
     assert(this.session.isLoaded());
-    const i = this.session.body.videoTracks.findIndex(t => t.id === cmd.videoTrack.id);
-    assert(i !== -1);
-    this.session.body.videoTracks.splice(i, 1);
+    assert(cmd.index < this.session.body.videoTracks.length);
+    this.session.body.videoTracks.splice(cmd.index, 1);
     this.changed();
   }
 
   unapplyDeleteVideoTrack(cmd: t.DeleteVideoTrackCmd) {
     assert(this.session.isLoaded());
-    this.session.body.videoTracks.push(cmd.videoTrack);
+    assert(cmd.index <= this.session.body.videoTracks.length);
+    this.session.body.videoTracks.splice(cmd.index, 0, cmd.videoTrack);
     this.changed();
   }
 

@@ -672,6 +672,7 @@ export type UpdateLastFocusCmd = {
 export type InsertAudioTrackCmd = {
   type: 'insertAudioTrack';
   // coalescing: boolean;
+  index: number;
   audioTrack: AudioTrack;
   sessionDuration: number;
   revSessionDuration: number;
@@ -679,6 +680,7 @@ export type InsertAudioTrackCmd = {
 export type DeleteAudioTrackCmd = {
   type: 'deleteAudioTrack';
   // coalescing: boolean;
+  index: number;
   audioTrack: AudioTrack;
 };
 export type UpdateAudioTrackCmd = {
@@ -691,6 +693,7 @@ export type UpdateAudioTrackCmd = {
 export type InsertVideoTrackCmd = {
   type: 'insertVideoTrack';
   // coalescing: boolean;
+  index: number;
   videoTrack: VideoTrack;
   sessionDuration: number;
   revSessionDuration: number;
@@ -698,6 +701,7 @@ export type InsertVideoTrackCmd = {
 export type DeleteVideoTrackCmd = {
   type: 'deleteVideoTrack';
   // coalescing: boolean;
+  index: number;
   videoTrack: VideoTrack;
 };
 export type UpdateVideoTrackCmd = {
