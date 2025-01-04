@@ -301,6 +301,46 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
 
   const hasRangeSelection = state.anchor && state.focus && state.anchor.clock !== state.focus.clock;
 
+  async function deleteTrack() {
+    if (!state.trackSelection) return;
+
+    if (state.trackSelection.type === 'audio') {
+      await postMessage({ type: 'recorder/deleteAudio', id: state.trackSelection.id });
+    } else {
+      await postMessage({ type: 'recorder/deleteVideo', id: state.trackSelection.id });
+    }
+    updateState(state => void (state.trackSelection = undefined));
+  }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    const activeElement = document.activeElement;
+
+    // Check for editable or interactive elements.
+    if (
+      activeElement &&
+      activeElement instanceof HTMLElement &&
+      (activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.tagName === 'SELECT' ||
+        activeElement.isContentEditable)
+    ) {
+      return;
+    }
+
+    if (e.key === 'Delete') {
+      if (state.trackSelection) deleteTrack();
+    }
+  }
+
+  useEffect(() => {
+    // Is this necessary or can we just use handleKeyDown directly?
+    function keyDown(e: KeyboardEvent) {
+      return handleKeyDown(e);
+    }
+    document.addEventListener('keydown', keyDown);
+    return () => document.removeEventListener('keydown', keyDown);
+  });
+
   function updateState(recipe: EditorViewStateRecipe) {
     setState(state => produce(state, recipe));
   }
@@ -490,6 +530,13 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
       disabled={session.playing || session.recording || hasRangeSelection || !state.focus}
       onClick={crop}
     />,
+    <Toolbar.Separator />,
+    <Toolbar.Button
+      title="Delete track"
+      icon="codicon codicon-trash"
+      disabled={session.playing || session.recording || hasRangeSelection || !state.trackSelection}
+      onClick={deleteTrack}
+    />,
   ];
 
   return (
@@ -644,7 +691,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
       });
     } else {
       this.props.onChange(state => {
-        if (clock === undefined) {
+        if (clock === undefined || !this.isMouseOverEmptySpaceInTimeline(e)) {
           state.cursor = undefined;
         } else {
           state.cursor = { id: 'focus', clock, type: 'cursor' };
@@ -672,6 +719,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
         for (const marker of state.markers) marker.active = false;
         state.focus = { id: 'focus', clock, type: 'focus', active: true };
         state.anchor = { id: 'anchor', clock, type: 'anchor' };
+        state.trackSelection = undefined;
       });
     }
   };
@@ -691,27 +739,14 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     // }
   };
 
-  keyDown = async (e: KeyboardEvent) => {
-    if (e.key === 'Delete') {
-      if (this.props.trackSelection) {
-        this.props.onChange(state => {
-          state.trackSelection = undefined;
-        });
-        if (this.props.trackSelection.type === 'audio') {
-          await postMessage({ type: 'recorder/deleteAudio', id: this.props.trackSelection.id });
-        } else {
-          await postMessage({ type: 'recorder/deleteVideo', id: this.props.trackSelection.id });
-        }
-      }
-    }
-  };
-
   getSelectionFromTrack = (track: t.RangedTrack): TrackSelection => {
     return { id: track.id, type: track.type };
   };
 
   trackClicked = (e: React.MouseEvent, track: t.RangedTrack) => {
     this.props.onChange(state => {
+      state.focus = undefined;
+      state.anchor = undefined;
       state.trackSelection = track;
     });
   };
@@ -854,7 +889,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 
   isMouseOverEmptySpaceInTimeline(e: MouseEvent): boolean {
     const target = e.target as HTMLElement;
-    return Boolean(target.closest('#timeline') && !target.closest('.track') && !target.closest('.marker'));
+    return Boolean(target.closest('#timeline') && !target.closest('.track, .marker, .line-focus p, .document-focus'));
   }
 
   // updateTimelineHeightPx = () => {
@@ -877,7 +912,6 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     document.addEventListener('mousemove', this.mouseMoved);
     document.addEventListener('mousedown', this.mouseDown);
     document.addEventListener('mouseup', this.mouseUp);
-    document.addEventListener('keydown', this.keyDown);
 
     const timelineBody = document.getElementById('timeline-body')!;
     timelineBody.addEventListener('mouseleave', this.mouseLeft);
@@ -892,7 +926,6 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     document.removeEventListener('mousemove', this.mouseMoved);
     document.removeEventListener('mousedown', this.mouseDown);
     document.removeEventListener('mouseup', this.mouseUp);
-    document.removeEventListener('keydown', this.keyDown);
 
     const timelineBody = document.getElementById('timeline-body')!;
     timelineBody.removeEventListener('mouseleave', this.mouseLeft);
@@ -910,7 +943,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   }
 
   render() {
-    const { markers, cursor, anchor, focus, trackSelection, session } = this.props;
+    const { markers, cursor, anchor, focus, trackSelection, session, onChange } = this.props;
     const { pxToSecRatio, trackDrag, markerDrag } = this.state;
     const clockMarker: Marker | undefined =
       session.clock > 0 && session.clock !== session.head.duration && !session.recording
@@ -955,6 +988,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
               timelineDuration={timelineDuration}
               // timelineHeightPx={timelineHeightPx}
               pxToSecRatio={pxToSecRatio}
+              onChange={onChange}
             />
             <RangedTracksUI
               timelineDuration={timelineDuration}
@@ -1118,117 +1152,129 @@ type EditorTrackUIProps = {
   timelineDuration: number;
   pxToSecRatio: number;
   workspaceFocusTimeline?: t.Focus[];
+  onChange: (draft: EditorViewStateRecipe) => any;
 };
-class EditorTrackUI extends React.Component<EditorTrackUIProps> {
-  render() {
-    const { sessionDuration, timelineDuration, pxToSecRatio, workspaceFocusTimeline } = this.props;
+function EditorTrackUI(props: EditorTrackUIProps) {
+  const { sessionDuration, timelineDuration, pxToSecRatio, workspaceFocusTimeline, onChange } = props;
 
-    // const lineFocusItems:t.LineFocus [] = [];
-    // if (workspaceFocusTimeline) {
-    //   const { documents, lines } = workspaceFocusTimeline;
-    //   const durationOfOneLine = (TRACK_HEIGHT_PX * timelineDuration) / timelineHeightPx;
+  // const lineFocusItems:t.LineFocus [] = [];
+  // if (workspaceFocusTimeline) {
+  //   const { documents, lines } = workspaceFocusTimeline;
+  //   const durationOfOneLine = (TRACK_HEIGHT_PX * timelineDuration) / timelineHeightPx;
 
-    //   // Cut duration of document focus items to durationOfOneLine.
-    //   const clockRangesOfOccupiedLines: t.ClockRange[] = documents.map(x => ({
-    //     start: x.clockRange.start,
-    //     end: x.clockRange.start + durationOfOneLine,
-    //   }));
+  //   // Cut duration of document focus items to durationOfOneLine.
+  //   const clockRangesOfOccupiedLines: t.ClockRange[] = documents.map(x => ({
+  //     start: x.clockRange.start,
+  //     end: x.clockRange.start + durationOfOneLine,
+  //   }));
 
-    //   for (const line of lines) {
-    //     const lineClockRange: t.ClockRange = {
-    //       start: line.clockRange.start,
-    //       end: line.clockRange.start + durationOfOneLine,
-    //     };
+  //   for (const line of lines) {
+  //     const lineClockRange: t.ClockRange = {
+  //       start: line.clockRange.start,
+  //       end: line.clockRange.start + durationOfOneLine,
+  //     };
 
-    //     // TODO write an algorithm with better time complexity.
-    //     if (!clockRangesOfOccupiedLines.some(x => lib.doClockRangesOverlap(x, lineClockRange))) {
-    //       lineFocusItems.push(line);
-    //     }
-    //   }
-    // }
+  //     // TODO write an algorithm with better time complexity.
+  //     if (!clockRangesOfOccupiedLines.some(x => lib.doClockRangesOverlap(x, lineClockRange))) {
+  //       lineFocusItems.push(line);
+  //     }
+  //   }
+  // }
 
-    // Skip lines that may cut into the previous line.
-    const lineFocusTimeline: { text: string; clockRange: t.ClockRange; offsetPx: number }[] = [];
-    // const heightOf1Sec = timelineHeightPx / timelineDuration;
-    // const heightOf1Sec = TIMELINE_STEP_HEIGHT / stepDuration;
-    for (const [i, focus] of (workspaceFocusTimeline ?? []).entries()) {
-      let offsetPx = 0;
-      const lastLineFocus = lineFocusTimeline.at(-1);
-      const nextFocusClock = workspaceFocusTimeline?.[i + 1]?.clock ?? sessionDuration;
-      if (lastLineFocus) {
-        // The following:
+  // Skip lines that may cut into the previous line.
+  const lineFocusTimeline: { text: string; clockRange: t.ClockRange; offsetPx: number }[] = [];
+  // const heightOf1Sec = timelineHeightPx / timelineDuration;
+  // const heightOf1Sec = TIMELINE_STEP_HEIGHT / stepDuration;
+  for (const [i, focus] of (workspaceFocusTimeline ?? []).entries()) {
+    let offsetPx = 0;
+    const lastLineFocus = lineFocusTimeline.at(-1);
+    const nextFocusClock = workspaceFocusTimeline?.[i + 1]?.clock ?? sessionDuration;
+    if (lastLineFocus) {
+      // The following:
 
-        // | first line
-        // | | second line
-        // | |
-        //   |
-        //
-        // must be turned into this:
-        //
-        // | first line
-        // | |
-        // | |
-        //   | second line
+      // | first line
+      // | | second line
+      // | |
+      //   |
+      //
+      // must be turned into this:
+      //
+      // | first line
+      // | |
+      // | |
+      //   | second line
 
-        const lastLineBottomPx = lastLineFocus.clockRange.start * pxToSecRatio + TRACK_HEIGHT_PX;
-        const lineOriginalTopPx = focus.clock * pxToSecRatio;
-        const lineOriginalBottomPx = nextFocusClock * pxToSecRatio;
+      const lastLineBottomPx = lastLineFocus.clockRange.start * pxToSecRatio + TRACK_HEIGHT_PX;
+      const lineOriginalTopPx = focus.clock * pxToSecRatio;
+      const lineOriginalBottomPx = nextFocusClock * pxToSecRatio;
 
-        const availableSpace = lineOriginalBottomPx - lastLineBottomPx;
-        const requiredSpace = TRACK_HEIGHT_PX + TRACK_MIN_GAP_PX;
+      const availableSpace = lineOriginalBottomPx - lastLineBottomPx;
+      const requiredSpace = TRACK_HEIGHT_PX + TRACK_MIN_GAP_PX;
 
-        if (availableSpace < requiredSpace) continue;
+      if (availableSpace < requiredSpace) continue;
 
-        const lineTopPx = Math.max(lastLineBottomPx + TRACK_MIN_GAP_PX, lineOriginalTopPx);
-        offsetPx = lineTopPx - lineOriginalTopPx;
-      }
-
-      lineFocusTimeline.push({ text: focus.text, offsetPx, clockRange: { start: focus.clock, end: nextFocusClock } });
+      const lineTopPx = Math.max(lastLineBottomPx + TRACK_MIN_GAP_PX, lineOriginalTopPx);
+      offsetPx = lineTopPx - lineOriginalTopPx;
     }
 
-    const documentFocusTimeline: { uri: string; clockRange: t.ClockRange }[] = [];
-    for (const [i, focus] of (workspaceFocusTimeline ?? []).entries()) {
-      const lastDocumentFocus = documentFocusTimeline.at(-1);
-      const nextFocusClock = workspaceFocusTimeline?.[i + 1]?.clock ?? sessionDuration;
-
-      if (lastDocumentFocus && lastDocumentFocus.uri === focus.uri) {
-        lastDocumentFocus.clockRange.end = nextFocusClock;
-      } else {
-        documentFocusTimeline.push({ uri: focus.uri, clockRange: { start: focus.clock, end: nextFocusClock } });
-      }
-    }
-
-    return (
-      <div className="editor-track">
-        {documentFocusTimeline.map(documentFocus => {
-          const style = {
-            top: `${(documentFocus.clockRange.start / timelineDuration) * 100}%`,
-            bottom: `calc(100% - ${(documentFocus.clockRange.end / timelineDuration) * 100}%)`,
-            minHeight: `${TRACK_HEIGHT_PX}px`,
-          };
-          return (
-            <div className="document-focus" style={style}>
-              <p>{path.basename(URI.parse(documentFocus.uri).fsPath)}</p>
-              {/*path.getUriShortNameOpt(documentFocus.uri) || 'unknown file'*/}
-            </div>
-          );
-        })}
-        {lineFocusTimeline.map(lineFocus => {
-          const style = {
-            top: `calc(${(lineFocus.clockRange.start / timelineDuration) * 100}% + ${lineFocus.offsetPx}px)`,
-            // paddingTop: `${lineFocus.offsetPx }px`,
-            bottom: `calc(100% - ${(lineFocus.clockRange.end / timelineDuration) * 100}%)`,
-            minHeight: `${TRACK_HEIGHT_PX}px`,
-          };
-          return (
-            <div className="line-focus" style={style}>
-              {lineFocus.text}
-            </div>
-          );
-        })}
-      </div>
-    );
+    lineFocusTimeline.push({ text: focus.text, offsetPx, clockRange: { start: focus.clock, end: nextFocusClock } });
   }
+
+  const documentFocusTimeline: { uri: string; clockRange: t.ClockRange }[] = [];
+  for (const [i, focus] of (workspaceFocusTimeline ?? []).entries()) {
+    const lastDocumentFocus = documentFocusTimeline.at(-1);
+    const nextFocusClock = workspaceFocusTimeline?.[i + 1]?.clock ?? sessionDuration;
+
+    if (lastDocumentFocus && lastDocumentFocus.uri === focus.uri) {
+      lastDocumentFocus.clockRange.end = nextFocusClock;
+    } else {
+      documentFocusTimeline.push({ uri: focus.uri, clockRange: { start: focus.clock, end: nextFocusClock } });
+    }
+  }
+
+  return (
+    <div className="editor-track">
+      {documentFocusTimeline.map(documentFocus => {
+        function documentFocusClicked() {
+          onChange(state => {
+            state.anchor = { id: 'anchor', clock: documentFocus.clockRange.start, type: 'anchor' };
+            state.focus = { id: 'focus', clock: documentFocus.clockRange.end, type: 'focus', active: true };
+          });
+        }
+
+        const style = {
+          top: `${(documentFocus.clockRange.start / timelineDuration) * 100}%`,
+          bottom: `calc(100% - ${(documentFocus.clockRange.end / timelineDuration) * 100}%)`,
+          minHeight: `${TRACK_HEIGHT_PX}px`,
+        };
+        return (
+          <div className="document-focus" style={style} onClick={documentFocusClicked}>
+            <p>{path.basename(URI.parse(documentFocus.uri).fsPath)}</p>
+            {/*path.getUriShortNameOpt(documentFocus.uri) || 'unknown file'*/}
+          </div>
+        );
+      })}
+      {lineFocusTimeline.map(lineFocus => {
+        function lineFocusClicked() {
+          onChange(state => {
+            state.anchor = { id: 'anchor', clock: lineFocus.clockRange.start, type: 'anchor' };
+            state.focus = { id: 'focus', clock: lineFocus.clockRange.end, type: 'focus', active: true };
+          });
+        }
+        const style = {
+          top: `calc(${(lineFocus.clockRange.start / timelineDuration) * 100}% + ${lineFocus.offsetPx}px)`,
+          // paddingTop: `${lineFocus.offsetPx }px`,
+          bottom: `calc(100% - ${(lineFocus.clockRange.end / timelineDuration) * 100}%)`,
+          minHeight: `${TRACK_HEIGHT_PX}px`,
+        };
+        return (
+          <div className="line-focus" style={style}>
+            <p onClick={lineFocusClicked}>{lineFocus.text || '<empty>'}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // const EDITOR_TRACK_COLUMN_COUNT = 2;

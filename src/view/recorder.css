@@ -166,6 +166,17 @@
                 /* padding: var(--spacing-x-small) var(--hor-padding); */
                 border-color: var(--editor-track-document-focus-color-1);
                 /* font-weight: bold; */
+                z-index: var(--track-z-index);
+
+                &:hover,
+                &.active {
+                  z-index: var(--active-track-z-index);
+                  border-color: var(--editor-track-document-focus-color-1-hover);
+
+                  p {
+                    font-weight: bold;
+                  }
+                }
 
                 p {
                   position: absolute;
@@ -182,6 +193,11 @@
               }
               .document-focus:nth-child(even) {
                 border-color: var(--editor-track-document-focus-color-2);
+
+                &:hover,
+                &.active {
+                  border-color: var(--editor-track-document-focus-color-2-hover);
+                }
               }
 
               .line-focus {
@@ -191,9 +207,21 @@
                 white-space: nowrap;
                 overflow: hidden;
                 padding: 0 var(--hor-padding);
-                text-overflow: ellipsis;
                 width: calc(100% - 2 * var(--hor-padding));
                 color: var(--editor-track-color);
+                z-index: var(--line-focus-z-index);
+
+                p {
+                  text-overflow: ellipsis;
+                  display: inline-block;
+
+                  &:hover,
+                  &.active {
+                    z-index: var(--active-track-z-index);
+                    color: var(--editor-track-color-hover);
+                    font-weight: bold;
+                  }
+                }
 
                 &::after {
                   content: '';
