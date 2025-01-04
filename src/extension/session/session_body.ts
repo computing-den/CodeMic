@@ -1,6 +1,6 @@
 import os from 'os';
 import * as t from '../../lib/types.js';
-import EventContainer from '../../lib/event_container.js';
+import EventContainer from './event_container.js';
 import _ from 'lodash';
 
 export default class SessionBody {

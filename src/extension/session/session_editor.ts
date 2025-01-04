@@ -82,7 +82,7 @@ export default class SessionEditor {
   ): t.UpdateTrackLastEventCmd | undefined {
     assert(this.session.isLoaded());
     const track = this.session.body.eventContainer.getTrack(uri);
-    const lastEvent = track.at(-1);
+    const lastEvent = track?.at(-1);
     assert(lastEvent);
 
     if (_.isEqual({ ...lastEvent, ...update }, lastEvent)) return;
@@ -93,17 +93,21 @@ export default class SessionEditor {
 
   applyUpdateTrackLastEvent(cmd: t.UpdateTrackLastEventCmd) {
     assert(this.session.isLoaded());
-    const e = this.session.body.eventContainer.getTrack(cmd.uri).at(-1);
-    assert(e);
-    Object.assign(e, cmd.update);
+    const track = this.session.body.eventContainer.getTrack(cmd.uri);
+    const e = track?.at(-1);
+    assert(track && e);
+    const newEvent = Object.assign({}, e, cmd.update);
+    this.session.body.eventContainer.replaceInTrackAt(cmd.uri, newEvent, track.length - 1);
     this.changed();
   }
 
   unapplyUpdateTrackLastEvent(cmd: t.UpdateTrackLastEventCmd) {
     assert(this.session.isLoaded());
-    const e = this.session.body.eventContainer.getTrack(cmd.uri).at(-1);
-    assert(e);
-    Object.assign(e, cmd.revUpdate);
+    const track = this.session.body.eventContainer.getTrack(cmd.uri);
+    const e = track?.at(-1);
+    assert(track && e);
+    const newEvent = Object.assign({}, e, cmd.revUpdate);
+    this.session.body.eventContainer.replaceInTrackAt(cmd.uri, newEvent, track.length - 1);
     this.changed();
   }
 
@@ -164,17 +168,17 @@ export default class SessionEditor {
 
   applyUpdateLastFocus(cmd: t.UpdateLastFocusCmd) {
     assert(this.session.isLoaded());
-    const lastFocus = this.session.body.focusTimeline.at(-1);
-    assert(lastFocus);
-    Object.assign(lastFocus, cmd.update);
+    const { focusTimeline } = this.session.body;
+    assert(focusTimeline.length > 0);
+    focusTimeline[focusTimeline.length - 1] = Object.assign({}, focusTimeline.at(-1)!, cmd.update);
     this.changed();
   }
 
   unapplyUpdateLastFocus(cmd: t.UpdateLastFocusCmd) {
     assert(this.session.isLoaded());
-    const lastFocus = this.session.body.focusTimeline.at(-1);
-    assert(lastFocus);
-    Object.assign(lastFocus, cmd.revUpdate);
+    const { focusTimeline } = this.session.body;
+    assert(focusTimeline.length > 0);
+    focusTimeline[focusTimeline.length - 1] = Object.assign({}, focusTimeline.at(-1)!, cmd.revUpdate);
     this.changed();
   }
 
@@ -256,17 +260,19 @@ export default class SessionEditor {
 
   applyUpdateAudioTrack(cmd: t.UpdateAudioTrackCmd) {
     assert(this.session.isLoaded());
-    const audioTrack = this.session.body.audioTracks.find(t => t.id === cmd.id);
-    assert(audioTrack);
-    Object.assign(audioTrack, cmd.update);
+    const { audioTracks } = this.session.body;
+    const i = audioTracks.findIndex(t => t.id === cmd.id);
+    assert(i !== -1);
+    audioTracks[i] = Object.assign({}, audioTracks[i], cmd.update);
     this.changed();
   }
 
   unapplyUpdateAudioTrack(cmd: t.UpdateAudioTrackCmd) {
     assert(this.session.isLoaded());
-    const audioTrack = this.session.body.audioTracks.find(t => t.id === cmd.id);
-    assert(audioTrack);
-    Object.assign(audioTrack, cmd.revUpdate);
+    const { audioTracks } = this.session.body;
+    const i = audioTracks.findIndex(t => t.id === cmd.id);
+    assert(i !== -1);
+    audioTracks[i] = Object.assign({}, audioTracks[i], cmd.revUpdate);
     this.changed();
   }
 
@@ -347,17 +353,19 @@ export default class SessionEditor {
 
   applyUpdateVideoTrack(cmd: t.UpdateVideoTrackCmd) {
     assert(this.session.isLoaded());
-    const videoTrack = this.session.body.videoTracks.find(t => t.id === cmd.id);
-    assert(videoTrack);
-    Object.assign(videoTrack, cmd.update);
+    const { videoTracks } = this.session.body;
+    const i = videoTracks.findIndex(t => t.id === cmd.id);
+    assert(i !== -1);
+    videoTracks[i] = Object.assign({}, videoTracks[i], cmd.update);
     this.changed();
   }
 
   unapplyUpdateVideoTrack(cmd: t.UpdateVideoTrackCmd) {
     assert(this.session.isLoaded());
-    const videoTrack = this.session.body.videoTracks.find(t => t.id === cmd.id);
-    assert(videoTrack);
-    Object.assign(videoTrack, cmd.revUpdate);
+    const { videoTracks } = this.session.body;
+    const i = videoTracks.findIndex(t => t.id === cmd.id);
+    assert(i !== -1);
+    videoTracks[i] = Object.assign({}, videoTracks[i], cmd.revUpdate);
     this.changed();
   }
 
@@ -430,16 +438,19 @@ export default class SessionEditor {
     const { head, body } = this.session;
 
     // Update events.
-    body.eventContainer.forEachExc(cmd.firstEventIndex, body.eventContainer.getSize(), e => {
-      e.event.clock = calcClockAfterRangeSpeedChange(e.event.clock, cmd.range, cmd.factor);
-    });
+    body.eventContainer.forEachExc(cmd.firstEventIndex, body.eventContainer.getSize(), (e, _i, replace) =>
+      replace({ ...e.event, clock: calcClockAfterRangeSpeedChange(e.event.clock, cmd.range, cmd.factor) }),
+    );
 
     // Reindex the event container.
     body.eventContainer.reindexStableOrder();
 
     // Update focus timeline.
-    for (const f of body.focusTimeline.slice(cmd.firstFocusIndex)) {
-      f.clock = calcClockAfterRangeSpeedChange(f.clock, cmd.range, cmd.factor);
+    for (const [i, f] of body.focusTimeline.slice(cmd.firstFocusIndex).entries()) {
+      body.focusTimeline[i + cmd.firstFocusIndex] = {
+        ...f,
+        clock: calcClockAfterRangeSpeedChange(f.clock, cmd.range, cmd.factor),
+      };
     }
 
     // Update session duration.
@@ -458,18 +469,22 @@ export default class SessionEditor {
     };
 
     // Update events.
-    body.eventContainer.forEachExc(cmd.firstEventIndex, body.eventContainer.getSize(), (e, i) => {
-      e.event.clock =
-        cmd.revEventClocksInRange[i - cmd.firstEventIndex] ??
-        calcClockAfterRangeSpeedChange(e.event.clock, range, factor);
-    });
+    body.eventContainer.forEachExc(cmd.firstEventIndex, body.eventContainer.getSize(), (e, i, replace) =>
+      replace({
+        ...e.event,
+        clock:
+          cmd.revEventClocksInRange[i - cmd.firstEventIndex] ??
+          calcClockAfterRangeSpeedChange(e.event.clock, range, factor),
+      }),
+    );
 
     // Reindex the event container.
     body.eventContainer.reindexStableOrder();
 
     // Update focus timeline.
     for (const [i, f] of body.focusTimeline.slice(cmd.firstFocusIndex).entries()) {
-      f.clock = cmd.revFocusClocksInRange[i] ?? calcClockAfterRangeSpeedChange(f.clock, range, factor);
+      const clock = cmd.revFocusClocksInRange[i] ?? calcClockAfterRangeSpeedChange(f.clock, range, factor);
+      body.focusTimeline[i + cmd.firstFocusIndex] = { ...f, clock };
     }
 
     // Update session duration.
@@ -492,16 +507,16 @@ export default class SessionEditor {
     const { head, body } = this.session;
 
     // Update events.
-    body.eventContainer.forEachExc(cmd.firstEventIndex, body.eventContainer.getSize(), e => {
-      e.event.clock = calcClockAfterMerge(e.event.clock, cmd.range);
-    });
+    body.eventContainer.forEachExc(cmd.firstEventIndex, body.eventContainer.getSize(), (e, _i, replace) =>
+      replace({ ...e.event, clock: calcClockAfterMerge(e.event.clock, cmd.range) }),
+    );
 
     // Reindex the event container.
     body.eventContainer.reindexStableOrder();
 
     // Update focus timeline.
-    for (const f of body.focusTimeline.slice(cmd.firstFocusIndex)) {
-      f.clock = calcClockAfterMerge(f.clock, cmd.range);
+    for (const [i, f] of body.focusTimeline.slice(cmd.firstFocusIndex).entries()) {
+      body.focusTimeline[i + cmd.firstFocusIndex] = { ...f, clock: calcClockAfterMerge(f.clock, cmd.range) };
     }
 
     // Update session duration.
@@ -515,16 +530,16 @@ export default class SessionEditor {
     const rangeDur = getClockRangeDur(cmd.range);
 
     // Update events.
-    body.eventContainer.forEachExc(cmd.firstEventIndex, body.eventContainer.getSize(), (e, i) => {
-      e.event.clock = cmd.revEventClocksInRange[i - cmd.firstEventIndex] ?? e.event.clock + rangeDur;
-    });
+    body.eventContainer.forEachExc(cmd.firstEventIndex, body.eventContainer.getSize(), (e, i, replace) =>
+      replace({ ...e.event, clock: cmd.revEventClocksInRange[i - cmd.firstEventIndex] ?? e.event.clock + rangeDur }),
+    );
 
     // Reindex the event container.
     body.eventContainer.reindexStableOrder();
 
     // Update focus timeline.
     for (const [i, f] of body.focusTimeline.slice(cmd.firstFocusIndex).entries()) {
-      f.clock = cmd.revFocusClocksInRange[i] ?? f.clock + rangeDur;
+      body.focusTimeline[i + cmd.firstFocusIndex] = { ...f, clock: cmd.revFocusClocksInRange[i] ?? f.clock + rangeDur };
     }
 
     // Update session duration.
@@ -545,7 +560,7 @@ export default class SessionEditor {
     body.eventContainer.forEachExc(
       body.eventContainer.getIndexAfterClock(cmd.clock),
       body.eventContainer.getSize(),
-      e => void (e.event.clock += cmd.duration),
+      (e, _i, replace) => replace({ ...e.event, clock: e.event.clock + cmd.duration }),
     );
 
     // Reindex the event container.
@@ -569,7 +584,7 @@ export default class SessionEditor {
     body.eventContainer.forEachExc(
       body.eventContainer.getIndexAfterClock(cmd.clock),
       body.eventContainer.getSize(),
-      e => void (e.event.clock -= cmd.duration),
+      (e, _i, replace) => replace({ ...e.event, clock: e.event.clock - cmd.duration }),
     );
 
     // Reindex the event container.

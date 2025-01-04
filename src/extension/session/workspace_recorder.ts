@@ -424,7 +424,7 @@ class WorkspaceRecorder {
       return;
     }
 
-    const lastEvent = this.session.body.eventContainer.getTrack(uri).at(-1);
+    const lastEvent = this.session.body.eventContainer.getTrack(uri)?.at(-1);
     const revSelections = irTextEditor.selections;
     irTextEditor.select(selections);
 
@@ -531,7 +531,7 @@ class WorkspaceRecorder {
     irTextEditor.scroll(visibleRange);
 
     // Merge successive scrolls.
-    const lastEvent = this.session.body.eventContainer.getTrack(uri).at(-1);
+    const lastEvent = this.session.body.eventContainer.getTrack(uri)?.at(-1);
     if (lastEvent?.type === 'scroll' && lastEvent.clock > this.clock - 0.5) {
       logAcceptedEvent(
         `accepted scroll for ${uri} visible range: ${visibleRange.start}:${visibleRange.end} (SHORTCUT)`,

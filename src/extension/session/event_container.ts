@@ -13,14 +13,15 @@
  *
  */
 
-import { EditorEvent, EditorEventWithUri, InternalEditorTracksJSON } from './types.js';
-import * as lib from './lib.js';
-import assert from './assert.js';
+import { EditorEvent, EditorEventWithUri, InternalEditorTracksJSON } from '../../lib/types.js';
+import * as lib from '../../lib/lib.js';
+import assert from '../../lib/assert.js';
+import config from '../config.js';
 import _ from 'lodash';
 
 const BUCKET_CLOCK_INTERVAL = 1 * 60;
 
-export type Iteratee = (value: EditorEventWithUri, i: number) => any;
+export type Iteratee = (value: EditorEventWithUri, i: number, replace: (e: EditorEvent) => void) => any;
 
 /** [index of bucket, index in bucket] */
 type Position = [number, number];
@@ -72,10 +73,56 @@ export default class EventContainer {
     const [e] = this.buckets[pos[0]].splice(pos[1], 1);
     const track = this.tracks.get(e.uri);
     assert(track);
-    const i = track.indexOf(e.event);
+    const i = binarySearch(track, e.event.clock, getClockOfEditorEvent, x => x === e.event);
     assert(i !== -1);
     track.splice(i, 1);
     this.size -= 1;
+  }
+
+  // replaceAt(event: EditorEvent, i: number) {
+  //   // Replace in bucket.
+  //   const pos = this.posOfIndex(i);
+  //   assert(pos);
+  //   const oldE = this.buckets[pos[0]][pos[1]];
+  //   this.buckets[pos[0]][pos[1]] = { uri: oldE.uri, event };
+
+  //   // Replace in track.
+  //   const track = this.tracks.get(oldE.uri);
+  //   assert(track);
+  //   let j = sortedIndex(track, oldE.event.clock, getClockOfEditorEvent);
+  //   while (j < track.length && track[j].clock === oldE.event.clock && track[j] !== oldE.event) j++;
+  //   assert(track[j] === oldE.event);
+  //   track[j] = event;
+  // }
+
+  replaceInTrackAt(uri: string, event: EditorEvent, i: number) {
+    const track = this.tracks.get(uri);
+    assert(track && i < track.length);
+    const oldEvent = track[i];
+    track[i] = event;
+
+    const bucketIndex = this.getBucketIndex(oldEvent.clock);
+    assert(bucketIndex < this.buckets.length);
+    const bucket = this.buckets[bucketIndex];
+    const indexInBucket = binarySearch(bucket, oldEvent.clock, getClockOfEditorEventWithUri, x => x.event === oldEvent);
+    assert(indexInBucket !== -1);
+    const eventWithUri = { uri, event: event };
+    if (config.debug) lib.deepFreeze(eventWithUri);
+    bucket[indexInBucket] = eventWithUri;
+  }
+
+  private replaceAtPos(event: EditorEvent, pos: Position) {
+    const oldE = this.atPos(pos);
+    assert(oldE);
+    const eventWithUri = { event, uri: oldE.uri };
+    if (config.debug) lib.deepFreeze(eventWithUri);
+    this.buckets[pos[0]][pos[1]] = eventWithUri;
+
+    const track = this.tracks.get(oldE.uri);
+    assert(track);
+    const i = binarySearch(track, oldE.event.clock, getClockOfEditorEvent, x => x === oldE.event);
+    assert(i !== -1);
+    track[i] = event;
   }
 
   indexOfEvent(e: EditorEvent): number {
@@ -105,8 +152,8 @@ export default class EventContainer {
     }
   }
 
-  getTrack(uri: string): readonly EditorEvent[] {
-    return this.tracks.get(uri) ?? [];
+  getTrack(uri: string): readonly EditorEvent[] | undefined {
+    return this.tracks.get(uri);
   }
 
   getSize(): number {
@@ -122,14 +169,15 @@ export default class EventContainer {
 
     let count = Math.abs(to - from);
     let pos = this.posOfIndex(from);
+    const replace = (event: EditorEvent) => this.replaceAtPos(event, pos!);
 
     if (from <= to) {
       for (let i = 0; i < count && pos; i++, pos = this.nextPos(pos)) {
-        if (f(this.atPos(pos)!, from + i) === false) break;
+        if (f(this.atPos(pos)!, from + i, replace) === false) break;
       }
     } else {
       for (let i = 0; i < count && pos; i++, pos = this.prevPos(pos)) {
-        if (f(this.atPos(pos)!, from - i) === false) break;
+        if (f(this.atPos(pos)!, from - i, replace) === false) break;
       }
     }
   }
@@ -281,12 +329,14 @@ export default class EventContainer {
 
   private insertIntoBucketAtPos(uri: string, event: EditorEvent, pos: Position) {
     this.ensureBucketAt(pos[0]);
-    this.buckets[pos[0]].splice(pos[1], 0, { event, uri });
+    const eventWithUri = { event, uri };
+    if (config.debug) lib.deepFreeze(eventWithUri);
+    this.buckets[pos[0]].splice(pos[1], 0, eventWithUri);
   }
 }
 
 /**
- * Binary search array. It'll return the last index when clock could be inserted.
+ * Binary search array. It'll return the last index where clock could be inserted.
  * For example:
  * sortedIndex([{clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5}], 2)
  * => 3
@@ -311,7 +361,7 @@ function lastSortedIndex<T>(array: T[], clock: number, iteratee: (x: T) => numbe
 }
 
 /**
- * Binary search array. It'll return the first index when clock could be inserted.
+ * Binary search array. It'll return the first index where clock could be inserted.
  * For example:
  * sortedIndex([{clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5}], 2)
  * => 2
@@ -341,4 +391,11 @@ function getClockOfEditorEventWithUri(x: EditorEventWithUri) {
 
 function getClockOfEditorEvent(x: EditorEvent) {
   return x.clock;
+}
+
+function binarySearch<T>(array: T[], clock: number, getClock: (x: T) => number, isTarget: (a: T) => boolean): number {
+  for (let j = sortedIndex(array, clock, getClock); j < array.length && getClock(array[j]) === clock; j++) {
+    if (isTarget(array[j])) return j;
+  }
+  return -1;
 }

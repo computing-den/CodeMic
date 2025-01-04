@@ -395,3 +395,15 @@ export function logRejectedPromises(results: PromiseSettledResult<any>[]) {
     if (result.status === 'rejected') console.error(result.reason);
   }
 }
+
+export function deepFreeze(arg: any) {
+  if (Array.isArray(arg)) {
+    for (const x of arg) deepFreeze(x);
+  } else if (typeof arg === 'object') {
+    for (const key in arg) {
+      if (arg.hasOwnProperty(key)) deepFreeze(arg[key]);
+    }
+  }
+
+  return Object.freeze(arg);
+}
