@@ -12,6 +12,7 @@ import {
   getClockRangeDur,
   insertIntoArray,
   isClockInRange,
+  unreachable,
 } from '../../lib/lib.js';
 import { URI } from 'vscode-uri';
 import * as path from 'path';
@@ -57,12 +58,10 @@ export default class SessionEditor {
     this.changed();
   }
 
-  insertEvent(e: t.EditorEvent, uri: string, opts: { coalescing: boolean }): t.InsertEventSessionCmd {
+  createInsertEvent(e: t.EditorEvent, uri: string, opts: { coalescing: boolean }): t.InsertEventSessionCmd {
     assert(this.session.isLoaded());
     const i = this.session.body.eventContainer.getIndexAfterClock(e.clock);
-    const cmd: t.InsertEventSessionCmd = { type: 'insertEvent', index: i, uri, event: e };
-    this.applyInsertEvent(cmd);
-    return this.insertSessionCmd(cmd, opts);
+    return this.insertSessionCmd({ type: 'insertEvent', index: i, uri, event: e }, opts);
   }
 
   applyInsertEvent(cmd: t.InsertEventSessionCmd) {
@@ -77,7 +76,10 @@ export default class SessionEditor {
     this.changed();
   }
 
-  updateTrackLastEvent<T extends t.EditorEvent>(uri: string, update: Partial<T>) {
+  createUpdateTrackLastEvent<T extends t.EditorEvent>(
+    uri: string,
+    update: Partial<T>,
+  ): t.UpdateTrackLastEventSessionCmd | undefined {
     assert(this.session.isLoaded());
     const track = this.session.body.eventContainer.getTrack(uri);
     const lastEvent = track.at(-1);
@@ -86,9 +88,7 @@ export default class SessionEditor {
     if (_.isEqual({ ...lastEvent, ...update }, lastEvent)) return;
 
     const revUpdate = _.pick(lastEvent, _.keys(update));
-    const cmd: t.UpdateTrackLastEventSessionCmd = { type: 'updateTrackLastEvent', uri, update, revUpdate };
-    this.applyUpdateTrackLastEvent(cmd);
-    this.insertSessionCmd(cmd, { coalescing: true });
+    return this.insertSessionCmd({ type: 'updateTrackLastEvent', uri, update, revUpdate }, { coalescing: true });
   }
 
   applyUpdateTrackLastEvent(cmd: t.UpdateTrackLastEventSessionCmd) {
@@ -107,7 +107,7 @@ export default class SessionEditor {
     this.changed();
   }
 
-  setFocus(focus: t.Focus) {
+  createSetFocus(focus: t.Focus): t.UpdateLastFocusSessionCmd | t.InsertFocusSessionCmd | undefined {
     assert(this.session.isLoaded());
     const lastFocus = this.session.body.focusTimeline.at(-1);
 
@@ -121,14 +121,32 @@ export default class SessionEditor {
       if (keyDiffs.length > 0) {
         const update = _.pick(focus, keyDiffs);
         const revUpdate = _.pick(lastFocus, keyDiffs);
-        const cmd: t.UpdateLastFocusSessionCmd = { type: 'updateLastFocus', update, revUpdate };
-        this.applyUpdateLastFocus(cmd);
-        this.insertSessionCmd(cmd, { coalescing: true });
+        return this.insertSessionCmd({ type: 'updateLastFocus', update, revUpdate }, { coalescing: true });
       }
     } else {
-      const cmd: t.InsertFocusSessionCmd = { type: 'insertFocus', focus };
-      this.applyInsertFocus(cmd);
-      this.insertSessionCmd(cmd, { coalescing: true });
+      return this.insertSessionCmd({ type: 'insertFocus', focus }, { coalescing: true });
+    }
+  }
+
+  applySetFocus(cmd: t.UpdateLastFocusSessionCmd | t.InsertFocusSessionCmd) {
+    switch (cmd.type) {
+      case 'updateLastFocus':
+        return this.applyUpdateLastFocus(cmd);
+      case 'insertFocus':
+        return this.applyInsertFocus(cmd);
+      default:
+        unreachable(cmd);
+    }
+  }
+
+  unapplySetFocus(cmd: t.UpdateLastFocusSessionCmd | t.InsertFocusSessionCmd) {
+    switch (cmd.type) {
+      case 'updateLastFocus':
+        return this.unapplyUpdateLastFocus(cmd);
+      case 'insertFocus':
+        return this.unapplyInsertFocus(cmd);
+      default:
+        unreachable(cmd);
     }
   }
 
