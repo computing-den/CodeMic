@@ -1,5 +1,6 @@
 import './config.js'; // Init config
 import WebviewProvider from './webview_provider.js';
+import config from './config.js';
 import Session from './session/session.js';
 import * as storage from './storage.js';
 import * as serverApi from './server_api.js';
@@ -59,23 +60,23 @@ class CodeMic {
     this.updateFeaturedAndCache().finally(this.updateFrontend.bind(this));
 
     // DEV
-    // if (config.debug && this.webviewProvider.bus) {
-    //   try {
-    //     const sessionId = 'XXX';
-    //     if (await Session.Core.fromLocal(this.context, sessionId)) {
-    //       // Recorder
-    //       await this.handleMessage({ type: 'recorder/open', sessionId });
-    //       await this.handleMessage({ type: 'recorder/openTab', tabId: 'editor-view' });
-    //       await this.updateFrontend();
+    if (config.debug && this.webviewProvider.bus) {
+      try {
+        const sessionId = '2f324d7a-1a2c-478e-ab80-df60f09e45bd';
+        if (await Session.Core.fromLocal(this.context, sessionId)) {
+          // Recorder
+          await this.handleMessage({ type: 'recorder/open', sessionId });
+          await this.handleMessage({ type: 'recorder/openTab', tabId: 'editor-view' });
+          await this.updateFrontend();
 
-    //       // Player
-    //       // await this.handleMessage({ type: 'player/open', sessionId });
-    //       // await this.updateFrontend();
-    //     }
-    //   } catch (error) {
-    //     console.error('ERROR trying to open debug session:', error);
-    //   }
-    // }
+          // Player
+          // await this.handleMessage({ type: 'player/open', sessionId });
+          // await this.updateFrontend();
+        }
+      } catch (error) {
+        console.error('ERROR trying to open debug session:', error);
+      }
+    }
   }
 
   static async fromExtensionContext(extension: vscode.ExtensionContext): Promise<CodeMic> {

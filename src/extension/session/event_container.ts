@@ -95,10 +95,14 @@ export default class EventContainer {
   //   track[j] = event;
   // }
 
+  /**
+   * Must not change event clock.
+   */
   replaceInTrackAt(uri: string, event: EditorEvent, i: number) {
     const track = this.tracks.get(uri);
     assert(track && i < track.length);
     const oldEvent = track[i];
+    assert(oldEvent.clock === event.clock);
     track[i] = event;
 
     const bucketIndex = this.getBucketIndex(oldEvent.clock);
@@ -111,6 +115,9 @@ export default class EventContainer {
     bucket[indexInBucket] = eventWithUri;
   }
 
+  /**
+   * May change event clock.
+   */
   private replaceAtPos(event: EditorEvent, pos: Position) {
     const oldE = this.atPos(pos);
     assert(oldE);
@@ -120,7 +127,8 @@ export default class EventContainer {
 
     const track = this.tracks.get(oldE.uri);
     assert(track);
-    const i = binarySearch(track, oldE.event.clock, getClockOfEditorEvent, x => x === oldE.event);
+    // We cannot use binary search here because the clock of other events may have been mutated.
+    const i = track.indexOf(oldE.event);
     assert(i !== -1);
     track[i] = event;
   }

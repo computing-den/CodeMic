@@ -156,16 +156,29 @@
               .document-focus {
                 position: absolute;
                 left: 0;
-                font-size: 0.8rem;
+                /* font-size: 0.8rem; */
                 white-space: nowrap;
-                overflow: hidden;
+                /* overflow: hidden; */
                 border-left: var(--left-border-width) solid;
                 /* border-right: 0; */
                 /* border-bottom: 0; */
                 /* border-top-left-radius: 5px; */
-                padding: var(--spacing-x-small) var(--hor-padding);
+                /* padding: var(--spacing-x-small) var(--hor-padding); */
                 border-color: var(--editor-track-document-focus-color-1);
-                font-weight: bold;
+                /* font-weight: bold; */
+
+                p {
+                  position: absolute;
+                  display: inline-block;
+                  transform: rotate(-90deg);
+                  right: 1px;
+                  transform-origin: calc(100% - 8px) center;
+                  white-space: nowrap;
+                  font-size: 0.7rem;
+                  padding: 0.1rem 2px;
+                  margin: 0;
+                  color: var(--text-weak);
+                }
               }
               .document-focus:nth-child(even) {
                 border-color: var(--editor-track-document-focus-color-2);
@@ -233,7 +246,7 @@
                   transform-origin: calc(100% - 8px) center;
                   white-space: nowrap;
                   font-size: 0.7rem;
-                  padding: 0.1rem;
+                  padding: 0.1rem 2px;
                   margin: 0;
 
                   .codicon {

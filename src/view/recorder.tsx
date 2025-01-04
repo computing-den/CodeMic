@@ -17,7 +17,8 @@ import _ from 'lodash';
 import { VSCodeButton, VSCodeTextArea, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 import Popover, { PopoverProps, usePopover } from './popover.jsx';
 import { AppContext } from './app_context.jsx';
-import { v4 as uuid } from 'uuid';
+import path from 'path';
+import { URI } from 'vscode-uri';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -949,6 +950,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
         >
           <div className="timeline-grid">
             <EditorTrackUI
+              sessionDuration={session.head.duration}
               workspaceFocusTimeline={session.workspaceFocusTimeline}
               timelineDuration={timelineDuration}
               // timelineHeightPx={timelineHeightPx}
@@ -1112,13 +1114,14 @@ class RangedTracksUI extends React.Component<RangedTracksUIProps> {
 }
 
 type EditorTrackUIProps = {
+  sessionDuration: number;
   timelineDuration: number;
   pxToSecRatio: number;
   workspaceFocusTimeline?: t.Focus[];
 };
 class EditorTrackUI extends React.Component<EditorTrackUIProps> {
   render() {
-    const { timelineDuration, pxToSecRatio, workspaceFocusTimeline } = this.props;
+    const { sessionDuration, timelineDuration, pxToSecRatio, workspaceFocusTimeline } = this.props;
 
     // const lineFocusItems:t.LineFocus [] = [];
     // if (workspaceFocusTimeline) {
@@ -1151,7 +1154,7 @@ class EditorTrackUI extends React.Component<EditorTrackUIProps> {
     for (const [i, focus] of (workspaceFocusTimeline ?? []).entries()) {
       let offsetPx = 0;
       const lastLineFocus = lineFocusTimeline.at(-1);
-      const nextFocusClock = workspaceFocusTimeline?.[i + 1]?.clock ?? timelineDuration;
+      const nextFocusClock = workspaceFocusTimeline?.[i + 1]?.clock ?? sessionDuration;
       if (lastLineFocus) {
         // The following:
 
@@ -1186,7 +1189,7 @@ class EditorTrackUI extends React.Component<EditorTrackUIProps> {
     const documentFocusTimeline: { uri: string; clockRange: t.ClockRange }[] = [];
     for (const [i, focus] of (workspaceFocusTimeline ?? []).entries()) {
       const lastDocumentFocus = documentFocusTimeline.at(-1);
-      const nextFocusClock = workspaceFocusTimeline?.[i + 1]?.clock ?? timelineDuration;
+      const nextFocusClock = workspaceFocusTimeline?.[i + 1]?.clock ?? sessionDuration;
 
       if (lastDocumentFocus && lastDocumentFocus.uri === focus.uri) {
         lastDocumentFocus.clockRange.end = nextFocusClock;
@@ -1205,6 +1208,7 @@ class EditorTrackUI extends React.Component<EditorTrackUIProps> {
           };
           return (
             <div className="document-focus" style={style}>
+              <p>{path.basename(URI.parse(documentFocus.uri).fsPath)}</p>
               {/*path.getUriShortNameOpt(documentFocus.uri) || 'unknown file'*/}
             </div>
           );

@@ -75,11 +75,15 @@ export default class SessionEditor {
     this.changed();
   }
 
+  /**
+   * Must not update clock of event.
+   */
   createUpdateTrackLastEvent<T extends t.EditorEvent>(
     uri: string,
     update: Partial<T>,
   ): t.UpdateTrackLastEventCmd | undefined {
     assert(this.session.isLoaded());
+    assert(!('clock' in update));
     const track = this.session.body.eventContainer.getTrack(uri);
     const lastEvent = track?.at(-1);
     assert(lastEvent);
