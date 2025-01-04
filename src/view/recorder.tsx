@@ -21,7 +21,7 @@ import { v4 as uuid } from 'uuid';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
-const TRACK_INDENT_PX = 5;
+const TRACK_INDENT_PX = 25;
 // const TIMELINE_STEP_HEIGHT = 30;
 // const TIMELINE_INITIAL_STEP_DURATION = 30;
 const TIMELINE_MAX_PX_TO_TIME_RATIO = 60;
@@ -1061,7 +1061,7 @@ class RangedTracksUI extends React.Component<RangedTracksUIProps> {
             // left: `calc(${start * 50}% + ${columnHalfGap}rem + ${indent * TRACK_INDENT_PX}px)`,
             // width: `calc(${(end - start) * 50}% - ${columnHalfGap * 2}rem - ${indent * TRACK_INDENT_PX}px)`,
             right: `${indentPx}px`,
-            maxWidth: `calc(50% - ${indentPx})`,
+            // maxWidth: `calc(50px - ${indentPx})`,
             top: `${(clockRange.start / timelineDuration) * 100}%`,
             bottom: `calc(100% - ${(clockRange.end / timelineDuration) * 100}%)`,
             minHeight: `${TRACK_HEIGHT_PX}px`,

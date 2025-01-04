@@ -42,18 +42,6 @@
           grid-auto-flow: column;
           grid-gap: var(--spacing-small);
         }
-
-        /* & vscode-button.pick { */
-        /*   position: absolute; */
-        /*   right: var(--spacing-medium); */
-        /*   bottom: var(--spacing-medium); */
-        /* } */
-        /* & vscode-button.delete { */
-        /*   position: absolute; */
-        /*   right: var(--spacing-medium); */
-        /*   top: var(--spacing-medium); */
-        /*   color: white; */
-        /* } */
       }
 
       & vscode-text-area.title {
@@ -154,46 +142,6 @@
             position: relative;
             display: flex;
 
-            .track {
-              /* display: flex; */
-              /* justify-content: center; */
-              /* align-items: center; */
-              border-radius: 4px;
-              z-index: var(--track-z-index);
-              transition: background 0.2s ease-in-out;
-              overflow: hidden;
-              /* container-type: size; */
-              /* container-name: track; */
-
-              &:hover,
-              &.active {
-                z-index: var(--active-track-z-index);
-              }
-
-              p {
-                font-size: 0.7rem;
-                width: 100%;
-                height: 100%;
-                text-overflow: ellipsis;
-                white-space: pre;
-                line-height: 10px;
-                padding: 0.3rem;
-                margin: 0;
-
-                .codicon {
-                  font-size: 0.7rem;
-                }
-
-                /* @container (min-height: 60px) { */
-                /*   padding: 0.5rem; */
-                /*   font-size: 0.9rem; */
-                /*   .track-text .codicon { */
-                /*     font-size: 0.9rem; */
-                /*   } */
-                /* } */
-              }
-            }
-
             .editor-track {
               --left-border-width: 3px;
               --hor-padding: var(--spacing-medium);
@@ -247,45 +195,6 @@
               }
             }
 
-            /* .editor-track { */
-            /*   grid-area: editor-track; */
-            /*   display: grid; */
-            /*   grid-template-columns: repeat(2, 1fr); */
-            /*   grid-gap: 0.5rem; */
-
-            /*   .column { */
-            /*     position: relative; */
-
-            /*     .track { */
-            /*       &.textChange { */
-            /*         border: 1px solid var(--editor-track-text-change-border); */
-            /*         background: var(--editor-track-text-change-background); */
-
-            /*         &:hover, */
-            /*         &.active { */
-            /*           background: var(--editor-track-text-change-background-hover); */
-            /*         } */
-            /*         &.active { */
-            /*           border-color: var(--editor-track-text-change-border-active); */
-            /*         } */
-            /*       } */
-
-            /*       &.documentChange { */
-            /*         border: 1px solid var(--editor-track-document-change-border); */
-            /*         background: var(--editor-track-document-change-background); */
-
-            /*         &:hover, */
-            /*         &.active { */
-            /*           background: var(--editor-track-document-change-background-hover); */
-            /*         } */
-            /*         &.active { */
-            /*           border-color: var(--editor-track-document-change-border-active); */
-            /*         } */
-            /*       } */
-            /*     } */
-            /*   } */
-            /* } */
-
             .ranged-tracks {
               position: absolute;
               top: 0;
@@ -297,18 +206,47 @@
 
               .track {
                 position: absolute;
-                border: 1px solid var(--ranged-track-border);
-                background: var(--ranged-track-background);
-                /* right: 0; */
-                overflow: hidden;
-                min-width: 10px;
+                /* border: 1px solid var(--ranged-track-border); */
+                border-right: 6px solid var(--ranged-track-border);
+                /* border-radius: 4px; */
+                z-index: var(--track-z-index);
+                transition: border-color 0.2s ease-in-out;
+                width: 1px;
 
                 &:hover,
                 &.active {
-                  background: var(--ranged-track-background-hover);
+                  z-index: var(--active-track-z-index);
+                  border-color: var(--ranged-track-border-hover);
+
+                  p {
+                    font-weight: bold;
+                  }
                 }
                 &.active {
                   border-color: var(--ranged-track-border-active);
+                }
+                p {
+                  position: absolute;
+                  display: inline-block;
+                  transform: rotate(-90deg);
+                  right: 0;
+                  transform-origin: calc(100% - 8px) center;
+                  white-space: nowrap;
+                  font-size: 0.7rem;
+                  padding: 0.1rem;
+                  margin: 0;
+
+                  .codicon {
+                    font-size: 0.7rem;
+                  }
+
+                  /* @container (min-height: 60px) { */
+                  /*   padding: 0.5rem; */
+                  /*   font-size: 0.9rem; */
+                  /*   .track-text .codicon { */
+                  /*     font-size: 0.9rem; */
+                  /*   } */
+                  /* } */
                 }
               }
             }
@@ -365,14 +303,6 @@
                 /* } */
 
                 .time {
-                  /*
-            position: absolute;
-            left: calc(100% + 3px);
-            background: var(--vscode-sideBar-background);
-            padding: 5px 0px;
-            top: -11px;
-            font-weight: bold;
-            */
                   position: absolute;
                   left: calc(100% + 9px);
                   background: var(--input-background);
@@ -421,17 +351,7 @@
                 margin-top: -7px;
                 font-size: 0.9em;
                 opacity: 0.8;
-                /* text-align: right; */
               }
-              /* position: relative; */
-              /* &::after { */
-              /*   content: ''; */
-              /*   position: absolute; */
-              /*   right: calc(100% + 3px); */
-              /*   width: 11px; */
-              /*   border-bottom: 1px solid var(--vscode-input-border, var(--popover-border)); */
-              /*   top: 50%; */
-              /* } */
             }
           }
         }

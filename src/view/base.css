@@ -35,10 +35,11 @@
 }
 
 body.vscode-light {
-  --ranged-track-background: #a1e0f0;
-  --ranged-track-background-hover: #5ccdea;
   --ranged-track-border: #007acc;
-  --ranged-track-border-active: #007acc;
+  --ranged-track-border-hover: #0066ab;
+  --ranged-track-border-active: #005fab;
+  /* --ranged-track-border: #007acc; */
+  /* --ranged-track-border-active: #007acc; */
 
   --text-weak: #666;
   --background-secondary: #e7e7e7;
@@ -61,10 +62,11 @@ body.vscode-light {
   /* --editor-track-document-focus-border-active: #8f86bd; */
 }
 body.vscode-dark {
-  --ranged-track-background: #063b49;
-  --ranged-track-background-hover: #135e71;
   --ranged-track-border: #007acc;
-  --ranged-track-border-active: #007acc;
+  --ranged-track-border-hover: #5ebeff;
+  --ranged-track-border-active: #3bf1ff;
+  /* --ranged-track-border: #007acc; */
+  /* --ranged-track-border-active: #007acc; */
 
   --text-weak: #aaa;
   --background-secondary: #181818;
