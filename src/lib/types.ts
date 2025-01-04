@@ -620,27 +620,27 @@ export enum Direction {
 
 export type UriSet = Set<string>;
 
-export type SessionCmd =
-  | InsertEventSessionCmd
-  | UpdateTrackLastEventSessionCmd
-  | InsertFocusSessionCmd
-  | UpdateLastFocusSessionCmd
-  | InsertAudioTrackSessionCmd
-  | DeleteAudioTrackSessionCmd
-  | UpdateAudioTrackSessionCmd
-  | InsertVideoTrackSessionCmd
-  | DeleteVideoTrackSessionCmd
-  | UpdateVideoTrackSessionCmd
-  // | UpdateHeadSessionCmd
-  // | UpdateFromUISessionCmd
-  | ChangeSpeedSessionCmd
-  | MergeSessionCmd
-  // | MergeSessionCmd
-  | InsertGapSessionCmd
-  | CropSessionCmd
-  | UpdateDurationSessionCmd;
+export type Cmd =
+  | InsertEventCmd
+  | UpdateTrackLastEventCmd
+  | InsertFocusCmd
+  | UpdateLastFocusCmd
+  | InsertAudioTrackCmd
+  | DeleteAudioTrackCmd
+  | UpdateAudioTrackCmd
+  | InsertVideoTrackCmd
+  | DeleteVideoTrackCmd
+  | UpdateVideoTrackCmd
+  // | UpdateHeadCmd
+  // | UpdateFromUICmd
+  | ChangeSpeedCmd
+  | MergeCmd
+  // | MergeCmd
+  | InsertGapCmd
+  | CropCmd
+  | UpdateDurationCmd;
 
-export type InsertEventSessionCmd = {
+export type InsertEventCmd = {
   type: 'insertEvent';
   // coalescing: boolean;
   index: number;
@@ -648,7 +648,7 @@ export type InsertEventSessionCmd = {
   event: EditorEvent;
 };
 
-export type UpdateTrackLastEventSessionCmd = {
+export type UpdateTrackLastEventCmd = {
   type: 'updateTrackLastEvent';
   // coalescing: boolean;
   uri: string;
@@ -656,58 +656,58 @@ export type UpdateTrackLastEventSessionCmd = {
   revUpdate: Partial<EditorEvent>;
 };
 
-export type InsertFocusSessionCmd = {
+export type InsertFocusCmd = {
   type: 'insertFocus';
   // coalescing: boolean;
   focus: Focus;
 };
 
-export type UpdateLastFocusSessionCmd = {
+export type UpdateLastFocusCmd = {
   type: 'updateLastFocus';
   // coalescing: boolean;
   update: Partial<Focus>;
   revUpdate: Partial<Focus>;
 };
 
-export type InsertAudioTrackSessionCmd = {
+export type InsertAudioTrackCmd = {
   type: 'insertAudioTrack';
   // coalescing: boolean;
   audioTrack: AudioTrack;
   sessionDuration: number;
   revSessionDuration: number;
 };
-export type DeleteAudioTrackSessionCmd = {
+export type DeleteAudioTrackCmd = {
   type: 'deleteAudioTrack';
   // coalescing: boolean;
   audioTrack: AudioTrack;
 };
-export type UpdateAudioTrackSessionCmd = {
+export type UpdateAudioTrackCmd = {
   type: 'updateAudioTrack';
   // coalescing: boolean;
   id: string;
   update: Partial<AudioTrack>;
   revUpdate: Partial<AudioTrack>;
 };
-export type InsertVideoTrackSessionCmd = {
+export type InsertVideoTrackCmd = {
   type: 'insertVideoTrack';
   // coalescing: boolean;
   videoTrack: VideoTrack;
   sessionDuration: number;
   revSessionDuration: number;
 };
-export type DeleteVideoTrackSessionCmd = {
+export type DeleteVideoTrackCmd = {
   type: 'deleteVideoTrack';
   // coalescing: boolean;
   videoTrack: VideoTrack;
 };
-export type UpdateVideoTrackSessionCmd = {
+export type UpdateVideoTrackCmd = {
   type: 'updateVideoTrack';
   // coalescing: boolean;
   id: string;
   update: Partial<VideoTrack>;
   revUpdate: Partial<VideoTrack>;
 };
-export type ChangeSpeedSessionCmd = {
+export type ChangeSpeedCmd = {
   type: 'changeSpeed';
   // coalescing: boolean;
   range: ClockRange;
@@ -718,7 +718,7 @@ export type ChangeSpeedSessionCmd = {
   revFocusClocksInRange: number[];
   revRrClock: number;
 };
-export type MergeSessionCmd = {
+export type MergeCmd = {
   type: 'merge';
   // coalescing: boolean;
   range: ClockRange;
@@ -728,11 +728,11 @@ export type MergeSessionCmd = {
   revFocusClocksInRange: number[];
   revRrClock: number;
 };
-// export type MergeSessionCmd = {
+// export type MergeCmd = {
 //   type: 'merge';
 //   coalescing: boolean;
 // };
-export type InsertGapSessionCmd = {
+export type InsertGapCmd = {
   type: 'insertGap';
   // coalescing: boolean;
   clock: number;
@@ -740,7 +740,7 @@ export type InsertGapSessionCmd = {
   // firstEventIndex: number;
   // firstFocusIndex: number;
 };
-export type CropSessionCmd = {
+export type CropCmd = {
   type: 'crop';
   clock: number;
   firstEventIndex: number;
@@ -750,7 +750,7 @@ export type CropSessionCmd = {
   revDuration: number;
   revRrClock: number;
 };
-export type UpdateDurationSessionCmd = {
+export type UpdateDurationCmd = {
   type: 'updateDuration';
   // coalescing: boolean;
   duration: number;

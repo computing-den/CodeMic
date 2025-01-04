@@ -235,14 +235,14 @@ export default class SessionRecordAndReplay {
     this.videoTrackPlayer.handleVideoEvent(e);
   }
 
-  async applyInsertEvent(cmd: t.InsertEventSessionCmd) {
+  async applyInsertEvent(cmd: t.InsertEventCmd) {
     if (this.internalWorkspace.eventIndex === cmd.index - 1) {
       this.internalWorkspace.eventIndex++;
       await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Forwards);
     }
   }
 
-  async unapplyInsertEvent(cmd: t.InsertEventSessionCmd) {
+  async unapplyInsertEvent(cmd: t.InsertEventCmd) {
     if (this.internalWorkspace.eventIndex === cmd.index) {
       this.internalWorkspace.eventIndex--;
       await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Backwards);

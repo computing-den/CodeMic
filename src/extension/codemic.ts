@@ -412,7 +412,7 @@ class CodeMic {
         assert(this.session?.isLoaded());
         await this.session.commander.undo();
         // const cmds = this.session.editor.undo();
-        // await this.session.rr.unapplySessionCmds(cmds);
+        // await this.session.rr.unapplyCmds(cmds);
         // console.log('Undo: ', cmds);
         this.enqueueFrontendUpdate();
         return ok;
@@ -421,7 +421,7 @@ class CodeMic {
         assert(this.session?.isLoaded());
         await this.session.commander.redo();
         // const cmds = this.session.editor.redo();
-        // await this.session.rr.applySessionCmds(cmds);
+        // await this.session.rr.applyCmds(cmds);
         // console.log('Redo: ', cmds);
         this.enqueueFrontendUpdate();
         return ok;
@@ -435,7 +435,7 @@ class CodeMic {
       // case 'recorder/updateDuration': {
       //   assert(this.session);
       //   this.session.editor.updateDuration(req.duration);
-      //   // await this.session.rr?.applySessionCmds([cmd]);
+      //   // await this.session.rr?.applyCmds([cmd]);
       //   this.enqueueFrontendUpdate();
       //   return ok;
       // }

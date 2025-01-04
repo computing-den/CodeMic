@@ -29,110 +29,110 @@ export default class SessionCommander {
     for (const cmd of cmds) await this.applyCmd(cmd);
   }
 
-  async applyInsertEvent(cmd: t.InsertEventSessionCmd) {
+  async applyInsertEvent(cmd: t.InsertEventCmd) {
     this.session.editor.applyInsertEvent(cmd);
     await this.session.rr.applyInsertEvent(cmd);
   }
 
-  async unapplyInsertEvent(cmd: t.InsertEventSessionCmd) {
+  async unapplyInsertEvent(cmd: t.InsertEventCmd) {
     this.session.editor.unapplyInsertEvent(cmd);
     await this.session.rr.unapplyInsertEvent(cmd);
   }
 
-  async applyUpdateTrackLastEvent(cmd: t.UpdateTrackLastEventSessionCmd) {
+  async applyUpdateTrackLastEvent(cmd: t.UpdateTrackLastEventCmd) {
     this.session.editor.applyUpdateTrackLastEvent(cmd);
   }
 
-  async unapplyUpdateTrackLastEvent(cmd: t.UpdateTrackLastEventSessionCmd) {
+  async unapplyUpdateTrackLastEvent(cmd: t.UpdateTrackLastEventCmd) {
     this.session.editor.unapplyUpdateTrackLastEvent(cmd);
   }
 
-  async applyInsertFocus(cmd: t.InsertFocusSessionCmd) {
+  async applyInsertFocus(cmd: t.InsertFocusCmd) {
     this.session.editor.applyInsertFocus(cmd);
   }
 
-  async unapplyInsertFocus(cmd: t.InsertFocusSessionCmd) {
+  async unapplyInsertFocus(cmd: t.InsertFocusCmd) {
     this.session.editor.unapplyInsertFocus(cmd);
   }
 
-  async applyUpdateLastFocus(cmd: t.UpdateLastFocusSessionCmd) {
+  async applyUpdateLastFocus(cmd: t.UpdateLastFocusCmd) {
     this.session.editor.applyUpdateLastFocus(cmd);
   }
 
-  async unapplyUpdateLastFocus(cmd: t.UpdateLastFocusSessionCmd) {
+  async unapplyUpdateLastFocus(cmd: t.UpdateLastFocusCmd) {
     this.session.editor.unapplyUpdateLastFocus(cmd);
   }
 
-  async applyInsertAudioTrack(cmd: t.InsertAudioTrackSessionCmd) {
+  async applyInsertAudioTrack(cmd: t.InsertAudioTrackCmd) {
     this.session.editor.applyInsertAudioTrack(cmd);
     this.session.rr.loadAudioTrack(cmd.audioTrack);
   }
 
-  async unapplyInsertAudioTrack(cmd: t.InsertAudioTrackSessionCmd) {
+  async unapplyInsertAudioTrack(cmd: t.InsertAudioTrackCmd) {
     this.session.editor.unapplyInsertAudioTrack(cmd);
     this.session.rr.unloadAudioTrack(cmd.audioTrack.id);
   }
 
-  async applyDeleteAudioTrack(cmd: t.DeleteAudioTrackSessionCmd) {
+  async applyDeleteAudioTrack(cmd: t.DeleteAudioTrackCmd) {
     this.session.editor.applyDeleteAudioTrack(cmd);
     this.session.rr.unloadAudioTrack(cmd.audioTrack.id);
   }
 
-  async unapplyDeleteAudioTrack(cmd: t.DeleteAudioTrackSessionCmd) {
+  async unapplyDeleteAudioTrack(cmd: t.DeleteAudioTrackCmd) {
     this.session.editor.unapplyDeleteAudioTrack(cmd);
     this.session.rr.loadAudioTrack(cmd.audioTrack);
   }
 
-  async applyUpdateAudioTrack(cmd: t.UpdateAudioTrackSessionCmd) {
+  async applyUpdateAudioTrack(cmd: t.UpdateAudioTrackCmd) {
     this.session.editor.applyUpdateAudioTrack(cmd);
     await this.session.rr.fastSync();
   }
 
-  async unapplyUpdateAudioTrack(cmd: t.UpdateAudioTrackSessionCmd) {
+  async unapplyUpdateAudioTrack(cmd: t.UpdateAudioTrackCmd) {
     this.session.editor.unapplyUpdateAudioTrack(cmd);
     await this.session.rr.fastSync();
   }
 
-  async applyInsertVideoTrack(cmd: t.InsertVideoTrackSessionCmd) {
+  async applyInsertVideoTrack(cmd: t.InsertVideoTrackCmd) {
     this.session.editor.applyInsertVideoTrack(cmd);
     this.session.rr.loadVideoTrack(cmd.videoTrack);
     await this.session.rr.fastSync();
   }
 
-  async unapplyInsertVideoTrack(cmd: t.InsertVideoTrackSessionCmd) {
+  async unapplyInsertVideoTrack(cmd: t.InsertVideoTrackCmd) {
     this.session.editor.unapplyInsertVideoTrack(cmd);
     this.session.rr.unloadVideoTrack(cmd.videoTrack.id);
     await this.session.rr.fastSync();
   }
 
-  async applyDeleteVideoTrack(cmd: t.DeleteVideoTrackSessionCmd) {
+  async applyDeleteVideoTrack(cmd: t.DeleteVideoTrackCmd) {
     this.session.editor.applyDeleteVideoTrack(cmd);
     this.session.rr.unloadVideoTrack(cmd.videoTrack.id);
     await this.session.rr.fastSync();
   }
 
-  async unapplyDeleteVideoTrack(cmd: t.DeleteVideoTrackSessionCmd) {
+  async unapplyDeleteVideoTrack(cmd: t.DeleteVideoTrackCmd) {
     this.session.editor.unapplyDeleteVideoTrack(cmd);
     this.session.rr.loadVideoTrack(cmd.videoTrack);
     await this.session.rr.fastSync();
   }
 
-  async applyUpdateVideoTrack(cmd: t.UpdateVideoTrackSessionCmd) {
+  async applyUpdateVideoTrack(cmd: t.UpdateVideoTrackCmd) {
     this.session.editor.applyUpdateVideoTrack(cmd);
     await this.session.rr.fastSync();
   }
 
-  async unapplyUpdateVideoTrack(cmd: t.UpdateVideoTrackSessionCmd) {
+  async unapplyUpdateVideoTrack(cmd: t.UpdateVideoTrackCmd) {
     this.session.editor.unapplyUpdateVideoTrack(cmd);
     await this.session.rr.fastSync();
   }
 
-  async applyChangeSpeed(cmd: t.ChangeSpeedSessionCmd) {
+  async applyChangeSpeed(cmd: t.ChangeSpeedCmd) {
     this.session.editor.applyChangeSpeed(cmd);
     await this.session.rr.seek(lib.calcClockAfterRangeSpeedChange(cmd.revRrClock, cmd.range, cmd.factor));
   }
 
-  async unapplyChangeSpeed(cmd: t.ChangeSpeedSessionCmd) {
+  async unapplyChangeSpeed(cmd: t.ChangeSpeedCmd) {
     this.session.editor.unapplyChangeSpeed(cmd);
     await this.session.rr.seek(cmd.revRrClock);
   }
@@ -143,12 +143,12 @@ export default class SessionCommander {
   //   // await this.applyMerge(cmd);
   // }
 
-  async applyMerge(cmd: t.MergeSessionCmd) {
+  async applyMerge(cmd: t.MergeCmd) {
     this.session.editor.applyMerge(cmd);
     await this.session.rr.seek(cmd.range.start);
   }
 
-  async unapplyMerge(cmd: t.MergeSessionCmd) {
+  async unapplyMerge(cmd: t.MergeCmd) {
     this.session.editor.unapplyMerge(cmd);
     await this.session.rr.seek(cmd.revRrClock);
   }
@@ -158,12 +158,12 @@ export default class SessionCommander {
     await this.applyInsertGap(cmd);
   }
 
-  async applyInsertGap(cmd: t.InsertGapSessionCmd) {
+  async applyInsertGap(cmd: t.InsertGapCmd) {
     this.session.editor.applyInsertGap(cmd);
     await this.session.rr.seek(cmd.clock);
   }
 
-  async unapplyInsertGap(cmd: t.InsertGapSessionCmd) {
+  async unapplyInsertGap(cmd: t.InsertGapCmd) {
     this.session.editor.unapplyInsertGap(cmd);
     await this.session.rr.seek(cmd.clock);
   }
@@ -173,27 +173,27 @@ export default class SessionCommander {
     await this.applyCrop(cmd);
   }
 
-  async applyCrop(cmd: t.CropSessionCmd) {
+  async applyCrop(cmd: t.CropCmd) {
     if (cmd.clock < this.session.rr.clock) await this.session.rr.seek(cmd.clock);
     this.session.editor.applyCrop(cmd);
   }
 
-  async unapplyCrop(cmd: t.CropSessionCmd) {
+  async unapplyCrop(cmd: t.CropCmd) {
     this.session.editor.unapplyCrop(cmd);
     if (cmd.clock < cmd.revRrClock) await this.session.rr.seek(cmd.revRrClock);
   }
 
-  async applyUpdateDuration(cmd: t.UpdateDurationSessionCmd) {
+  async applyUpdateDuration(cmd: t.UpdateDurationCmd) {
     this.session.editor.applyUpdateDuration(cmd);
     await this.session.rr.seek(cmd.duration);
   }
 
-  async unapplyUpdateDuration(cmd: t.UpdateDurationSessionCmd) {
+  async unapplyUpdateDuration(cmd: t.UpdateDurationCmd) {
     this.session.editor.unapplyUpdateDuration(cmd);
     await this.session.rr.seek(cmd.revDuration);
   }
 
-  async applyCmd(cmd: t.SessionCmd) {
+  async applyCmd(cmd: t.Cmd) {
     switch (cmd.type) {
       case 'insertEvent':
         return this.applyInsertEvent(cmd);
@@ -231,7 +231,7 @@ export default class SessionCommander {
     }
   }
 
-  async unapplyCmd(cmd: t.SessionCmd) {
+  async unapplyCmd(cmd: t.Cmd) {
     switch (cmd.type) {
       case 'insertEvent':
         return this.unapplyInsertEvent(cmd);
