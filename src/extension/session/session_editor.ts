@@ -615,10 +615,9 @@ export default class SessionEditor {
     const firstEventIndex = body.eventContainer.getIndexAfterClock(clock);
     const revEvents = body.eventContainer.collectExc(firstEventIndex, body.eventContainer.getSize());
 
-    const firstFocusIndex = Math.max(
-      0,
-      body.focusTimeline.findIndex(f => f.clock >= clock),
-    );
+    let firstFocusIndex = body.focusTimeline.findIndex(f => f.clock >= clock);
+    if (firstFocusIndex === -1) firstFocusIndex = body.focusTimeline.length;
+
     const revFocusTimeline = body.focusTimeline.slice(firstFocusIndex);
 
     return this.insertCmd({
@@ -706,14 +705,12 @@ export default class SessionEditor {
       .collectExc(firstEventIndex, endEventIndex)
       .map(e => e.event.clock);
 
-    const firstFocusIndex = Math.max(
-      0,
-      body.focusTimeline.findIndex(f => f.clock >= range.start),
-    );
-    const endFocusIndex = Math.max(
-      0,
-      body.focusTimeline.findIndex(f => f.clock >= range.end),
-    );
+    let firstFocusIndex = body.focusTimeline.findIndex(f => f.clock >= range.start);
+    if (firstFocusIndex === -1) firstFocusIndex = body.focusTimeline.length;
+
+    let endFocusIndex = body.focusTimeline.findIndex(f => f.clock >= range.end);
+    if (endFocusIndex === -1) endFocusIndex = body.focusTimeline.length;
+
     const revFocusClocksInRange: number[] = body.focusTimeline.slice(firstFocusIndex, endFocusIndex).map(f => f.clock);
 
     return { firstEventIndex, firstFocusIndex, revEventClocksInRange, revFocusClocksInRange };

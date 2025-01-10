@@ -85,11 +85,13 @@ export default class SessionCommander {
 
   async applyUpdateAudioTrack(cmd: t.UpdateAudioTrackCmd) {
     this.session.editor.applyUpdateAudioTrack(cmd);
+    this.session.rr.updateAudioTrack(this.session.body.audioTracks.find(t => t.id === cmd.id)!);
     await this.session.rr.fastSync();
   }
 
   async unapplyUpdateAudioTrack(cmd: t.UpdateAudioTrackCmd) {
     this.session.editor.unapplyUpdateAudioTrack(cmd);
+    this.session.rr.updateAudioTrack(this.session.body.audioTracks.find(t => t.id === cmd.id)!);
     await this.session.rr.fastSync();
   }
 
@@ -119,11 +121,13 @@ export default class SessionCommander {
 
   async applyUpdateVideoTrack(cmd: t.UpdateVideoTrackCmd) {
     this.session.editor.applyUpdateVideoTrack(cmd);
+    this.session.rr.updateVideoTrack(this.session.body.videoTracks.find(t => t.id === cmd.id)!);
     await this.session.rr.fastSync();
   }
 
   async unapplyUpdateVideoTrack(cmd: t.UpdateVideoTrackCmd) {
     this.session.editor.unapplyUpdateVideoTrack(cmd);
+    this.session.rr.updateVideoTrack(this.session.body.videoTracks.find(t => t.id === cmd.id)!);
     await this.session.rr.fastSync();
   }
 

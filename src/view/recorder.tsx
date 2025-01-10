@@ -767,13 +767,14 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     if (!trackDrag) return;
 
     const clockRange = getClockRangeOfTrackDrag(trackDrag);
-    this.setState({ trackDrag: undefined });
-
     if (trackDrag.load.type === 'audio') {
       await postMessage({ type: 'recorder/updateAudio', update: { id: trackDrag.load.id, clockRange } });
     } else if (trackDrag.load.type === 'video') {
       await postMessage({ type: 'recorder/updateVideo', update: { id: trackDrag.load.id, clockRange } });
     }
+
+    // Must be after postMessage to avoid flash of old track.
+    this.setState({ trackDrag: undefined });
   };
 
   trackDragged = (e: React.DragEvent, track: t.RangedTrack) => {

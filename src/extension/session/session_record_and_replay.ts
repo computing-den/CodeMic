@@ -249,6 +249,17 @@ export default class SessionRecordAndReplay {
     }
   }
 
+  updateAudioTrack(audioTrack: t.AudioTrack) {
+    const audioTrackPlayer = this.audioTrackPlayers.find(p => p.audioTrack.id === audioTrack.id);
+    assert(audioTrackPlayer);
+    audioTrackPlayer.audioTrack = audioTrack;
+  }
+
+  updateVideoTrack(videoTrack: t.VideoTrack) {
+    assert(this.videoTrackPlayer.videoTrack?.id === videoTrack.id);
+    this.videoTrackPlayer.videoTrack = videoTrack;
+  }
+
   private initAudioPlayer(c: AudioTrackPlayer) {
     c.onError = this.gotError.bind(this);
   }
