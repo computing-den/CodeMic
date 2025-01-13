@@ -257,6 +257,7 @@ export default class SessionCore {
     const out = unzipper.Extract({ path: this.dataPath, verbose: true });
     await stream.promises.pipeline(fs.createReadStream(path.join(this.dataPath, 'body.zip')), out);
     await out.promise();
+    this.session.local = true;
   }
 
   async createWorkspaceDir() {
@@ -300,6 +301,7 @@ export default class SessionCore {
   async package() {
     assert(await storage.pathExists(path.join(this.dataPath, 'body.json')), "Session body doesn't exist");
 
+    const blobs = await this.getUsedBlobs();
     return new Promise<string>((resolve, reject) => {
       // const packagePath = path.abs(os.tmpdir(), this.head.id + '.zip');
 
@@ -327,9 +329,36 @@ export default class SessionCore {
         archive.file(path.join(this.dataPath, 'cover'), { name: 'cover' });
       }
       archive.file(path.join(this.dataPath, 'body.json'), { name: 'body.json' });
-      archive.directory(path.join(this.dataPath, 'blobs'), 'blobs');
+
+      for (const blob of blobs) {
+        archive.file(path.join(this.dataPath, 'blobs'), { name: path.posix.join('blobs', blob) });
+      }
+
       archive.finalize();
     });
+  }
+
+  async getUsedBlobs(): Promise<Set<string>> {
+    assert(this.session.local, 'Session does not exist on disk');
+    const body = this.session.body?.toJSON() ?? (await this.readBody());
+    const blobs = new Set<string>();
+
+    // Find blobs in editor tracks.
+    for (const track of Object.values(body.editorTracks)) {
+      for (const e of track) {
+        if (e.type === 'init' && e.file.type === 'local') blobs.add(e.file.sha1);
+      }
+    }
+
+    // Find blobs in audio and video tracks.
+    for (const track of body.audioTracks) {
+      if (track.file.type === 'local') blobs.add(track.file.sha1);
+    }
+    for (const track of body.videoTracks) {
+      if (track.file.type === 'local') blobs.add(track.file.sha1);
+    }
+
+    return blobs;
   }
 
   async publish() {
