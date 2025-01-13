@@ -105,6 +105,9 @@ class WorkspaceRecorder {
 
     // register disposables
     this.session.context.extension.subscriptions.push(...this.disposables);
+
+    // update or create focus
+    this.setFocus();
   }
 
   pause() {
