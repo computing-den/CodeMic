@@ -525,6 +525,27 @@ class CodeMic {
         this.enqueueFrontendUpdate();
         return ok;
       }
+      case 'recorder/insertChapter': {
+        assert(this.session?.isLoaded());
+        const cmd = this.session.editor.createInsertChapter(req.clock, req.title);
+        await this.session.commander.applyInsertChapter(cmd);
+        this.enqueueFrontendUpdate();
+        return ok;
+      }
+      case 'recorder/updateChapter': {
+        assert(this.session?.isLoaded());
+        const cmd = this.session.editor.createUpdateChapter(req.index, req.update);
+        await this.session.commander.applyUpdateChapter(cmd);
+        this.enqueueFrontendUpdate();
+        return ok;
+      }
+      case 'recorder/deleteChapter': {
+        assert(this.session?.isLoaded());
+        const cmd = this.session.editor.createDeleteChapter(req.index);
+        await this.session.commander.applyDeleteChapter(cmd);
+        this.enqueueFrontendUpdate();
+        return ok;
+      }
       case 'recorder/crop': {
         assert(this.session?.isLoaded());
         // await this.session.commander.crop(req.clock);
@@ -833,7 +854,8 @@ class CodeMic {
   }
 
   async recorderWillClose(): Promise<boolean> {
-    if (this.session?.mustScan) {
+    assert(this.session);
+    if (this.session.mustScan) {
       const cancel = 'Cancel';
       const exit = 'Exit';
       const answer = await vscode.window.showWarningMessage(
@@ -847,6 +869,7 @@ class CodeMic {
     }
 
     await this.writeSession({ pause: true });
+    await this.session.core.gcBlobs();
     this.session = undefined;
     this.recorder = undefined;
     return true;

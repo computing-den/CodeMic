@@ -172,6 +172,30 @@ export default class SessionCommander {
     await this.session.rr.seek(cmd.clock);
   }
 
+  async applyInsertChapter(cmd: t.InsertChapterCmd) {
+    this.session.editor.applyInsertChapter(cmd);
+  }
+
+  async unapplyInsertChapter(cmd: t.InsertChapterCmd) {
+    this.session.editor.unapplyInsertChapter(cmd);
+  }
+
+  async applyUpdateChapter(cmd: t.UpdateChapterCmd) {
+    this.session.editor.applyUpdateChapter(cmd);
+  }
+
+  async unapplyUpdateChapter(cmd: t.UpdateChapterCmd) {
+    this.session.editor.unapplyUpdateChapter(cmd);
+  }
+
+  async applyDeleteChapter(cmd: t.DeleteChapterCmd) {
+    this.session.editor.applyDeleteChapter(cmd);
+  }
+
+  async unapplyDeleteChapter(cmd: t.DeleteChapterCmd) {
+    this.session.editor.unapplyDeleteChapter(cmd);
+  }
+
   async crop(clock: number) {
     const cmd = this.session.editor.createCrop(clock);
     await this.applyCrop(cmd);
@@ -225,13 +249,19 @@ export default class SessionCommander {
         return this.applyMerge(cmd);
       case 'insertGap':
         return this.applyInsertGap(cmd);
+      case 'insertChapter':
+        return this.applyInsertChapter(cmd);
+      case 'updateChapter':
+        return this.applyUpdateChapter(cmd);
+      case 'deleteChapter':
+        return this.applyDeleteChapter(cmd);
       case 'crop':
         return this.applyCrop(cmd);
       case 'updateDuration':
         return this.applyUpdateDuration(cmd);
 
       default:
-        throw new Error(`unknown cmd type: ${(cmd as any).type}`);
+        lib.unreachable(cmd, 'unknown cmd type');
     }
   }
 
@@ -263,12 +293,18 @@ export default class SessionCommander {
         return this.unapplyMerge(cmd);
       case 'insertGap':
         return this.unapplyInsertGap(cmd);
+      case 'insertChapter':
+        return this.unapplyInsertChapter(cmd);
+      case 'updateChapter':
+        return this.unapplyUpdateChapter(cmd);
+      case 'deleteChapter':
+        return this.unapplyDeleteChapter(cmd);
       case 'crop':
         return this.unapplyCrop(cmd);
       case 'updateDuration':
         return this.unapplyUpdateDuration(cmd);
       default:
-        throw new Error(`unknown cmd type: ${(cmd as any).type}`);
+        lib.unreachable(cmd, 'unknown cmd type');
     }
   }
 }

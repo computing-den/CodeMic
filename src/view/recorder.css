@@ -167,6 +167,7 @@
                 border-color: var(--editor-track-document-focus-color-1);
                 /* font-weight: bold; */
                 z-index: var(--track-z-index);
+                transition: border-color 0.2s ease-in-out;
 
                 &:hover,
                 &.active {
@@ -214,6 +215,7 @@
                 p {
                   text-overflow: ellipsis;
                   display: inline-block;
+                  transition: color 0.2s ease-in-out;
 
                   &:hover,
                   &.active {
@@ -300,6 +302,7 @@
                 /* height: 1px; */
                 border-top: 1px solid;
                 z-index: var(--marker-z-index);
+                transition: border-color 0.2s ease-in-out;
 
                 /* &:hover { */
                 /*   z-index: 1; */
@@ -329,12 +332,33 @@
                   border-color: var(--marker-end-color);
                   border-width: 3px;
 
+                  /* &:hover { */
+                  /*   border-width: var(--marker-end-color-hover); */
+                  /*   border-width: 3px; */
+                  /*   font-weight: bold; */
+                  /* } */
+                }
+                &.marker_chapter {
+                  border-color: var(--marker-chapter-color);
+                  border-width: 3px;
+                }
+                &.marker_chapter {
+                  border-color: var(--marker-chapter-color);
+                  border-width: 3px;
+                  .label {
+                    background: var(--marker-chapter-color);
+                  }
+
+                  &.marker_active,
                   &:hover {
-                    border-width: var(--marker-end-color-hover);
+                    border-color: var(--marker-chapter-color-hover);
                     border-width: 3px;
-                    font-weight: bold;
+                    .label {
+                      background: var(--marker-chapter-color-hover);
+                    }
                   }
                 }
+
                 &.marker_recording {
                   border-color: var(--marker-end-color);
                 }
@@ -353,6 +377,25 @@
                   border-radius: 8px;
                   border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--popover-border));
                   text-align: center;
+                }
+                .label {
+                  position: absolute;
+                  right: 0;
+                  /* background: var(--vscode-sideBar-background); */
+                  background: #777;
+                  top: 0px;
+                  font-size: 0.9em;
+                  padding: 1px 5px 3px 5px;
+                  text-align: right;
+                  max-width: 80%;
+                  text-overflow: ellipsis;
+                  display: inline-block;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  z-index: -1;
+                  font-weight: bold;
+                  color: white;
+                  transition: background 0.2s ease-in-out;
                 }
               }
             }
@@ -418,6 +461,22 @@
     display: flex;
     gap: var(--spacing-small);
   }
+  & vscode-button {
+    margin-top: var(--spacing-medium);
+  }
+}
+
+.popover .insert-chapter-popover-form {
+  display: grid;
+  gap: var(--spacing-small);
+
+  vscode-text-area::part(label) {
+    color: var(--popover-foreground);
+  }
+  /* .inputs { */
+  /*   display: flex; */
+  /*   gap: var(--spacing-small); */
+  /* } */
   & vscode-button {
     margin-top: var(--spacing-medium);
   }

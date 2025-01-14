@@ -338,6 +338,25 @@ export default class SessionCore {
     });
   }
 
+  async gcBlobs() {
+    const usedBlobs = await this.getUsedBlobs();
+
+    let allBlobs: string[] = [];
+    try {
+      allBlobs = await fs.promises.readdir(path.join(this.dataPath, 'blobs'), { recursive: true });
+    } catch (error) {
+      // It's ok if blobs doesn't exist.
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+
+    for (const blob of allBlobs) {
+      if (!usedBlobs.has(blob)) {
+        console.log('GC blobs: deleting', blob);
+        await fs.promises.rm(path.join(this.dataPath, 'blobs', blob), { force: true });
+      }
+    }
+  }
+
   async getUsedBlobs(): Promise<Set<string>> {
     assert(this.session.local, 'Session does not exist on disk');
     const body = this.session.body?.toJSON() ?? (await this.readBody());

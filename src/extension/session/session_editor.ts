@@ -605,6 +605,55 @@ export default class SessionEditor {
     this.changed();
   }
 
+  createInsertChapter(clock: number, title: string): t.InsertChapterCmd {
+    return this.insertCmd({ type: 'insertChapter', clock, title });
+  }
+
+  applyInsertChapter(cmd: t.InsertChapterCmd) {
+    this.session.head.toc.push({ clock: cmd.clock, title: cmd.title });
+    this.session.head.toc.sort((a, b) => a.clock - b.clock);
+  }
+
+  unapplyInsertChapter(cmd: t.InsertChapterCmd) {
+    const i = this.session.head.toc.findIndex(x => x.clock === cmd.clock);
+    assert(i !== -1);
+    this.session.head.toc.splice(i, 1);
+  }
+
+  createUpdateChapter(index: number, update: Partial<t.TocItem>): t.UpdateChapterCmd {
+    const chapter = this.session.head.toc[index];
+    assert(chapter);
+    const revUpdate = _.pick(chapter, Object.keys(update));
+    // const coalescing = _.last(this.curUndoHistoryGroup)?.type === 'updateChapter';
+    return this.insertCmd({ type: 'updateChapter', index, update, revUpdate });
+  }
+
+  applyUpdateChapter(cmd: t.UpdateChapterCmd) {
+    this.session.head.toc[cmd.index] = { ...this.session.head.toc[cmd.index], ...cmd.update };
+    // cannot sort because the index will change
+    // this.session.head.toc.sort((a, b) => a.clock - b.clock);
+  }
+
+  unapplyUpdateChapter(cmd: t.UpdateChapterCmd) {
+    this.session.head.toc[cmd.index] = { ...this.session.head.toc[cmd.index], ...cmd.revUpdate };
+    // cannot sort because the index will change
+    // this.session.head.toc.sort((a, b) => a.clock - b.clock);
+  }
+
+  createDeleteChapter(index: number): t.DeleteChapterCmd {
+    const chapter = this.session.head.toc[index];
+    assert(chapter);
+    return this.insertCmd({ type: 'deleteChapter', index, chapter });
+  }
+
+  applyDeleteChapter(cmd: t.DeleteChapterCmd) {
+    this.session.head.toc.splice(cmd.index, 1);
+  }
+
+  unapplyDeleteChapter(cmd: t.DeleteChapterCmd) {
+    this.session.head.toc.splice(cmd.index, 0, cmd.chapter);
+  }
+
   /**
    * Crops the session to clock.
    */

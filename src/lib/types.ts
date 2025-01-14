@@ -47,6 +47,9 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/changeSpeed'; range: ClockRange; factor: number }; response: OKResponse }
   | { request: { type: 'recorder/merge'; range: ClockRange }; response: OKResponse }
   | { request: { type: 'recorder/insertGap'; clock: number; dur: number }; response: OKResponse }
+  | { request: { type: 'recorder/insertChapter'; title: string; clock: number }; response: OKResponse }
+  | { request: { type: 'recorder/updateChapter'; index: number; update: Partial<TocItem> }; response: OKResponse }
+  | { request: { type: 'recorder/deleteChapter'; index: number }; response: OKResponse }
   | { request: { type: 'recorder/crop'; clock: number }; response: OKResponse }
   // | { request: { type: 'toggleRecorderStudio' }; response: OKResponse }
   | { request: { type: 'deleteSession'; sessionId: string }; response: OKResponse }
@@ -374,7 +377,7 @@ export type FocusCompact = {
 
 export type RangedTrack = {
   id: string;
-  type: 'audio' | 'video' | 'editor';
+  type: 'audio' | 'video' | 'image';
   clockRange: ClockRange;
   title: string;
 };
@@ -637,6 +640,9 @@ export type Cmd =
   | MergeCmd
   // | MergeCmd
   | InsertGapCmd
+  | InsertChapterCmd
+  | UpdateChapterCmd
+  | DeleteChapterCmd
   | CropCmd
   | UpdateDurationCmd;
 
@@ -743,6 +749,22 @@ export type InsertGapCmd = {
   duration: number;
   // firstEventIndex: number;
   // firstFocusIndex: number;
+};
+export type InsertChapterCmd = {
+  type: 'insertChapter';
+  clock: number;
+  title: string;
+};
+export type UpdateChapterCmd = {
+  type: 'updateChapter';
+  index: number;
+  update: Partial<TocItem>;
+  revUpdate: Partial<TocItem>;
+};
+export type DeleteChapterCmd = {
+  type: 'deleteChapter';
+  index: number;
+  chapter: TocItem;
 };
 export type CropCmd = {
   type: 'crop';
