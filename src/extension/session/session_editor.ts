@@ -17,7 +17,14 @@ import { URI } from 'vscode-uri';
 import * as path from 'path';
 import cache from '../cache.js';
 
-// type HistoryPosition = [number, number];
+type TimelineRange = {
+  eventIndex: number;
+  focusIndex: number;
+  tocIndex: number;
+  events: t.EditorEventWithUri[];
+  focusTimeline: t.Focus[];
+  toc: t.TocItem[];
+};
 
 export default class SessionEditor {
   dirty = false;
@@ -429,12 +436,18 @@ export default class SessionEditor {
 
   createChangeSpeed(range: t.ClockRange, factor: number): t.ChangeSpeedCmd {
     assert(this.session.isLoaded());
+    const timeline = this.collectTimelineRange(range);
     return this.insertCmd({
       type: 'changeSpeed',
       range,
       factor,
       revRrClock: this.session.rr.clock,
-      ...this.collectEventAndFocusClocks(range),
+      firstEventIndex: timeline.eventIndex,
+      firstFocusIndex: timeline.focusIndex,
+      firstTocIndex: timeline.tocIndex,
+      revEventClocks: timeline.events.map(e => e.event.clock),
+      revFocusClocks: timeline.focusTimeline.map(f => f.clock),
+      revTocClocks: timeline.toc.map(x => x.clock),
     });
   }
 
@@ -458,6 +471,11 @@ export default class SessionEditor {
       };
     }
 
+    // Update toc.
+    for (const [i, x] of head.toc.slice(cmd.firstTocIndex).entries()) {
+      head.toc[i + cmd.firstTocIndex] = { ...x, clock: calcClockAfterRangeSpeedChange(x.clock, cmd.range, cmd.factor) };
+    }
+
     // Update session duration.
     head.duration = calcClockAfterRangeSpeedChange(head.duration, cmd.range, cmd.factor);
     this.changed();
@@ -478,8 +496,7 @@ export default class SessionEditor {
       replace({
         ...e.event,
         clock:
-          cmd.revEventClocksInRange[i - cmd.firstEventIndex] ??
-          calcClockAfterRangeSpeedChange(e.event.clock, range, factor),
+          cmd.revEventClocks[i - cmd.firstEventIndex] ?? calcClockAfterRangeSpeedChange(e.event.clock, range, factor),
       }),
     );
 
@@ -488,8 +505,14 @@ export default class SessionEditor {
 
     // Update focus timeline.
     for (const [i, f] of body.focusTimeline.slice(cmd.firstFocusIndex).entries()) {
-      const clock = cmd.revFocusClocksInRange[i] ?? calcClockAfterRangeSpeedChange(f.clock, range, factor);
+      const clock = cmd.revFocusClocks[i] ?? calcClockAfterRangeSpeedChange(f.clock, range, factor);
       body.focusTimeline[i + cmd.firstFocusIndex] = { ...f, clock };
+    }
+
+    // Update toc.
+    for (const [i, x] of head.toc.slice(cmd.firstTocIndex).entries()) {
+      const clock = cmd.revTocClocks[i] ?? calcClockAfterRangeSpeedChange(x.clock, range, factor);
+      head.toc[i + cmd.firstTocIndex] = { ...x, clock };
     }
 
     // Update session duration.
@@ -499,11 +522,17 @@ export default class SessionEditor {
 
   createMerge(range: t.ClockRange): t.MergeCmd {
     assert(this.session.isLoaded());
+    const timeline = this.collectTimelineRange(range);
     return this.insertCmd({
       type: 'merge',
       range,
       revRrClock: this.session.rr.clock,
-      ...this.collectEventAndFocusClocks(range),
+      firstEventIndex: timeline.eventIndex,
+      firstFocusIndex: timeline.focusIndex,
+      firstTocIndex: timeline.tocIndex,
+      revEventClocks: timeline.events.map(e => e.event.clock),
+      revFocusClocks: timeline.focusTimeline.map(f => f.clock),
+      revTocClocks: timeline.toc.map(x => x.clock),
     });
   }
 
@@ -524,6 +553,11 @@ export default class SessionEditor {
       body.focusTimeline[i + cmd.firstFocusIndex] = { ...f, clock: calcClockAfterMerge(f.clock, cmd.range) };
     }
 
+    // Update toc.
+    for (const [i, x] of head.toc.slice(cmd.firstTocIndex).entries()) {
+      head.toc[i + cmd.firstTocIndex] = { ...x, clock: calcClockAfterMerge(x.clock, cmd.range) };
+    }
+
     // Update session duration.
     head.duration -= getClockRangeDur(cmd.range);
     this.changed();
@@ -536,7 +570,7 @@ export default class SessionEditor {
 
     // Update events.
     body.eventContainer.forEachExc(cmd.firstEventIndex, body.eventContainer.getSize(), (e, i, replace) =>
-      replace({ ...e.event, clock: cmd.revEventClocksInRange[i - cmd.firstEventIndex] ?? e.event.clock + rangeDur }),
+      replace({ ...e.event, clock: cmd.revEventClocks[i - cmd.firstEventIndex] ?? e.event.clock + rangeDur }),
     );
 
     // Reindex the event container.
@@ -544,7 +578,12 @@ export default class SessionEditor {
 
     // Update focus timeline.
     for (const [i, f] of body.focusTimeline.slice(cmd.firstFocusIndex).entries()) {
-      body.focusTimeline[i + cmd.firstFocusIndex] = { ...f, clock: cmd.revFocusClocksInRange[i] ?? f.clock + rangeDur };
+      body.focusTimeline[i + cmd.firstFocusIndex] = { ...f, clock: cmd.revFocusClocks[i] ?? f.clock + rangeDur };
+    }
+
+    // Update toc.
+    for (const [i, x] of head.toc.slice(cmd.firstTocIndex).entries()) {
+      head.toc[i + cmd.firstTocIndex] = { ...x, clock: cmd.revTocClocks[i] ?? x.clock + rangeDur };
     }
 
     // Update session duration.
@@ -576,6 +615,11 @@ export default class SessionEditor {
       if (f.clock > cmd.clock) f.clock += cmd.duration;
     }
 
+    // Update toc.
+    for (const x of head.toc) {
+      if (x.clock > cmd.clock) x.clock += cmd.duration;
+    }
+
     // Update session duration.
     head.duration += cmd.duration;
     this.changed();
@@ -598,6 +642,11 @@ export default class SessionEditor {
     // Update focus timeline.
     for (const f of body.focusTimeline) {
       if (f.clock > cmd.clock) f.clock -= cmd.duration;
+    }
+
+    // Update toc.
+    for (const x of head.toc) {
+      if (x.clock > cmd.clock) x.clock -= cmd.duration;
     }
 
     // Update session duration.
@@ -659,23 +708,18 @@ export default class SessionEditor {
    */
   createCrop(clock: number): t.CropCmd {
     assert(this.session.isLoaded());
-    const { head, body } = this.session;
+    const { head } = this.session;
 
-    const firstEventIndex = body.eventContainer.getIndexAfterClock(clock);
-    const revEvents = body.eventContainer.collectExc(firstEventIndex, body.eventContainer.getSize());
-
-    let firstFocusIndex = body.focusTimeline.findIndex(f => f.clock >= clock);
-    if (firstFocusIndex === -1) firstFocusIndex = body.focusTimeline.length;
-
-    const revFocusTimeline = body.focusTimeline.slice(firstFocusIndex);
-
+    const timeline = this.collectTimelineRange({ start: clock, end: head.duration });
     return this.insertCmd({
       type: 'crop',
       clock,
-      firstEventIndex,
-      firstFocusIndex,
-      revEvents,
-      revFocusTimeline,
+      firstEventIndex: timeline.eventIndex,
+      firstFocusIndex: timeline.focusIndex,
+      firstTocIndex: timeline.tocIndex,
+      revEvents: timeline.events,
+      revFocusTimeline: timeline.focusTimeline,
+      revToc: timeline.toc,
       revDuration: head.duration,
       revRrClock: this.session.rr.clock,
     });
@@ -693,6 +737,9 @@ export default class SessionEditor {
     // Delete focus.
     body.focusTimeline.length = cmd.firstFocusIndex;
 
+    // Delete toc.
+    head.toc.length = cmd.firstTocIndex;
+
     // Update session duration.
     head.duration = cmd.clock;
     this.changed();
@@ -707,6 +754,9 @@ export default class SessionEditor {
 
     // Insert focus.
     insertIntoArray(body.focusTimeline, cmd.revFocusTimeline);
+
+    // Insert toc.
+    insertIntoArray(head.toc, cmd.revToc);
 
     // Update session duration.
     head.duration = cmd.revDuration;
@@ -739,30 +789,27 @@ export default class SessionEditor {
    * every time because doing the calculations back and forth is not reliable due
    * to floating point precision loss.
    */
-  private collectEventAndFocusClocks(range: t.ClockRange): {
-    firstEventIndex: number;
-    firstFocusIndex: number;
-    revEventClocksInRange: number[];
-    revFocusClocksInRange: number[];
-  } {
+  private collectTimelineRange(range: t.ClockRange): TimelineRange {
     assert(this.session.isLoaded());
-    const { body } = this.session;
+    const { body, head } = this.session;
 
-    const firstEventIndex = body.eventContainer.getIndexAfterClock(range.start);
-    const endEventIndex = body.eventContainer.getIndexAfterClock(range.end);
-    const revEventClocksInRange = body.eventContainer
-      .collectExc(firstEventIndex, endEventIndex)
-      .map(e => e.event.clock);
+    const eventIndex = body.eventContainer.getIndexAfterClock(range.start);
+    const eventIndexEnd = body.eventContainer.getIndexAfterClock(range.end);
+    const events = body.eventContainer.collectExc(eventIndex, eventIndexEnd);
 
-    let firstFocusIndex = body.focusTimeline.findIndex(f => f.clock >= range.start);
-    if (firstFocusIndex === -1) firstFocusIndex = body.focusTimeline.length;
+    let focusIndex = body.focusTimeline.findIndex(f => f.clock >= range.start);
+    if (focusIndex === -1) focusIndex = body.focusTimeline.length;
+    let focusIndexEnd = body.focusTimeline.findIndex(f => f.clock > range.end);
+    if (focusIndexEnd === -1) focusIndexEnd = body.focusTimeline.length;
+    const focusTimeline = body.focusTimeline.slice(focusIndex, focusIndexEnd);
 
-    let endFocusIndex = body.focusTimeline.findIndex(f => f.clock >= range.end);
-    if (endFocusIndex === -1) endFocusIndex = body.focusTimeline.length;
+    let tocIndex = head.toc.findIndex(x => x.clock >= range.start);
+    if (tocIndex === -1) tocIndex = head.toc.length;
+    let tocIndexEnd = head.toc.findIndex(x => x.clock > range.end);
+    if (tocIndexEnd === -1) tocIndexEnd = head.toc.length;
+    const toc = head.toc.slice(tocIndex, tocIndexEnd);
 
-    const revFocusClocksInRange: number[] = body.focusTimeline.slice(firstFocusIndex, endFocusIndex).map(f => f.clock);
-
-    return { firstEventIndex, firstFocusIndex, revEventClocksInRange, revFocusClocksInRange };
+    return { eventIndex, focusIndex, tocIndex, events, focusTimeline, toc };
   }
 
   private changed() {

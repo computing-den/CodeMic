@@ -394,7 +394,7 @@
                   overflow: hidden;
                   z-index: -1;
                   font-weight: bold;
-                  color: white;
+                  color: var(--marker-label-color);
                   transition: background 0.2s ease-in-out;
                 }
               }
@@ -444,7 +444,7 @@
   }
 }
 
-.popover .recorder-speed-popover-form {
+.recorder-speed-popover form {
   display: grid;
   /* align-items: center; */
   gap: var(--spacing-small);
@@ -453,7 +453,7 @@
   }
 }
 
-.popover .insert-gap-popover-form {
+.insert-gap-popover form {
   display: grid;
   gap: var(--spacing-small);
 
@@ -466,18 +466,24 @@
   }
 }
 
-.popover .insert-chapter-popover-form {
-  display: grid;
-  gap: var(--spacing-small);
+.chapter-popover {
+  width: calc(100vw - 2 * var(--container-padding-hor));
+  max-width: 300px;
 
-  vscode-text-area::part(label) {
-    color: var(--popover-foreground);
-  }
-  /* .inputs { */
-  /*   display: flex; */
-  /*   gap: var(--spacing-small); */
-  /* } */
-  & vscode-button {
-    margin-top: var(--spacing-medium);
+  form {
+    width: 100%;
+    display: grid;
+    gap: var(--spacing-small);
+
+    vscode-text-area::part(label) {
+      color: var(--popover-foreground);
+    }
+    /* .inputs { */
+    /*   display: flex; */
+    /*   gap: var(--spacing-small); */
+    /* } */
+    & vscode-button {
+      margin-top: var(--spacing-medium);
+    }
   }
 }

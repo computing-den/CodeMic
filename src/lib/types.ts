@@ -724,8 +724,10 @@ export type ChangeSpeedCmd = {
   factor: number;
   firstEventIndex: number;
   firstFocusIndex: number;
-  revEventClocksInRange: number[];
-  revFocusClocksInRange: number[];
+  firstTocIndex: number;
+  revEventClocks: number[];
+  revFocusClocks: number[];
+  revTocClocks: number[];
   revRrClock: number;
 };
 export type MergeCmd = {
@@ -734,8 +736,10 @@ export type MergeCmd = {
   range: ClockRange;
   firstEventIndex: number;
   firstFocusIndex: number;
-  revEventClocksInRange: number[];
-  revFocusClocksInRange: number[];
+  firstTocIndex: number;
+  revEventClocks: number[];
+  revFocusClocks: number[];
+  revTocClocks: number[];
   revRrClock: number;
 };
 // export type MergeCmd = {
@@ -744,11 +748,8 @@ export type MergeCmd = {
 // };
 export type InsertGapCmd = {
   type: 'insertGap';
-  // coalescing: boolean;
   clock: number;
   duration: number;
-  // firstEventIndex: number;
-  // firstFocusIndex: number;
 };
 export type InsertChapterCmd = {
   type: 'insertChapter';
@@ -771,9 +772,11 @@ export type CropCmd = {
   clock: number;
   firstEventIndex: number;
   firstFocusIndex: number;
+  firstTocIndex: number;
   revEvents: EditorEventWithUri[];
   revFocusTimeline: Focus[];
   revDuration: number;
+  revToc: TocItem[];
   revRrClock: number;
 };
 export type UpdateDurationCmd = {

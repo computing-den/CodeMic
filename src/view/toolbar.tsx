@@ -1,4 +1,4 @@
-import React, { forwardRef, useRef, useState } from 'react';
+import React, { forwardRef, Ref, useRef, useState } from 'react';
 import { cn } from './misc.js';
 import { useClickOutsideHandler } from './hooks.js';
 import _ from 'lodash';
@@ -6,9 +6,13 @@ import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 
 type ToolbarProps = { actions: React.ReactNode[] };
 
-function Toolbar(props: ToolbarProps) {
-  return <div className="toolbar">{props.actions}</div>;
-}
+const Toolbar = forwardRef(function Toolbar(props: ToolbarProps, ref: Ref<any>) {
+  return (
+    <div ref={ref} className="toolbar">
+      {props.actions}
+    </div>
+  );
+});
 
 function ToolbarSeparator() {
   return <div className="separator-line" />;
@@ -51,8 +55,9 @@ const ToolbarButton = forwardRef(function ToolbarButton(props: ToolbarButtonProp
 //   );
 // }
 
-Toolbar.Separator = ToolbarSeparator;
-Toolbar.Button = ToolbarButton;
-// Toolbar.ButtonWithOverlay = ToolbarButtonWithOverlay;
+export default Object.assign(Toolbar, { Separator: ToolbarSeparator, Button: ToolbarButton });
+// Toolbar.Separator = ToolbarSeparator;
+// Toolbar.Button = ToolbarButton;
+// // Toolbar.ButtonWithOverlay = ToolbarButtonWithOverlay;
 
-export default Toolbar;
+// export default Toolbar;

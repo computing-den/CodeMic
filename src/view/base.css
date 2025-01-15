@@ -23,7 +23,6 @@
   --marker-end-color: #f85149;
   /* --marker-end-color-hover: #e84139; */
   --marker-chapter-color: #e99671;
-  --marker-chapter-color-hover: #bd6c47;
   --marker-base-color: #000;
   /* --marker-selection-color: #55ffff; */
   --marker-z-index: 10;
@@ -49,6 +48,9 @@ body.vscode-light {
 
   --editor-track-color: #666;
   --editor-track-color-hover: #000;
+
+  --marker-label-color: white;
+  --marker-chapter-color-hover: #bd6c47;
 
   --popover-border-color: #aaa;
   --popover-background: #1f1f1f;
@@ -79,6 +81,9 @@ body.vscode-dark {
 
   --editor-track-color: #aaa;
   --editor-track-color-hover: #fff;
+
+  --marker-label-color: #333;
+  --marker-chapter-color-hover: #f8b394;
 
   --popover-border-color: #aaa;
   --popover-background: #1f1f1f;

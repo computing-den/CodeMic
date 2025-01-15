@@ -1,6 +1,6 @@
 import { produce, type Draft } from 'immer';
 import MediaToolbar, * as MT from './media_toolbar.jsx';
-import React, { forwardRef, RefObject, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, Ref, RefObject, useEffect, useRef, useState } from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { Vec2, Rect } from '../lib/lib.js';
@@ -300,7 +300,11 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
 
   const [state, setState] = useState<EditorViewState>({});
 
-  // const clocksFromSelection = getClocksFromSelection(state.selection, session);
+  const toolbarRef = useRef(null);
+
+  const selectionClockRange = getSelectionClockRange(session, state.selection);
+  const selectedChapterIndex = state.selection?.type === 'chapter' ? state.selection.index : undefined;
+  const selectedChapter = selectedChapterIndex !== undefined ? head.toc[selectedChapterIndex] : undefined;
   const hasEditorSelection = Boolean(getNonEmptyEditorSelection(state.selection));
 
   async function deleteSelection() {
@@ -372,7 +376,7 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
       },
     });
     if (uris?.length === 1) {
-      const clock = getSelectionClockRange(session, state.selection)?.start ?? 0;
+      const clock = selectionClockRange?.start ?? 0;
       await postMessage({ type: 'recorder/insertAudio', uri: uris[0], clock });
     }
   }
@@ -386,7 +390,7 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
       },
     });
     if (uris?.length === 1) {
-      const clock = getSelectionClockRange(session, state.selection)?.start ?? 0;
+      const clock = selectionClockRange?.start ?? 0;
       await postMessage({ type: 'recorder/insertVideo', uri: uris[0], clock });
     }
   }
@@ -422,7 +426,7 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
           title: 'Play',
           icon: 'codicon-play',
           disabled: session.recording,
-          onClick: () => onPlay(getSelectionClockRange(session, state.selection)?.start),
+          onClick: () => onPlay(selectionClockRange?.start),
         },
   ];
 
@@ -474,7 +478,7 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
 
   async function crop() {
     // assert(state.selection?.type === 'editor');
-    const clock = getSelectionClockRange(session, state.selection)?.end;
+    const clock = selectionClockRange?.end;
     assert(clock !== undefined);
     await postMessage({ type: 'recorder/crop', clock });
   }
@@ -483,7 +487,7 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
   const insertGapButtonRef = useRef(null);
 
   async function insertGap(dur: number) {
-    const clock = getSelectionClockRange(session, state.selection)?.start;
+    const clock = selectionClockRange?.start;
     assert(clock !== undefined);
     await postMessage({ type: 'recorder/insertGap', clock, dur });
     insertGapPopover.close();
@@ -493,12 +497,20 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
   }
 
   async function insertOrUpdateChapter(title: string, index?: number) {
-    if (index !== undefined) {
-      await postMessage({ type: 'recorder/updateChapter', index, update: { title } });
+    if (index === undefined) {
+      // insert new.
+      if (title) {
+        const clock = selectionClockRange?.start;
+        assert(clock !== undefined);
+        await postMessage({ type: 'recorder/insertChapter', title, clock });
+      }
     } else {
-      const clock = getSelectionClockRange(session, state.selection)?.start;
-      assert(clock !== undefined);
-      await postMessage({ type: 'recorder/insertChapter', title, clock });
+      // update old
+      if (title) {
+        await postMessage({ type: 'recorder/updateChapter', index, update: { title } });
+      } else {
+        await postMessage({ type: 'recorder/deleteChapter', index });
+      }
     }
     chapterPopover.close();
   }
@@ -511,8 +523,8 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
   }
 
   const chapterPopover = usePopover();
-  const insertChapterButtonRef = useRef(null);
-  const selectedChapterMarkerRef = useRef<HTMLElement>(null);
+  // const insertChapterButtonRef = useRef(null);
+  const selectionRef = useRef(null);
 
   async function undo() {
     await postMessage({ type: 'recorder/undo' });
@@ -545,10 +557,10 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
       onClick={() => console.log('TODO')}
     />,
     <Toolbar.Button
-      ref={insertChapterButtonRef}
+      // ref={insertChapterButtonRef}
       title="Insert chapter"
       icon="fa-solid fa-font"
-      disabled={session.playing || session.recording || getSelectionClockRange(session, state.selection) === undefined}
+      disabled={session.playing || session.recording || selectionClockRange === undefined}
       onClick={chapterPopover.toggle}
     />,
     <Toolbar.Separator />,
@@ -576,23 +588,13 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
       ref={insertGapButtonRef}
       title="Insert gap"
       icon="fa-solid fa-arrows-left-right-to-line icon-rotate-cw-90"
-      disabled={
-        session.playing ||
-        session.recording ||
-        hasEditorSelection ||
-        getSelectionClockRange(session, state.selection) === undefined
-      }
+      disabled={session.playing || session.recording || hasEditorSelection || selectionClockRange === undefined}
       onClick={insertGapPopover.toggle}
     />,
     <Toolbar.Button
       title="Crop"
       icon="fa-solid fa-crop-simple"
-      disabled={
-        session.playing ||
-        session.recording ||
-        hasEditorSelection ||
-        getSelectionClockRange(session, state.selection)?.end === undefined
-      }
+      disabled={session.playing || session.recording || hasEditorSelection || selectionClockRange?.end === undefined}
       onClick={crop}
     />,
     <Toolbar.Separator />,
@@ -625,7 +627,7 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
         </div>
       </div>
       <div className="subsection">
-        <Toolbar actions={toolbarActions} />
+        <Toolbar actions={toolbarActions} ref={toolbarRef} />
       </div>
       <Timeline
         session={session}
@@ -637,7 +639,7 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
         selection={state.selection}
         onChange={updateState}
         onChapterSelect={selectChapter}
-        selectedChapterMarkerRef={selectedChapterMarkerRef}
+        selectionRef={selectionRef}
       />
       <SpeedControlPopover
         popover={slowDownPopover}
@@ -653,14 +655,19 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
         pointOnAnchor="bottom-right"
         pointOnPopover="top-right"
       />
-      <ChapterPopover
-        chapter={state.selection?.type === 'chapter' ? session.head.toc[state.selection.index] : undefined}
-        index={state.selection?.type === 'chapter' ? state.selection.index : undefined}
-        popover={chapterPopover}
-        onConfirm={insertOrUpdateChapter}
-        anchor={state.selection?.type === 'chapter' ? selectedChapterMarkerRef : insertChapterButtonRef}
-        clock={getSelectionClockRange(session, state.selection)?.start}
-      />
+
+      {selectionClockRange?.start !== undefined && (
+        <ChapterPopover
+          chapter={selectedChapter}
+          index={selectedChapterIndex}
+          popover={chapterPopover}
+          onConfirm={insertOrUpdateChapter}
+          anchor={selectionRef}
+          pointOnAnchor="bottom-center"
+          pointOnPopover="top-center"
+          clock={selectionClockRange.start}
+        />
+      )}
     </div>
   );
 }
@@ -671,7 +678,7 @@ type TimelineProps = {
   selection?: Selection;
   onChange: (draft: EditorViewStateRecipe) => any;
   onChapterSelect: (index: number) => any;
-  selectedChapterMarkerRef: RefObject<HTMLElement>;
+  selectionRef: Ref<any>;
 };
 type TimelineState = {
   pxToSecRatio: number;
@@ -1030,7 +1037,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   }
 
   render() {
-    const { cursor, selection, session, onChange, selectedChapterMarkerRef } = this.props;
+    const { cursor, selection, session, onChange, selectionRef } = this.props;
     const { pxToSecRatio, trackDrag, markerDrag } = this.state;
     // const clockMarker: Marker | undefined =
     //   session.clock > 0 && session.clock !== session.head.duration && !session.recording
@@ -1099,6 +1106,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
                     clock={selection.focus}
                     timelineDuration={timelineDuration}
                     active
+                    ref={selectionRef}
                   />
                 </>
               )}
@@ -1117,7 +1125,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
                   onDragStart={e => this.chapterDragStarted(e, i)}
                   onDragEnd={e => this.chapterDragEnded(e, i)}
                   onDrag={e => this.chapterDragged(e, i)}
-                  ref={selection?.type === 'chapter' && selection.index === i ? selectedChapterMarkerRef : null}
+                  ref={selection?.type === 'chapter' && selection.index === i ? selectionRef : null}
                 />
               ))}
               {session.clock > 0 && session.clock !== session.head.duration && !session.recording && (
@@ -1529,8 +1537,8 @@ function RangeSelection(props: { timelineDuration: number; range: t.ClockRange }
 function SpeedControlPopover(props: PopoverProps & { title: string; onConfirm: (factor: number) => any }) {
   const [factor, setFactor] = useState(2);
   return (
-    <Popover {...props}>
-      <form className="recorder-speed-popover-form">
+    <Popover {...props} className="recorder-speed-popover">
+      <form>
         <label className="label" htmlFor="speed-control-slider">
           {props.title} by {factor}x
         </label>
@@ -1556,8 +1564,8 @@ function InsertGapPopover(props: PopoverProps & { onConfirm: (dur: number) => an
   const [minutes, setMinutes] = useState('');
   const [seconds, setSeconds] = useState('');
   return (
-    <Popover {...props}>
-      <form className="insert-gap-popover-form">
+    <Popover {...props} className="insert-gap-popover">
+      <form>
         <label className="label" htmlFor="gap-time-minute">
           Insert gap
         </label>
@@ -1612,8 +1620,8 @@ function ChapterPopover(
   }, [props.popover.isOpen]);
 
   return (
-    <Popover {...props}>
-      <form className="insert-chapter-popover-form">
+    <Popover {...props} className="chapter-popover">
+      <form>
         <VSCodeTextArea
           className="title"
           rows={2}
@@ -1628,7 +1636,7 @@ function ChapterPopover(
         <VSCodeButton
           appearance="secondary"
           onClick={e => {
-            if (title.trim()) props.onConfirm(title.trim(), props.index);
+            props.onConfirm(title.trim(), props.index);
           }}
         >
           OK
