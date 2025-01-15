@@ -1,7 +1,7 @@
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { cn } from './misc.js';
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 
 export type CommonAction = {
@@ -14,7 +14,8 @@ export type PrimaryAction = CommonAction & {
   type: 'recorder/record' | 'recorder/pause' | 'player/load' | 'player/play' | 'player/pause';
 };
 export type Action = CommonAction & {
-  icon: string;
+  icon?: string;
+  children?: ReactNode;
 };
 export type Props = {
   primaryAction: PrimaryAction;
@@ -75,7 +76,8 @@ export default class MediaToolbar extends React.Component<Props> {
         <div className="actions">
           {this.props.actions.map(a => (
             <VSCodeButton appearance="icon" title={a.title} onClick={a.onClick} disabled={Boolean(a.disabled)}>
-              <span className={cn('codicon', a.icon)} />
+              {a.icon && <span className={cn('codicon', a.icon)} />}
+              {a.children}
             </VSCodeButton>
           ))}
         </div>

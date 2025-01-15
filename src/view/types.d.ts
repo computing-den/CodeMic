@@ -26,3 +26,18 @@
 //     }
 //   }
 // }
+
+// interface HTMLElement {
+//   requestPictureInPicture?: () => Promise<PictureInPictureWindow>;
+// }
+
+// interface Document {
+//   pictureInPictureElement?: HTMLElement;
+//   exitPictureInPicture?: () => Promise<void>;
+// }
+
+// interface PictureInPictureWindow extends EventTarget {
+//   readonly width: number;
+//   readonly height: number;
+//   onresize: ((this: PictureInPictureWindow, ev: Event) => any) | null;
+// }

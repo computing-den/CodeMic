@@ -32,6 +32,7 @@ export default class VideoManager {
       this.video = video;
 
       video.addEventListener('volumechange', this.handleVolumeChange);
+      video.addEventListener('ratechange', this.handleRateChange);
       video.addEventListener('timeupdate', this.handleTimeUpdate);
       video.addEventListener('error', this.handleError);
 

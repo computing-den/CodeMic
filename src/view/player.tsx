@@ -16,6 +16,7 @@ import { cn, getCoverUri } from './misc.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeDropdown, VSCodeOption, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 import { AppContext } from './app_context.jsx';
+import { PictureInPicture } from './svgs.jsx';
 
 type Props = { user?: t.User; player: t.PlayerUIState; session: t.SessionUIState };
 export default class Player extends React.Component<Props> {
@@ -30,7 +31,7 @@ export default class Player extends React.Component<Props> {
   };
 
   play = async () => {
-    await this.mediaManager.prepare(this.getVideoElem());
+    await this.mediaManager.prepare(this.getVideoElem()!);
     await postMessage({ type: 'player/play' });
   };
 
@@ -50,8 +51,8 @@ export default class Player extends React.Component<Props> {
     await postMessage({ type: 'player/seek', clock });
   };
 
-  getVideoElem = (): HTMLVideoElement => {
-    return document.getElementById('guide-video') as HTMLVideoElement;
+  getVideoElem = (): HTMLVideoElement | undefined => {
+    return document.getElementById('guide-video') as HTMLVideoElement | undefined;
   };
 
   getCoverContainerElem = (): HTMLElement => {
@@ -98,6 +99,18 @@ export default class Player extends React.Component<Props> {
     container.style.height = `${height}px`;
   };
 
+  togglePictureInPicture = async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        await this.getVideoElem()!.requestPictureInPicture();
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   updateResources() {
     this.mediaManager.updateResources(this.props.session);
   }
@@ -142,11 +155,6 @@ export default class Player extends React.Component<Props> {
       //   icon: 'codicon-repo-forked',
       //   onClick: this.fork,
       // },
-      {
-        title: 'Edit: open this project in the Studio',
-        icon: 'codicon-edit',
-        onClick: this.edit,
-      },
       // {
       //   title: 'Bookmark at this point',
       //   icon: 'codicon-bookmark',
@@ -160,6 +168,19 @@ export default class Player extends React.Component<Props> {
         onClick: () => {
           console.log('TODO');
         },
+      },
+      {
+        title: 'Picture-in-Picture',
+        children: <PictureInPicture />,
+        onClick: this.togglePictureInPicture,
+        // NOTE: change of video src does not trigger an update
+        //       but it's ok for now, since state/props change during playback.
+        disabled: !this.getVideoElem()?.src,
+      },
+      {
+        title: 'Edit: open this project in the Studio',
+        icon: 'codicon-edit',
+        onClick: this.edit,
       },
     ];
 

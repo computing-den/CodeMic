@@ -19,6 +19,7 @@ import Popover, { PopoverProps, usePopover } from './popover.jsx';
 import { AppContext } from './app_context.jsx';
 import path from 'path';
 import { URI } from 'vscode-uri';
+import { PictureInPicture } from './svgs.jsx';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -324,7 +325,8 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
 
   const [state, setState] = useState<EditorViewState>({});
 
-  const toolbarRef = useRef(null);
+  // const toolbarRef = useRef(null);
+  const guideVideoRef = useRef<HTMLVideoElement>(null);
 
   const selectionClockRange = getSelectionClockRange(session, state.selection);
   const selectedChapterIndex = state.selection?.type === 'chapter' ? state.selection.index : undefined;
@@ -419,6 +421,18 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
     }
   }
 
+  async function togglePictureInPicture() {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        await guideVideoRef.current!.requestPictureInPicture();
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
   let primaryAction: MT.PrimaryAction;
   if (session.recording) {
     primaryAction = {
@@ -452,6 +466,15 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
           disabled: session.recording,
           onClick: () => onPlay(selectionClockRange?.start),
         },
+
+    {
+      title: 'Picture-in-Picture',
+      children: <PictureInPicture />,
+      onClick: () => togglePictureInPicture(),
+      // NOTE: change of video src does not trigger an update
+      //       but it's ok for now, since state/props change during playback.
+      disabled: !guideVideoRef.current?.src,
+    },
   ];
 
   const slowDownPopover = usePopover();
@@ -645,13 +668,13 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
         duration={head.duration}
       />
       <div className="subsection subsection_spaced guide-video-container">
-        <video id="guide-video" />
+        <video id="guide-video" ref={guideVideoRef} />
         <div className="empty-content">
           <span className="codicon codicon-device-camera-video" />
         </div>
       </div>
       <div className="subsection">
-        <Toolbar actions={toolbarActions} ref={toolbarRef} />
+        <Toolbar actions={toolbarActions} />
       </div>
       <Timeline
         session={session}
