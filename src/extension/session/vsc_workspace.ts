@@ -378,11 +378,7 @@ export default class VscWorkspace {
   shouldRecordVscUri(vscUri: vscode.Uri): boolean {
     switch (vscUri.scheme) {
       case 'file':
-        // TODO ignore file
-        if (lib.isBaseOfPath(path.join(this.session.workspace, '.CodeMic'), vscUri.fsPath)) return false;
-        if (lib.isBaseOfPath(path.join(this.session.workspace, '.git'), vscUri.fsPath)) return false;
-
-        return lib.isBaseOfPath(this.session.workspace, vscUri.fsPath);
+        return this.session.core.shouldRecordAbsPath(vscUri.fsPath);
       case 'untitled':
         return true;
       default:

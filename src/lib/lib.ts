@@ -386,9 +386,9 @@ export function workspaceUriFrom(workspace: string, absPath: string): string {
   return workspaceUri(path.relative(workspace, absPath));
 }
 
-export function isBaseOfPath(base: string, p: string) {
-  return p.startsWith(base) && (base.length === p.length || p[base.length] === path.sep);
-}
+// export function isBaseOfPath(base: string, p: string) {
+//   return p.startsWith(base) && (base.length === p.length || p[base.length] === path.sep);
+// }
 
 export function logRejectedPromises(results: PromiseSettledResult<any>[]) {
   for (const result of results) {
@@ -407,3 +407,16 @@ export function deepFreeze(arg: any) {
 
   return Object.freeze(arg);
 }
+
+export const defaultIgnorePatterns = `# Ignore the .git directory
+.git
+
+# Node.js dependencies
+node_modules
+
+# Python byte-compiled / optimized / DLL files
+__pycache__
+*.py[cod]
+*$py.class
+
+`;

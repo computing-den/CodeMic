@@ -58,7 +58,7 @@
       .subsection.buttons {
         display: grid;
         grid-gap: var(--spacing-small);
-        grid-template-columns: 1fr 1fr;
+        /* grid-template-columns: 1fr 1fr; */
 
         /* & vscode-button + vscode-button { */
         /*   margin-left: var(--spacing-medium); */

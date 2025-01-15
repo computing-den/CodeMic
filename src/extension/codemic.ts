@@ -429,7 +429,7 @@ class CodeMic {
       }
       case 'recorder/updateDetails': {
         assert(this.session);
-        this.session.editor.updateFromUI(req.changes);
+        this.session.editor.updateDetails(req.changes);
         this.enqueueFrontendUpdate();
         return ok;
       }

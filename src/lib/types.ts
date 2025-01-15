@@ -300,6 +300,7 @@ export type SessionDetailsUpdate = {
   handle?: string;
   description?: string;
   workspace?: string;
+  ignorePatterns?: string;
 };
 
 export type TocItem = { title: string; clock: number };
@@ -320,6 +321,7 @@ export type SessionHead = {
   toc: TocItem[];
   forkedFrom?: string;
   hasCover: boolean;
+  ignorePatterns: string;
   formatVersion: number;
 };
 
@@ -634,11 +636,8 @@ export type Cmd =
   | InsertVideoTrackCmd
   | DeleteVideoTrackCmd
   | UpdateVideoTrackCmd
-  // | UpdateHeadCmd
-  // | UpdateFromUICmd
   | ChangeSpeedCmd
   | MergeCmd
-  // | MergeCmd
   | InsertGapCmd
   | InsertChapterCmd
   | UpdateChapterCmd

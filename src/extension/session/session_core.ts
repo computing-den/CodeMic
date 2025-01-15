@@ -16,6 +16,7 @@ import stream from 'stream';
 import { v4 as uuid } from 'uuid';
 import * as path from 'path';
 import { URI } from 'vscode-uri';
+import ignore from 'ignore';
 
 export default class SessionCore {
   constructor(public session: Session) {}
@@ -71,6 +72,7 @@ export default class SessionCore {
       modificationTimestamp: new Date().toISOString(), // will be overwritten at the end
       toc: [],
       formatVersion: SessionCore.LATEST_FORMAT_VERSION,
+      ignorePatterns: lib.defaultIgnorePatterns,
       hasCover: false,
     };
   }
@@ -136,11 +138,9 @@ export default class SessionCore {
 
     filenames.sort();
     for (const childname of filenames) {
-      // TODO ignore file
-      if (childname === '.CodeMic') continue;
-      if (childname === '.git') continue;
-
       const childRel = path.join(rel, childname);
+      if (!this.shouldRecordRelPath(childRel)) continue;
+
       const childFull = path.join(this.session.workspace, childRel);
       const stat = await fs.promises.stat(childFull);
 
@@ -173,6 +173,19 @@ export default class SessionCore {
 
   resolveUri(uri: string): string {
     return lib.resolveWorkspaceUri(this.session.workspace, uri);
+  }
+
+  private getIgnoreInstance = _.memoize(ignorePatterns => ignore().add('.CodeMic').add(ignorePatterns));
+
+  shouldRecordAbsPath(abs: string): boolean {
+    return this.shouldRecordRelPath(path.relative(this.session.workspace, abs));
+  }
+
+  shouldRecordRelPath(rel: string): boolean {
+    // Note: path.relative will return '' if abs is the same as workspace.
+    if (rel === '' || rel === '..' || rel.startsWith('../') || rel.startsWith('..\\')) return true;
+
+    return !this.getIgnoreInstance(this.session.head.ignorePatterns).ignores(rel);
   }
 
   /**

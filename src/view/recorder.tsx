@@ -153,6 +153,11 @@ class DetailsView extends React.Component<DetailsViewProps> {
     await postMessage({ type: 'recorder/updateDetails', changes });
   };
 
+  ignorePatternsChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
+    const changes = { ignorePatterns: (e.target as HTMLInputElement).value };
+    await postMessage({ type: 'recorder/updateDetails', changes });
+  };
+
   save = async () => {
     await postMessage({ type: 'recorder/save' });
   };
@@ -257,7 +262,22 @@ class DetailsView extends React.Component<DetailsViewProps> {
         >
           Description
         </VSCodeTextArea>
-        <VSCodeTextField
+
+        <VSCodeTextArea
+          className="ignore subsection"
+          rows={10}
+          resize="vertical"
+          value={head.ignorePatterns}
+          onInput={this.ignorePatternsChanged}
+          placeholder={lib.defaultIgnorePatterns}
+        >
+          Ignore patterns
+        </VSCodeTextArea>
+        <p className="subsection help">
+          Ignore patterns have the same format as .gitignore. Files that match these patterns will not be scanned.
+        </p>
+
+        {/*<VSCodeTextField
           className="subsection"
           // value={''}
           // onInput={this.descriptionChanged}
@@ -275,14 +295,18 @@ class DetailsView extends React.Component<DetailsViewProps> {
         </VSCodeTextField>
         <p className="subsection help">
           Use <code>.codemicignore</code> to ignore paths.
-        </p>
+        </p>*/}
         <div className="subsection buttons">
-          <VSCodeButton onClick={this.publish} disabled={!session.loaded}>
+          <VSCodeButton
+            onClick={this.publish}
+            disabled={!session.loaded}
+            appearance={session.loaded ? 'primary' : 'secondary'}
+          >
             Publish
           </VSCodeButton>
-          <VSCodeButton appearance="secondary" onClick={this.save} disabled={session.mustScan}>
+          {/*<VSCodeButton appearance="secondary" onClick={this.save} disabled={session.mustScan}>
             Save
-          </VSCodeButton>
+            </VSCodeButton>*/}
         </div>
         {!session.loaded && (
           <VSCodeButton className="subsection" onClick={onLoadRecorder} autoFocus>

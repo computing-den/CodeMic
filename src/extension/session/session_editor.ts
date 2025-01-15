@@ -386,11 +386,12 @@ export default class SessionEditor {
     this.changed();
   }
 
-  updateFromUI(update: t.SessionDetailsUpdate) {
+  updateDetails(update: t.SessionDetailsUpdate) {
     if (update.workspace !== undefined) this.session.workspace = update.workspace;
     if (update.title !== undefined) this.session.head.title = update.title;
     if (update.description !== undefined) this.session.head.description = update.description;
     if (update.handle !== undefined) this.session.head.handle = update.handle;
+    if (update.ignorePatterns !== undefined) this.session.head.ignorePatterns = update.ignorePatterns;
 
     this.changed();
   }

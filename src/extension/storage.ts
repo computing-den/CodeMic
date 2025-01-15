@@ -18,14 +18,26 @@ export async function readJSONOptional<T>(p: string): Promise<T | undefined> {
   return readJSON(p, () => undefined);
 }
 
+export async function readStringOptional<T>(p: string): Promise<string | undefined> {
+  try {
+    return await fs.promises.readFile(p, 'utf8');
+  } catch (error: any) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+}
+
 export async function writeJSON(p: string, data: any) {
-  await ensureContainingDir(p);
-  await fs.promises.writeFile(p, stringify(data, { maxLength: 200, indent: 2 }), 'utf8');
+  await writeString(p, stringify(data, { maxLength: 200, indent: 2 }));
 }
 
 export async function writeBinary(p: string, buffer: NodeJS.ArrayBufferView) {
   await ensureContainingDir(p);
   await fs.promises.writeFile(p, buffer);
+}
+
+export async function writeString(p: string, str: string) {
+  await ensureContainingDir(p);
+  await fs.promises.writeFile(p, str, 'utf8');
 }
 
 export async function pathExists(p: string): Promise<boolean> {
