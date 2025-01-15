@@ -136,12 +136,15 @@ class WorkspaceRecorder {
     const irTextEditor = this.internalWorkspace.activeTextEditor;
     if (!irTextEditor) return;
 
-    const cmd = this.session.editor.createSetFocus({
-      clock: this.clock,
-      uri: irTextEditor.document.uri,
-      number: irTextEditor.currentLine,
-      text: irTextEditor.currentLineText,
-    });
+    const cmd = this.session.editor.createSetFocus(
+      {
+        clock: this.clock,
+        uri: irTextEditor.document.uri,
+        number: irTextEditor.currentLine,
+        text: irTextEditor.currentLineText,
+      },
+      irTextEditor.document.isEmpty,
+    );
     if (cmd) this.session.editor.applySetFocus(cmd);
   }
   // private updateFocus() {

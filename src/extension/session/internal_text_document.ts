@@ -12,6 +12,10 @@ export default class InternalTextDocument implements t.InternalDocument {
     return new InternalTextDocument(uri, lines, eol);
   }
 
+  get isEmpty(): boolean {
+    return this.lines.length <= 1 && this.lines.every(line => !line);
+  }
+
   getContent(): Uint8Array {
     return new TextEncoder().encode(this.getText());
   }

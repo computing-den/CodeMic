@@ -121,7 +121,7 @@ export default class SessionEditor {
     this.changed();
   }
 
-  createSetFocus(focus: t.Focus): t.UpdateLastFocusCmd | t.InsertFocusCmd | undefined {
+  createSetFocus(focus: t.Focus, isDocumentEmpty: boolean): t.UpdateLastFocusCmd | t.InsertFocusCmd | undefined {
     assert(this.session.isLoaded());
     const lastFocus = this.session.body.focusTimeline.at(-1);
 
@@ -130,6 +130,10 @@ export default class SessionEditor {
       lastFocus &&
       (focus.clock - lastFocus.clock < 1 || (lastFocus.uri === focus.uri && lastFocus.number === focus.number))
     ) {
+      // In the last moment before closing an untitled document, we empty its content to avoid
+      // the saving confirmation dialog. This must not affect the focus.
+      if (isDocumentEmpty && URI.parse(focus.uri).scheme === 'untitled') return;
+
       const keys: Array<keyof t.Focus> = ['uri', 'number', 'text'];
       const keyDiffs = keys.filter(k => focus[k] !== lastFocus[k]);
       if (keyDiffs.length > 0) {
