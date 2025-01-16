@@ -3,6 +3,7 @@ import fs from 'fs';
 import _ from 'lodash';
 import stringify from 'json-stringify-pretty-compact';
 import path from 'path';
+import assert from '../lib/assert.js';
 
 export async function readJSON<T>(p: string, defaultFn?: () => T): Promise<T> {
   try {
@@ -27,7 +28,10 @@ export async function readStringOptional<T>(p: string): Promise<string | undefin
 }
 
 export async function writeJSON(p: string, data: any) {
-  await writeString(p, stringify(data, { maxLength: 200, indent: 2 }));
+  assert(data);
+  const str = stringify(data, { maxLength: 200, indent: 2 });
+  assert(str);
+  await writeString(p, str);
 }
 
 export async function writeBinary(p: string, buffer: NodeJS.ArrayBufferView) {

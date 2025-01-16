@@ -102,7 +102,7 @@ class CodeMic {
   /**
    * Set this.session with proper workspace before calling this.
    */
-  async setUpWorkspace(restoreState?: { recorder?: { tabId: t.RecorderUITabId; clock?: number } }) {
+  async setUpWorkspace_MAY_RESTART_VSCODE(restoreState?: { recorder?: { tabId: t.RecorderUITabId; clock?: number } }) {
     assert(this.session);
 
     // Return if workspace is already up-to-date.
@@ -294,7 +294,15 @@ class CodeMic {
       case 'player/load': {
         assert(this.session);
         this.session.core.assertFormatVersionSupport();
-        await this.setUpWorkspace();
+
+        // Write history. Do it before setUpWorkspace because that may cause vscode restart.
+        await this.session.core.writeHistoryOpenClose();
+
+        // This might trigger a vscode restart in which case nothing after this line will run.
+        // After restart, this.restoreStateAfterRestart() will be called and it will recreate
+        // the session, call session.prepare(), and set the screen.
+        await this.setUpWorkspace_MAY_RESTART_VSCODE();
+
         await this.session.prepare();
         this.enqueueFrontendUpdate();
         return ok;
@@ -667,12 +675,15 @@ class CodeMic {
         this.setScreen(t.Screen.Recorder);
         this.recorder = { tabId: 'details-view' };
 
+        // Write history. Do it before setUpWorkspace because that may cause vscode restart.
+        await session.core.writeHistoryRecording();
+
         // This might trigger a vscode restart in which case nothing after this line will run.
         // After restart, this.restoreStateAfterRestart() will be called and it will recreate
         // the session, call session.prepare(), and set the screen.
-        await this.setUpWorkspace({ recorder: { clock, tabId: this.recorder.tabId } });
+        await this.setUpWorkspace_MAY_RESTART_VSCODE({ recorder: { clock, tabId: this.recorder.tabId } });
 
-        // Must be called after this.setUpWorkspace()
+        // Must be called after setUpWorkspace
         await this.session!.prepare({ clock });
       }
     } else {
@@ -682,7 +693,7 @@ class CodeMic {
 
   async openRecorderNewSession() {
     const user = this.context.user && lib.userToUserSummary(this.context.user);
-    // For new sessions, user will manually call recorder/load which will call setUpWorkspace().
+    // For new sessions, user will manually call recorder/load which will call setUpWorkspace.
     const head = Session.Core.makeNewHead(user);
     const workspace =
       VscWorkspace.getDefaultVscWorkspace() ??
@@ -746,10 +757,13 @@ class CodeMic {
       await this.session.core.commitTemp();
     }
 
+    // Write history. Do it before setUpWorkspace because that may cause vscode restart.
+    await this.session.core.writeHistoryRecording();
+
     // This might trigger a vscode restart in which case nothing after this line will run.
     // After restart, this.restoreStateAfterRestart() will be called and it will recreate
     // the session, call session.prepare(), and set the screen.
-    await this.setUpWorkspace({ recorder: { tabId: 'editor-view' } });
+    await this.setUpWorkspace_MAY_RESTART_VSCODE({ recorder: { tabId: 'editor-view' } });
 
     await this.session.prepare();
     this.recorder.tabId = 'editor-view';
@@ -1063,27 +1077,23 @@ class CodeMic {
       const workspace = VscWorkspace.getDefaultVscWorkspace();
       let current: t.SessionHead | undefined;
       if (workspace) {
-        current = (await Session.Core.fromLocal(this.context, workspace))?.head;
-        // if (current) {
-        //   coversUris[current.id] = this.getCoverCacheUri(current.id);
-        // }
-      }
-
-      for (const history of Object.values(this.context.settings.history)) {
         try {
-          const session = await Session.Core.fromLocal(this.context, history.workspace);
-          if (!session) continue;
-
-          // coversUris[session.head.id] = this.getCoverCacheUri(session.head.id);
-          recent.push(session.head);
+          current = (await Session.Core.fromLocal(this.context, workspace))?.head;
         } catch (error) {
           console.error(error);
         }
       }
 
-      // for (const head of this.featured ?? []) {
-      //   coversUris[head.id] = this.getCoverCacheUri(head.id);
-      // }
+      for (const history of Object.values(this.context.settings.history)) {
+        try {
+          const session = await Session.Core.fromLocal(this.context, history.workspace);
+          if (!session || session.head.id !== history.id) continue;
+
+          recent.push(session.head);
+        } catch (error) {
+          console.error(error);
+        }
+      }
 
       welcome = {
         current,

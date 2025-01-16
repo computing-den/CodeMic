@@ -18,15 +18,17 @@
         position: relative;
         background: var(--background-secondary);
         min-height: 150px;
+        aspect-ratio: 16/9;
 
         &.has-cover {
           background: #1f1f1f;
         }
 
         & img {
-          /* min-height: 200px; */
-          height: 200px;
-          object-fit: contain;
+          object-fit: cover;
+          width: 100%;
+          height: 100%;
+          object-position: center;
         }
 
         & p {

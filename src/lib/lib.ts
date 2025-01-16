@@ -6,6 +6,8 @@ import * as path from 'path';
 
 export const ANONYM_USERNAME = '_'; // minimum valid username is 3 characters
 
+// export const COVER_WITH_TO_HEIGHT_RATIO = 16 / 9;
+
 export function unreachable(arg: never, message: string = 'Unreachable'): never {
   throw new Error(`${message}: ${JSON.stringify(arg)}`);
 }

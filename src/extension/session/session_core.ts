@@ -231,7 +231,14 @@ export default class SessionCore {
     settings.history[id] ??= { id, handle: this.session.head.handle, workspace: this.session.workspace };
     if (update) Object.assign(settings.history[id], update);
     await storage.writeJSON(this.session.context.userSettingsPath, settings);
-    console.log('Wrote session history');
+    console.log('Wrote session history (update)');
+  }
+
+  async deleteHistory() {
+    const { settings, userSettingsPath } = this.session.context;
+    delete settings.history[this.session.head.id];
+    await storage.writeJSON(userSettingsPath, settings);
+    console.log('Wrote session history (delete)');
   }
 
   async writeHistoryClock(options?: { ifDirtyForLong?: boolean }) {
@@ -308,8 +315,7 @@ export default class SessionCore {
 
   async delete() {
     await fs.promises.rm(this.dataPath, { force: true, recursive: true });
-    delete this.session.context.settings.history[this.session.head.id];
-    await storage.writeJSON(this.session.context.userSettingsPath, this.session.context.settings);
+    await this.deleteHistory();
   }
 
   async package() {
