@@ -183,9 +183,10 @@ export default class SessionCore {
 
   shouldRecordRelPath(rel: string): boolean {
     // Note: path.relative will return '' if abs is the same as workspace.
-    if (rel === '' || rel === '..' || rel.startsWith('../') || rel.startsWith('..\\')) return true;
-
-    return !this.getIgnoreInstance(this.session.head.ignorePatterns).ignores(rel);
+    return (
+      !(rel === '' || rel === '..' || rel.startsWith('../') || rel.startsWith('..\\')) &&
+      !this.getIgnoreInstance(this.session.head.ignorePatterns).ignores(rel)
+    );
   }
 
   /**
