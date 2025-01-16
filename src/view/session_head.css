@@ -8,13 +8,12 @@
   }
 
   .session-head-list-item {
-    padding: 0 var(--spacing-large);
-
+    /* margin-top: var(--spacing-medium); */
+    padding: var(--spacing-medium) var(--spacing-large);
     display: flex;
     flex-direction: column;
     justify-content: center;
     cursor: pointer;
-    margin-top: var(--spacing-medium);
 
     &:hover {
       background: var(--vscode-list-hoverBackground);
@@ -24,9 +23,9 @@
       }
     }
 
-    + .session-head-list-item {
-      margin-top: var(--spacing-large);
-    }
+    /* + .session-head-list-item { */
+    /*   margin-top: var(--spacing-medium); */
+    /* } */
 
     .cover-container {
       aspect-ratio: 16 / 9;
@@ -58,8 +57,8 @@
 
     .caption {
       position: relative;
-      padding: var(--spacing-large) 0;
-      padding-bottom: var(--spacing-medium);
+      padding-top: var(--spacing-large);
+      /* padding-bottom: var(--spacing-medium); */
 
       .actions {
         padding: var(--spacing-small) var(--spacing-large);

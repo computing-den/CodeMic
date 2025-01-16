@@ -7,7 +7,7 @@ let codemic: CodeMic;
 export async function activate(extensionContext: vscode.ExtensionContext) {
   try {
     codemic = await CodeMic.fromExtensionContext(extensionContext);
-    // await codemic.restoreStateAfterRestart();
+    await codemic.start();
 
     // debug
     //@ts-ignore

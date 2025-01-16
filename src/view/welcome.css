@@ -63,4 +63,12 @@
     /*   } */
     /* } */
   }
+
+  .empty {
+    font-size: 1.5rem;
+    color: var(--text-weak);
+    margin-top: 30vh;
+    text-align: center;
+    letter-spacing: 2px;
+  }
 }

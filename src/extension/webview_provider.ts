@@ -5,29 +5,27 @@ import _ from 'lodash';
 import * as t from '../lib/types.js';
 import * as b from '../lib/bus.js';
 import osPaths from './os_paths.js';
-import { Context } from './types.js';
 
 class WebviewProvider implements vscode.WebviewViewProvider {
   static readonly viewType = 'codemic-view';
 
-  view?: vscode.WebviewView;
-  bus?: b.Bus;
+  onMessage?: b.MessageHandler;
+  onViewOpen?: () => void;
 
-  constructor(
-    public context: Context,
-    public messageHandler: b.MessageHandler,
-    public onViewOpen: () => void,
-  ) {}
+  private view?: vscode.WebviewView;
+  private bus?: b.Bus;
+
+  constructor(public extension: vscode.ExtensionContext) {}
 
   resolveWebviewView(
     webviewView: vscode.WebviewView,
     _webviewContext: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken,
   ) {
-    this.bus = new b.Bus(this.postParcel.bind(this), this.messageHandler);
+    this.bus = new b.Bus(this.postParcel.bind(this), this.handleMessage.bind(this));
     this.view = webviewView;
 
-    console.log('resolveWebviewView localResourceRoots', this.context.extension.extensionUri);
+    console.log('resolveWebviewView localResourceRoots', this.extension.extensionUri);
 
     // NOTE: Reassigning webview options causes the webview page to refresh!
     // Also, cannot mutate localResourceRoots directly. Must reassign options.
@@ -38,25 +36,35 @@ class WebviewProvider implements vscode.WebviewViewProvider {
 
       // Allow access to files from these directories
       localResourceRoots: [
-        this.context.extension.extensionUri,
+        this.extension.extensionUri,
         vscode.Uri.file(osPaths.data),
         vscode.Uri.file(osPaths.cache),
         ...(vscode.workspace.workspaceFolders ?? []).map(f => f.uri),
       ],
     };
 
+    console.log('resolveWebviewView options: ', webviewView.webview.options);
+
     webviewView.webview.html = this.getHtmlForWebview();
     webviewView.webview.onDidReceiveMessage(this.bus.handleParcel.bind(this.bus));
-    this.onViewOpen();
+    this.onViewOpen?.();
   }
 
-  // hasView(): boolean {
-  //   return Boolean(this.view);
-  // }
+  async handleMessage(msg: any): Promise<any> {
+    return await this.onMessage?.(msg);
+  }
 
-  // show() {
-  //   this.view?.show();
-  // }
+  get isReady(): boolean {
+    return Boolean(this.bus && this.view);
+  }
+
+  setTitle(title: string) {
+    if (this.view) this.view.title = title;
+  }
+
+  show() {
+    this.view?.show();
+  }
 
   async postMessage(req: t.BackendRequest): Promise<t.FrontendResponse> {
     assert(this.bus);
@@ -80,7 +88,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
   private getHtmlForWebview() {
     const webview = this.view!.webview;
     const getPath = (...args: string[]) =>
-      webview.asWebviewUri(vscode.Uri.joinPath(this.context.extension.extensionUri, ...args));
+      webview.asWebviewUri(vscode.Uri.joinPath(this.extension.extensionUri, ...args));
 
     const resourcesUri = getPath('resources');
     const webviewJs = getPath('dist', 'webview.js');
@@ -91,8 +99,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     const webviewConfig: t.WebviewConfig = {
       debug: config.debug,
       webviewUriBase: webview.asWebviewUri(vscode.Uri.file('/')).toString(),
-      extensionWebviewUri: webview.asWebviewUri(this.context.extension.extensionUri).toString(),
-      // cacheVersion: this.context.cache.version,
+      extensionWebviewUri: webview.asWebviewUri(this.extension.extensionUri).toString(),
     };
 
     const sanitizedWebviewConfig = _.escape(JSON.stringify(webviewConfig));

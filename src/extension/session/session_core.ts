@@ -1,4 +1,5 @@
 import { deserializeSessionBody, serializeSessionBodyJSON } from './serialization.js';
+import config from '../config.js';
 import * as lib from '../../lib/lib.js';
 import * as t from '../../lib/types.js';
 import assert from '../../lib/assert.js';
@@ -189,23 +190,65 @@ export default class SessionCore {
     );
   }
 
+  verifyAndNormalizeTemp(): string | undefined {
+    if (!this.session.workspace) {
+      return 'Please select a workspace for the session.';
+    }
+    if (!path.isAbsolute(this.session.workspace)) {
+      return 'Please select an absolute path for workspace.';
+    }
+
+    // Remove .. and trailing slashes.
+    this.session.workspace = path.resolve(this.session.workspace);
+
+    if (!this.session.head.handle) {
+      return 'Please select a handle for the session.';
+    }
+    if (/[^A-Za-z0-9_]/.test(this.session.head.handle)) {
+      return 'Please select a valid handle of format A-Z a-z 0-9 _ (e.g. my_project).';
+    }
+  }
+
   /**
    * Move the session from temp to its final data path and set temp = false.
+   * Call verifyAndNormalizeTemp() first.
    */
   async commitTemp() {
     if (await Session.Core.sessionExists(this.session.workspace)) {
-      const old = await Session.Core.fromLocal(this.session.context, this.session.workspace);
-      if (old) await old.core.delete();
+      // Delete the old session.
+      try {
+        const old = await Session.Core.fromLocal(this.session.context, this.session.workspace);
+        if (old) await old.core.delete();
+      } catch (error) {
+        // If opening the session failed for any reason, force delete it.
+        // This won't delete its history though.
+        await fs.promises.rm(this.finalDataPath, { force: true, recursive: true });
+        console.error(error);
+      }
     }
+    await this.write();
     await fs.promises.cp(this.tempDataPath, this.finalDataPath, { force: true, recursive: true });
     this.session.temp = false;
   }
 
   async write() {
+    console.log('XXX WRITE START', this.session.head.handle, new Date().toISOString());
     await this.writeHead();
     if (this.session.isLoaded()) await this.writeBody();
 
     this.session.editor.saved();
+    console.log('XXX WRITE END', this.session.head.handle, new Date().toISOString());
+
+    if (config.debug) {
+      console.log('XXX DEBUG Reading head again to make sure');
+      try {
+        await SessionCore.fromLocal(this.session.context, this.session.workspace);
+        console.log('XXX DEBUG head was written correctly');
+      } catch (error) {
+        debugger;
+        console.error('XXX DEBUG head was not written correctly', error);
+      }
+    }
   }
 
   async writeHead() {
@@ -226,6 +269,7 @@ export default class SessionCore {
   }
 
   async writeHistory(update?: Partial<t.SessionHistory>) {
+    assert(!this.session.temp);
     const { id } = this.session.head;
     const { settings } = this.session.context;
     settings.history[id] ??= { id, handle: this.session.head.handle, workspace: this.session.workspace };
@@ -241,8 +285,7 @@ export default class SessionCore {
     console.log('Wrote session history (delete)');
   }
 
-  async writeHistoryClock(options?: { ifDirtyForLong?: boolean }) {
-    // TODO support options.ifDirtyForLong
+  async writeHistoryClock() {
     assert(this.session.isLoaded());
     await this.writeHistory({ lastWatchedClock: this.session.rr.clock });
   }
@@ -289,7 +332,7 @@ export default class SessionCore {
     const fsPath = URI.parse(this.resolveUri(uri)).fsPath;
 
     if (!(await storage.pathExists(fsPath))) {
-      await fs.promises.writeFile(fsPath, text);
+      fs.writeFileSync(fsPath, text, { flush: true });
     }
   }
 
@@ -298,7 +341,7 @@ export default class SessionCore {
   }
 
   async writeBlob(sha1: string, data: string | NodeJS.ArrayBufferView) {
-    await fs.promises.writeFile(path.join(this.dataPath, 'blobs', sha1), data, 'utf8');
+    fs.writeFileSync(path.join(this.dataPath, 'blobs', sha1), data, { flush: true, encoding: 'utf8' });
   }
 
   async readFile(file: t.File): Promise<Uint8Array> {
@@ -314,6 +357,7 @@ export default class SessionCore {
   }
 
   async delete() {
+    assert(!this.session.temp, 'Tried to delete a temp session.');
     await fs.promises.rm(this.dataPath, { force: true, recursive: true });
     await this.deleteHistory();
   }

@@ -58,7 +58,10 @@ export default class Welcome extends React.Component<Props> {
           <SessionsSection title="WORKSPACE" history={welcome.history} sessionHeads={[welcome.current]} />
         )}
         {recent.length > 0 && <SessionsSection title="RECENT" history={welcome.history} sessionHeads={recent} />}
-        <SessionsSection title="FEATURED" history={welcome.history} sessionHeads={featured} />
+        {featured.length > 0 && <SessionsSection title="FEATURED" history={welcome.history} sessionHeads={featured} />}
+        {!welcome.current && recent.length === 0 && featured.length === 0 && (
+          <div className="empty">NO SESSIONS FOUND</div>
+        )}
       </Screen>
     );
   }

@@ -1,17 +1,17 @@
-import type { ExtensionContext, WebviewView } from 'vscode';
+import type { ExtensionContext } from 'vscode';
 import * as t from '../lib/types.js';
 import _ from 'lodash';
+import type WebviewProvider from './webview_provider.js';
 
 export type Context = {
   extension: ExtensionContext;
+  webviewProvider: WebviewProvider;
   userDataPath: string;
   userSettingsPath: string;
   settings: t.Settings;
   postAudioMessage?: (req: t.BackendAudioRequest) => Promise<t.FrontendAudioResponse>;
   postVideoMessage?: (req: t.BackendVideoRequest) => Promise<t.FrontendVideoResponse>;
   updateFrontend?: () => any;
-  postMessage?: (req: t.BackendRequest) => Promise<t.FrontendResponse>;
-  view?: WebviewView;
   user?: t.User;
 };
 

@@ -36,12 +36,12 @@ export async function writeJSON(p: string, data: any) {
 
 export async function writeBinary(p: string, buffer: NodeJS.ArrayBufferView) {
   await ensureContainingDir(p);
-  await fs.promises.writeFile(p, buffer);
+  fs.writeFileSync(p, buffer, { flush: true });
 }
 
 export async function writeString(p: string, str: string) {
   await ensureContainingDir(p);
-  await fs.promises.writeFile(p, str, 'utf8');
+  fs.writeFileSync(p, str, { flush: true, encoding: 'utf8' });
 }
 
 export async function pathExists(p: string): Promise<boolean> {

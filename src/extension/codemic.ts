@@ -1,6 +1,5 @@
 import './config.js'; // Init config
 import WebviewProvider from './webview_provider.js';
-import config from './config.js';
 import Session from './session/session.js';
 import * as storage from './storage.js';
 import * as serverApi from './server_api.js';
@@ -19,77 +18,62 @@ import cache from './cache.js';
 const SAVE_TIMEOUT_MS = 5_000;
 
 class CodeMic {
+  context: Context;
   screen: t.Screen = t.Screen.Welcome;
   account?: t.AccountState;
   session?: Session;
   featured?: t.SessionHead[];
   recorder?: { tabId: t.RecorderUITabId };
-  webviewProvider: WebviewProvider;
 
   frontendUpdateBlockCounter = 0;
   isFrontendDirty = true;
 
   test: any = 0;
 
-  constructor(public context: Context) {
-    context.extension.subscriptions.push(vscode.commands.registerCommand('codemic.openView', this.openView.bind(this)));
-    context.extension.subscriptions.push(
-      vscode.commands.registerCommand('codemic.openWelcome', this.openWelcomeCommand.bind(this)),
-    );
-    context.extension.subscriptions.push(
-      vscode.commands.registerCommand('codemic.account', this.openAccountCommand.bind(this)),
-    );
-
-    this.webviewProvider = new WebviewProvider(context, this.handleMessage.bind(this), this.viewOpened.bind(this));
-
-    context.extension.subscriptions.push(
-      vscode.window.registerWebviewViewProvider(WebviewProvider.viewType, this.webviewProvider, {
-        webviewOptions: { retainContextWhenHidden: true },
-      }),
-    );
-
-    // context.cache.onChange = this.cacheChanged.bind(this);
-
-    this.onStartUp().catch(console.error);
-  }
-
-  async onStartUp() {
-    await this.restoreStateAfterRestart();
-    await this.updateFrontend();
-
-    this.updateFeaturedAndCache().finally(this.updateFrontend.bind(this));
-
-    // DEV
-    if (config.debug && this.webviewProvider.bus) {
-      try {
-        const sessionId = '2f324d7a-1a2c-478e-ab80-df60f09e45bd';
-        if (await Session.Core.fromLocal(this.context, sessionId)) {
-          // Recorder
-          await this.handleMessage({ type: 'recorder/open', sessionId });
-          await this.handleMessage({ type: 'recorder/openTab', tabId: 'editor-view' });
-          await this.updateFrontend();
-
-          // Player
-          // await this.handleMessage({ type: 'player/open', sessionId });
-          // await this.updateFrontend();
-        }
-      } catch (error) {
-        console.error('ERROR trying to open debug session:', error);
-      }
-    }
+  constructor(context: Context) {
+    this.context = context;
   }
 
   static async fromExtensionContext(extension: vscode.ExtensionContext): Promise<CodeMic> {
+    const webviewProvider = new WebviewProvider(extension);
     const user = extension.globalState.get<t.User>('user');
     const userDataPath = path.join(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
     const userSettingsPath = path.join(userDataPath, 'settings.json');
     const settings = await storage.readJSON<t.Settings>(userSettingsPath, CodeMic.makeDefaultSettings);
-    const context: Context = { extension, user, userDataPath, userSettingsPath, settings };
+    const context: Context = { extension, webviewProvider, user, userDataPath, userSettingsPath, settings };
     return new CodeMic(context);
   }
 
   static makeDefaultSettings(): t.Settings {
     return { history: {} };
+  }
+
+  async start() {
+    // Vscode may restarts after changing workspace. Restore state after such restart.
+    // This will not reject.
+    await this.restoreStateAfterRestart();
+
+    // Set up commands.
+    this.context.extension.subscriptions.push(
+      vscode.commands.registerCommand('codemic.openView', this.openView.bind(this)),
+    );
+    this.context.extension.subscriptions.push(
+      vscode.commands.registerCommand('codemic.openWelcome', this.openWelcomeCommand.bind(this)),
+    );
+    this.context.extension.subscriptions.push(
+      vscode.commands.registerCommand('codemic.account', this.openAccountCommand.bind(this)),
+    );
+
+    // Set up webview.
+    this.context.webviewProvider.onMessage = this.handleMessage.bind(this);
+    this.context.webviewProvider.onViewOpen = this.viewOpened.bind(this);
+    this.context.extension.subscriptions.push(
+      vscode.window.registerWebviewViewProvider(WebviewProvider.viewType, this.context.webviewProvider, {
+        webviewOptions: { retainContextWhenHidden: true },
+      }),
+    );
+
+    this.updateFeaturedAndCache().catch(console.error); // do not await
   }
 
   async setWorkspaceChangeGlobalState(state?: WorkspaceChangeGlobalState) {
@@ -106,7 +90,10 @@ class CodeMic {
     assert(this.session);
 
     // Return if workspace is already up-to-date.
-    if (VscWorkspace.getDefaultVscWorkspace() === this.session.workspace) return;
+    {
+      const vscWorkspace = VscWorkspace.getDefaultVscWorkspace();
+      if (vscWorkspace && path.resolve(vscWorkspace) === path.resolve(this.session.workspace)) return;
+    }
 
     // Save first so that we can restore it after vscode restart.
     if (this.screen === t.Screen.Recorder) {
@@ -141,9 +128,15 @@ class CodeMic {
     await this.setWorkspaceChangeGlobalState();
 
     // Make sure workspace is updated properly.
-    assert(VscWorkspace.getDefaultVscWorkspace() === this.session.workspace);
+    {
+      const vscWorkspace = VscWorkspace.getDefaultVscWorkspace();
+      assert(vscWorkspace && path.resolve(vscWorkspace) === path.resolve(this.session.workspace));
+    }
   }
 
+  /**
+   * Will not reject.
+   */
   async restoreStateAfterRestart() {
     try {
       const workspaceChange = this.getWorkspaceChangeGlobalState();
@@ -179,12 +172,30 @@ class CodeMic {
 
   async viewOpened() {
     try {
-      this.context.view = this.webviewProvider.view;
       this.context.postAudioMessage = this.postAudioMessage.bind(this);
       this.context.postVideoMessage = this.postVideoMessage.bind(this);
       this.context.updateFrontend = this.updateFrontend.bind(this);
-      this.context.postMessage = this.webviewProvider.postMessage.bind(this.webviewProvider);
       this.updateViewTitle();
+      await this.updateFrontend();
+
+      // // DEV
+      // if (config.debug && this.webviewProvider.bus) {
+      //   try {
+      //     const sessionId = '2f324d7a-1a2c-478e-ab80-df60f09e45bd';
+      //     if (await Session.Core.fromLocal(this.context, sessionId)) {
+      //       // Recorder
+      //       await this.handleMessage({ type: 'recorder/open', sessionId });
+      //       await this.handleMessage({ type: 'recorder/openTab', tabId: 'editor-view' });
+      //       await this.updateFrontend();
+
+      //       // Player
+      //       // await this.handleMessage({ type: 'player/open', sessionId });
+      //       // await this.updateFrontend();
+      //     }
+      //   } catch (error) {
+      //     console.error('ERROR trying to open debug session:', error);
+      //   }
+      // }
     } catch (error) {
       console.error(error);
     }
@@ -723,16 +734,13 @@ class CodeMic {
     assert(this.session);
     assert(this.recorder);
 
-    if (!this.session.workspace) {
-      vscode.window.showErrorMessage('Please select a workspace for the session.');
-      return;
-    }
-    if (!this.session.head.handle) {
-      vscode.window.showErrorMessage('Please select a handle for the session.');
-      return;
-    }
-
     if (this.session.temp) {
+      const errorMessage = this.session.core.verifyAndNormalizeTemp();
+      if (errorMessage) {
+        vscode.window.showErrorMessage(errorMessage);
+        return;
+      }
+
       if (await Session.Core.sessionExists(this.session.workspace)) {
         const confirmTitle = 'Overwrite';
         const answer = await vscode.window.showWarningMessage(
@@ -770,14 +778,11 @@ class CodeMic {
   }
 
   updateViewTitle() {
-    // console.log('updateViewTitle: webviewProvider.view ' + (this.webviewProvider.view ? 'is set' : 'is NOT set'));
-    if (this.context.view) {
-      const username = this.context.user?.username;
-      const title = username
-        ? ` ${username} / ` + SCREEN_TITLES[this.screen]
-        : SCREEN_TITLES[this.screen] + ` (not logged in) `;
-      this.context.view.title = title;
-    }
+    const username = this.context.user?.username;
+    const title = username
+      ? ` ${username} / ` + SCREEN_TITLES[this.screen]
+      : SCREEN_TITLES[this.screen] + ` (not logged in) `;
+    this.context.webviewProvider.setTitle(title);
   }
 
   setScreen(screen: t.Screen) {
@@ -802,7 +807,9 @@ class CodeMic {
 
   async handleSessionChange() {
     await this.updateFrontend();
-    this.writeSessionThrottled();
+    if (this.session && !this.session.temp) {
+      this.writeSessionThrottled();
+    }
   }
 
   async openWelcome() {
@@ -902,6 +909,7 @@ class CodeMic {
    */
   async writeSession(opts?: { pause?: boolean; ifDirty?: boolean }) {
     assert(this.session);
+    assert(!this.session.temp);
     this.writeSessionThrottled.cancel();
 
     if (opts?.pause && this.session.rr?.running) {
@@ -924,14 +932,12 @@ class CodeMic {
   async updateFeatured() {
     try {
       const res = await serverApi.send({ type: 'featured/get' }, this.context.user?.token);
-
       await Promise.allSettled(
         res.sessionHeads.flatMap(head => [
           serverApi.downloadSessionCover(head.id),
           head.author && serverApi.downloadAvatar(head.author.username),
         ]),
       ).then(lib.logRejectedPromises);
-
       this.featured = res.sessionHeads;
     } catch (error) {
       console.error(error);
@@ -956,14 +962,11 @@ class CodeMic {
       this.updateFeatured(),
       this.updateWorkspaceCache(),
     ]).then(lib.logRejectedPromises);
+    await this.updateFrontend();
   }
 
-  // async cacheChanged(version: number) {
-  //   await this.context.postMessage?.({ type: 'updateCacheVersion', version });
-  // }
-
   openView() {
-    this.context.view?.show();
+    this.context.webviewProvider.show();
   }
 
   async deactivate() {
@@ -984,7 +987,7 @@ class CodeMic {
     this.context.settings = settings;
     this.context.extension.globalState.update('user', user);
 
-    this.updateFeaturedAndCache().finally(this.updateFrontend.bind(this));
+    this.updateFeaturedAndCache().catch(console.error); // do not await
 
     await this.openWelcome();
   }
@@ -995,8 +998,10 @@ class CodeMic {
       return;
     }
     const store = await this.getStore();
-    await this.context.postMessage?.({ type: 'updateStore', store });
-    this.isFrontendDirty = false;
+    if (this.context.webviewProvider.isReady) {
+      await this.context.webviewProvider.postMessage({ type: 'updateStore', store });
+      this.isFrontendDirty = false;
+    }
   }
 
   enqueueFrontendUpdate() {
@@ -1027,13 +1032,11 @@ class CodeMic {
   }
 
   async postAudioMessage(req: t.BackendAudioRequest): Promise<t.FrontendAudioResponse> {
-    assert(this.context.postMessage);
-    return this.context.postMessage(req);
+    return this.context.webviewProvider.postMessage(req);
   }
 
   async postVideoMessage(req: t.BackendVideoRequest): Promise<t.FrontendVideoResponse> {
-    assert(this.context.postMessage);
-    return this.context.postMessage?.(req);
+    return this.context.webviewProvider.postMessage(req);
   }
 
   // getCoverCacheUri(id: string): string {
