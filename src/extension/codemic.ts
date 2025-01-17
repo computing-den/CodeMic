@@ -280,17 +280,10 @@ class CodeMic {
         return ok;
       }
       case 'player/open': {
-        const history = this.context.settings.history[req.sessionId];
-        const featured = this.featured?.find(s => s.id === req.sessionId);
-        let session: Session | undefined;
-
-        if (history) {
-          session = await Session.Core.fromLocal(this.context, history.workspace);
-        } else if (featured) {
-          session = await Session.Core.fromRemote(this.context, featured);
-        }
-
+        const session = await this.findRequestedSessionById(req.sessionId);
         if (session) {
+          session.core.assertFormatVersionSupport();
+
           if (await this.closeCurrentScreen()) {
             this.setSession(session);
             this.setScreen(t.Screen.Player);
@@ -668,19 +661,11 @@ class CodeMic {
     }
 
     // Edit existing session.
-    const history = this.context.settings.history[sessionId];
-    const featured = this.featured?.find(s => s.id === sessionId);
-    let session: Session | undefined;
-
-    if (history) {
-      session = await Session.Core.fromLocal(this.context, history.workspace);
-    } else if (featured) {
-      session = await Session.Core.fromRemote(this.context, featured);
+    const session = await this.findRequestedSessionById(sessionId);
+    if (session) {
       session.core.assertFormatVersionSupport();
       await session.core.download({ skipIfExists: true });
-    }
 
-    if (session) {
       if (await this.closeCurrentScreen()) {
         this.setSession(session);
         this.setScreen(t.Screen.Recorder);
@@ -1045,6 +1030,31 @@ class CodeMic {
   //     .toString();
   // }
 
+  async findRequestedSessionById(sessionId: string): Promise<Session | undefined> {
+    const current = await this.getSessionOfDefaultVscWorkspace();
+    const history = this.context.settings.history[sessionId];
+    const featured = this.featured?.find(s => s.id === sessionId);
+
+    if (current?.head.id === sessionId) {
+      return current;
+    } else if (history) {
+      return await Session.Core.fromLocal(this.context, history.workspace);
+    } else if (featured) {
+      return await Session.Core.fromRemote(this.context, featured);
+    }
+  }
+
+  async getSessionOfDefaultVscWorkspace(): Promise<Session | undefined> {
+    try {
+      const workspace = VscWorkspace.getDefaultVscWorkspace();
+      if (workspace && (await Session.Core.sessionExists(workspace))) {
+        return await Session.Core.fromLocal(this.context, workspace);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
   async getStore(): Promise<t.Store> {
     let session: t.SessionUIState | undefined;
     if (this.session) {
@@ -1077,15 +1087,7 @@ class CodeMic {
       // const avatarsUris: t.UriMap = {};
       const recent: t.SessionHead[] = [];
 
-      const workspace = VscWorkspace.getDefaultVscWorkspace();
-      let current: t.SessionHead | undefined;
-      if (workspace) {
-        try {
-          current = (await Session.Core.fromLocal(this.context, workspace))?.head;
-        } catch (error) {
-          console.error(error);
-        }
-      }
+      const current = (await this.getSessionOfDefaultVscWorkspace())?.head;
 
       for (const history of Object.values(this.context.settings.history)) {
         try {
