@@ -180,13 +180,16 @@ class CodeMic {
     }
   }
 
+  /**
+   * HTML DOM is not necessarily loaded. See the webviewLoaded message handler.
+   */
   async viewOpened() {
     try {
       this.context.postAudioMessage = this.postAudioMessage.bind(this);
       this.context.postVideoMessage = this.postVideoMessage.bind(this);
       this.context.updateFrontend = this.updateFrontend.bind(this);
       this.updateViewTitle();
-      await this.updateFrontend();
+      // await this.updateFrontend();
 
       // // DEV
       // if (config.debug && this.webviewProvider.bus) {
@@ -227,6 +230,10 @@ class CodeMic {
     const ok = { type: 'ok' } as t.OKResponse;
 
     switch (req.type) {
+      case 'webviewLoaded': {
+        this.enqueueFrontendUpdate();
+        return ok;
+      }
       case 'account/open': {
         await this.openAccount(req);
         this.enqueueFrontendUpdate();

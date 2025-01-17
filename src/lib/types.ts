@@ -8,6 +8,7 @@ export type OKResponse = { type: 'ok' };
 export type ErrorResponse = { type: 'error'; message?: string };
 
 export type FrontendToBackendReqRes =
+  | { request: { type: 'webviewLoaded' }; response: OKResponse }
   | { request: { type: 'account/open'; join?: boolean }; response: OKResponse }
   | { request: { type: 'account/update'; changes: AccountUpdate }; response: OKResponse }
   | { request: { type: 'account/join' }; response: OKResponse }
