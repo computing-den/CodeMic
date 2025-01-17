@@ -24,6 +24,7 @@ class CodeMic {
   session?: Session;
   featured?: t.SessionHead[];
   recorder?: { tabId: t.RecorderUITabId };
+  welcomeError?: string;
 
   frontendUpdateBlockCounter = 0;
   isFrontendDirty = true;
@@ -37,10 +38,19 @@ class CodeMic {
   static async fromExtensionContext(extension: vscode.ExtensionContext): Promise<CodeMic> {
     const webviewProvider = new WebviewProvider(extension);
     const user = extension.globalState.get<t.User>('user');
+    const earlyAccessEmail = extension.globalState.get<string>('earlyAccessEmail');
     const userDataPath = path.join(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
     const userSettingsPath = path.join(userDataPath, 'settings.json');
     const settings = await storage.readJSON<t.Settings>(userSettingsPath, CodeMic.makeDefaultSettings);
-    const context: Context = { extension, webviewProvider, user, userDataPath, userSettingsPath, settings };
+    const context: Context = {
+      extension,
+      webviewProvider,
+      user,
+      userDataPath,
+      userSettingsPath,
+      settings,
+      earlyAccessEmail,
+    };
     return new CodeMic(context);
   }
 
@@ -276,6 +286,20 @@ class CodeMic {
       }
       case 'welcome/open': {
         await this.openWelcome();
+        this.enqueueFrontendUpdate();
+        return ok;
+      }
+      case 'welcome/earlyAccessEmail': {
+        const res = await serverApi.send({ type: 'earlyAccessEmail', email: req.email }, this.context.user?.token);
+        this.welcomeError = undefined;
+
+        if (res.value) {
+          this.context.extension.globalState.update('earlyAccessEmail', req.email);
+        } else {
+          this.context.extension.globalState.update('earlyAccessEmail', undefined);
+          this.welcomeError = 'Email not found.';
+        }
+
         this.enqueueFrontendUpdate();
         return ok;
       }
@@ -765,8 +789,8 @@ class CodeMic {
   updateViewTitle() {
     const username = this.context.user?.username;
     const title = username
-      ? ` ${username} / ` + SCREEN_TITLES[this.screen]
-      : SCREEN_TITLES[this.screen] + ` (not logged in) `;
+      ? _.compact([` ${username}`, SCREEN_TITLES[this.screen]]).join(' / ')
+      : _.compact([SCREEN_TITLES[this.screen], `(not logged in) `]).join(' ');
     this.context.webviewProvider.setTitle(title);
   }
 
@@ -812,7 +836,7 @@ class CodeMic {
     if (await this.closeCurrentScreen()) {
       this.account = {
         credentials: {
-          email: '',
+          email: this.context.earlyAccessEmail ?? '',
           username: '',
           password: '',
         },
@@ -1083,12 +1107,8 @@ class CodeMic {
 
     let welcome: t.WelcomeUIState | undefined;
     if (this.screen === t.Screen.Welcome) {
-      // const coversUris: t.UriMap = {};
-      // const avatarsUris: t.UriMap = {};
+      // Gather recent sessions.
       const recent: t.SessionHead[] = [];
-
-      const current = (await this.getSessionOfDefaultVscWorkspace())?.head;
-
       for (const history of Object.values(this.context.settings.history)) {
         try {
           const session = await Session.Core.fromLocal(this.context, history.workspace);
@@ -1101,15 +1121,16 @@ class CodeMic {
       }
 
       welcome = {
-        current,
+        current: (await this.getSessionOfDefaultVscWorkspace())?.head,
         recent,
         featured: this.featured || [],
         history: this.context.settings.history,
-        // coversUris,
+        error: this.welcomeError,
       };
     }
 
     return {
+      earlyAccessEmail: this.context.earlyAccessEmail,
       screen: this.screen,
       user: this.context.user,
       account: this.account,
@@ -1129,7 +1150,7 @@ class CodeMic {
 
 const SCREEN_TITLES = {
   [t.Screen.Account]: 'account',
-  [t.Screen.Welcome]: 'projects',
+  [t.Screen.Welcome]: '',
   [t.Screen.Player]: 'player',
   [t.Screen.Recorder]: 'studio',
   [t.Screen.Loading]: 'loading',

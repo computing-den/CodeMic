@@ -13,6 +13,7 @@ export type Context = {
   postVideoMessage?: (req: t.BackendVideoRequest) => Promise<t.FrontendVideoResponse>;
   updateFrontend?: () => any;
   user?: t.User;
+  earlyAccessEmail?: string;
 };
 
 export type RecorderRestoreState = {

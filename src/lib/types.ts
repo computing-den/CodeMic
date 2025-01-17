@@ -14,6 +14,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'account/login' }; response: OKResponse }
   | { request: { type: 'account/logout' }; response: OKResponse }
   | { request: { type: 'welcome/open' }; response: OKResponse }
+  | { request: { type: 'welcome/earlyAccessEmail'; email: string }; response: OKResponse }
   | { request: { type: 'player/open'; sessionId: string }; response: OKResponse }
   | { request: { type: 'player/load' }; response: OKResponse }
   | { request: { type: 'player/play' }; response: OKResponse }
@@ -165,6 +166,10 @@ export type BackendToServerReqRes =
       response: { type: 'user'; user: User };
     }
   | {
+      request: { type: 'earlyAccessEmail'; email: string };
+      response: BooleanResponse;
+    }
+  | {
       request: { type: 'account/login'; credentials: Credentials };
       response: { type: 'user'; user: User };
     }
@@ -197,6 +202,7 @@ export type WebviewConfig = {
 };
 
 export type Store = {
+  earlyAccessEmail?: string;
   screen: Screen;
   user?: User;
   account?: AccountUIState;
@@ -248,6 +254,7 @@ export type AccountUIState = AccountState;
 export type AccountUpdate = Partial<AccountState>;
 
 export type WelcomeUIState = {
+  error?: string;
   workspace?: string;
   current?: SessionHead;
   recent: SessionHead[];

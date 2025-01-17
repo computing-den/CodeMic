@@ -7,7 +7,7 @@ import _ from 'lodash';
 import moment from 'moment';
 import { VSCodeButton, VSCodeLink, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 
-type Props = { user?: t.User; account: t.AccountUIState };
+type Props = { user?: t.User; account: t.AccountUIState; earlyAccessEmail?: string };
 export default class Account extends React.Component<Props> {
   fieldChanged = async (field: keyof t.AccountUpdate, value: any) => {
     await postMessage({ type: 'account/update', changes: { [field]: value } });
@@ -29,11 +29,11 @@ export default class Account extends React.Component<Props> {
     await postMessage({ type: 'account/logout' });
   };
   join = async () => {
-    if (!this.props.account.join) {
+    if (this.props.account.join || this.props.earlyAccessEmail) {
+      await postMessage({ type: 'account/join' });
+    } else {
       await this.fieldChanged('join', true);
-      return;
     }
-    await postMessage({ type: 'account/join' });
   };
 
   keyDown = async (e: React.KeyboardEvent) => {
@@ -47,7 +47,7 @@ export default class Account extends React.Component<Props> {
   };
 
   render() {
-    const { user, account } = this.props;
+    const { user, account, earlyAccessEmail } = this.props;
     const { credentials, join, error } = account;
 
     const wrap = (body: JSX.Element) => (
@@ -100,8 +100,9 @@ export default class Account extends React.Component<Props> {
           >
             Password
           </VSCodeTextField>
-          {join && (
+          {(join || earlyAccessEmail) && (
             <VSCodeTextField
+              type="email"
               value={credentials.email}
               onInput={this.emailChanged}
               onKeyDown={this.keyDown}

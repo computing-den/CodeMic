@@ -1,4 +1,42 @@
-.welcome {
+.welcome-ask-early-access-email {
+  .main-section .section-body {
+    padding: var(--container-padding-ver-small) var(--container-padding-hor) 0 var(--container-padding-hor);
+  }
+
+  .heading-subsection {
+    text-align: center;
+  }
+  .fields-subsection {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    & vscode-text-field {
+      margin-top: 0.25rem;
+      &::part(label),
+      &::part(control) {
+        text-align: center;
+      }
+    }
+    p {
+      margin: 0.25rem 0 0 0;
+    }
+  }
+
+  .buttons-subsection {
+    margin-top: 1rem;
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    display: flex;
+    /* flex-direction: column; */
+
+    & vscode-button {
+      flex: 1 0 0;
+      margin: 0 0.25rem;
+    }
+  }
+}
+
+.welcome-sessions {
   .search-section .section-body {
     /* Set 1px top padding so that the focus outline of the search input doesn't overflow. */
     padding: 1px var(--container-padding-hor) 0 var(--container-padding-hor);
