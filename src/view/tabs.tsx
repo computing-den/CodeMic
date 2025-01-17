@@ -8,7 +8,13 @@ export type Tab = {
 };
 export type TabChild = React.ReactElement<TabViewProps>;
 export type TabViewProps = { id: string; className?: string; active?: boolean };
-type Props = { tabs: Tab[]; activeTabId: string; onTabChange: (id: string) => any; children: TabChild | TabChild[] };
+type Props = {
+  tabs: Tab[];
+  hideHeader: boolean;
+  activeTabId: string;
+  onTabChange: (id: string) => any;
+  children: TabChild | TabChild[];
+};
 
 export default class Tabs extends React.Component<Props> {
   render() {
@@ -31,12 +37,14 @@ export default class Tabs extends React.Component<Props> {
 
     return (
       <div className="tabs">
-        <div className="tabs-header">
-          {this.props.tabs.map((tab, i) => (
-            <TabItem tab={tab} active={this.props.activeTabId === tab.id} onClick={this.props.onTabChange} i={i} />
-          ))}
-          <div className="active-indicator" style={{ gridArea: `2 / ${activeTabIndex + 1} / auto / auto` }} />
-        </div>
+        {!this.props.hideHeader && (
+          <div className="tabs-header">
+            {this.props.tabs.map((tab, i) => (
+              <TabItem tab={tab} active={this.props.activeTabId === tab.id} onClick={this.props.onTabChange} i={i} />
+            ))}
+            <div className="active-indicator" style={{ gridArea: `2 / ${activeTabIndex + 1} / auto / auto` }} />
+          </div>
+        )}
         <div className="tabs-body">{children}</div>
       </div>
     );

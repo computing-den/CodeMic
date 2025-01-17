@@ -117,7 +117,12 @@ export default class Recorder extends React.Component<RecorderProps> {
   render() {
     return (
       <Screen className="recorder">
-        <Tabs tabs={this.tabs} activeTabId={this.props.recorder.tabId} onTabChange={this.tabChanged}>
+        <Tabs
+          tabs={this.tabs}
+          activeTabId={this.props.recorder.tabId}
+          onTabChange={this.tabChanged}
+          hideHeader={!this.props.session.loaded}
+        >
           <DetailsView id="details-view" {...this.props} onLoadRecorder={this.loadRecorder} />
           <EditorView id="editor-view" {...this.props} onRecord={this.record} onPlay={this.play} />
         </Tabs>
