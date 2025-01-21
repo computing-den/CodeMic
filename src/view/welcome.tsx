@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { SessionHeadList } from './session_head.jsx';
@@ -13,7 +13,11 @@ import { VSCodeButton, VSCodeLink, VSCodeTextField } from '@vscode/webview-ui-to
 type Props = { user?: t.User; welcome: t.WelcomeUIState; earlyAccessEmail?: string };
 
 export default function Welcome(props: Props) {
-  return props.earlyAccessEmail ? <WelcomeSessions {...props} /> : <WelcomeAskEarlyAccessEmail {...props} />;
+  return props.earlyAccessEmail || props.user ? (
+    <WelcomeSessions {...props} />
+  ) : (
+    <WelcomeAskEarlyAccessEmail {...props} />
+  );
 }
 
 function WelcomeAskEarlyAccessEmail(props: Props) {
@@ -24,7 +28,7 @@ function WelcomeAskEarlyAccessEmail(props: Props) {
   }
 
   async function keyDown(e: React.KeyboardEvent) {
-    if (e.code === 'Enter') {
+    if (e.key === 'Enter') {
       await confirm();
     }
   }
@@ -42,7 +46,8 @@ function WelcomeAskEarlyAccessEmail(props: Props) {
               value={email}
               onInput={e => setEmail((e.target as HTMLInputElement).value)}
               onKeyDown={keyDown}
-              placeholder="Example: sean@computing-den.com"
+              placeholder="name@example.com"
+              autoFocus
             >
               Early access email
             </VSCodeTextField>
@@ -76,6 +81,13 @@ function WelcomeSessions(props: Props) {
   const featured = welcome.featured.filter(
     h => h.id !== welcome.current?.id && !welcome.recent.some(r => r.id === h.id),
   );
+
+  // const [loading, setLoading] = useState(false);
+
+  const empty = !welcome.current && recent.length === 0 && featured.length === 0;
+  // useEffect(() => {
+  // }, [welcome.current, recent, featured]
+
   return (
     <Screen className="welcome-sessions">
       {/*<LatencyTest store={this.props.store} />*/}
@@ -106,9 +118,7 @@ function WelcomeSessions(props: Props) {
       )}
       {recent.length > 0 && <SessionsSection title="RECENT" history={welcome.history} sessionHeads={recent} />}
       {featured.length > 0 && <SessionsSection title="FEATURED" history={welcome.history} sessionHeads={featured} />}
-      {!welcome.current && recent.length === 0 && featured.length === 0 && (
-        <div className="empty">NO SESSIONS FOUND</div>
-      )}
+      {welcome.loadingFeatured && empty && <div className="empty">LOADING ...</div>}
     </Screen>
   );
 }

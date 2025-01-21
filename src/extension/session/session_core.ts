@@ -36,9 +36,9 @@ export default class SessionCore {
   }
 
   static async fromRemote(context: Context, head: t.SessionHead): Promise<Session> {
-    assert(head.author?.username, 'Session has no author');
+    assert(head.author, 'Session has no author');
     assert(head.handle, 'Session has no handle');
-    const workspace = path.join(paths.getDefaultWorkspaceBasePath(osPaths.home), head.author.username, head.handle);
+    const workspace = path.join(paths.getDefaultWorkspaceBasePath(osPaths.home), head.author, head.handle);
     return new Session(context, workspace, head);
   }
 
@@ -60,7 +60,7 @@ export default class SessionCore {
   //   return path.abs(paths.getDefaultWorkspaceBasePath(os.homedir()), head.handle);
   // }
 
-  static makeNewHead(author?: t.UserSummary): t.SessionHead {
+  static makeNewHead(author?: string): t.SessionHead {
     return {
       id: uuid(),
       handle: '',
@@ -395,7 +395,7 @@ export default class SessionCore {
       archive.file(path.join(this.dataPath, 'body.json'), { name: 'body.json' });
 
       for (const blob of blobs) {
-        archive.file(path.join(this.dataPath, 'blobs'), { name: path.posix.join('blobs', blob) });
+        archive.file(path.join(this.dataPath, 'blobs', blob), { name: path.posix.join('blobs', blob) });
       }
 
       archive.finalize();

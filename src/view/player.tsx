@@ -31,7 +31,7 @@ export default class Player extends React.Component<Props> {
   };
 
   play = async () => {
-    await this.mediaManager.prepare(this.getVideoElem()!);
+    await this.prepareMedia();
     await postMessage({ type: 'player/play' });
   };
 
@@ -48,7 +48,12 @@ export default class Player extends React.Component<Props> {
       console.error(`Cannot seek track that is not loaded`);
       return;
     }
+    await this.prepareMedia();
     await postMessage({ type: 'player/seek', clock });
+  };
+
+  prepareMedia = async () => {
+    await this.mediaManager.prepare(this.getVideoElem()!);
   };
 
   getVideoElem = (): HTMLVideoElement | undefined => {
@@ -229,14 +234,16 @@ export default class Player extends React.Component<Props> {
                 autoFocus
               />
               )*/}
-            <div className="subsection search">
-              <VSCodeDropdown>
-                <VSCodeOption>Table of contents</VSCodeOption>
-                <VSCodeOption>Files</VSCodeOption>
-                <VSCodeOption>Entities</VSCodeOption>
-              </VSCodeDropdown>
-              <VSCodeTextField placeholder="Search"></VSCodeTextField>
-            </div>
+            {head.toc.length > 0 && (
+              <div className="subsection search">
+                <VSCodeDropdown>
+                  <VSCodeOption>Table of contents</VSCodeOption>
+                  {/*<VSCodeOption>Files</VSCodeOption>
+                <VSCodeOption>Entities</VSCodeOption>*/}
+                </VSCodeDropdown>
+                <VSCodeTextField placeholder="Search"></VSCodeTextField>
+              </div>
+            )}
             {head.toc.length > 0 && (
               <div className="subsection toc">
                 {head.toc.map((item, i) => (

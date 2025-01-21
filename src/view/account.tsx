@@ -37,7 +37,7 @@ export default class Account extends React.Component<Props> {
   };
 
   keyDown = async (e: React.KeyboardEvent) => {
-    if (e.code === 'Enter') {
+    if (e.key === 'Enter') {
       if (this.props.account.join) {
         await this.join();
       } else {

@@ -25,6 +25,7 @@ class CodeMic {
   featured?: t.SessionHead[];
   recorder?: { tabId: t.RecorderUITabId };
   welcomeError?: string;
+  loadingFeatured = false;
 
   frontendUpdateBlockCounter = 0;
   isFrontendDirty = true;
@@ -302,9 +303,11 @@ class CodeMic {
 
         if (res.value) {
           this.context.extension.globalState.update('earlyAccessEmail', req.email);
+          this.context.earlyAccessEmail = req.email;
         } else {
           this.context.extension.globalState.update('earlyAccessEmail', undefined);
-          this.welcomeError = 'Email not found.';
+          this.welcomeError = 'Email is not on the early-access list.';
+          this.context.earlyAccessEmail = undefined;
         }
 
         this.enqueueFrontendUpdate();
@@ -721,7 +724,7 @@ class CodeMic {
   async openRecorderNewSession() {
     const user = this.context.user && lib.userToUserSummary(this.context.user);
     // For new sessions, user will manually call recorder/load which will call setUpWorkspace.
-    const head = Session.Core.makeNewHead(user);
+    const head = Session.Core.makeNewHead(user?.username);
     const workspace =
       VscWorkspace.getDefaultVscWorkspace() ??
       path.join(paths.getDefaultWorkspaceBasePath(osPaths.home), user?.username ?? 'anonym', 'new_session');
@@ -947,17 +950,20 @@ class CodeMic {
 
   async updateFeatured() {
     try {
+      this.loadingFeatured = true;
       const res = await serverApi.send({ type: 'featured/get' }, this.context.user?.token);
       await Promise.allSettled(
         res.sessionHeads.flatMap(head => [
           serverApi.downloadSessionCover(head.id),
-          head.author && serverApi.downloadAvatar(head.author.username),
+          head.author && serverApi.downloadAvatar(head.author),
         ]),
       ).then(lib.logRejectedPromises);
       this.featured = res.sessionHeads;
     } catch (error) {
       console.error(error);
       vscode.window.showErrorMessage('Failed to fetch featured items:', (error as Error).message);
+    } finally {
+      this.loadingFeatured = false;
     }
   }
 
@@ -967,7 +973,7 @@ class CodeMic {
     if (!session) return;
 
     await Promise.allSettled([
-      session.head.author && serverApi.downloadAvatar(session.head.author.username),
+      session.head.author && serverApi.downloadAvatar(session.head.author),
       cache.copyCover(session.core.dataPath, session.head.id),
     ]).then(lib.logRejectedPromises);
   }
@@ -1002,6 +1008,7 @@ class CodeMic {
     this.context.userSettingsPath = userSettingsPath;
     this.context.settings = settings;
     this.context.extension.globalState.update('user', user);
+    this.context.extension.globalState.update('earlyAccessEmail', undefined);
 
     this.updateFeaturedAndCache().catch(console.error); // do not await
 
@@ -1133,6 +1140,7 @@ class CodeMic {
         featured: this.featured || [],
         history: this.context.settings.history,
         error: this.welcomeError,
+        loadingFeatured: this.loadingFeatured,
       };
     }
 

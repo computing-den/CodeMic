@@ -32,11 +32,11 @@ export type NormalProps = CommonProps & {
 
 export function SessionHead({ className, withAuthor, sessionHead: s }: NormalProps) {
   return (
-    <WithAvatar className={cn('session-head', className)} username={s.author?.username}>
+    <WithAvatar className={cn('session-head', className)} username={s.author}>
       <div className="title">{s.title || 'Untitled'}</div>
       {withAuthor && (
         <div className="footer">
-          <span className="footer-item author">{s.author?.username || 'anonymous'}</span>
+          <span className="footer-item author">{s.author || 'anonymous'}</span>
         </div>
       )}
     </WithAvatar>
@@ -112,7 +112,7 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
             <img src={getCoverUri(s.id, cache).toString()} />
           </div>
         )}
-        <WithAvatar username={s.author?.username} className="caption" small>
+        <WithAvatar username={s.author} className="caption" small>
           <div className="title">{s.title || 'Untitled'}</div>
           {/*s.description && (
             <div className="description">
@@ -134,7 +134,7 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
             </div>
           )}
           <div className="footer">
-            <span className="footer-item author">{s.author?.username || 'anonymous'}</span>
+            <span className="footer-item author">{s.author || 'anonymous'}</span>
             {s.publishTimestamp && (
               <>
                 <div className="footer-item badge">

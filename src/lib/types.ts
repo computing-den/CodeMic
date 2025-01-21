@@ -163,12 +163,12 @@ export type PostVideoMessageToFrontend = (req: BackendVideoRequest) => Promise<F
 
 export type BackendToServerReqRes =
   | {
-      request: { type: 'account/join'; credentials: Credentials };
-      response: { type: 'user'; user: User };
-    }
-  | {
       request: { type: 'earlyAccessEmail'; email: string };
       response: BooleanResponse;
+    }
+  | {
+      request: { type: 'account/join'; credentials: Credentials };
+      response: { type: 'user'; user: User };
     }
   | {
       request: { type: 'account/login'; credentials: Credentials };
@@ -261,6 +261,7 @@ export type WelcomeUIState = {
   recent: SessionHead[];
   featured: SessionHead[];
   history: SessionsHistory;
+  loadingFeatured: boolean;
   // coversUris: UriMap;
 };
 
@@ -318,7 +319,7 @@ export type SessionHead = {
   handle: string;
   title: string;
   description: string;
-  author?: UserSummary;
+  author?: string;
   // published: boolean;
   // publishedUri?: Uri;
   duration: number;
