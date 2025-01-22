@@ -8,6 +8,7 @@ import fs from 'fs';
 import FormData from 'form-data'; // native FormData does not support appending streams
 import * as vscode from 'vscode';
 import stream from 'stream';
+import { Progress } from './types.js';
 
 export async function send<Req extends t.BackendToServerRequest>(
   req: Req,
@@ -24,17 +25,27 @@ export async function publishSession(
   sessionHead: t.SessionHead,
   filePath: string,
   token?: string,
+  progress?: Progress,
+  abortController?: AbortController,
 ): Promise<t.SessionHead> {
   try {
     const form = new FormData();
     form.append('sessionHead', JSON.stringify(sessionHead));
     form.append('file', fs.createReadStream(filePath));
 
+    let lastReportedProgress = 0;
     return (
       await axios.post(getURLString('/publish_session', { token }), form, {
+        signal: abortController?.signal,
         // Set boundary in the header field 'Content-Type' by calling method `getHeaders`
         headers: form.getHeaders(),
         maxBodyLength: Infinity,
+        onUploadProgress: e => {
+          if (e.progress !== undefined) {
+            progress?.report({ increment: (e.progress - lastReportedProgress) * 100 });
+            lastReportedProgress = e.progress;
+          }
+        },
       })
     ).data;
   } catch (error) {
@@ -42,40 +53,36 @@ export async function publishSession(
   }
 }
 
-export async function downloadSession(id: string, dst: string, token?: string) {
-  await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      cancellable: true,
-      title: 'Downloading session',
-    },
-    async (progress, cancellationToken) => {
-      try {
-        const controller = new AbortController();
-        cancellationToken.onCancellationRequested(controller.abort);
-        let lastReportedProgress = 0;
-        const res = await axios.get(getURLString('/session', { token, id }), {
-          signal: controller.signal,
-          responseType: 'stream',
-          maxContentLength: Infinity,
-          onDownloadProgress: e => {
-            if (e.progress !== undefined) {
-              progress.report({ increment: (e.progress - lastReportedProgress) * 100 });
-              lastReportedProgress = e.progress;
-            }
-          },
-        });
+export async function downloadSessionBody(
+  id: string,
+  dst: string,
+  token?: string,
+  progress?: Progress,
+  abortController?: AbortController,
+) {
+  try {
+    let lastReportedProgress = 0;
+    const res = await axios.get(getURLString('/session-body', { token, id }), {
+      signal: abortController?.signal,
+      responseType: 'stream',
+      maxContentLength: Infinity,
+      onDownloadProgress: e => {
+        if (e.progress !== undefined) {
+          progress?.report({ increment: (e.progress - lastReportedProgress) * 100 });
+          lastReportedProgress = e.progress;
+        }
+      },
+    });
 
-        // const contentLength = res.headers['Content-Length'];
-        // console.log('XXX: contentLength', typeof contentLength, contentLength);
+    // const contentLength = res.headers['Content-Length'];
+    // console.log('XXX: contentLength', typeof contentLength, contentLength);
 
-        await fs.promises.mkdir(path.dirname(dst), { recursive: true });
-        await stream.promises.pipeline(res.data, fs.createWriteStream(dst));
-      } catch (error) {
-        handleAxiosError('download session', error as Error);
-      }
-    },
-  );
+    await fs.promises.mkdir(path.dirname(dst), { recursive: true });
+    await stream.promises.pipeline(res.data, fs.createWriteStream(dst));
+    console.log('Downloaded session to', dst);
+  } catch (error) {
+    handleAxiosError('download session', error as Error);
+  }
 }
 
 function handleAxiosError(label: string, error: Error): never {

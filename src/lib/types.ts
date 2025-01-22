@@ -320,12 +320,7 @@ export type SessionHead = {
   title: string;
   description: string;
   author?: string;
-  // published: boolean;
-  // publishedUri?: Uri;
   duration: number;
-  views: number;
-  likes: number;
-  publishTimestamp?: string;
   modificationTimestamp: string;
   toc: TocItem[];
   forkedFrom?: string;

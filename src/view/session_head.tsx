@@ -61,12 +61,7 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
     const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
 
     const actions = _.compact<Action>([
-      // {
-      //   icon: 'codicon-play',
-      //   title: 'Play',
-      //   onClick: () => postMessage({ type: 'player/open', sessionId: this.props.sessionHead.id }),
-      // },
-      !this.props.sessionHead.publishTimestamp && {
+      /*!this.props.sessionHead.publishTimestamp*/ true && {
         icon: 'codicon-trash',
         title: 'Delete',
         onClick: () => postMessage({ type: 'deleteSession', sessionId: this.props.sessionHead.id }),
@@ -126,16 +121,16 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
               </span>
             </div>
             )*/}
-          {s.publishTimestamp && (
+          {/*s.publishTimestamp && (
             <div className="footer">
               <span className="footer-item timestamp">
                 Published <TimeFromNow timestamp={s.publishTimestamp} />
               </span>
             </div>
-          )}
+            )*/}
           <div className="footer">
             <span className="footer-item author">{s.author || 'anonymous'}</span>
-            {s.publishTimestamp && (
+            {/*s.publishTimestamp && (
               <>
                 <div className="footer-item badge">
                   <span className="codicon codicon-eye va-top m-right_small" />
@@ -146,7 +141,7 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
                   <span className="count">{s.likes}</span>
                 </div>
               </>
-            )}
+              )*/}
           </div>
           <div className="actions">
             {actions.map(a => (

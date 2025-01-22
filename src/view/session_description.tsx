@@ -17,15 +17,15 @@ export default class SessionDescription extends React.Component<Props> {
       <div className={cn('session-description', className)}>
         <div className="header">
           <span className="item timestamp">
-            <TimeFromNow timestamp={s.publishTimestamp ?? s.modificationTimestamp} capitalize />
+            <TimeFromNow timestamp={/*s.publishTimestamp ??*/ s.modificationTimestamp} capitalize />
           </span>
           <div className="item views">
             <span className="codicon codicon-eye va-top m-right_small" />
-            <span className="count">{s.views}</span>
+            <span className="count">{/*s.views*/ 0}</span>
           </div>
           <div className="item likes">
             <span className="codicon codicon-heart-filled va-top m-right_small" />
-            <span className="count">{s.likes}</span>
+            <span className="count">{/*s.likes*/ 0}</span>
           </div>
         </div>
         <div className="body">

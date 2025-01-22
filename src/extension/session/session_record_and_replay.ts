@@ -10,6 +10,7 @@ import WorkspacePlayer from './workspace_player.js';
 import WorkspaceRecorder from './workspace_recorder.js';
 import VscWorkspace from './vsc_workspace.js';
 import _ from 'lodash';
+import { Progress } from '../types.js';
 
 enum Status {
   Init,

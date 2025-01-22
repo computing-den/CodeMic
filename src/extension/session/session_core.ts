@@ -5,7 +5,7 @@ import * as t from '../../lib/types.js';
 import assert from '../../lib/assert.js';
 import * as paths from '../../lib/paths.js';
 import * as serverApi from '../server_api.js';
-import type { Context, ReadDirOptions } from '../types.js';
+import type { Context, Progress, ReadDirOptions } from '../types.js';
 import * as storage from '../storage.js';
 import osPaths from '../os_paths.js';
 import Session from './session.js';
@@ -18,6 +18,7 @@ import { v4 as uuid } from 'uuid';
 import * as path from 'path';
 import { URI } from 'vscode-uri';
 import ignore from 'ignore';
+import { scaleProgress } from '../misc.js';
 
 export default class SessionCore {
   constructor(public session: Session) {}
@@ -68,8 +69,6 @@ export default class SessionCore {
       description: '',
       author,
       duration: 0,
-      views: 0,
-      likes: 0,
       modificationTimestamp: new Date().toISOString(), // will be overwritten at the end
       toc: [],
       formatVersion: SessionCore.LATEST_FORMAT_VERSION,
@@ -232,12 +231,10 @@ export default class SessionCore {
   }
 
   async write() {
-    console.log('XXX WRITE START', this.session.head.handle, new Date().toISOString());
     await this.writeHead();
     if (this.session.isLoaded()) await this.writeBody();
 
     this.session.editor.saved();
-    console.log('XXX WRITE END', this.session.head.handle, new Date().toISOString());
 
     if (config.debug) {
       console.log('XXX DEBUG Reading head again to make sure');
@@ -298,30 +295,48 @@ export default class SessionCore {
     await this.writeHistory({ lastRecordedTimestamp: new Date().toISOString() });
   }
 
-  async readBody(options?: { download: boolean }): Promise<t.SessionBodyJSON> {
+  async readBody(options?: {
+    download?: boolean;
+    progress?: Progress;
+    abortController?: AbortController;
+  }): Promise<t.SessionBodyJSON> {
     this.assertFormatVersionSupport();
 
-    if (options?.download) await this.download({ skipIfExists: true });
+    if (options?.download) {
+      await this.download({ skipIfExists: true, progress: options.progress, abortController: options.abortController });
+    }
     const compact = await storage.readJSON<t.SessionBodyCompact>(path.join(this.dataPath, 'body.json'));
     return deserializeSessionBody(compact);
   }
 
-  async download(options?: { skipIfExists: boolean }) {
+  async download(options?: { skipIfExists?: boolean; progress?: Progress; abortController?: AbortController }) {
     this.assertFormatVersionSupport();
 
-    if (options?.skipIfExists && (await storage.pathExists(path.join(this.dataPath, 'body.json')))) return;
+    if (options?.skipIfExists && (await storage.pathExists(path.join(this.dataPath, 'body.json')))) {
+      options?.progress?.report({ increment: 100 });
+      return;
+    }
 
-    await serverApi.downloadSession(
+    options?.progress?.report({ message: 'downloading' });
+    const zipFilename = `${this.session.head.handle}_body.zip`;
+    const zipFilepath = path.join(this.dataPath, zipFilename);
+    await serverApi.downloadSessionBody(
       this.session.head.id,
-      path.join(this.dataPath, 'body.zip'),
+      zipFilepath,
       this.session.context.user?.token,
+      options?.progress && scaleProgress(options.progress, 0.9),
+      options?.abortController,
     );
+
     // For some reason when stream.pipeline() resolves, the extracted files have not
     // yet been written. So we have to wait on out.promise().
+    options?.progress?.report({ message: 'extracting' });
     const out = unzipper.Extract({ path: this.dataPath, verbose: true });
-    await stream.promises.pipeline(fs.createReadStream(path.join(this.dataPath, 'body.zip')), out);
+    await stream.promises.pipeline(fs.createReadStream(zipFilepath), out);
     await out.promise();
+    await this.writeHead();
     this.session.local = true;
+    options?.progress?.report({ increment: 10 });
   }
 
   async createWorkspaceDir() {
@@ -362,19 +377,19 @@ export default class SessionCore {
     await this.deleteHistory();
   }
 
-  async package() {
+  async packageBody() {
     assert(await storage.pathExists(path.join(this.dataPath, 'body.json')), "Session body doesn't exist");
 
     const blobs = await this.getUsedBlobs();
     return new Promise<string>((resolve, reject) => {
-      // const packagePath = path.abs(os.tmpdir(), this.head.id + '.zip');
-
-      const output = fs.createWriteStream(path.join(this.dataPath, 'body.zip'));
+      const zipFilename = `${this.session.head.handle}_body.zip`;
+      const zipFilepath = path.join(this.dataPath, zipFilename);
+      const output = fs.createWriteStream(zipFilepath);
       const archive = archiver('zip', { zlib: { level: 9 } });
 
       // 'close' event is fired only when a file descriptor is involved
       output.on('close', () => {
-        resolve(path.join(this.dataPath, 'body.zip'));
+        resolve(zipFilepath);
       });
 
       // This event is fired when the data source is drained no matter what was the data source.
@@ -393,6 +408,7 @@ export default class SessionCore {
         archive.file(path.join(this.dataPath, 'cover'), { name: 'cover' });
       }
       archive.file(path.join(this.dataPath, 'body.json'), { name: 'body.json' });
+      archive.file(path.join(this.dataPath, 'head.json'), { name: 'head.json' });
 
       for (const blob of blobs) {
         archive.file(path.join(this.dataPath, 'blobs', blob), { name: path.posix.join('blobs', blob) });
@@ -444,10 +460,21 @@ export default class SessionCore {
     return blobs;
   }
 
-  async publish() {
-    const zip = await this.package();
-    const res = await serverApi.publishSession(this.session.head, zip, this.session.context.user?.token);
+  async publish(options?: { progress?: Progress; abortController?: AbortController }) {
+    options?.progress?.report({ message: 'packaging' });
+    const bodyZip = await this.packageBody();
+
+    options?.progress?.report({ message: 'uploading', increment: 50 });
+    const res = await serverApi.publishSession(
+      this.session.head,
+      bodyZip,
+      this.session.context.user?.token,
+      options?.progress,
+      options?.abortController,
+    );
     this.session.head = res;
+
+    options?.progress?.report({ increment: 45 });
     await this.write();
   }
 

@@ -51,6 +51,16 @@ class CodeMic {
       userSettingsPath,
       settings,
       earlyAccessEmail,
+      withProgress(options, task) {
+        return vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, ...options },
+          (progress, cancellationToken) => {
+            const controller = new AbortController();
+            cancellationToken.onCancellationRequested(controller.abort);
+            return task(progress, controller);
+          },
+        );
+      },
     };
     return new CodeMic(context);
   }
@@ -432,8 +442,13 @@ class CodeMic {
           assert(this.session?.isLoaded());
           // let sessionHead: t.SessionHead;
           await this.writeSession({ pause: true });
-          await this.session.core.publish();
-          vscode.window.showInformationMessage('Published session.');
+          await this.context.withProgress(
+            { title: `Publishing session ${this.session.head.handle}`, cancellable: true },
+            async (progress, abortController) => {
+              await this.session!.core.publish({ progress, abortController });
+              vscode.window.showInformationMessage('Published session.');
+            },
+          );
         } catch (error) {
           this.showError(error as Error);
         }
@@ -1069,16 +1084,30 @@ class CodeMic {
   // }
 
   async findRequestedSessionById(sessionId: string): Promise<Session | undefined> {
-    const current = await this.getSessionOfDefaultVscWorkspace();
-    const history = this.context.settings.history[sessionId];
-    const featured = this.featured?.find(s => s.id === sessionId);
+    // Check session in current VSC workspace.
+    {
+      const current = await this.getSessionOfDefaultVscWorkspace();
+      if (current?.head.id === sessionId) return current;
+    }
 
-    if (current?.head.id === sessionId) {
-      return current;
-    } else if (history) {
-      return await Session.Core.fromLocal(this.context, history.workspace);
-    } else if (featured) {
-      return await Session.Core.fromRemote(this.context, featured);
+    // Check session in history.
+    try {
+      const history = this.context.settings.history[sessionId];
+      if (history && (await Session.Core.sessionExists(history.workspace))) {
+        return await Session.Core.fromLocal(this.context, history.workspace);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+
+    // Check session in featured.
+    try {
+      const featured = this.featured?.find(s => s.id === sessionId);
+      if (featured) {
+        return await Session.Core.fromRemote(this.context, featured);
+      }
+    } catch (error) {
+      console.error(error);
     }
   }
 

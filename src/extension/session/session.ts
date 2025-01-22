@@ -7,6 +7,7 @@ import SessionRecordAndReplay from './session_record_and_replay.js';
 import SessionEditor from './session_editor.js';
 import SessionCommander from './session_commander.js';
 import _ from 'lodash';
+import { scaleProgress } from '../misc.js';
 
 export type LoadedSession = Session & {
   body: SessionBody;
@@ -70,21 +71,41 @@ export class Session {
     assert(!this.mustScan, 'Must be scanned, not loaded.');
     assert(!this.temp, 'Cannot load a temp session.');
 
-    const bodyJSON = await this.core.readBody({ download: true });
-    this.body = new SessionBody(bodyJSON);
-    this.rr = new SessionRecordAndReplay(this as LoadedSession);
-    this.commander = new SessionCommander(this as LoadedSession);
-    await this.rr.load(options);
+    await this.context.withProgress(
+      { title: `Loading session ${this.head.handle}`, cancellable: true },
+      async (progress, abortController) => {
+        const bodyJSON = await this.core.readBody({
+          download: true,
+          progress: scaleProgress(progress, 0.8),
+          abortController,
+        });
+
+        progress.report({ message: 'reading' });
+        this.body = new SessionBody(bodyJSON);
+        this.rr = new SessionRecordAndReplay(this as LoadedSession);
+        this.commander = new SessionCommander(this as LoadedSession);
+
+        progress.report({ message: 'loading', increment: 10 });
+        await this.rr.load(options);
+
+        progress.report({ message: 'done', increment: 10 });
+      },
+    );
   }
 
   private async scan() {
     assert(!this.isLoaded(), 'Already loaded.');
     assert(this.mustScan, 'Must be loaded, not scanned.');
 
-    this.body = new SessionBody();
-    this.rr = new SessionRecordAndReplay(this as LoadedSession);
-    this.commander = new SessionCommander(this as LoadedSession);
-    await this.rr.scan();
+    await this.context.withProgress(
+      { title: `Scanning session ${this.head.handle}`, cancellable: false },
+      async (progress, abortController) => {
+        this.body = new SessionBody();
+        this.rr = new SessionRecordAndReplay(this as LoadedSession);
+        this.commander = new SessionCommander(this as LoadedSession);
+        await this.rr.scan();
+      },
+    );
   }
 }
 

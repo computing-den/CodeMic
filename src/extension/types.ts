@@ -14,7 +14,18 @@ export type Context = {
   updateFrontend?: () => any;
   user?: t.User;
   earlyAccessEmail?: string;
+  withProgress<R>(options: ProgressOptions, task: ProgressTask<R>): PromiseLike<R>;
 };
+
+export type ProgressOptions = { title?: string; cancellable?: boolean };
+
+export type ProgressTask<R> = (progress: Progress, abortController: AbortController) => PromiseLike<R>;
+
+export type Progress = {
+  report: ProgressReport;
+};
+
+export type ProgressReport = (value: { message?: string; increment?: number }) => void;
 
 export type RecorderRestoreState = {
   mustScan: boolean;
@@ -30,3 +41,5 @@ export type WorkspaceChangeGlobalState = {
   recorder?: RecorderRestoreState;
 };
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
+
+// export interface Thenable<T> extends PromiseLike<T> { }

@@ -5,7 +5,7 @@ import { Position, Range, Selection, LineRange } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import * as misc from '../misc.js';
 import * as storage from '../storage.js';
-import type { Context } from '../types.js';
+import type { Context, Progress } from '../types.js';
 import Session, { LoadedSession } from './session.js';
 import * as serverApi from '../server_api.js';
 import * as git from '../git';
