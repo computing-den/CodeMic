@@ -417,7 +417,7 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
       type: 'showOpenDialog',
       options: {
         title: 'Select video file',
-        filters: { 'MP4 Video': ['mp4'], 'WebM Video': ['webm'] },
+        filters: { 'MP4 Video': ['mp4'] },
       },
     });
     if (uris?.length === 1) {

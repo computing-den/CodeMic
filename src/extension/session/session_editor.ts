@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { getMp3Duration, getVideoDuration } from '../get_audio_video_duration.js';
+import { getMp4MetaData, getMp3Duration } from '../get_media_metadata.js';
 import * as misc from '../misc.js';
 import * as t from '../../lib/types.js';
 import assert from '../../lib/assert.js';
@@ -295,7 +295,24 @@ export default class SessionEditor {
     assert(this.session.isLoaded());
     const fsPath = URI.parse(uri).fsPath;
     const data = await fs.promises.readFile(fsPath);
-    const duration = getVideoDuration(data);
+    const metadata = await getMp4MetaData(data);
+
+    // Supported video codec example (h264): 'avc1.64001f'
+    // Supported audio codec example (mp3): 'mp4a.6b'
+    // Unsupported video codec example (h265): 'hev1.1.6.L90.90'
+    // Unsupported audio codec example (aac): 'mp4a.40.2'
+    if (metadata.videoTracks.some((t: any) => !t.codec.startsWith('avc1'))) {
+      throw new Error(
+        `Unsupported video codec. Please use H264 + MP3 codecs. Try: ffmpeg -i input.mp4 -c:v libx264 -c:a libmp3lame output.mp4`,
+      );
+    }
+    if (metadata.audioTracks.some((t: any) => !t.codec.startsWith('mp4a.6b'))) {
+      throw new Error(
+        `Unsupported audio codec. Please use H264 + MP3 codecs. Try: ffmpeg -i input.mp4 -c:v libx264 -c:a libmp3lame output.mp4`,
+      );
+    }
+
+    const duration = metadata.duration / metadata.timescale;
     const sha1 = await misc.computeSHA1(data);
     await this.session.core.copyToBlob(fsPath, sha1);
     const videoTrack: t.VideoTrack = {
