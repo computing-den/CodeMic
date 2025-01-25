@@ -94,7 +94,7 @@ class CodeMic {
       }),
     );
 
-    this.updateFeaturedAndCache().catch(console.error); // do not await
+    this.updateWelcome().catch(console.error); // do not await
   }
 
   async setWorkspaceChangeGlobalState(state?: WorkspaceChangeGlobalState) {
@@ -963,42 +963,42 @@ class CodeMic {
 
   writeSessionThrottled = _.throttle(this.writeSessionThrottledCommit, SAVE_TIMEOUT_MS, { leading: false });
 
-  async updateFeatured() {
+  async updateWelcome() {
+    // Update user avatar.
+    if (this.context.user) {
+      await serverApi.downloadAvatar(this.context.user.username).catch(console.error);
+    }
+
+    // Update Workspace cover and avatar.
     try {
-      this.loadingFeatured = true;
+      const workspace = VscWorkspace.getDefaultVscWorkspace();
+      const session = workspace && (await Session.Core.fromLocal(this.context, workspace));
+      if (session) {
+        if (session.head.author) await serverApi.downloadAvatar(session.head.author).catch(console.error);
+        await cache.copyCover(session.core.dataPath, session.head.id).catch(console.error);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+
+    this.loadingFeatured = true;
+    await this.updateFrontend();
+
+    // Update featured sessions.
+    try {
       const res = await serverApi.send({ type: 'featured/get' }, this.context.user?.token);
-      await Promise.allSettled(
-        res.sessionHeads.flatMap(head => [
-          serverApi.downloadSessionCover(head.id),
-          head.author && serverApi.downloadAvatar(head.author),
-        ]),
-      ).then(lib.logRejectedPromises);
       this.featured = res.sessionHeads;
+      const cachePromises = this.featured.flatMap(head => [
+        serverApi.downloadSessionCover(head.id).catch(console.error),
+        head.author && serverApi.downloadAvatar(head.author).catch(console.error),
+      ]);
+      await Promise.all(cachePromises);
     } catch (error) {
       console.error(error);
       vscode.window.showErrorMessage('Failed to fetch featured items:', (error as Error).message);
     } finally {
       this.loadingFeatured = false;
     }
-  }
-
-  async updateWorkspaceCache() {
-    const workspace = VscWorkspace.getDefaultVscWorkspace();
-    const session = workspace && (await Session.Core.fromLocal(this.context, workspace));
-    if (!session) return;
-
-    await Promise.allSettled([
-      session.head.author && serverApi.downloadAvatar(session.head.author),
-      cache.copyCover(session.core.dataPath, session.head.id),
-    ]).then(lib.logRejectedPromises);
-  }
-
-  async updateFeaturedAndCache() {
-    await Promise.allSettled([
-      this.context.user && serverApi.downloadAvatar(this.context.user.username),
-      this.updateFeatured(),
-      this.updateWorkspaceCache(),
-    ]).then(lib.logRejectedPromises);
     await this.updateFrontend();
   }
 
@@ -1025,7 +1025,7 @@ class CodeMic {
     this.context.extension.globalState.update('user', user);
     this.context.extension.globalState.update('earlyAccessEmail', undefined);
 
-    this.updateFeaturedAndCache().catch(console.error); // do not await
+    this.updateWelcome().catch(console.error); // do not await
 
     await this.openWelcome();
   }
