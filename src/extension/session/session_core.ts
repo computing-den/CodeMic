@@ -249,8 +249,9 @@ export default class SessionCore {
   }
 
   async writeHead() {
-    assert(this.session.head); // Sometimes head.json becomes blank. Maybe this'll catch the issue?
-    await storage.writeJSON(path.join(this.dataPath, 'head.json'), this.session.head);
+    // Omit publication field before writing
+    const head: t.SessionHead = { ...this.session.head, publication: undefined };
+    await storage.writeJSON(path.join(this.dataPath, 'head.json'), head);
     this.session.local = true;
     console.log('Wrote session head');
   }
@@ -309,10 +310,14 @@ export default class SessionCore {
     return deserializeSessionBody(compact);
   }
 
+  async bodyExists() {
+    return await storage.pathExists(path.join(this.dataPath, 'body.json'));
+  }
+
   async download(options?: { skipIfExists?: boolean; progress?: Progress; abortController?: AbortController }) {
     this.assertFormatVersionSupport();
 
-    if (options?.skipIfExists && (await storage.pathExists(path.join(this.dataPath, 'body.json')))) {
+    if (options?.skipIfExists && (await this.bodyExists())) {
       options?.progress?.report({ increment: 100 });
       return;
     }
@@ -373,7 +378,7 @@ export default class SessionCore {
 
   async delete() {
     assert(!this.session.temp, 'Tried to delete a temp session.');
-    await fs.promises.rm(this.dataPath, { force: true, recursive: true });
+    await fs.promises.rm(this.session.workspace, { force: true, recursive: true });
     await this.deleteHistory();
   }
 
@@ -408,7 +413,7 @@ export default class SessionCore {
         archive.file(path.join(this.dataPath, 'cover'), { name: 'cover' });
       }
       archive.file(path.join(this.dataPath, 'body.json'), { name: 'body.json' });
-      archive.file(path.join(this.dataPath, 'head.json'), { name: 'head.json' });
+      // archive.file(path.join(this.dataPath, 'head.json'), { name: 'head.json' });
 
       for (const blob of blobs) {
         archive.file(path.join(this.dataPath, 'blobs', blob), { name: path.posix.join('blobs', blob) });
@@ -461,18 +466,25 @@ export default class SessionCore {
   }
 
   async publish(options?: { progress?: Progress; abortController?: AbortController }) {
+    if (!this.session.context.user) throw new Error('Please join/login to publish.');
+
+    if (this.session.head.author && this.session.head.author !== this.session.context.user.username) {
+      throw new Error(`This session belongs to ${this.session.head.author}. You cannot publish it.`);
+    }
+
+    // If session's author is undefined, server will automatically set author to current user.
+
     options?.progress?.report({ message: 'packaging' });
     const bodyZip = await this.packageBody();
 
     options?.progress?.report({ message: 'uploading', increment: 50 });
-    const res = await serverApi.publishSession(
+    this.session.head = await serverApi.publishSession(
       this.session.head,
       bodyZip,
       this.session.context.user?.token,
       options?.progress,
       options?.abortController,
     );
-    this.session.head = res;
 
     options?.progress?.report({ increment: 45 });
     await this.write();

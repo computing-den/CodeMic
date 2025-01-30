@@ -14,18 +14,30 @@ import * as paths from '../lib/paths.js';
 import VscWorkspace from './session/vsc_workspace.js';
 import path from 'path';
 import cache from './cache.js';
+import { doesVscHaveCorrectWorkspace } from './misc.js';
 
 const SAVE_TIMEOUT_MS = 5_000;
 
+type OpenScreenParams =
+  | { screen: t.Screen.Loading }
+  | { screen: t.Screen.Account; join?: boolean }
+  | { screen: t.Screen.Player; session: Session }
+  | { screen: t.Screen.Recorder; session: Session; tabId: t.RecorderUITabId; clock?: number }
+  | { screen: t.Screen.Welcome };
+
 class CodeMic {
   context: Context;
-  screen: t.Screen = t.Screen.Welcome;
-  account?: t.AccountState;
+  screen: t.Screen = t.Screen.Loading;
   session?: Session;
-  featured?: t.SessionHead[];
+  account?: t.AccountState;
   recorder?: { tabId: t.RecorderUITabId };
-  welcomeError?: string;
-  loadingFeatured = false;
+  welcome?: {
+    current?: Session;
+    recent: Session[];
+    featured?: Session[];
+    loading: boolean;
+    error?: string;
+  };
 
   frontendUpdateBlockCounter = 0;
   isFrontendDirty = true;
@@ -70,19 +82,18 @@ class CodeMic {
   }
 
   async start() {
-    // Vscode may restarts after changing workspace. Restore state after such restart.
-    // This will not reject.
-    await this.restoreStateAfterRestart();
-
     // Set up commands.
     this.context.extension.subscriptions.push(
       vscode.commands.registerCommand('codemic.openView', this.openView.bind(this)),
     );
     this.context.extension.subscriptions.push(
-      vscode.commands.registerCommand('codemic.openWelcome', this.openWelcomeCommand.bind(this)),
+      vscode.commands.registerCommand('codemic.openHome', () => this.openScreen({ screen: t.Screen.Welcome })),
     );
     this.context.extension.subscriptions.push(
-      vscode.commands.registerCommand('codemic.account', this.openAccountCommand.bind(this)),
+      vscode.commands.registerCommand('codemic.refreshHome', () => this.openScreen({ screen: t.Screen.Welcome })),
+    );
+    this.context.extension.subscriptions.push(
+      vscode.commands.registerCommand('codemic.account', () => this.openScreen({ screen: t.Screen.Account })),
     );
 
     // Set up webview.
@@ -94,7 +105,11 @@ class CodeMic {
       }),
     );
 
-    this.updateWelcome().catch(console.error); // do not await
+    // Vscode may restart after changing workspace. Restore state after such restart.
+    // Otherwise, open the welcome screen.
+    if (!(await this.restoreStateAfterRestart())) {
+      await this.openScreen({ screen: t.Screen.Welcome });
+    }
   }
 
   async setWorkspaceChangeGlobalState(state?: WorkspaceChangeGlobalState) {
@@ -111,10 +126,7 @@ class CodeMic {
     assert(this.session);
 
     // Return if workspace is already up-to-date.
-    {
-      const vscWorkspace = VscWorkspace.getDefaultVscWorkspace();
-      if (vscWorkspace && path.resolve(vscWorkspace) === path.resolve(this.session.workspace)) return;
-    }
+    if (doesVscHaveCorrectWorkspace(this.session.workspace)) return;
 
     // Save first so that we can restore it after vscode restart.
     if (this.screen === t.Screen.Recorder) {
@@ -149,45 +161,60 @@ class CodeMic {
     await this.setWorkspaceChangeGlobalState();
 
     // Make sure workspace is updated properly.
-    {
-      const vscWorkspace = VscWorkspace.getDefaultVscWorkspace();
-      assert(vscWorkspace && path.resolve(vscWorkspace) === path.resolve(this.session.workspace));
-    }
+    assert(doesVscHaveCorrectWorkspace(this.session.workspace));
   }
 
   /**
    * Will not reject.
+   * Returns true if we have restart state and it was restored properly.
    */
   async restoreStateAfterRestart() {
     try {
       const workspaceChange = this.getWorkspaceChangeGlobalState();
-      if (!workspaceChange) return;
+      if (!workspaceChange) return false;
 
       console.log('restoreStateAfterRestart(): ', workspaceChange);
-
-      const { screen, sessionId, recorder, workspace } = workspaceChange;
-      this.setScreen(t.Screen.Loading);
-
       await this.setWorkspaceChangeGlobalState();
 
-      if (sessionId) {
-        const session = await Session.Core.fromLocal(this.context, workspace, {
-          mustScan: recorder?.mustScan,
-        });
-        assert(session);
-        assert(VscWorkspace.getDefaultVscWorkspace() === session.workspace);
+      const { screen, sessionId, recorder, workspace } = workspaceChange;
 
-        this.setSession(session);
-        await session.prepare(recorder);
-        if (recorder) {
-          this.recorder = { tabId: recorder.tabId };
-        }
+      const session = await Session.Core.fromLocal(this.context, workspace, { mustScan: recorder?.mustScan });
+      assert(session);
+      assert(doesVscHaveCorrectWorkspace(session.workspace));
+
+      if (screen === t.Screen.Player) {
+        await this.openScreen({ screen, session });
+      } else if (screen === t.Screen.Recorder) {
+        await this.openScreen({ screen, session, tabId: recorder!.tabId, clock: recorder!.clock });
+      } else {
+        throw new Error('Why was workspaceChange set?');
       }
-      this.setScreen(screen);
+
+      return true;
+
+      // this.setScreen(t.Screen.Loading);
+
+      // await this.setWorkspaceChangeGlobalState();
+
+      // if (sessionId) {
+      //   const session = await Session.Core.fromLocal(this.context, workspace, {
+      //     mustScan: recorder?.mustScan,
+      //   });
+      //   assert(session);
+      //   assert(VscWorkspace.getDefaultVscWorkspace() === session.workspace);
+
+      //   this.setSession(session);
+      //   await session.prepare(recorder);
+      //   if (recorder) {
+      //     this.recorder = { tabId: recorder.tabId };
+      //   }
+      // }
+      // this.setScreen(screen);
+      // return true;
     } catch (error) {
       console.error(error);
       this.showError(error as Error);
-      this.setScreen(t.Screen.Welcome);
+      return false;
     }
   }
 
@@ -242,18 +269,18 @@ class CodeMic {
 
     switch (req.type) {
       case 'webviewLoaded': {
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'account/open': {
-        await this.openAccount(req);
-        this.enqueueFrontendUpdate();
+        await this.openScreen({ screen: t.Screen.Account, join: req.join });
+        this.updateFrontend();
         return ok;
       }
       case 'account/update': {
         assert(this.account);
         this.account = { ...this.account, ...req.changes };
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'account/join': {
@@ -273,7 +300,7 @@ class CodeMic {
           await this.changeUser(user);
         }
 
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'account/login': {
@@ -294,49 +321,119 @@ class CodeMic {
           await this.changeUser(user);
         }
 
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'account/logout': {
         await this.changeUser();
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'welcome/open': {
-        await this.openWelcome();
-        this.enqueueFrontendUpdate();
+        await this.openScreen({ screen: t.Screen.Welcome });
+        this.updateFrontend();
         return ok;
       }
       case 'welcome/earlyAccessEmail': {
+        assert(this.welcome);
         const res = await serverApi.send({ type: 'earlyAccessEmail', email: req.email }, this.context.user?.token);
-        this.welcomeError = undefined;
+        this.welcome.error = undefined;
 
         if (res.value) {
           this.context.extension.globalState.update('earlyAccessEmail', req.email);
           this.context.earlyAccessEmail = req.email;
         } else {
           this.context.extension.globalState.update('earlyAccessEmail', undefined);
-          this.welcomeError = 'Email is not on the early-access list.';
+          this.welcome.error = 'Email is not on the early-access list.';
           this.context.earlyAccessEmail = undefined;
         }
 
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
-      case 'player/open': {
-        const session = await this.findRequestedSessionById(req.sessionId);
-        if (session) {
-          session.core.assertFormatVersionSupport();
+      case 'welcome/openSessionInPlayer': {
+        const session = this.findSessionInWelcomeById(req.sessionId);
+        await this.openScreen({ screen: t.Screen.Player, session });
 
-          if (await this.closeCurrentScreen()) {
-            this.setSession(session);
-            this.setScreen(t.Screen.Player);
-          }
-        } else {
-          this.showError(new Error(`Could not find requested session.`));
+        this.updateFrontend();
+        return ok;
+      }
+      case 'welcome/openSessionInRecorder': {
+        const session = this.findSessionInWelcomeById(req.sessionId);
+        await this.openScreen({ screen: t.Screen.Recorder, session, tabId: 'details-view' });
+
+        this.updateFrontend();
+        return ok;
+      }
+      case 'welcome/openNewSessionInRecorder': {
+        const user = this.context.user && lib.userToUserSummary(this.context.user);
+        // For new sessions, user will manually call recorder/load which will call setUpWorkspace.
+        const head = Session.Core.makeNewHead(user?.username);
+        const workspace =
+          VscWorkspace.getDefaultVscWorkspace() ??
+          path.join(paths.getDefaultWorkspaceBasePath(osPaths.home), user?.username ?? 'anonym', 'new_session');
+
+        const session = await Session.Core.fromNew(this.context, workspace, head);
+        await this.openScreen({ screen: t.Screen.Recorder, session, tabId: 'details-view' });
+
+        this.updateFrontend();
+        return ok;
+      }
+      case 'welcome/deleteSession': {
+        const session = this.findSessionInWelcomeById(req.sessionId);
+
+        const cancel = 'Cancel';
+        const del = 'Delete';
+        const answer = await vscode.window.showWarningMessage(
+          `Are you sure you want to delete session ${session.head.handle}?`,
+          { modal: true, detail: `${session.workspace} will be deleted.` },
+          { title: cancel, isCloseAffordance: true },
+          { title: del },
+        );
+
+        if (answer?.title === del) {
+          await session.core.delete();
+        }
+        this.updateFrontend();
+        return ok;
+      }
+      case 'welcome/likeSession': {
+        const session = this.findSessionInWelcomeById(req.sessionId);
+        await this.likeSession(session, req.value);
+
+        this.updateFrontend();
+        return ok;
+      }
+
+      case 'player/openInRecorder': {
+        assert(this.session);
+        let cancel = false;
+        if (this.session.rr?.playing) {
+          this.session.rr.pause();
+
+          const confirmTitle = 'Edit';
+          const answer = await vscode.window.showWarningMessage(
+            `Do you want to stop playing and edit the current session at ${lib.formatTimeSeconds(
+              this.session.rr.clock,
+            )}?`,
+            { modal: true },
+            { title: 'Cancel', isCloseAffordance: true },
+            { title: confirmTitle },
+          );
+          cancel = answer?.title != confirmTitle;
+          if (cancel) await this.session.rr.play();
         }
 
-        this.enqueueFrontendUpdate();
+        if (!cancel) {
+          await this.openScreen({
+            screen: t.Screen.Recorder,
+            session: this.session,
+            tabId: 'editor-view',
+            clock: this.session.rr?.clock,
+          });
+        }
+
+        this.updateFrontend();
         return ok;
       }
       case 'player/load': {
@@ -352,27 +449,40 @@ class CodeMic {
         await this.setUpWorkspace_MAY_RESTART_VSCODE();
 
         await this.session.prepare();
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'player/play': {
         assert(this.session?.isLoaded());
         await this.session.rr.play();
-        await this.session?.core.writeHistoryOpenClose();
-        this.enqueueFrontendUpdate();
+        await this.session.core.writeHistoryOpenClose();
+        this.updateFrontend();
         return ok;
       }
       case 'player/pause': {
         assert(this.session?.isLoaded());
         this.session.rr.pause();
-        await this.session?.core.writeHistoryClock();
-        this.enqueueFrontendUpdate();
+        await this.session.core.writeHistoryClock();
+        this.updateFrontend();
         return ok;
       }
       case 'player/seek': {
         assert(this.session?.isLoaded());
         this.session.rr.seek(req.clock);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
+        return ok;
+      }
+      case 'player/comment': {
+        assert(this.session);
+        await this.postComment(this.session, req.text, req.clock);
+        this.updateFrontend();
+        return ok;
+      }
+      case 'player/likeSession': {
+        assert(this.session);
+        await this.likeSession(this.session, req.value);
+
+        this.updateFrontend();
         return ok;
       }
       // case 'player/update': {
@@ -381,78 +491,65 @@ class CodeMic {
       //   // this.player.updateState(req.changes);
       //   // return ok
       // }
-      case 'recorder/open': {
-        if (req.sessionId) {
-          await this.openRecorderExistingSession(req.sessionId, req.clock, req.fork);
-        } else {
-          await this.openRecorderNewSession();
-        }
-
-        this.enqueueFrontendUpdate();
-        return ok;
-      }
       case 'recorder/openTab': {
         assert(this.session);
         assert(this.recorder);
-        if (req.tabId === 'editor-view' && !this.session.isLoaded()) {
-          await this.loadRecorder();
-        } else {
-          this.recorder.tabId = req.tabId;
-        }
-        this.enqueueFrontendUpdate();
+        assert(req.tabId !== 'editor-view' || this.session.isLoaded());
+        this.recorder.tabId = req.tabId;
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/load': {
         await this.loadRecorder();
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/record': {
         assert(this.session?.isLoaded());
         await this.session.rr.record();
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/play': {
         assert(this.session?.isLoaded());
         await this.session.rr.play();
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/pause': {
         assert(this.session?.isLoaded());
         this.session.rr.pause();
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/seek': {
         assert(this.session?.isLoaded());
         await this.session.rr.seek(req.clock);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/save': {
         assert(this.session?.isLoaded());
         await this.writeSession({ pause: true });
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/publish': {
         try {
           assert(this.session?.isLoaded());
-          // let sessionHead: t.SessionHead;
           await this.writeSession({ pause: true });
           await this.context.withProgress(
             { title: `Publishing session ${this.session.head.handle}`, cancellable: true },
             async (progress, abortController) => {
-              await this.session!.core.publish({ progress, abortController });
+              assert(this.session?.isLoaded());
+              await this.session.core.publish({ progress, abortController });
               vscode.window.showInformationMessage('Published session.');
             },
           );
         } catch (error) {
           this.showError(error as Error);
         }
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'getStore': {
@@ -476,7 +573,7 @@ class CodeMic {
         // const cmds = this.session.editor.undo();
         // await this.session.rr.unapplyCmds(cmds);
         // console.log('Undo: ', cmds);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/redo': {
@@ -485,20 +582,20 @@ class CodeMic {
         // const cmds = this.session.editor.redo();
         // await this.session.rr.applyCmds(cmds);
         // console.log('Redo: ', cmds);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/updateDetails': {
         assert(this.session);
         this.session.editor.updateDetails(req.changes);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       // case 'recorder/updateDuration': {
       //   assert(this.session);
       //   this.session.editor.updateDuration(req.duration);
       //   // await this.session.rr?.applyCmds([cmd]);
-      //   this.enqueueFrontendUpdate();
+      //   this.updateFrontend();
       //   return ok;
       // }
       case 'recorder/insertAudio': {
@@ -506,7 +603,7 @@ class CodeMic {
         // await this.session.commander.insertAudioTrack(req.uri, req.clock);
         const cmd = await this.session.editor.createInsertAudioTrack(req.uri, req.clock);
         await this.session.commander.applyInsertAudioTrack(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteAudio': {
@@ -514,7 +611,7 @@ class CodeMic {
         // await this.session.commander.deleteAudioTrack(req.id);
         const cmd = this.session.editor.createDeleteAudioTrack(req.id);
         await this.session.commander.applyDeleteAudioTrack(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/updateAudio': {
@@ -522,7 +619,7 @@ class CodeMic {
         // await this.session.commander.updateAudioTrack(req.update);
         const cmd = this.session.editor.createUpdateAudioTrack(req.update);
         if (cmd) await this.session.commander.applyUpdateAudioTrack(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/insertVideo': {
@@ -530,7 +627,7 @@ class CodeMic {
         // await this.session.commander.insertVideoTrack(req.uri, req.clock);
         const cmd = await this.session.editor.createInsertVideoTrack(req.uri, req.clock);
         await this.session.commander.applyInsertVideoTrack(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteVideo': {
@@ -538,7 +635,7 @@ class CodeMic {
         // await this.session.commander.deleteVideoTrack(req.id);
         const cmd = this.session.editor.createDeleteVideoTrack(req.id);
         await this.session.commander.applyDeleteVideoTrack(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/updateVideo': {
@@ -546,20 +643,20 @@ class CodeMic {
         // await this.session.commander.updateVideoTrack(req.update);
         const cmd = this.session.editor.createUpdateVideoTrack(req.update);
         if (cmd) await this.session.commander.applyUpdateVideoTrack(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/setCover': {
         // assert(this.session?.isLoaded());
         assert(this.session);
         await this.session.editor.setCover(req.uri);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteCover': {
         assert(this.session?.isLoaded());
         await this.session.editor.deleteCover();
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/changeSpeed': {
@@ -567,7 +664,7 @@ class CodeMic {
         // await this.session.commander.changeSpeed(req.range, req.factor);
         const cmd = this.session.editor.createChangeSpeed(req.range, req.factor);
         await this.session.commander.applyChangeSpeed(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/merge': {
@@ -575,7 +672,7 @@ class CodeMic {
         // await this.session.commander.merge(req.range);
         const cmd = this.session.editor.createMerge(req.range);
         await this.session.commander.applyMerge(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/insertGap': {
@@ -583,28 +680,28 @@ class CodeMic {
         // await this.session.commander.insertGap(req.clock, req.dur);
         const cmd = this.session.editor.createInsertGap(req.clock, req.dur);
         await this.session.commander.applyInsertGap(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/insertChapter': {
         assert(this.session?.isLoaded());
         const cmd = this.session.editor.createInsertChapter(req.clock, req.title);
         await this.session.commander.applyInsertChapter(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/updateChapter': {
         assert(this.session?.isLoaded());
         const cmd = this.session.editor.createUpdateChapter(req.index, req.update);
         await this.session.commander.applyUpdateChapter(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteChapter': {
         assert(this.session?.isLoaded());
         const cmd = this.session.editor.createDeleteChapter(req.index);
         await this.session.commander.applyDeleteChapter(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
       case 'recorder/crop': {
@@ -612,71 +709,32 @@ class CodeMic {
         // await this.session.commander.crop(req.clock);
         const cmd = this.session.editor.createCrop(req.clock);
         await this.session.commander.applyCrop(cmd);
-        this.enqueueFrontendUpdate();
+        this.updateFrontend();
         return ok;
       }
-      case 'confirmForkFromPlayer': {
-        if (!this.session?.isLoaded() || !this.session.rr.playing) {
-          return { type: 'boolean', value: true };
-        }
+      // case 'confirmForkFromPlayer': {
+      //   if (!this.session?.isLoaded() || !this.session.rr.playing) {
+      //     return { type: 'boolean', value: true };
+      //   }
 
-        const wasRunning = this.session.rr.playing;
-        this.session.rr.pause();
+      //   const wasRunning = this.session.rr.playing;
+      //   this.session.rr.pause();
 
-        const confirmTitle = 'Fork';
-        const answer = await vscode.window.showWarningMessage(
-          `Do you want to stop playing and fork the current session?`,
-          { modal: true },
-          { title: 'Cancel', isCloseAffordance: true },
-          { title: confirmTitle },
-        );
-        if (answer?.title != confirmTitle && wasRunning) {
-          await this.session.rr.play();
-        }
-        this.enqueueFrontendUpdate();
-        return { type: 'boolean', value: answer?.title === confirmTitle };
-      }
-      case 'confirmEditFromPlayer': {
-        if (!this.session?.isLoaded() || !this.session.rr.playing) {
-          return { type: 'boolean', value: true };
-        }
-        const wasRunning = this.session.rr.playing;
-        this.session.rr.pause();
-
-        const confirmTitle = 'Edit';
-        const answer = await vscode.window.showWarningMessage(
-          `Do you want to stop playing and edit the current session at ${lib.formatTimeSeconds(req.clock)}?`,
-          { modal: true },
-          { title: 'Cancel', isCloseAffordance: true },
-          { title: confirmTitle },
-        );
-        if (answer?.title != confirmTitle && wasRunning) {
-          await this.session.rr.play();
-        }
-        this.enqueueFrontendUpdate();
-        return { type: 'boolean', value: answer?.title === confirmTitle };
-      }
-      case 'deleteSession': {
-        const history = this.context.settings.history[req.sessionId];
-        if (history) {
-          const session = await Session.Core.fromLocal(this.context, history.workspace);
-          if (session) {
-            const confirmTitle = 'Delete';
-            const answer = await vscode.window.showWarningMessage(
-              `Do you want to delete session "${session.head?.title || 'Untitled'}"?`,
-              { modal: true },
-              { title: 'Cancel', isCloseAffordance: true },
-              { title: confirmTitle },
-            );
-            if (answer?.title === confirmTitle) {
-              await session.core.delete();
-            }
-          }
-        }
-
-        this.enqueueFrontendUpdate();
-        return ok;
-      }
+      //   const confirmTitle = 'Fork';
+      //   const answer = await vscode.window.showWarningMessage(
+      //     `Do you want to stop playing and fork the current session?`,
+      //     { modal: true },
+      //     { title: 'Cancel', isCloseAffordance: true },
+      //     { title: confirmTitle },
+      //   );
+      //   if (answer?.title != confirmTitle && wasRunning) {
+      //     await this.session.rr.play();
+      //   }
+      //   this.updateFrontend();
+      //   return { type: 'boolean', value: answer?.title === confirmTitle };
+      // }
+      // case 'confirmEditFromPlayer': {
+      // }
       case 'audio': {
         assert(this.session?.isLoaded());
         this.session.rr.handleFrontendAudioEvent(req.event);
@@ -697,74 +755,69 @@ class CodeMic {
     }
   }
 
-  async openRecorderExistingSession(sessionId: string, clock?: number, fork?: boolean) {
-    if (fork) {
-      // Fork existing session.
-      // const user = this.context.user && lib.userToUserSummary(this.context.user);
-      // session = await Session.Core.fromFork(this.context, sessionId, { author: user });
+  // async openRecorderExistingSession(sessionId: string, clock?: number, fork?: boolean) {
+  //   if (fork) {
+  //     // Fork existing session.
+  //     // const user = this.context.user && lib.userToUserSummary(this.context.user);
+  //     // session = await Session.Core.fromFork(this.context, sessionId, { author: user });
 
-      // TODO we may need to download the session. Where to download it to?
-      //      what should the handle be? where to store the session data?
-      vscode.window.showErrorMessage('TODO: support forking session.');
-      return;
-    }
+  //     // TODO we may need to download the session. Where to download it to?
+  //     //      what should the handle be? where to store the session data?
+  //     vscode.window.showErrorMessage('TODO: support forking session.');
+  //     return;
+  //   }
 
-    // Edit existing session.
-    const session = await this.findRequestedSessionById(sessionId);
-    if (session) {
-      session.core.assertFormatVersionSupport();
-      await session.core.download({ skipIfExists: true });
+  //   // Edit existing session.
+  //   const session = this.findSessionInWelcomeById(sessionId);
+  //   if (session) {
+  //     session.core.assertFormatVersionSupport();
+  //     await session.download({ skipIfExists: true });
 
-      if (await this.closeCurrentScreen()) {
-        this.setSession(session);
-        this.setScreen(t.Screen.Recorder);
-        this.recorder = { tabId: 'details-view' };
+  //     await this.openScreen({ screen: t.Screen.Recorder, session, tabId: 'details-view', clock });
 
-        // Write history. Do it before setUpWorkspace because that may cause vscode restart.
-        await session.core.writeHistoryRecording();
+  //     // if (await this.closeCurrentScreen()) {
+  //     //   this.setSession(session);
+  //     //   this.setScreen(t.Screen.Recorder);
+  //     //   this.recorder = { tabId: 'details-view' };
 
-        // This might trigger a vscode restart in which case nothing after this line will run.
-        // After restart, this.restoreStateAfterRestart() will be called and it will recreate
-        // the session, call session.prepare(), and set the screen.
-        await this.setUpWorkspace_MAY_RESTART_VSCODE({ recorder: { clock, tabId: this.recorder.tabId } });
+  //     //   // Write history. Do it before setUpWorkspace because that may cause vscode restart.
+  //     //   await session.core.writeHistoryRecording();
 
-        // Must be called after setUpWorkspace
-        await this.session!.prepare({ clock });
-      }
-    } else {
-      this.showError(new Error(`Could not find requested session.`));
-    }
-  }
+  //     //   // This might trigger a vscode restart in which case nothing after this line will run.
+  //     //   // After restart, this.restoreStateAfterRestart() will be called and it will recreate
+  //     //   // the session, call session.prepare(), and set the screen.
+  //     //   await this.setUpWorkspace_MAY_RESTART_VSCODE({ recorder: { clock, tabId: this.recorder.tabId } });
 
-  async openRecorderNewSession() {
-    const user = this.context.user && lib.userToUserSummary(this.context.user);
-    // For new sessions, user will manually call recorder/load which will call setUpWorkspace.
-    const head = Session.Core.makeNewHead(user?.username);
-    const workspace =
-      VscWorkspace.getDefaultVscWorkspace() ??
-      path.join(paths.getDefaultWorkspaceBasePath(osPaths.home), user?.username ?? 'anonym', 'new_session');
+  //     //   // Must be called after setUpWorkspace
+  //     //   await this.session!.prepare({ clock });
+  //     // }
+  //   } else {
+  //     this.showError(new Error(`Could not find requested session.`));
+  //   }
+  // }
 
-    // if (!workspace) {
-    //   const options = {
-    //     canSelectFiles: false,
-    //     canSelectFolders: true,
-    //     canSelectMany: false,
-    //     title: 'Select a directory to start recording.',
-    //   };
-    //   const uris = await vscode.window.showOpenDialog(options);
-    //   if (uris?.length === 1) workspace = path.abs(uris[0].path);
-    // }
+  // async openRecorderNewSession() {
+  //   const user = this.context.user && lib.userToUserSummary(this.context.user);
+  //   // For new sessions, user will manually call recorder/load which will call setUpWorkspace.
+  //   const head = Session.Core.makeNewHead(user?.username);
+  //   const workspace =
+  //     VscWorkspace.getDefaultVscWorkspace() ??
+  //     path.join(paths.getDefaultWorkspaceBasePath(osPaths.home), user?.username ?? 'anonym', 'new_session');
 
-    const session = await Session.Core.fromNew(this.context, workspace, head);
+  //   const session = await Session.Core.fromNew(this.context, workspace, head);
+  //   await this.openScreen({ screen: t.Screen.Recorder, session, tabId: 'details-view' });
 
-    if (await this.closeCurrentScreen()) {
-      this.setSession(session);
-      this.setScreen(t.Screen.Recorder);
-      this.recorder = { tabId: 'details-view' };
-    }
-  }
+  //   // if (await this.closeCurrentScreen()) {
+  //   //   this.setSession(session);
+  //   //   this.setScreen(t.Screen.Recorder);
+  //   //   this.recorder = { tabId: 'details-view' };
+  //   // }
+  // }
 
   async loadRecorder() {
+    // This is currently only used on temp sessions. Previously, it used to be used on committed
+    // sessions too but decided that session must be fully loaded on opening recorder.
+
     assert(this.session);
     assert(this.recorder);
 
@@ -821,8 +874,9 @@ class CodeMic {
 
   setScreen(screen: t.Screen) {
     this.screen = screen;
+    vscode.commands.executeCommand('setContext', 'codemic.canOpenHome', screen !== t.Screen.Welcome);
+    vscode.commands.executeCommand('setContext', 'codemic.canRefreshHome', screen === t.Screen.Welcome);
     this.updateViewTitle();
-    vscode.commands.executeCommand('setContext', 'codemic.canOpenWelcome', screen !== t.Screen.Welcome);
   }
 
   setSession(session: Session) {
@@ -846,95 +900,166 @@ class CodeMic {
     }
   }
 
-  async openWelcome() {
-    if (this.screen !== t.Screen.Welcome) {
-      await this.closeCurrentScreen();
-    }
-  }
-
-  async openWelcomeCommand() {
-    await this.openWelcome();
-    await this.updateFrontend();
-  }
-
-  async openAccount(options?: { join?: boolean }) {
-    if (await this.closeCurrentScreen()) {
-      this.account = {
-        credentials: {
-          email: this.context.earlyAccessEmail ?? '',
-          username: '',
-          password: '',
-        },
-        join: options?.join ?? false,
-      };
-      this.setScreen(t.Screen.Account);
-    }
-  }
-
-  async openAccountCommand() {
-    await this.openAccount();
-    await this.updateFrontend();
-  }
-
-  // async scanOrLoadRecorder(options?: { afterRestart: boolean }) {
-  //   assert(this.session);
-  //   assert(this.session?.isLoaded())
-
+  // async openWelcome() {
+  //   if (await this.closeCurrentScreen()) {
+  //     await this.updateFrontend();
+  //     this.updateWelcome().catch(console.error); // Do not await.
+  //   }
   // }
 
-  // async loadPlayer(options?: { afterRestart: boolean }) {
-  //   assert(this.session?.isLoaded())
-
+  // async openAccount(options?: { join?: boolean }) {
+  //   if (await this.closeCurrentScreen()) {
+  //     this.account = {
+  //       credentials: {
+  //         email: this.context.earlyAccessEmail ?? '',
+  //         username: '',
+  //         password: '',
+  //       },
+  //       join: options?.join ?? false,
+  //     };
+  //     this.setScreen(t.Screen.Account);
+  //     await this.updateFrontend();
+  //   }
   // }
+
+  async openScreen(params: OpenScreenParams): Promise<void> {
+    // NOTE: opening the same screen is akin to F5 refresh and used for the refreshHome command.
+    // if (params.screen === this.screen) return;
+
+    if (!(await this.closeCurrentScreen())) return;
+
+    switch (params.screen) {
+      case t.Screen.Loading: {
+        this.setScreen(t.Screen.Loading);
+        await this.updateFrontend();
+        break;
+      }
+      case t.Screen.Account: {
+        this.account = {
+          credentials: {
+            email: this.context.earlyAccessEmail ?? '',
+            username: '',
+            password: '',
+          },
+          join: Boolean(params.join),
+        };
+        this.setScreen(t.Screen.Account);
+        await this.updateFrontend();
+        break;
+      }
+      case t.Screen.Player: {
+        this.setSession(params.session);
+        this.enrichSessions([params.session], { refreshPublication: true }).catch(console.error);
+        this.setScreen(t.Screen.Player);
+        await this.updateFrontend();
+        break;
+      }
+      case t.Screen.Recorder: {
+        params.session.core.assertFormatVersionSupport();
+        await params.session.download({ skipIfExists: true });
+        this.setSession(params.session);
+        assert(this.session);
+
+        this.enrichSessions([this.session], { refreshPublication: true }).catch(console.error);
+        this.recorder = { tabId: params.tabId };
+
+        // A non-temp session must be loaded immediately.
+        if (!this.session.temp) {
+          // Write history. Do it before setUpWorkspace because that may cause vscode restart.
+          await this.session.core.writeHistoryRecording();
+
+          // This might trigger a vscode restart in which case nothing after this line will run.
+          // After restart, this.restoreStateAfterRestart() will be called and it will recreate
+          // the session, call session.prepare(), and set the screen.
+          await this.setUpWorkspace_MAY_RESTART_VSCODE({ recorder: { tabId: params.tabId, clock: params.clock } });
+
+          // Must be called after setUpWorkspace
+          await this.session.prepare({ clock: params.clock });
+        }
+
+        this.setScreen(t.Screen.Recorder);
+        await this.updateFrontend();
+        break;
+      }
+      case t.Screen.Welcome: {
+        const current = await this.getSessionOfDefaultVscWorkspace();
+        const recent = await this.getRecentSessions();
+        this.welcome = {
+          current,
+          recent,
+          loading: true,
+        };
+
+        // Do not block the welcome screen while enriching current and recent sessions.
+        this.enrichSessions(_.compact([current, ...recent]), { refreshPublication: true }).catch(console.error);
+
+        // Do not block the welcome screen while fetching featured sessions.
+        (async () => {
+          try {
+            const featured = await this.fetchFeaturedSessions();
+            if (this.welcome) {
+              this.welcome.featured = featured;
+              this.enrichSessions(featured);
+            }
+          } catch (error) {
+            console.error(error);
+          } finally {
+            if (this.welcome) this.welcome.loading = false;
+          }
+        })();
+
+        this.setScreen(t.Screen.Welcome);
+        await this.updateFrontend();
+        break;
+      }
+      default:
+        lib.unreachable(params);
+    }
+  }
 
   async closeCurrentScreen(): Promise<boolean> {
-    let canClose = true;
-    if (this.screen === t.Screen.Account) {
-      canClose = await this.accountWillClose();
-    } else if (this.screen === t.Screen.Recorder) {
-      canClose = await this.recorderWillClose();
-    } else if (this.screen === t.Screen.Player) {
-      canClose = await this.playerWillClose();
+    switch (this.screen) {
+      case t.Screen.Loading: {
+        break;
+      }
+      case t.Screen.Account: {
+        this.account = undefined;
+        break;
+      }
+      case t.Screen.Player: {
+        this.session?.rr?.pause();
+        this.session = undefined;
+        break;
+      }
+      case t.Screen.Recorder: {
+        assert(this.session);
+        if (this.session.mustScan) {
+          const cancel = 'Cancel';
+          const exit = 'Exit';
+          const answer = await vscode.window.showWarningMessage(
+            'Are you sure you want to exit the recorder?',
+            { modal: true, detail: 'Your changes will be lost if you exit.' },
+            { title: cancel, isCloseAffordance: true },
+            { title: exit },
+          );
+
+          if (answer?.title !== exit) return false;
+        }
+
+        await this.writeSession({ pause: true });
+        await this.session.core.gcBlobs();
+        this.session = undefined;
+        this.recorder = undefined;
+        break;
+      }
+      case t.Screen.Welcome: {
+        break;
+      }
+      default:
+        lib.unreachable(this.screen);
     }
 
-    if (canClose) {
-      this.setScreen(t.Screen.Welcome);
-    }
-    return canClose;
-  }
-
-  async accountWillClose(): Promise<boolean> {
-    this.account = undefined;
-    return true;
-  }
-
-  async recorderWillClose(): Promise<boolean> {
-    assert(this.session);
-    if (this.session.mustScan) {
-      const cancel = 'Cancel';
-      const exit = 'Exit';
-      const answer = await vscode.window.showWarningMessage(
-        'Are you sure you want to exit the recorder?',
-        { modal: true, detail: 'Your changes will be lost if you exit.' },
-        { title: cancel, isCloseAffordance: true },
-        { title: exit },
-      );
-
-      return answer?.title === exit;
-    }
-
-    await this.writeSession({ pause: true });
-    await this.session.core.gcBlobs();
-    this.session = undefined;
-    this.recorder = undefined;
-    return true;
-  }
-
-  async playerWillClose(): Promise<boolean> {
-    if (this.session?.rr?.running) {
-      this.session.rr.pause();
-    }
-    this.session = undefined;
+    this.setScreen(t.Screen.Loading);
     return true;
   }
 
@@ -963,44 +1088,77 @@ class CodeMic {
 
   writeSessionThrottled = _.throttle(this.writeSessionThrottledCommit, SAVE_TIMEOUT_MS, { leading: false });
 
-  async updateWelcome() {
-    // Update user avatar.
-    if (this.context.user) {
-      await serverApi.downloadAvatar(this.context.user.username).catch(console.error);
-    }
+  // async downloadSessionsPublication(sessionIds: string[]) {
+  //   const { type, publications } = await serverApi.send(
+  //     { type: 'sessions/publication', sessionIds },
+  //     this.context.user?.token,
+  //   );
+  //   assert(type === 'sessionPublication');
+  //   throw new Error('TODO'); // what to do with the publications?
+  // }
 
-    // Update Workspace cover and avatar.
-    try {
-      const workspace = VscWorkspace.getDefaultVscWorkspace();
-      const session = workspace && (await Session.Core.fromLocal(this.context, workspace));
-      if (session) {
-        if (session.head.author) await serverApi.downloadAvatar(session.head.author).catch(console.error);
-        await cache.copyCover(session.core.dataPath, session.head.id).catch(console.error);
-      }
-    } catch (error) {
-      console.error(error);
-    }
+  // async updateWelcome() {
+  //   try {
+  //     const welcome: t.WelcomeUIState = {
+  //       recent: [],
+  //       featured: [],
+  //       loading: true,
+  //     };
+  //     this.welcome = welcome;
 
-    this.loadingFeatured = true;
-    await this.updateFrontend();
+  //     // Update user avatar.
+  //     const loadUser = async () => {
+  //       if (this.context.user) {
+  //         serverApi.downloadAvatar(this.context.user.username, this.context.user.token);
+  //       }
+  //     };
 
-    // Update featured sessions.
-    try {
-      const res = await serverApi.send({ type: 'featured/get' }, this.context.user?.token);
-      this.featured = res.sessionHeads;
-      const cachePromises = this.featured.flatMap(head => [
-        serverApi.downloadSessionCover(head.id).catch(console.error),
-        head.author && serverApi.downloadAvatar(head.author).catch(console.error),
-      ]);
-      await Promise.all(cachePromises);
-    } catch (error) {
-      console.error(error);
-      vscode.window.showErrorMessage('Failed to fetch featured items:', (error as Error).message);
-    } finally {
-      this.loadingFeatured = false;
-    }
-    await this.updateFrontend();
-  }
+  //     // Update Workspace cover and avatar.
+  //     const loadCurrent = async () => {
+  //       const session = await this.getSessionOfDefaultVscWorkspace();
+  //       welcome.current = session?.head;
+  //       if (!session) return;
+
+  //       const innerPromises = [
+  //         session.head.author && serverApi.downloadAvatar(session.head.author, this.context.user?.token),
+  //         cache.copyCover(session.core.dataPath, session.head.id),
+  //         this.downloadSessionsPublication([session.head.id]),
+  //       ];
+  //       lib.logRejectedPromises(await Promise.allSettled(innerPromises));
+  //     };
+
+  //     const loadFeatured = async () => {
+  //       const { sessionHeads } = await serverApi.send({ type: 'sessions/featured' }, this.context.user?.token);
+  //       welcome.featured = sessionHeads;
+
+  //       const innerPromises = sessionHeads.flatMap(head => [
+  //         serverApi.downloadSessionCover(head.id, this.context.user?.token),
+  //         head.author && serverApi.downloadAvatar(head.author, this.context.user?.token),
+  //         this.downloadSessionsPublication(sessionHeads.map(h => h.id)),
+  //       ]);
+  //       lib.logRejectedPromises(await Promise.allSettled(innerPromises));
+  //     };
+
+  //     // TODO load recent sessions
+
+  //     const promises = [loadUser(), loadCurrent(), loadFeatured()];
+  //     lib.logRejectedPromises(await Promise.allSettled(promises));
+
+  //     // Update featured sessions.
+  //     // try {
+  //     // } catch (error) {
+  //     //   console.error(error);
+  //     //   vscode.window.showErrorMessage('Failed to fetch featured items:', (error as Error).message);
+  //     // } finally {
+  //     //   this.loadingFeatured = false;
+  //     // }
+  //     await this.updateFrontend();
+  //   } catch (error) {
+  //     this.showError(error as Error);
+  //   } finally {
+  //     if (this.welcome) this.welcome.loading = false;
+  //   }
+  // }
 
   openView() {
     this.context.webviewProvider.show();
@@ -1025,9 +1183,7 @@ class CodeMic {
     this.context.extension.globalState.update('user', user);
     this.context.extension.globalState.update('earlyAccessEmail', undefined);
 
-    this.updateWelcome().catch(console.error); // do not await
-
-    await this.openWelcome();
+    await this.openScreen({ screen: t.Screen.Welcome });
   }
 
   async updateFrontend() {
@@ -1042,13 +1198,13 @@ class CodeMic {
     }
   }
 
-  enqueueFrontendUpdate() {
-    assert(
-      this.frontendUpdateBlockCounter > 0,
-      'It does not make much sense to call enqueueFrontendUpdate() when frontend update is not blocked. Call updateFrontend() directly.',
-    );
-    this.isFrontendDirty = true;
-  }
+  // updateFrontend() {
+  //   assert(
+  //     this.frontendUpdateBlockCounter > 0,
+  //     'It does not make much sense to call updateFrontend() when frontend update is not blocked. Call updateFrontend() directly.',
+  //   );
+  //   this.isFrontendDirty = true;
+  // }
 
   frontendUpdateBlockInc() {
     this.frontendUpdateBlockCounter++;
@@ -1083,32 +1239,13 @@ class CodeMic {
   //     .toString();
   // }
 
-  async findRequestedSessionById(sessionId: string): Promise<Session | undefined> {
-    // Check session in current VSC workspace.
-    {
-      const current = await this.getSessionOfDefaultVscWorkspace();
-      if (current?.head.id === sessionId) return current;
-    }
-
-    // Check session in history.
-    try {
-      const history = this.context.settings.history[sessionId];
-      if (history && (await Session.Core.sessionExists(history.workspace))) {
-        return await Session.Core.fromLocal(this.context, history.workspace);
-      }
-    } catch (error) {
-      console.error(error);
-    }
-
-    // Check session in featured.
-    try {
-      const featured = this.featured?.find(s => s.id === sessionId);
-      if (featured) {
-        return await Session.Core.fromRemote(this.context, featured);
-      }
-    } catch (error) {
-      console.error(error);
-    }
+  findSessionInWelcomeById(sessionId: string): Session {
+    assert(this.welcome);
+    const session = [this.welcome.current, ...this.welcome.recent, ...(this.welcome.featured ?? [])].find(
+      s => s?.head.id === sessionId,
+    );
+    assert(session);
+    return session;
   }
 
   async getSessionOfDefaultVscWorkspace(): Promise<Session | undefined> {
@@ -1120,6 +1257,68 @@ class CodeMic {
     } catch (error) {
       console.error(error);
     }
+  }
+
+  async getRecentSessions(): Promise<Session[]> {
+    const recent: Session[] = [];
+    for (const history of Object.values(this.context.settings.history)) {
+      try {
+        const session = await Session.Core.fromLocal(this.context, history.workspace);
+        if (!session || session.head.id !== history.id) continue;
+
+        recent.push(session);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+    return recent;
+  }
+
+  async fetchFeaturedSessions(): Promise<Session[]> {
+    try {
+      const { sessionHeads } = await serverApi.send({ type: 'sessions/featured' }, this.context.user?.token);
+      return Promise.all(sessionHeads.map(h => Session.Core.fromRemote(this.context, h)));
+    } catch (error) {
+      this.showError(error as Error);
+      return [];
+    }
+  }
+
+  async enrichSessions(sessions: Session[], options?: { refreshPublication?: boolean }) {
+    // We shouldn't download the cover of a session that is on disk.
+    // The one on disk may be newer (author may be editing it locally).
+
+    // TODO
+    console.log(
+      `enriching sessions (refreshPublication: ${options?.refreshPublication ?? false}): `,
+      sessions.map(s => s.head.handle).join(', '),
+    );
+    await this.updateFrontend();
+
+    // await this.updateFrontend();
+  }
+
+  async likeSession(session: Session, value: boolean) {
+    // TODO
+    console.log(`${value ? 'liking' : 'unliking'} session: ${session.head.handle}`);
+    return;
+
+    // if (!this.context.user) throw new Error('Please join/login to like sessions.');
+    // await serverApi.send({ type: 'session/like/toggle', sessionId: req.sessionId }, this.context.user.token);
+    // await this.enrichSessions([session]);
+  }
+
+  async postComment(session: Session, text: string, clock?: number) {
+    // TODO
+    console.log(`commenting on session: ${session.head.handle}`);
+    return;
+
+    // assert(this.context.user, 'Please join/login to post comments.');
+    // await serverApi.send(
+    //   { type: 'session/comment/post', sessionId: this.session.head.id, text: req.text, clock: req.clock },
+    //   this.context.user.token,
+    // );
+    // await this.enrichSessions([session]);
   }
 
   async getStore(): Promise<t.Store> {
@@ -1138,38 +1337,22 @@ class CodeMic {
         workspace: this.session.workspace,
         dataPath: this.session.core.dataPath,
         history: this.context.settings.history[this.session.head.id],
-        // Get cover from cache because session may not be on disk.
-        // coverUri: this.getCoverCacheUri(this.session.head.id),
         workspaceFocusTimeline: this.session.body?.focusTimeline,
         audioTracks: this.session.body?.audioTracks,
         videoTracks: this.session.body?.videoTracks,
-        // blobsUriMap: this.session.rr?.vscWorkspace.getBlobsUriMap(),
-        comments: COMMENTS[this.session.head.id],
       };
     }
 
     let welcome: t.WelcomeUIState | undefined;
     if (this.screen === t.Screen.Welcome) {
-      // Gather recent sessions.
-      const recent: t.SessionHead[] = [];
-      for (const history of Object.values(this.context.settings.history)) {
-        try {
-          const session = await Session.Core.fromLocal(this.context, history.workspace);
-          if (!session || session.head.id !== history.id) continue;
-
-          recent.push(session.head);
-        } catch (error) {
-          console.error(error);
-        }
-      }
-
+      assert(this.welcome);
       welcome = {
-        current: (await this.getSessionOfDefaultVscWorkspace())?.head,
-        recent,
-        featured: this.featured || [],
+        loading: this.welcome?.loading,
+        recent: this.welcome.recent.map(s => s.head),
+        current: this.welcome.current?.head,
+        featured: this.welcome.featured?.map(s => s.head),
+        error: this.welcome.error,
         history: this.context.settings.history,
-        error: this.welcomeError,
-        loadingFeatured: this.loadingFeatured,
       };
     }
 
@@ -1198,174 +1381,6 @@ const SCREEN_TITLES = {
   [t.Screen.Player]: 'player',
   [t.Screen.Recorder]: 'studio',
   [t.Screen.Loading]: 'loading',
-};
-
-const COMMENTS: Record<string, t.Comment[]> = {
-  '1d87d99d-e0d4-4631-8a0b-b531e47d2a8a': [
-    {
-      id: 'c1',
-      author: 'jason_walker',
-      text: 'This brings back so many memories! Love seeing how the old code works.',
-      likes: 15,
-      dislikes: 0,
-      creation_timestamp: '2024-07-02T14:35:00Z',
-    },
-    {
-      id: 'c2',
-      author: 'marcusstone',
-      text: 'Wow, the AI logic was ahead of its time. Great breakdown!',
-      likes: 22,
-      dislikes: 1,
-      creation_timestamp: '2024-07-04T09:12:00Z',
-    },
-    {
-      id: 'c3',
-      author: 'alexturner',
-      text: "Never thought I'd be tweaking DOOM's code in 2024. Thanks for this!",
-      likes: 18,
-      dislikes: 0,
-      creation_timestamp: '2024-06-28T18:47:00Z',
-    },
-    {
-      id: 'c4',
-      author: 'ashley_taylor',
-      text: 'The way you explain the architecture makes it so easy to follow. Awesome content!',
-      likes: 25,
-      dislikes: 0,
-      creation_timestamp: '2024-07-10T11:30:00Z',
-    },
-    {
-      id: 'c5',
-      author: 'emily_james',
-      text: "I've always wondered how the AI worked in DOOM. Super insightful!",
-      likes: 30,
-      dislikes: 2,
-      creation_timestamp: '2024-08-01T16:20:00Z',
-    },
-    {
-      id: 'c6',
-      author: 'matthughes',
-      text: "Your enthusiasm for the game is infectious. Can't wait to try these tweaks myself!",
-      likes: 12,
-      dislikes: 0,
-      creation_timestamp: '2024-07-15T14:45:00Z',
-    },
-    {
-      id: 'c7',
-      author: 'ethanross',
-      text: 'I didn’t realize how complex the enemy logic was. This is gold!',
-      likes: 20,
-      dislikes: 1,
-      creation_timestamp: '2024-06-30T10:15:00Z',
-    },
-    {
-      id: 'c8',
-      author: 'samuelgreen',
-      text: 'Perfect mix of nostalgia and learning. Keep these deep dives coming!',
-      likes: 28,
-      dislikes: 0,
-      creation_timestamp: '2024-07-18T12:50:00Z',
-    },
-    {
-      id: 'c9',
-      author: 'andrew_clark',
-      text: 'Watching this made me want to fire up DOOM again. Great video!',
-      likes: 16,
-      dislikes: 0,
-      creation_timestamp: '2024-08-05T17:10:00Z',
-    },
-    {
-      id: 'c10',
-      author: 'chrismiller',
-      text: 'Can’t believe how well you explained such a complex system. Subscribed for more!',
-      likes: 35,
-      dislikes: 0,
-      creation_timestamp: '2024-07-22T14:22:00Z',
-    },
-  ],
-
-  '6f9e08ff-be59-41ee-a082-803f22f67711': [
-    {
-      id: 'c11',
-      author: 'chrismiller',
-      text: 'I had no idea Minetest had such a solid rendering engine. Awesome breakdown!',
-      likes: 19,
-      dislikes: 0,
-      creation_timestamp: '2024-08-10T10:12:00Z',
-    },
-    {
-      id: 'c12',
-      author: 'andrew_clark',
-      text: 'This is exactly what I was looking for! Great explanation of the OpenGL renderer.',
-      likes: 24,
-      dislikes: 1,
-      creation_timestamp: '2024-07-28T16:35:00Z',
-    },
-    {
-      id: 'c13',
-      author: 'emily_james',
-      text: 'The design choices here are fascinating. Minetest is truly underrated!',
-      likes: 22,
-      dislikes: 0,
-      creation_timestamp: '2024-07-05T11:27:00Z',
-    },
-    {
-      id: 'c14',
-      author: 'alexturner',
-      text: 'Love seeing the OpenGL details. Can you do a deeper dive into the shaders next?',
-      likes: 18,
-      dislikes: 0,
-      creation_timestamp: '2024-08-02T14:47:00Z',
-    },
-    {
-      id: 'c15',
-      author: 'marcusstone',
-      text: 'Minetest deserves more attention, especially with such a capable renderer!',
-      likes: 26,
-      dislikes: 0,
-      creation_timestamp: '2024-06-30T13:59:00Z',
-    },
-    {
-      id: 'c16',
-      author: 'jason_walker',
-      text: 'This video helped me appreciate the rendering process so much more. Thanks!',
-      likes: 20,
-      dislikes: 1,
-      creation_timestamp: '2024-07-15T09:45:00Z',
-    },
-    {
-      id: 'c17',
-      author: 'ethanross',
-      text: 'Breaking down OpenGL in Minetest is no small feat. Thanks for making it accessible!',
-      likes: 17,
-      dislikes: 0,
-      creation_timestamp: '2024-08-07T15:30:00Z',
-    },
-    {
-      id: 'c18',
-      author: 'marcusstone',
-      text: 'I’ve been playing Minetest for years, but never knew how the rendering worked. Awesome!',
-      likes: 23,
-      dislikes: 0,
-      creation_timestamp: '2024-07-22T12:10:00Z',
-    },
-    {
-      id: 'c19',
-      author: 'emily_james',
-      text: 'Amazing content! Can’t wait to see more videos on rendering engines.',
-      likes: 28,
-      dislikes: 0,
-      creation_timestamp: '2024-08-15T18:55:00Z',
-    },
-    {
-      id: 'c20',
-      author: 'matthughes',
-      text: 'Great breakdown of the OpenGL renderer! Learned a lot from this.',
-      likes: 32,
-      dislikes: 0,
-      creation_timestamp: '2024-07-19T14:00:00Z',
-    },
-  ],
 };
 
 export default CodeMic;

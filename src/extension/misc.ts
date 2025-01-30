@@ -5,6 +5,8 @@ import _ from 'lodash';
 import assert from 'assert';
 import crypto from 'crypto';
 import type { Progress } from './types.js';
+import path from 'path';
+import VscWorkspace from './session/vsc_workspace.js';
 
 // /**
 //  * Given '/home/sean/abc/' will return '~/abc/'.
@@ -32,4 +34,9 @@ export function scaleProgress(progress: Progress, multiplier: number): Progress 
       progress.report({ ...value, increment: value?.increment && value.increment * multiplier });
     },
   };
+}
+
+export function doesVscHaveCorrectWorkspace(workspace: string): boolean {
+  const vscWorkspace = VscWorkspace.getDefaultVscWorkspace();
+  return Boolean(vscWorkspace && path.resolve(vscWorkspace) === path.resolve(workspace));
 }

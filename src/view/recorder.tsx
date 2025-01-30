@@ -1604,7 +1604,7 @@ function SpeedControlPopover(props: PopoverProps & { title: string; onConfirm: (
           onChange={e => setFactor(Number(e.currentTarget!.value))}
           autoFocus
         />
-        <VSCodeButton appearance="secondary" onClick={e => props.onConfirm(factor)}>
+        <VSCodeButton appearance="primary" onClick={e => props.onConfirm(factor)}>
           OK
         </VSCodeButton>
       </form>
@@ -1644,7 +1644,7 @@ function InsertGapPopover(props: PopoverProps & { onConfirm: (dur: number) => an
           />
         </div>
         <VSCodeButton
-          appearance="secondary"
+          appearance="primary"
           onClick={e => {
             if (/[^0-9]/.test(minutes) || /[^0-9]/.test(seconds)) return;
             props.onConfirm(Number(minutes || '0') * 60 + Number(seconds || '0'));
@@ -1667,6 +1667,14 @@ function ChapterPopover(
 ) {
   const [title, setTitle] = useState(props.chapter?.title ?? '');
 
+  function keyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) confirm();
+  }
+
+  function confirm() {
+    props.onConfirm(title.trim(), props.index);
+  }
+
   useEffect(() => {
     setTitle(props.chapter?.title ?? '');
   }, [props.popover.isOpen]);
@@ -1681,16 +1689,12 @@ function ChapterPopover(
           value={title}
           onInput={e => setTitle((e.currentTarget as HTMLTextAreaElement).value)}
           placeholder="Enter chapter title"
+          onKeyDown={keyDown}
           autoFocus
         >
           Chapter at {props.clock ? lib.formatTimeSeconds(props.clock) : ''}
         </VSCodeTextArea>
-        <VSCodeButton
-          appearance="secondary"
-          onClick={e => {
-            props.onConfirm(title.trim(), props.index);
-          }}
-        >
+        <VSCodeButton appearance="primary" onClick={confirm}>
           OK
         </VSCodeButton>
       </form>

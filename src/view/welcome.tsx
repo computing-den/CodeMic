@@ -78,13 +78,13 @@ function WelcomeSessions(props: Props) {
     postMessage({ type: 'account/open', join: true });
   }
   const recent = welcome.recent.filter(h => h.id !== welcome.current?.id);
-  const featured = welcome.featured.filter(
+  const featured = welcome.featured?.filter(
     h => h.id !== welcome.current?.id && !welcome.recent.some(r => r.id === h.id),
   );
 
   // const [loading, setLoading] = useState(false);
 
-  const empty = !welcome.current && recent.length === 0 && featured.length === 0;
+  const empty = !welcome.current && recent.length === 0 && (!featured || featured.length === 0);
   // useEffect(() => {
   // }, [welcome.current, recent, featured]
 
@@ -95,7 +95,10 @@ function WelcomeSessions(props: Props) {
         <Section.Body>
           <div className="search-subsection subsection">
             <VSCodeTextField placeholder="Search" autofocus></VSCodeTextField>
-            <VSCodeButton onClick={() => postMessage({ type: 'recorder/open' })} title="Record a new session">
+            <VSCodeButton
+              onClick={() => postMessage({ type: 'welcome/openNewSessionInRecorder' })}
+              title="Record a new session"
+            >
               <span className="codicon codicon-device-camera-video" />
             </VSCodeButton>
           </div>
@@ -117,8 +120,10 @@ function WelcomeSessions(props: Props) {
         <SessionsSection title="WORKSPACE" history={welcome.history} sessionHeads={[welcome.current]} />
       )}
       {recent.length > 0 && <SessionsSection title="RECENT" history={welcome.history} sessionHeads={recent} />}
-      {featured.length > 0 && <SessionsSection title="FEATURED" history={welcome.history} sessionHeads={featured} />}
-      {welcome.loadingFeatured && empty && <div className="empty">LOADING ...</div>}
+      {featured && featured.length > 0 && (
+        <SessionsSection title="FEATURED" history={welcome.history} sessionHeads={featured} />
+      )}
+      {welcome.loading && empty && <div className="empty">LOADING ...</div>}
     </Screen>
   );
 }

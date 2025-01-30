@@ -3,10 +3,10 @@ import TextToParagraphs from './text_to_paragraphs.jsx';
 import TimeFromNow from './time_from_now.jsx';
 import WithAvatar from './with_avatar.jsx';
 import { cn } from './misc.js';
-import React from 'react';
+import React, { useState } from 'react';
 import postMessage from './api.js';
 import _ from 'lodash';
-import { VSCodeTextArea } from '@vscode/webview-ui-toolkit/react';
+import { VSCodeButton, VSCodeTextArea } from '@vscode/webview-ui-toolkit/react';
 
 export type CommentProps = {
   className?: string;
@@ -23,8 +23,9 @@ export class Comment extends React.Component<CommentProps> {
         </div>
         <div className="footer">
           <span className="footer-item">
-            {comment.author} <TimeFromNow timestamp={comment.creation_timestamp} />
+            {comment.author} <TimeFromNow timestamp={comment.creationTimestamp} />
           </span>
+          {/*
           <div className="footer-item badge">
             <span className="codicon codicon-reply va-top m-right_small" />
           </div>
@@ -35,7 +36,7 @@ export class Comment extends React.Component<CommentProps> {
           <div className="footer-item badge">
             <span className="codicon codicon-thumbsdown va-top m-right_small" />
             <span className="count">{comment.dislikes}</span>
-          </div>
+            </div>*/}
         </div>
       </WithAvatar>
     );
@@ -100,29 +101,35 @@ export class CommentList extends React.Component<CommentListProps> {
 export type CommentInputProps = {
   className?: string;
   author: t.UserSummary;
+  onSend: (text: string) => any;
 };
-export class CommentInput extends React.Component<CommentInputProps> {
-  state = {
-    text: '',
-  };
+export function CommentInput(props: CommentInputProps) {
+  const [text, setText] = useState('');
 
-  textChanged = async (e: Event | React.FormEvent<HTMLElement>) =>
-    this.setState({ text: (e.target as HTMLInputElement).value });
-
-  render() {
-    const { className, author } = this.props;
-    const { text } = this.state;
-
-    return (
-      <WithAvatar className={cn('comment-input', className)} username={author.username}>
-        <VSCodeTextArea
-          rows={2}
-          resize="vertical"
-          value={text}
-          onInput={this.textChanged}
-          placeholder="Leave a comment"
-        ></VSCodeTextArea>
-      </WithAvatar>
-    );
+  async function send() {
+    await props.onSend(text);
+    setText('');
   }
+
+  function keyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
+  }
+
+  return (
+    <WithAvatar className={cn('comment-input', props.className)} username={props.author.username}>
+      <VSCodeTextArea
+        rows={2}
+        resize="vertical"
+        value={text}
+        onInput={e => setText((e.target as HTMLInputElement).value)}
+        placeholder="Leave a comment"
+        onKeyDown={keyDown}
+      ></VSCodeTextArea>
+      {text.trim() && (
+        <VSCodeButton appearance="primary" onClick={send}>
+          Send
+        </VSCodeButton>
+      )}
+    </WithAvatar>
+  );
 }

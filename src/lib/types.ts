@@ -16,16 +16,26 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'account/logout' }; response: OKResponse }
   | { request: { type: 'welcome/open' }; response: OKResponse }
   | { request: { type: 'welcome/earlyAccessEmail'; email: string }; response: OKResponse }
-  | { request: { type: 'player/open'; sessionId: string }; response: OKResponse }
+  | { request: { type: 'welcome/openSessionInPlayer'; sessionId: string }; response: OKResponse }
+  | {
+      request: { type: 'welcome/openSessionInRecorder'; sessionId: string; clock?: number; fork?: boolean };
+      response: OKResponse;
+    }
+  | { request: { type: 'welcome/openNewSessionInRecorder' }; response: OKResponse }
+  | { request: { type: 'welcome/deleteSession'; sessionId: string }; response: OKResponse }
+  | { request: { type: 'welcome/likeSession'; sessionId: string; value: boolean }; response: OKResponse }
+  | { request: { type: 'player/openInRecorder' }; response: OKResponse }
   | { request: { type: 'player/load' }; response: OKResponse }
   | { request: { type: 'player/play' }; response: OKResponse }
   | { request: { type: 'player/pause' }; response: OKResponse }
   | { request: { type: 'player/seek'; clock: number }; response: OKResponse }
+  | { request: { type: 'player/comment'; text: string; clock?: number }; response: OKResponse }
+  | { request: { type: 'player/likeSession'; value: boolean }; response: OKResponse }
   // | { request: { type: 'player/update'; changes: PlayerUpdate }; response: OKResponse }
-  | {
-      request: { type: 'recorder/open'; sessionId?: string; clock?: number; fork?: boolean };
-      response: OKResponse;
-    }
+  // | {
+  //     request: { type: 'recorder/open'; sessionId?: string; clock?: number; fork?: boolean };
+  //     response: OKResponse;
+  //   }
   | { request: { type: 'recorder/openTab'; tabId: RecorderUITabId }; response: OKResponse }
   | { request: { type: 'recorder/load' }; response: OKResponse }
   | { request: { type: 'recorder/play' }; response: OKResponse }
@@ -53,12 +63,10 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/updateChapter'; index: number; update: Partial<TocItem> }; response: OKResponse }
   | { request: { type: 'recorder/deleteChapter'; index: number }; response: OKResponse }
   | { request: { type: 'recorder/crop'; clock: number }; response: OKResponse }
-  // | { request: { type: 'toggleRecorderStudio' }; response: OKResponse }
-  | { request: { type: 'deleteSession'; sessionId: string }; response: OKResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
   | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }
-  | { request: { type: 'confirmForkFromPlayer' }; response: BooleanResponse }
-  | { request: { type: 'confirmEditFromPlayer'; clock: number }; response: BooleanResponse }
+  // | { request: { type: 'confirmForkFromPlayer' }; response: BooleanResponse }
+  // | { request: { type: 'confirmEditFromPlayer'; clock: number }; response: BooleanResponse }
   | { request: { type: 'test'; value: any }; response: OKResponse }
   | { request: { type: 'audio'; event: FrontendMediaEvent }; response: OKResponse }
   | { request: { type: 'video'; event: FrontendMediaEvent }; response: OKResponse };
@@ -175,8 +183,20 @@ export type BackendToServerReqRes =
       response: { type: 'user'; user: User };
     }
   | {
-      request: { type: 'featured/get' };
+      request: { type: 'sessions/featured' };
       response: { type: 'sessionHeads'; sessionHeads: SessionHead[] };
+    }
+  | {
+      request: { type: 'sessions/publication'; sessionIds: string[] };
+      response: { type: 'sessionPublication'; publications: SessionPublication[] };
+    }
+  | {
+      request: { type: 'session/comment/post'; sessionId: string; text: string; clock?: number };
+      response: OKResponse;
+    }
+  | {
+      request: { type: 'session/like/toggle'; sessionId: string };
+      response: OKResponse;
     };
 export type BackendToServerRequest = BackendToServerReqRes['request'];
 export type ServerResponse = BackendToServerReqRes['response'] | ErrorResponse;
@@ -211,7 +231,6 @@ export type Store = {
   recorder?: RecorderUIState;
   player?: PlayerUIState;
   session?: SessionUIState;
-  // webviewUriBase: string;
   test?: any;
   cache: CacheUIState;
 };
@@ -255,14 +274,12 @@ export type AccountUIState = AccountState;
 export type AccountUpdate = Partial<AccountState>;
 
 export type WelcomeUIState = {
-  error?: string;
-  workspace?: string;
   current?: SessionHead;
   recent: SessionHead[];
-  featured: SessionHead[];
+  featured?: SessionHead[];
+  loading: boolean;
+  error?: string;
   history: SessionsHistory;
-  loadingFeatured: boolean;
-  // coversUris: UriMap;
 };
 
 export type RecorderUIState = {
@@ -292,8 +309,8 @@ export type SessionUIState = {
   workspaceFocusTimeline?: Focus[];
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
+  publication?: SessionPublication;
   // blobsUriMap?: UriMap;
-  comments?: Comment[];
 };
 
 export type LoadedSessionUIState = SessionUIState & {
@@ -301,7 +318,6 @@ export type LoadedSessionUIState = SessionUIState & {
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
   // blobsUriMap: UriMap;
-  comments: Comment[];
 };
 
 export type SessionDetailsUpdate = {
@@ -327,17 +343,31 @@ export type SessionHead = {
   hasCover: boolean;
   ignorePatterns: string;
   formatVersion: number;
+  publication?: SessionPublication;
 };
 
-export type SessionHeadMap = { [key: string]: SessionHead | undefined };
+export type SessionPublication = {
+  comments: Comment[];
+  likes: number;
+  views: number;
+  publishTimestamp: string;
+};
+
+// export type SessionPublishRes = {
+//   head: SessionHead;
+//   // metadata: SessionPublication;
+// };
+
+// export type SessionMetadataRecord = Record<string, SessionPublication | undefined>;
 
 export type Comment = {
   id: string;
   author: string;
+  clock?: number;
   text: string;
   likes: number;
   dislikes: number;
-  creation_timestamp: string;
+  creationTimestamp: string;
   // modification_timestamp: string;
 };
 

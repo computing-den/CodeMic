@@ -24,7 +24,7 @@ export async function send<Req extends t.BackendToServerRequest>(
 export async function publishSession(
   sessionHead: t.SessionHead,
   filePath: string,
-  token?: string,
+  token: string,
   progress?: Progress,
   abortController?: AbortController,
 ): Promise<t.SessionHead> {
@@ -34,20 +34,19 @@ export async function publishSession(
     form.append('file', fs.createReadStream(filePath));
 
     let lastReportedProgress = 0;
-    return (
-      await axios.post(getURLString('/publish_session', { token }), form, {
-        signal: abortController?.signal,
-        // Set boundary in the header field 'Content-Type' by calling method `getHeaders`
-        headers: form.getHeaders(),
-        maxBodyLength: Infinity,
-        onUploadProgress: e => {
-          if (e.progress !== undefined) {
-            progress?.report({ increment: (e.progress - lastReportedProgress) * 100 });
-            lastReportedProgress = e.progress;
-          }
-        },
-      })
-    ).data;
+    const res = await axios.post(getURLString('/publish_session', { token }), form, {
+      signal: abortController?.signal,
+      // Set boundary in the header field 'Content-Type' by calling method `getHeaders`
+      headers: form.getHeaders(),
+      maxBodyLength: Infinity,
+      onUploadProgress: e => {
+        if (e.progress !== undefined) {
+          progress?.report({ increment: (e.progress - lastReportedProgress) * 100 });
+          lastReportedProgress = e.progress;
+        }
+      },
+    });
+    return res.data;
   } catch (error) {
     handleAxiosError('publish session', error as Error);
   }
@@ -95,13 +94,13 @@ function handleAxiosError(label: string, error: Error): never {
   }
 }
 
-export async function downloadSessionCover(id: string) {
-  const res = await axios.get(getURLString('/session-cover', { id }), { responseType: 'arraybuffer' });
+export async function downloadSessionCover(id: string, token?: string) {
+  const res = await axios.get(getURLString('/session-cover', { id, token }), { responseType: 'arraybuffer' });
   await cache.writeCover(id, res.data);
 }
 
-export async function downloadAvatar(username: string) {
-  const res = await axios.get(getURLString('/avatar', { username }), { responseType: 'arraybuffer' });
+export async function downloadAvatar(username: string, token?: string) {
+  const res = await axios.get(getURLString('/avatar', { username, token }), { responseType: 'arraybuffer' });
   await cache.writeAvatar(username, res.data);
 }
 

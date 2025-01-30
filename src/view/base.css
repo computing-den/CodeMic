@@ -34,6 +34,7 @@
   --active-track-z-index: 2;
   --popover-z-index: 100;
   --cover-container-border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--popover-border));
+  --popover-button-min-width: 60px;
 }
 
 body.vscode-light {

@@ -48,7 +48,7 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
   static contextType = AppContext;
   declare context: React.ContextType<typeof AppContext>;
 
-  clicked = () => postMessage({ type: 'player/open', sessionId: this.props.sessionHead.id });
+  clicked = () => postMessage({ type: 'welcome/openSessionInPlayer', sessionId: this.props.sessionHead.id });
   actionClicked = (e: React.MouseEvent, a: Action) => {
     e.preventDefault();
     e.stopPropagation();
@@ -58,13 +58,13 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
   render() {
     const { cache } = this.context;
     const { className, history, sessionHead: s } = this.props;
-    const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
+    // const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
 
     const actions = _.compact<Action>([
-      /*!this.props.sessionHead.publishTimestamp*/ true && {
+      history?.workspace && {
         icon: 'codicon-trash',
-        title: 'Delete',
-        onClick: () => postMessage({ type: 'deleteSession', sessionId: this.props.sessionHead.id }),
+        title: 'Delete session and its data',
+        onClick: () => postMessage({ type: 'welcome/deleteSession', sessionId: this.props.sessionHead.id }),
       },
       // {
       //   icon: 'codicon-repo-forked',
@@ -79,7 +79,7 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
       {
         icon: 'codicon-edit',
         title: 'Edit: open this project in the Studio',
-        onClick: () => postMessage({ type: 'recorder/open', sessionId: this.props.sessionHead.id }),
+        onClick: () => postMessage({ type: 'welcome/openSessionInRecorder', sessionId: this.props.sessionHead.id }),
       },
       {
         icon: 'codicon-heart-filled',
@@ -121,27 +121,27 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
               </span>
             </div>
             )*/}
-          {/*s.publishTimestamp && (
+          {s.publication?.publishTimestamp && (
             <div className="footer">
               <span className="footer-item timestamp">
-                Published <TimeFromNow timestamp={s.publishTimestamp} />
+                Published <TimeFromNow timestamp={s.publication.publishTimestamp} />
               </span>
             </div>
-            )*/}
+          )}
           <div className="footer">
             <span className="footer-item author">{s.author || 'anonymous'}</span>
-            {/*s.publishTimestamp && (
+            {s.publication?.publishTimestamp && (
               <>
                 <div className="footer-item badge">
                   <span className="codicon codicon-eye va-top m-right_small" />
-                  <span className="count">{s.views}</span>
+                  <span className="count">{s.publication.views}</span>
                 </div>
                 <div className="footer-item badge">
                   <span className="codicon codicon-heart-filled va-top m-right_small" />
-                  <span className="count">{s.likes}</span>
+                  <span className="count">{s.publication.likes}</span>
                 </div>
               </>
-              )*/}
+            )}
           </div>
           <div className="actions">
             {actions.map(a => (
@@ -161,20 +161,19 @@ export type SessionHeadListProps = {
   history: t.SessionsHistory;
   className?: string;
 };
-type SHPair = [t.SessionHead, t.SessionHistory];
 
 export class SessionHeadList extends React.Component<SessionHeadListProps> {
   render() {
-    const iteratee = ([s, h]: [t.SessionHead, t.SessionHistory]) =>
-      (h && lib.getSessionHistoryItemLastOpenTimestamp(h)) || '';
+    const { history, sessionHeads } = this.props;
 
-    let pairs: SHPair[] = _.map(this.props.sessionHeads, s => [s, this.props.history[s.id]] as SHPair);
-    pairs = _.orderBy(pairs, iteratee, 'desc');
+    const iteratee = (s: t.SessionHead) =>
+      (history[s.id] && lib.getSessionHistoryItemLastOpenTimestamp(history[s.id])) || '';
+    const sessionHeadsOrdered = _.orderBy(sessionHeads, iteratee, 'desc');
 
     return (
       <div className={cn('session-head-list', this.props.className)}>
-        {pairs.map(([sessionHead, history]) => (
-          <SessionHeadListItem history={history} sessionHead={sessionHead} />
+        {sessionHeadsOrdered.map(s => (
+          <SessionHeadListItem sessionHead={s} history={history[s.id]} />
         ))}
       </div>
     );

@@ -66,8 +66,28 @@ export class Session {
     }
   }
 
+  async download(options?: { skipIfExists?: boolean }) {
+    if (options?.skipIfExists && (await this.core.bodyExists())) return;
+
+    await this.context.withProgress(
+      { title: `Downloading session ${this.head.handle}`, cancellable: true },
+      async (progress, abortController) => {
+        await this.core.download({ ...options, progress, abortController });
+      },
+    );
+  }
+
   private async load(options?: { clock?: number }) {
-    assert(!this.isLoaded(), 'Already loaded.');
+    // It may already be loaded if we hit edit inside the player.
+    // This causes the video DOM in player screen to be replaced with
+    // another video DOM in recorder screen.
+    // Here, the video DOM may not have been mounted even.
+    if (this.isLoaded()) {
+      this.rr.unloadVideo();
+      return;
+    }
+
+    // assert(!this.isLoaded(), 'Already loaded.');
     assert(!this.mustScan, 'Must be scanned, not loaded.');
     assert(!this.temp, 'Cannot load a temp session.');
 

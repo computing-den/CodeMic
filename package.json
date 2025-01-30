@@ -52,11 +52,19 @@
         "title": "CodeMic"
       },
       {
-        "command": "codemic.openWelcome",
+        "command": "codemic.openHome",
         "title": "Home",
         "icon": {
           "light": "./resources/light/home.svg",
           "dark": "./resources/dark/home.svg"
+        }
+      },
+      {
+        "command": "codemic.refreshHome",
+        "title": "Refresh list",
+        "icon": {
+          "light": "./resources/light/refresh.svg",
+          "dark": "./resources/dark/refresh.svg"
         }
       },
       {
@@ -71,14 +79,19 @@
     "menus": {
       "view/title": [
         {
-          "command": "codemic.openWelcome",
-          "when": "view == codemic-view && codemic.canOpenWelcome",
+          "command": "codemic.refreshHome",
+          "when": "view == codemic-view && codemic.canRefreshHome",
           "group": "navigation@1"
+        },
+        {
+          "command": "codemic.openHome",
+          "when": "view == codemic-view && codemic.canOpenHome",
+          "group": "navigation@2"
         },
         {
           "command": "codemic.account",
           "when": "view == codemic-view",
-          "group": "navigation@2"
+          "group": "navigation@3"
         }
       ]
     }

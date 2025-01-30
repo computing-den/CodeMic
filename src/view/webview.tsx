@@ -17,12 +17,8 @@ async function load() {
   setStoreListener(renderApp);
   const root = createRoot(document.getElementById('app')!);
 
-  try {
-    // Backend will send the store.
-    await postMessage({ type: 'webviewLoaded' });
-  } catch (error) {
-    console.error(error);
-  }
+  // Backend will send the store.
+  postMessage({ type: 'webviewLoaded' }).catch(console.error);
 }
 
 window.onload = load;

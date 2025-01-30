@@ -70,22 +70,24 @@ export default class Player extends React.Component<Props> {
   };
 
   fork = async () => {
-    const res = await postMessage({ type: 'confirmForkFromPlayer' });
-    if (res.value) {
-      await postMessage({
-        type: 'recorder/open',
-        sessionId: this.props.session.head.id,
-        fork: true,
-        clock: this.props.session.clock,
-      });
-    }
+    // TODO
+    // const res = await postMessage({ type: 'confirmForkFromPlayer' });
+    // if (res.value) {
+    //   await postMessage({
+    //     type: 'recorder/open',
+    //     sessionId: this.props.session.head.id,
+    //     fork: true,
+    //     clock: this.props.session.clock,
+    //   });
+    // }
   };
 
   edit = async () => {
-    const res = await postMessage({ type: 'confirmEditFromPlayer', clock: this.props.session.clock });
-    if (res.value) {
-      await postMessage({ type: 'recorder/open', sessionId: this.props.session.head.id });
-    }
+    await postMessage({ type: 'player/openInRecorder' });
+  };
+
+  like = async () => {
+    await postMessage({ type: 'player/likeSession', value: true });
   };
 
   // isStoppedAlmostAtTheEnd(): boolean {
@@ -114,6 +116,15 @@ export default class Player extends React.Component<Props> {
     } catch (error) {
       console.error(error);
     }
+  };
+
+  sendComment = async (text: string) => {
+    await postMessage({
+      type: 'player/comment',
+      text,
+      sessionId: this.props.session.head.id,
+      clock: this.props.session.clock,
+    });
   };
 
   updateResources() {
@@ -170,9 +181,7 @@ export default class Player extends React.Component<Props> {
       {
         title: 'Like',
         icon: 'codicon-heart-filled',
-        onClick: () => {
-          console.log('TODO');
-        },
+        onClick: this.like,
       },
       {
         title: 'Picture-in-Picture',
@@ -234,16 +243,17 @@ export default class Player extends React.Component<Props> {
                 autoFocus
               />
               )*/}
-            {head.toc.length > 0 && (
+            {/*head.toc.length > 0 && (
               <div className="subsection search">
                 <VSCodeDropdown>
                   <VSCodeOption>Table of contents</VSCodeOption>
-                  {/*<VSCodeOption>Files</VSCodeOption>
-                <VSCodeOption>Entities</VSCodeOption>*/}
+                  {
+                    //<VSCodeOption>Files</VSCodeOption><VSCodeOption>Entities</VSCodeOption>
+                  }
                 </VSCodeDropdown>
                 <VSCodeTextField placeholder="Search"></VSCodeTextField>
               </div>
-            )}
+              )*/}
             {head.toc.length > 0 && (
               <div className="subsection toc">
                 {head.toc.map((item, i) => (
@@ -263,8 +273,8 @@ export default class Player extends React.Component<Props> {
         <Section className="comments-section">
           <Section.Header title="COMMENTS" collapsible />
           <Section.Body>
-            {user && <CommentInput author={user} />}
-            <CommentList comments={session.comments} />
+            {user && <CommentInput author={user} onSend={this.sendComment} />}
+            {session.publication && <CommentList comments={session.publication.comments} />}
           </Section.Body>
         </Section>
         {/*

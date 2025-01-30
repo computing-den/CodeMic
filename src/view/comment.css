@@ -58,9 +58,15 @@
 
   > .body {
     flex: 1;
+    display: grid;
 
     & vscode-text-area {
       width: 100%;
+    }
+
+    & vscode-button {
+      margin-left: auto;
+      margin-top: var(--spacing-small);
     }
   }
 }

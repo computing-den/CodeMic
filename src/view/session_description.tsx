@@ -17,16 +17,20 @@ export default class SessionDescription extends React.Component<Props> {
       <div className={cn('session-description', className)}>
         <div className="header">
           <span className="item timestamp">
-            <TimeFromNow timestamp={/*s.publishTimestamp ??*/ s.modificationTimestamp} capitalize />
+            <TimeFromNow timestamp={s.publication?.publishTimestamp ?? s.modificationTimestamp} capitalize />
           </span>
-          <div className="item views">
-            <span className="codicon codicon-eye va-top m-right_small" />
-            <span className="count">{/*s.views*/ 0}</span>
-          </div>
-          <div className="item likes">
-            <span className="codicon codicon-heart-filled va-top m-right_small" />
-            <span className="count">{/*s.likes*/ 0}</span>
-          </div>
+          {s.publication && (
+            <>
+              <div className="item views">
+                <span className="codicon codicon-eye va-top m-right_small" />
+                <span className="count">{s.publication.views}</span>
+              </div>
+              <div className="item likes">
+                <span className="codicon codicon-heart-filled va-top m-right_small" />
+                <span className="count">{s.publication.likes}</span>
+              </div>
+            </>
+          )}
         </div>
         <div className="body">
           <TextToParagraphs text={s.description} />

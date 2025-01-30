@@ -451,7 +451,8 @@
   /* align-items: center; */
   gap: var(--spacing-small);
   & vscode-button {
-    margin-top: var(--spacing-medium);
+    margin: 0 0 0 auto;
+    min-width: var(--popover-button-min-width);
   }
 }
 
@@ -464,7 +465,8 @@
     gap: var(--spacing-small);
   }
   & vscode-button {
-    margin-top: var(--spacing-medium);
+    margin: 0 0 0 auto;
+    min-width: var(--popover-button-min-width);
   }
 }
 
@@ -485,7 +487,9 @@
     /*   gap: var(--spacing-small); */
     /* } */
     & vscode-button {
-      margin-top: var(--spacing-medium);
+      /* margin-top: var(--spacing-medium); */
+      margin: 0 0 0 auto;
+      min-width: var(--popover-button-min-width);
     }
   }
 }

@@ -113,6 +113,10 @@ export default class SessionRecordAndReplay {
     if (videoTrack) this.videoTrackPlayer.loadTrack(videoTrack);
   }
 
+  unloadVideo() {
+    this.videoTrackPlayer.unloadTrack();
+  }
+
   async scan() {
     // Create workspace directory.
     await this.session.core.createWorkspaceDir();
