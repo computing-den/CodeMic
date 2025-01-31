@@ -20,17 +20,17 @@ export default class AudioTrackPlayer {
     this.audioTrack = audioTrack;
   }
 
-  load() {
-    assert(this.audioTrack.file.type === 'local', 'AudioTrackPlayer: only supports local files');
-    if (!this.loading && !this.loaded) {
-      this.loading = true;
-      // this.postAudioMessage({
-      //   type: 'audio/load',
-      //   id: this.audioTrack.id,
-      //   src: this.getSessionBlobUri(this.audioTrack.file.sha1),
-      // }).catch(this.gotError);
-    }
-  }
+  // load() {
+  //   assert(this.audioTrack.file.type === 'local', 'AudioTrackPlayer: only supports local files');
+  //   if (!this.loading && !this.loaded) {
+  //     this.loading = true;
+  //     // this.postAudioMessage({
+  //     //   type: 'audio/load',
+  //     //   id: this.audioTrack.id,
+  //     //   src: this.getSessionBlobUri(this.audioTrack.file.sha1),
+  //     // }).catch(this.gotError);
+  //   }
+  // }
 
   play() {
     this.running = true;

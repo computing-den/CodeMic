@@ -77,16 +77,12 @@ function WelcomeSessions(props: Props) {
     e.preventDefault();
     postMessage({ type: 'account/open', join: true });
   }
-  const recent = welcome.recent.filter(h => h.id !== welcome.current?.id);
-  const featured = welcome.featured?.filter(
-    h => h.id !== welcome.current?.id && !welcome.recent.some(r => r.id === h.id),
+  const current = welcome.sessions.find(s => s.type === 'current');
+  const recent = welcome.sessions.filter(s => s.type === 'recent' && s.head.id !== current?.head.id);
+  const featured = welcome.sessions.filter(
+    s => s.type === 'remote' && s.head.id !== current?.head.id && !recent.some(r => r.head.id === s.head.id),
   );
-
-  // const [loading, setLoading] = useState(false);
-
-  const empty = !welcome.current && recent.length === 0 && (!featured || featured.length === 0);
-  // useEffect(() => {
-  // }, [welcome.current, recent, featured]
+  const empty = !current && recent.length === 0 && featured.length === 0;
 
   return (
     <Screen className="welcome-sessions">
@@ -116,13 +112,9 @@ function WelcomeSessions(props: Props) {
           )}
         </Section.Body>
       </Section>
-      {welcome.current && (
-        <SessionsSection title="WORKSPACE" history={welcome.history} sessionHeads={[welcome.current]} />
-      )}
-      {recent.length > 0 && <SessionsSection title="RECENT" history={welcome.history} sessionHeads={recent} />}
-      {featured && featured.length > 0 && (
-        <SessionsSection title="FEATURED" history={welcome.history} sessionHeads={featured} />
-      )}
+      {current && <SessionsSection title="WORKSPACE" listings={[current]} />}
+      {recent.length > 0 && <SessionsSection title="RECENT" listings={recent} />}
+      {featured.length > 0 && <SessionsSection title="FEATURED" listings={featured} />}
       {welcome.loading && empty && <div className="empty">LOADING ...</div>}
     </Screen>
   );
@@ -130,30 +122,21 @@ function WelcomeSessions(props: Props) {
 
 type SessionsSectionProps = {
   title: string;
-  sessionHeads: t.SessionHead[];
-  history: t.SessionsHistory;
+  listings: t.SessionUIListing[];
   bordered?: boolean;
 };
 
-type SessionAndHistory = { sessionHead: t.SessionHead; history?: t.SessionHistory };
+function SessionsSection(props: SessionsSectionProps) {
+  const iteratee = (listing: t.SessionUIListing) =>
+    (listing.history && lib.getSessionHistoryItemLastOpenTimestamp(listing.history)) || '';
+  const listingsOrdered = _.orderBy(props.listings, iteratee, 'desc');
 
-class SessionsSection extends React.Component<SessionsSectionProps> {
-  render() {
-    let sh: SessionAndHistory[] = _.map(this.props.sessionHeads, s => ({
-      sessionHead: s,
-      history: this.props.history[s.id],
-    }));
-    const iteratee = ({ history }: SessionAndHistory) =>
-      (history && lib.getSessionHistoryItemLastOpenTimestamp(history)) || '';
-    sh = _.orderBy(sh, iteratee, 'desc');
-
-    return (
-      <Section className="sessions-section" bordered={this.props.bordered}>
-        <Section.Header title={this.props.title} collapsible />
-        <Section.Body>
-          <SessionHeadList sessionHeads={this.props.sessionHeads} history={this.props.history} />
-        </Section.Body>
-      </Section>
-    );
-  }
+  return (
+    <Section className="sessions-section" bordered={props.bordered}>
+      <Section.Header title={props.title} collapsible />
+      <Section.Body>
+        <SessionHeadList listings={listingsOrdered} />
+      </Section.Body>
+    </Section>
+  );
 }

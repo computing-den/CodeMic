@@ -184,11 +184,15 @@ export type BackendToServerReqRes =
     }
   | {
       request: { type: 'sessions/featured' };
-      response: { type: 'sessionHeads'; sessionHeads: SessionHead[] };
+      response: {
+        type: 'sessionHeadsAndPublications';
+        heads: SessionHead[];
+        publications: Record<string, SessionPublication>;
+      };
     }
   | {
       request: { type: 'sessions/publication'; sessionIds: string[] };
-      response: { type: 'sessionPublication'; publications: SessionPublication[] };
+      response: { type: 'sessionPublications'; publications: Record<string, SessionPublication> };
     }
   | {
       request: { type: 'session/comment/post'; sessionId: string; text: string; clock?: number };
@@ -274,12 +278,9 @@ export type AccountUIState = AccountState;
 export type AccountUpdate = Partial<AccountState>;
 
 export type WelcomeUIState = {
-  current?: SessionHead;
-  recent: SessionHead[];
-  featured?: SessionHead[];
+  sessions: SessionUIListing[];
   loading: boolean;
   error?: string;
-  history: SessionsHistory;
 };
 
 export type RecorderUIState = {
@@ -305,10 +306,10 @@ export type SessionUIState = {
   workspace: string;
   dataPath: string;
   // coverUri: string;
-  history?: SessionHistory;
   workspaceFocusTimeline?: Focus[];
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
+  history?: SessionHistory;
   publication?: SessionPublication;
   // blobsUriMap?: UriMap;
 };
@@ -343,7 +344,6 @@ export type SessionHead = {
   hasCover: boolean;
   ignorePatterns: string;
   formatVersion: number;
-  publication?: SessionPublication;
 };
 
 export type SessionPublication = {
@@ -353,10 +353,23 @@ export type SessionPublication = {
   publishTimestamp: string;
 };
 
-// export type SessionPublishRes = {
-//   head: SessionHead;
-//   // metadata: SessionPublication;
-// };
+// session id -> publication
+// export type SessionPublicationMap = Record<string, SessionPublication>;
+
+export type SessionListing = {
+  type: 'recent' | 'current' | 'remote';
+  head: SessionHead;
+  workspace?: string;
+};
+export type SessionUIListing = SessionListing & {
+  history?: SessionHistory;
+  publication?: SessionPublication;
+};
+
+export type SessionPublishRes = {
+  head: SessionHead;
+  publication: SessionPublication;
+};
 
 // export type SessionMetadataRecord = Record<string, SessionPublication | undefined>;
 
@@ -859,7 +872,7 @@ export type Settings = {
   history: SessionsHistory;
 };
 
-export type SessionsHistory = { [key: string]: SessionHistory };
+export type SessionsHistory = Record<string, SessionHistory>;
 
 export type SessionHistory = {
   id: string;

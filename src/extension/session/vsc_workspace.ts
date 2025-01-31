@@ -5,7 +5,7 @@ import { Position, Range, Selection, LineRange } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import * as misc from '../misc.js';
 import * as storage from '../storage.js';
-import type { Context, Progress } from '../types.js';
+import type { Context, Progress, WorkspaceChangeGlobalState } from '../types.js';
 import Session, { LoadedSession } from './session.js';
 import * as serverApi from '../server_api.js';
 import * as git from '../git';
@@ -29,6 +29,48 @@ export default class VscWorkspace {
   //     .toString();
   // }
 
+  static async setWorkspaceChangeGlobalState(context: Context, state?: WorkspaceChangeGlobalState) {
+    await context.extension.globalState.update('workspaceChange', state);
+  }
+  static getWorkspaceChangeGlobalState(context: Context): WorkspaceChangeGlobalState | undefined {
+    return context.extension.globalState.get<WorkspaceChangeGlobalState>('workspaceChange');
+  }
+
+  static async setUpWorkspace_MAY_RESTART_VSCODE(context: Context, state: WorkspaceChangeGlobalState) {
+    // Return if workspace is already up-to-date.
+    if (VscWorkspace.doesVscHaveCorrectWorkspace(state.workspace)) return;
+
+    // TODO should this even be here?
+    // Save first so that we can restore it after vscode restart.
+    // if (this.screen === t.Screen.Recorder) {
+    //   await session.core.write();
+    // }
+
+    // Set global state to get ready for possible restart.
+    await this.setWorkspaceChangeGlobalState(context, state);
+
+    // Change vscode's workspace folders.
+    // This may cause vscode to restart and the rest of the would not run.
+    {
+      const disposables: vscode.Disposable[] = [];
+      const done = new Promise(resolve => {
+        vscode.workspace.onDidChangeWorkspaceFolders(() => resolve(undefined), undefined, disposables);
+      });
+      const success = vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length ?? 0, {
+        uri: vscode.Uri.file(state.workspace),
+      });
+      assert(success);
+      await done;
+      for (const d of disposables) d.dispose();
+    }
+
+    // Clear global state.
+    await this.setWorkspaceChangeGlobalState(context);
+
+    // Make sure workspace is updated properly.
+    assert(VscWorkspace.doesVscHaveCorrectWorkspace(state.workspace));
+  }
+
   static async getGitAPI(): Promise<git.API> {
     const extension = vscode.extensions.getExtension('vscode.git') as vscode.Extension<git.GitExtension>;
 
@@ -42,6 +84,14 @@ export default class VscWorkspace {
     // probably because it doesn't cause a vscode restart.
     const uri = vscode.workspace.workspaceFolders?.[0]?.uri;
     return uri?.scheme === 'file' ? uri.fsPath : undefined;
+  }
+
+  static doesVscHaveCorrectWorkspace(workspace: string): boolean {
+    const vscWorkspace = VscWorkspace.getDefaultVscWorkspace();
+    const vscWorkspaceResolved = vscWorkspace && path.resolve(vscWorkspace);
+    const workspaceResolved = path.resolve(workspace);
+    console.log('doesVscHaveCorrectWorkspace: ', vscWorkspace, vscWorkspaceResolved, workspaceResolved);
+    return Boolean(vscWorkspaceResolved === workspaceResolved);
   }
 
   static toVscPosition(position: Position): vscode.Position {

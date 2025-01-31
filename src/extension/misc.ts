@@ -35,8 +35,3 @@ export function scaleProgress(progress: Progress, multiplier: number): Progress 
     },
   };
 }
-
-export function doesVscHaveCorrectWorkspace(workspace: string): boolean {
-  const vscWorkspace = VscWorkspace.getDefaultVscWorkspace();
-  return Boolean(vscWorkspace && path.resolve(vscWorkspace) === path.resolve(workspace));
-}

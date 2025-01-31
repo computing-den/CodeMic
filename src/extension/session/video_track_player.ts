@@ -36,14 +36,14 @@ export default class VideoTrackPlayer {
     }
   }
 
-  unloadTrack() {
-    if (this.videoTrack) {
-      this.loaded = false;
-      this.loading = false;
-      this.videoTrack = undefined;
-      // this.session.context.postVideoMessage?.({ type: 'video/loadTrack', track: videoTrack }).catch(this.gotError);
-    }
-  }
+  // unloadTrack() {
+  //   if (this.videoTrack) {
+  //     this.loaded = false;
+  //     this.loading = false;
+  //     this.videoTrack = undefined;
+  //     // this.session.context.postVideoMessage?.({ type: 'video/loadTrack', track: videoTrack }).catch(this.gotError);
+  //   }
+  // }
 
   play() {
     console.log('VideoTrackPlayers play', this.loaded);

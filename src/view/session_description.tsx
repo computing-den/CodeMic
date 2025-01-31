@@ -7,33 +7,34 @@ import React from 'react';
 
 export type Props = {
   className?: string;
-  sessionHead: t.SessionHead;
+  head: t.SessionHead;
+  publication?: t.SessionPublication;
 };
 export default class SessionDescription extends React.Component<Props> {
   render() {
-    const { className, sessionHead: s } = this.props;
+    const { className, head, publication } = this.props;
 
     return (
       <div className={cn('session-description', className)}>
         <div className="header">
           <span className="item timestamp">
-            <TimeFromNow timestamp={s.publication?.publishTimestamp ?? s.modificationTimestamp} capitalize />
+            <TimeFromNow timestamp={publication?.publishTimestamp ?? head.modificationTimestamp} capitalize />
           </span>
-          {s.publication && (
+          {publication && (
             <>
               <div className="item views">
                 <span className="codicon codicon-eye va-top m-right_small" />
-                <span className="count">{s.publication.views}</span>
+                <span className="count">{publication.views}</span>
               </div>
               <div className="item likes">
                 <span className="codicon codicon-heart-filled va-top m-right_small" />
-                <span className="count">{s.publication.likes}</span>
+                <span className="count">{publication.likes}</span>
               </div>
             </>
           )}
         </div>
         <div className="body">
-          <TextToParagraphs text={s.description} />
+          <TextToParagraphs text={head.description} />
         </div>
       </div>
     );

@@ -78,12 +78,12 @@ export class Session {
   }
 
   private async load(options?: { clock?: number }) {
-    // It may already be loaded if we hit edit inside the player.
+    // Session may already be loaded if we hit edit inside the player.
     // This causes the video DOM in player screen to be replaced with
-    // another video DOM in recorder screen.
-    // Here, the video DOM may not have been mounted even.
+    // another video DOM in recorder screen. Same for the audio context.
+    // That's why we must reload the media track players.
     if (this.isLoaded()) {
-      this.rr.unloadVideo();
+      this.rr.reloadMedia();
       return;
     }
 
@@ -106,7 +106,7 @@ export class Session {
         this.commander = new SessionCommander(this as LoadedSession);
 
         progress.report({ message: 'loading', increment: 10 });
-        await this.rr.load(options);
+        await this.rr.loadWorkspace(options);
 
         progress.report({ message: 'done', increment: 10 });
       },

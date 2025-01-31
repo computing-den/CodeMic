@@ -14,10 +14,11 @@ import { AppContext } from './app_context.jsx';
 
 export type CommonProps = {
   className?: string;
-  sessionHead: t.SessionHead;
+  head: t.SessionHead;
 };
 export type ForListProps = CommonProps & {
   history?: t.SessionHistory;
+  publication?: t.SessionPublication;
 };
 export type ListItemProps = ForListProps & {
   // onOpen: (id: string) => unknown;
@@ -30,13 +31,13 @@ export type NormalProps = CommonProps & {
   withAuthor?: boolean;
 };
 
-export function SessionHead({ className, withAuthor, sessionHead: s }: NormalProps) {
+export function SessionHead({ className, withAuthor, head }: NormalProps) {
   return (
-    <WithAvatar className={cn('session-head', className)} username={s.author}>
-      <div className="title">{s.title || 'Untitled'}</div>
+    <WithAvatar className={cn('session-head', className)} username={head.author}>
+      <div className="title">{head.title || 'Untitled'}</div>
       {withAuthor && (
         <div className="footer">
-          <span className="footer-item author">{s.author || 'anonymous'}</span>
+          <span className="footer-item author">{head.author || 'anonymous'}</span>
         </div>
       )}
     </WithAvatar>
@@ -48,7 +49,7 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
   static contextType = AppContext;
   declare context: React.ContextType<typeof AppContext>;
 
-  clicked = () => postMessage({ type: 'welcome/openSessionInPlayer', sessionId: this.props.sessionHead.id });
+  clicked = () => postMessage({ type: 'welcome/openSessionInPlayer', sessionId: this.props.head.id });
   actionClicked = (e: React.MouseEvent, a: Action) => {
     e.preventDefault();
     e.stopPropagation();
@@ -57,14 +58,14 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
 
   render() {
     const { cache } = this.context;
-    const { className, history, sessionHead: s } = this.props;
+    const { className, history, publication, head } = this.props;
     // const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
 
     const actions = _.compact<Action>([
       history?.workspace && {
         icon: 'codicon-trash',
         title: 'Delete session and its data',
-        onClick: () => postMessage({ type: 'welcome/deleteSession', sessionId: this.props.sessionHead.id }),
+        onClick: () => postMessage({ type: 'welcome/deleteSession', sessionId: this.props.head.id }),
       },
       // {
       //   icon: 'codicon-repo-forked',
@@ -72,14 +73,14 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
       //   onClick: () =>
       //     postMessage({
       //       type: 'recorder/open',
-      //       sessionId: this.props.sessionHead.id,
+      //       sessionId: this.props.head.id,
       //       fork: true,
       //     }),
       // },
       {
         icon: 'codicon-edit',
         title: 'Edit: open this project in the Studio',
-        onClick: () => postMessage({ type: 'welcome/openSessionInRecorder', sessionId: this.props.sessionHead.id }),
+        onClick: () => postMessage({ type: 'welcome/openSessionInRecorder', sessionId: this.props.head.id }),
       },
       {
         icon: 'codicon-heart-filled',
@@ -92,7 +93,7 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
 
     // return (
     //   <SessionHeadForList
-    //     sessionHead={this.props.sessionHead}
+    //     head={this.props.head}
     //     history={this.props.history}
     //     coverUri={this.props.coverUri}
     //   />
@@ -101,17 +102,17 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
 
     return (
       <div className={cn('session-head-list-item', className)} onClick={this.clicked} tabIndex={0}>
-        {s.hasCover && (
+        {head.hasCover && (
           <div className="cover-container">
             {/*<div className="background" style={{ backgroundImage: `url(${coverUri})` }} />*/}
-            <img src={getCoverUri(s.id, cache).toString()} />
+            <img src={getCoverUri(head.id, cache).toString()} />
           </div>
         )}
-        <WithAvatar username={s.author} className="caption" small>
-          <div className="title">{s.title || 'Untitled'}</div>
-          {/*s.description && (
+        <WithAvatar username={head.author} className="caption" small>
+          <div className="title">{head.title || 'Untitled'}</div>
+          {/*head.description && (
             <div className="description">
-              <TextToParagraphs text={s.description} />
+              <TextToParagraphs text={head.description} />
             </div>
             )*/}
           {/*lastOpenedTimestamp && (
@@ -121,24 +122,24 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
               </span>
             </div>
             )*/}
-          {s.publication?.publishTimestamp && (
+          {publication?.publishTimestamp && (
             <div className="footer">
               <span className="footer-item timestamp">
-                Published <TimeFromNow timestamp={s.publication.publishTimestamp} />
+                Published <TimeFromNow timestamp={publication.publishTimestamp} />
               </span>
             </div>
           )}
           <div className="footer">
-            <span className="footer-item author">{s.author || 'anonymous'}</span>
-            {s.publication?.publishTimestamp && (
+            <span className="footer-item author">{head.author || 'anonymous'}</span>
+            {publication?.publishTimestamp && (
               <>
                 <div className="footer-item badge">
                   <span className="codicon codicon-eye va-top m-right_small" />
-                  <span className="count">{s.publication.views}</span>
+                  <span className="count">{publication.views}</span>
                 </div>
                 <div className="footer-item badge">
                   <span className="codicon codicon-heart-filled va-top m-right_small" />
-                  <span className="count">{s.publication.likes}</span>
+                  <span className="count">{publication.likes}</span>
                 </div>
               </>
             )}
@@ -157,23 +158,22 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
 }
 
 export type SessionHeadListProps = {
-  sessionHeads: t.SessionHead[];
-  history: t.SessionsHistory;
+  listings: t.SessionUIListing[];
   className?: string;
 };
 
 export class SessionHeadList extends React.Component<SessionHeadListProps> {
   render() {
-    const { history, sessionHeads } = this.props;
+    const { listings } = this.props;
 
-    const iteratee = (s: t.SessionHead) =>
-      (history[s.id] && lib.getSessionHistoryItemLastOpenTimestamp(history[s.id])) || '';
-    const sessionHeadsOrdered = _.orderBy(sessionHeads, iteratee, 'desc');
+    const iteratee = (listing: t.SessionUIListing) =>
+      (listing.history && lib.getSessionHistoryItemLastOpenTimestamp(listing.history)) || '';
+    const listingsOrdered = _.orderBy(listings, iteratee, 'desc');
 
     return (
       <div className={cn('session-head-list', this.props.className)}>
-        {sessionHeadsOrdered.map(s => (
-          <SessionHeadListItem sessionHead={s} history={history[s.id]} />
+        {listingsOrdered.map(listing => (
+          <SessionHeadListItem head={listing.head} history={listing.history} publication={listing.publication} />
         ))}
       </div>
     );

@@ -27,7 +27,7 @@ export async function publishSession(
   token: string,
   progress?: Progress,
   abortController?: AbortController,
-): Promise<t.SessionHead> {
+): Promise<t.SessionPublishRes> {
   try {
     const form = new FormData();
     form.append('sessionHead', JSON.stringify(sessionHead));

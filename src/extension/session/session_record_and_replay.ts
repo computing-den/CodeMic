@@ -68,7 +68,7 @@ export default class SessionRecordAndReplay {
     return Boolean(this.running && !this.mode.recordingEditor);
   }
 
-  async load(options?: { clock?: number }) {
+  async loadWorkspace(options?: { clock?: number }) {
     // Create workspace directory.
     await this.session.core.createWorkspaceDir();
 
@@ -104,17 +104,30 @@ export default class SessionRecordAndReplay {
 
     // Close irrelevant tabs.
     await this.vscWorkspace.closeIrrelevantVscTabs();
-
-    // Load media tracks so that they're ready to play when they come into range.
-    for (const c of this.audioTrackPlayers) c.load();
-
-    // Load video.
-    const videoTrack = this.findInRangeVideoTrack();
-    if (videoTrack) this.videoTrackPlayer.loadTrack(videoTrack);
   }
 
-  unloadVideo() {
-    this.videoTrackPlayer.unloadTrack();
+  // /**
+  //  * This must be called after loadWorkspace() and after the media manager and
+  //  * the video element have been mounted on the page.
+  //  * It's an optimization to preload mainly the video and not strictly necessary.
+  //  */
+  // loadMedia() {
+  //   // Load media tracks so that they're ready to play when they come into range.
+  //   // for (const p of this.audioTrackPlayers) p.load();
+
+  //   // Load video.
+  //   const videoTrack = this.findInRangeVideoTrack();
+  //   if (videoTrack) this.videoTrackPlayer.loadTrack(videoTrack);
+  // }
+
+  reloadMedia() {
+    this.audioTrackPlayers.forEach(p => this.disposeAudioPlayer(p));
+    this.disposeVideoPlayer();
+
+    this.audioTrackPlayers = this.session.body.audioTracks.map(
+      audioTrack => new AudioTrackPlayer(this.session, audioTrack),
+    );
+    this.videoTrackPlayer = new VideoTrackPlayer(this.session);
   }
 
   async scan() {
@@ -204,7 +217,7 @@ export default class SessionRecordAndReplay {
     const audioTrackPlayer = new AudioTrackPlayer(this.session, audioTrack);
     this.audioTrackPlayers.push(audioTrackPlayer);
     this.initAudioPlayer(audioTrackPlayer);
-    audioTrackPlayer.load();
+    // audioTrackPlayer.load();
   }
 
   unloadAudioTrack(id: string) {
@@ -215,16 +228,19 @@ export default class SessionRecordAndReplay {
     }
 
     this.audioTrackPlayers[i].pause();
+    this.disposeAudioPlayer(this.audioTrackPlayers[i]);
     this.audioTrackPlayers.splice(i, 1);
   }
 
   loadVideoTrack(videoTrack: t.VideoTrack) {
-    // nothing.
+    // Maybe load if video is in range?
   }
 
   unloadVideoTrack(id: string) {
-    this.videoTrackPlayer.stop();
-    // this.onChange?.();
+    if (this.videoTrackPlayer.videoTrack?.id === id) {
+      this.videoTrackPlayer.stop();
+    }
+    this.disposeVideoPlayer();
   }
 
   handleFrontendAudioEvent(e: t.FrontendMediaEvent) {
@@ -273,6 +289,14 @@ export default class SessionRecordAndReplay {
 
   private initVideoPlayer() {
     this.videoTrackPlayer.onError = this.gotError.bind(this);
+  }
+
+  private disposeAudioPlayer(c: AudioTrackPlayer) {
+    c.onError = undefined;
+  }
+
+  private disposeVideoPlayer() {
+    this.videoTrackPlayer.onError = undefined;
   }
 
   private async seekEditor() {

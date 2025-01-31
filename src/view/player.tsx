@@ -93,7 +93,7 @@ export default class Player extends React.Component<Props> {
   // isStoppedAlmostAtTheEnd(): boolean {
   //   return (
   //     this.props.player.state.status === t.TrackPlayerStatus.Stopped &&
-  //     this.props.player.clock >= this.props.player.sessionHead.duration - 0.5
+  //     this.props.player.clock >= this.props.player.head.duration - 0.5
   //   );
   // }
 
@@ -151,7 +151,7 @@ export default class Player extends React.Component<Props> {
   render() {
     const { cache } = this.context;
     const { session, user } = this.props;
-    const { head } = session;
+    const { head, publication } = session;
 
     let primaryAction: MT.PrimaryAction;
     if (session.playing) {
@@ -220,7 +220,7 @@ export default class Player extends React.Component<Props> {
           />
             */}
           <Section.Body>
-            <SessionHead className="subsection subsection_spaced" sessionHead={head} withAuthor />
+            <SessionHead className="subsection subsection_spaced" head={head} withAuthor />
             <MediaToolbar
               className="subsection subsection_spaced"
               primaryAction={primaryAction}
@@ -232,7 +232,7 @@ export default class Player extends React.Component<Props> {
               {head.hasCover && <img src={getCoverUri(head.id, cache).toString()} />}
               <video id="guide-video" />
             </div>
-            <SessionDescription className="subsection subsection_spaced" sessionHead={head} />
+            <SessionDescription className="subsection subsection_spaced" head={head} publication={publication} />
             {/*!player.loaded && (
               <PathField
                 className="subsection"

@@ -35,8 +35,8 @@ export type RecorderRestoreState = {
 
 export type WorkspaceChangeGlobalState = {
   screen: t.Screen;
-  sessionId: string;
-  sessionHandle: string;
+  // sessionId: string;
+  // sessionHandle: string;
   workspace: string;
   recorder?: RecorderRestoreState;
 };

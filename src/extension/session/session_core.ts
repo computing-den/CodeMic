@@ -25,29 +25,58 @@ export default class SessionCore {
 
   static LATEST_FORMAT_VERSION = 1;
 
-  static async fromLocal(
+  static async readLocalHead(workspace: string): Promise<t.SessionHead | undefined> {
+    return await storage.readJSONOptional<t.SessionHead>(path.join(workspace, '.CodeMic', 'head.json'));
+  }
+
+  static async readLocal(
     context: Context,
     workspace: string,
     opts?: { mustScan?: boolean },
   ): Promise<Session | undefined> {
-    const head = await storage.readJSONOptional<t.SessionHead>(path.join(workspace, '.CodeMic', 'head.json'));
-    if (head) {
-      return new Session(context, workspace, head, { local: true, mustScan: opts?.mustScan });
-    }
+    const head = await this.readLocalHead(workspace);
+    return head && this.fromLocal(context, head, workspace, opts);
   }
 
-  static async fromRemote(context: Context, head: t.SessionHead): Promise<Session> {
+  /**
+   * Clones head.
+   */
+  static fromLocal(context: Context, head: t.SessionHead, workspace: string, opts?: { mustScan?: boolean }): Session {
+    head = structuredClone(head);
+    return new Session(context, workspace, head, { local: true, mustScan: opts?.mustScan });
+  }
+
+  /**
+   * Clones head.
+   */
+  static fromRemote(context: Context, head: t.SessionHead): Session {
+    head = structuredClone(head);
     assert(head.author, 'Session has no author');
     assert(head.handle, 'Session has no handle');
     const workspace = path.join(paths.getDefaultWorkspaceBasePath(osPaths.home), head.author, head.handle);
     return new Session(context, workspace, head);
   }
 
+  /**
+   * Clones head.
+   */
+  static fromListing(context: Context, listing: t.SessionListing): Session {
+    if (listing.workspace) {
+      return this.fromLocal(context, listing.head, listing.workspace);
+    } else {
+      return this.fromRemote(context, listing.head);
+    }
+  }
+
   static async sessionExists(workspace: string): Promise<boolean> {
     return storage.pathExists(path.join(workspace, '.CodeMic'));
   }
 
+  /**
+   * Clones head.
+   */
   static async fromNew(context: Context, workspace: string, head: t.SessionHead): Promise<Session> {
+    head = structuredClone(head);
     const temp = path.join(context.userDataPath, 'new_session');
     await fs.promises.rm(temp, { recursive: true, force: true });
     await fs.promises.mkdir(temp, { recursive: true });
@@ -216,7 +245,7 @@ export default class SessionCore {
     if (await Session.Core.sessionExists(this.session.workspace)) {
       // Delete the old session.
       try {
-        const old = await Session.Core.fromLocal(this.session.context, this.session.workspace);
+        const old = await Session.Core.readLocal(this.session.context, this.session.workspace);
         if (old) await old.core.delete();
       } catch (error) {
         // If opening the session failed for any reason, force delete it.
@@ -239,7 +268,7 @@ export default class SessionCore {
     if (config.debug) {
       console.log('XXX DEBUG Reading head again to make sure');
       try {
-        await SessionCore.fromLocal(this.session.context, this.session.workspace);
+        await SessionCore.readLocal(this.session.context, this.session.workspace);
         console.log('XXX DEBUG head was written correctly');
       } catch (error) {
         debugger;
@@ -249,9 +278,7 @@ export default class SessionCore {
   }
 
   async writeHead() {
-    // Omit publication field before writing
-    const head: t.SessionHead = { ...this.session.head, publication: undefined };
-    await storage.writeJSON(path.join(this.dataPath, 'head.json'), head);
+    await storage.writeJSON(path.join(this.dataPath, 'head.json'), this.session.head);
     this.session.local = true;
     console.log('Wrote session head');
   }
@@ -465,7 +492,7 @@ export default class SessionCore {
     return blobs;
   }
 
-  async publish(options?: { progress?: Progress; abortController?: AbortController }) {
+  async publish(options?: { progress?: Progress; abortController?: AbortController }): Promise<t.SessionPublication> {
     if (!this.session.context.user) throw new Error('Please join/login to publish.');
 
     if (this.session.head.author && this.session.head.author !== this.session.context.user.username) {
@@ -478,16 +505,18 @@ export default class SessionCore {
     const bodyZip = await this.packageBody();
 
     options?.progress?.report({ message: 'uploading', increment: 50 });
-    this.session.head = await serverApi.publishSession(
+    const res = await serverApi.publishSession(
       this.session.head,
       bodyZip,
       this.session.context.user?.token,
       options?.progress,
       options?.abortController,
     );
-
     options?.progress?.report({ increment: 45 });
+    this.session.head = res.head;
     await this.write();
+
+    return res.publication;
   }
 
   assertFormatVersionSupport() {

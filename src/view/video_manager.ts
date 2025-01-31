@@ -17,18 +17,17 @@ export default class VideoManager {
   video?: HTMLVideoElement;
   // videoTracks?: t.VideoTrack[];
   curTrackId?: string;
-  prepared = false;
   sessionDataPath?: string;
   constructor() {}
 
   updateResources(sessionDataPath: string) {
-    // this.videoTracks = videoTracks;
+    // this.videoTrack = videoTrack;
     this.sessionDataPath = sessionDataPath;
   }
 
   prepare(video: HTMLVideoElement) {
     console.log(`VideoManager prepare`);
-    if (!this.prepared) {
+    if (this.video !== video) {
       this.video = video;
 
       video.addEventListener('volumechange', this.handleVolumeChange);
@@ -45,7 +44,6 @@ export default class VideoManager {
       video.preload = 'auto';
 
       video.load();
-      this.prepared = true;
     }
   }
 
