@@ -19,6 +19,7 @@ import * as path from 'path';
 import { URI } from 'vscode-uri';
 import ignore from 'ignore';
 import { scaleProgress } from '../misc.js';
+import cache from '../cache.js';
 
 export default class SessionCore {
   constructor(public session: Session) {}
@@ -26,7 +27,7 @@ export default class SessionCore {
   static LATEST_FORMAT_VERSION = 1;
 
   static async readLocalHead(workspace: string): Promise<t.SessionHead | undefined> {
-    return await storage.readJSONOptional<t.SessionHead>(path.join(workspace, '.CodeMic', 'head.json'));
+    return await storage.readJSONOptional<t.SessionHead>(path.join(SessionCore.getDataPath(workspace), 'head.json'));
   }
 
   static async readLocal(
@@ -41,7 +42,12 @@ export default class SessionCore {
   /**
    * Clones head.
    */
-  static fromLocal(context: Context, head: t.SessionHead, workspace: string, opts?: { mustScan?: boolean }): Session {
+  static fromLocal(
+    context: Context,
+    head: t.SessionHead,
+    workspace: string,
+    opts?: { mustScan?: boolean; temp?: boolean },
+  ): Session {
     head = structuredClone(head);
     return new Session(context, workspace, head, { local: true, mustScan: opts?.mustScan });
   }
@@ -69,18 +75,17 @@ export default class SessionCore {
   }
 
   static async sessionExists(workspace: string): Promise<boolean> {
-    return storage.pathExists(path.join(workspace, '.CodeMic'));
+    return storage.pathExists(SessionCore.getDataPath(workspace));
   }
 
   /**
    * Clones head.
    */
   static async fromNew(context: Context, workspace: string, head: t.SessionHead): Promise<Session> {
-    head = structuredClone(head);
     const temp = path.join(context.userDataPath, 'new_session');
     await fs.promises.rm(temp, { recursive: true, force: true });
     await fs.promises.mkdir(temp, { recursive: true });
-    return new Session(context, workspace, head, { mustScan: true, temp: true });
+    return this.fromLocal(context, head, workspace, { mustScan: true, temp: true });
   }
 
   // static getWorkspace(context: Context, head: t.SessionHead): t.AbsPath {
@@ -104,6 +109,10 @@ export default class SessionCore {
       ignorePatterns: lib.defaultIgnorePatterns,
       hasCover: false,
     };
+  }
+
+  static getDataPath(workspace: string): string {
+    return path.join(workspace, '.CodeMic');
   }
 
   // static async fromFork(
@@ -197,7 +206,7 @@ export default class SessionCore {
 
   get finalDataPath(): string {
     assert(this.session.workspace);
-    return path.join(this.session.workspace, '.CodeMic');
+    return SessionCore.getDataPath(this.session.workspace);
   }
 
   resolveUri(uri: string): string {
@@ -341,6 +350,9 @@ export default class SessionCore {
     return await storage.pathExists(path.join(this.dataPath, 'body.json'));
   }
 
+  /**
+   * Downloads the session zip from server. Writes the head as well as the session data and updates the cache.
+   */
   async download(options?: { skipIfExists?: boolean; progress?: Progress; abortController?: AbortController }) {
     this.assertFormatVersionSupport();
 
@@ -367,6 +379,7 @@ export default class SessionCore {
     await stream.promises.pipeline(fs.createReadStream(zipFilepath), out);
     await out.promise();
     await this.writeHead();
+    await cache.copyCover(this.dataPath, this.session.head.id);
     this.session.local = true;
     options?.progress?.report({ increment: 10 });
   }

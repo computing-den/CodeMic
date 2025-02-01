@@ -12,11 +12,11 @@ import Screen from './screen.jsx';
 import Section from './section.jsx';
 import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
-import { cn, getCoverUri } from './misc.js';
+import { cn } from './misc.js';
 import _ from 'lodash';
-import { VSCodeButton, VSCodeDropdown, VSCodeOption, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 import { AppContext } from './app_context.jsx';
 import { PictureInPicture } from './svgs.jsx';
+import Cover from './cover.jsx';
 
 type Props = { user?: t.User; player: t.PlayerUIState; session: t.SessionUIState };
 export default class Player extends React.Component<Props> {
@@ -151,7 +151,7 @@ export default class Player extends React.Component<Props> {
   render() {
     const { cache } = this.context;
     const { session, user } = this.props;
-    const { head, publication } = session;
+    const { head, publication, local } = session;
 
     let primaryAction: MT.PrimaryAction;
     if (session.playing) {
@@ -229,7 +229,7 @@ export default class Player extends React.Component<Props> {
               duration={head.duration}
             />
             <div id="cover-container" className="cover-container subsection">
-              {head.hasCover && <img src={getCoverUri(head.id, cache).toString()} />}
+              {head.hasCover && <Cover local={local} head={head} />}
               <video id="guide-video" />
             </div>
             <SessionDescription className="subsection subsection_spaced" head={head} publication={publication} />

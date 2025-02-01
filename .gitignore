@@ -7,3 +7,4 @@
 *.tsbuildinfo
 .emacs.desktop.lock
 .emacs.desktop
+#*

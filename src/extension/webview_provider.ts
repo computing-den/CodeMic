@@ -100,6 +100,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
       debug: config.debug,
       webviewUriBase: webview.asWebviewUri(vscode.Uri.file('/')).toString(),
       extensionWebviewUri: webview.asWebviewUri(this.extension.extensionUri).toString(),
+      server: config.server,
     };
 
     const sanitizedWebviewConfig = _.escape(JSON.stringify(webviewConfig));

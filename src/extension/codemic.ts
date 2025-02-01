@@ -20,7 +20,7 @@ const SAVE_TIMEOUT_MS = 5_000;
 type OpenScreenParams =
   | { screen: t.Screen.Loading }
   | { screen: t.Screen.Account; join?: boolean }
-  | { screen: t.Screen.Player; session: Session }
+  | { screen: t.Screen.Player; session: Session; prepare?: boolean }
   | { screen: t.Screen.Recorder; session: Session; tabId: t.RecorderUITabId; clock?: number }
   | { screen: t.Screen.Welcome };
 
@@ -35,6 +35,10 @@ class CodeMic {
     loading: boolean;
     error?: string;
   };
+
+  // With the publications in a global map, we don't have to worry about which
+  // part of the app mutates session head and if it contains the latest
+  // publication or not. We always have the latest publication.
   publications = new Map<string, t.SessionPublication>();
 
   frontendUpdateBlockCounter = 0;
@@ -104,10 +108,10 @@ class CodeMic {
     );
 
     // Vscode may restart after changing workspace. Restore state after such restart.
-    // Otherwise, open the welcome screen.
-    if (!(await this.restoreStateAfterRestart())) {
-      await this.openScreen({ screen: t.Screen.Welcome });
-    }
+    if (await this.restoreStateAfterRestart()) return;
+
+    // If there was no restart state to restore (or restore failed), open welcome.
+    await this.openScreen({ screen: t.Screen.Welcome });
   }
 
   /**
@@ -128,7 +132,7 @@ class CodeMic {
       assert(VscWorkspace.doesVscHaveCorrectWorkspace(session.workspace));
 
       if (screen === t.Screen.Player) {
-        await this.openScreen({ screen, session });
+        await this.openScreen({ screen, session, prepare: true });
       } else if (screen === t.Screen.Recorder) {
         await this.openScreen({ screen, session, tabId: recorder!.tabId, clock: recorder!.clock });
       } else {
@@ -813,7 +817,7 @@ class CodeMic {
     });
 
     this.setSession(session);
-    this.enrichSessions([session.head.id], { refreshPublication: true }).catch(console.error);
+    this.enrichSessions([session.head.id]).catch(console.error);
     await session.prepare({ clock });
   }
 
@@ -902,8 +906,9 @@ class CodeMic {
       }
       case t.Screen.Player: {
         this.setSession(params.session);
-        this.enrichSessions([params.session.head.id], { refreshPublication: true }).catch(console.error);
+        this.enrichSessions([params.session.head.id]).catch(console.error);
         this.setScreen(t.Screen.Player);
+        if (params.prepare) await params.session.prepare();
         await this.updateFrontend();
         break;
       }
@@ -924,28 +929,14 @@ class CodeMic {
           loading: true,
         };
 
+        // Update caches.
+        await this.updateCachesOfLocalSessionListings(this.welcome.sessions);
+
         // Do not block the welcome screen while enriching current and recent sessions.
-        this.enrichSessions(
-          this.welcome.sessions.map(s => s.head.id),
-          { refreshPublication: true },
-        ).catch(console.error);
+        this.enrichSessions(this.welcome.sessions.map(s => s.head.id)).catch(console.error);
 
         // Do not block the welcome screen while fetching featured sessions.
-        (async () => {
-          try {
-            const featured = await this.fetchFeaturedSessionListings();
-            if (this.welcome) {
-              this.welcome.sessions = this.welcome.sessions.filter(s => s.type !== 'remote');
-              this.welcome.sessions.push(...featured);
-              this.enrichSessions(featured.map(s => s.head.id)).catch(console.error);
-            }
-          } catch (error) {
-            console.error(error);
-          } finally {
-            if (this.welcome) this.welcome.loading = false;
-            this.updateFrontend().catch(console.error);
-          }
-        })();
+        this.updateFeaturedSessionListings().catch(console.error);
 
         this.setScreen(t.Screen.Welcome);
         await this.updateFrontend();
@@ -1158,11 +1149,11 @@ class CodeMic {
     vscode.window.showErrorMessage(error.message);
   }
 
-  getFirstSessionHistoryById(...ids: (string | undefined)[]): t.SessionHistory | undefined {
-    return _.compact(ids)
-      .map(id => this.context.settings.history[id])
-      .find(Boolean);
-  }
+  // getFirstSessionHistoryById(...ids: (string | undefined)[]): t.SessionHistory | undefined {
+  //   return _.compact(ids)
+  //     .map(id => this.context.settings.history[id])
+  //     .find(Boolean);
+  // }
 
   async postAudioMessage(req: t.BackendAudioRequest): Promise<t.FrontendAudioResponse> {
     return this.context.webviewProvider.postMessage(req);
@@ -1197,7 +1188,7 @@ class CodeMic {
       const workspace = VscWorkspace.getDefaultVscWorkspace();
       if (workspace && (await Session.Core.sessionExists(workspace))) {
         const head = await Session.Core.readLocalHead(workspace);
-        return head && { type: 'current', head, workspace };
+        return head && { head, workspace, group: 'current', local: true };
       }
     } catch (error) {
       console.error(error);
@@ -1210,7 +1201,7 @@ class CodeMic {
       try {
         const head = await Session.Core.readLocalHead(history.workspace);
         if (head?.id === history.id) {
-          recent.push({ type: 'recent', head, workspace: history.workspace });
+          recent.push({ head, workspace: history.workspace, group: 'recent', local: true });
         }
       } catch (error) {
         console.error(error);
@@ -1219,35 +1210,56 @@ class CodeMic {
     return recent;
   }
 
-  async fetchFeaturedSessionListings(): Promise<t.SessionListing[]> {
+  async updateFeaturedSessionListings() {
     try {
       const { heads, publications } = await serverApi.send({ type: 'sessions/featured' }, this.context.user?.token);
+
+      // Update this.publications.
       for (const [id, publication] of Object.entries(publications)) this.publications.set(id, publication);
-      return Promise.all(
-        heads.map(head => ({ type: 'remote', head, history: this.context.settings.history[head.id] })),
-      );
+
+      if (this.welcome) {
+        // Insert into welcome sessions.
+        this.welcome.sessions = this.welcome.sessions.filter(s => s.group !== 'remote');
+        this.welcome.sessions.push(
+          ...heads.map(head => ({ head, group: 'remote', local: false } satisfies t.SessionListing)),
+        );
+
+        // this.enrichSessions(
+        //   heads.map(h => h.id),
+        //   { skipPublicationIfExists: true },
+        // ).catch(console.error);
+      }
     } catch (error) {
+      console.error(error);
       this.showError(error as Error);
-      return [];
+    } finally {
+      if (this.welcome) this.welcome.loading = false;
+      this.updateFrontend().catch(console.error);
     }
   }
 
-  async enrichSessions(sessionIds: string[], options?: { refreshPublication?: boolean }) {
-    // We shouldn't download the cover of a session that is on disk.
-    // The one on disk may be newer (author may be editing it locally).
+  async updateCachesOfLocalSessionListings(listings: t.SessionListing[]) {
+    for (const listing of listings) {
+      if (listing.workspace) {
+        await cache.copyCover(Session.Core.getDataPath(listing.workspace), listing.head.id);
+      }
+    }
+  }
 
+  /**
+   * Downloads publications.
+   */
+  async enrichSessions(sessionIds: string[]) {
     // TODO
-    console.log(
-      `enriching sessions (refreshPublication: ${options?.refreshPublication ?? false}): `,
-      sessionIds.join(', '),
-    );
+    console.log(`enriching sessions: `, sessionIds.join(', '));
     await this.updateFrontend();
 
     // await this.updateFrontend();
   }
 
   async likeSession(sessionId: string, value: boolean) {
-    // TODO
+    // TODO apply locally and then enrich the session which will automatically fetch publication
+    //      also fetch user's list of likes.
     console.log(`${value ? 'liking' : 'unliking'} session: ${sessionId}`);
     return;
 
@@ -1273,6 +1285,7 @@ class CodeMic {
     let session: t.SessionUIState | undefined;
     if (this.session) {
       session = {
+        local: this.session.local,
         temp: this.session.temp,
         mustScan: this.session.mustScan,
         loaded: this.session.isLoaded(),

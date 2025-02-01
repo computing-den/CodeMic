@@ -10,10 +10,10 @@ export function asWebviewUri(...paths: string[]): URI {
   return Utils.joinPath(URI.parse(config.webviewUriBase), ...paths);
 }
 
-export function getCoverUri(sessionId: string, cache: CacheUIState): URI {
+export function getCoverCacheUri(sessionId: string, cache: CacheUIState): URI {
   return asWebviewUri(cache.coversPath, sessionId).with({ query: `v=${cache.version}` });
 }
 
-export function getAvatarUri(username: string, cache: CacheUIState): URI {
-  return asWebviewUri(cache.avatarsPath, username).with({ query: `v=${cache.version}` });
-}
+// export function getAvatarUri(username: string, cache: CacheUIState): URI {
+//   return asWebviewUri(cache.avatarsPath, username).with({ query: `v=${cache.version}` });
+// }

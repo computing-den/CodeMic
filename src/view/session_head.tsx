@@ -1,37 +1,23 @@
-import { getStore } from './store.js';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
-import TextToParagraphs from './text_to_paragraphs.jsx';
 import TimeFromNow from './time_from_now.jsx';
 import WithAvatar from './with_avatar.jsx';
-import { cn, getCoverUri } from './misc.js';
+import { cn } from './misc.js';
 import React from 'react';
 // import Selectable, * as SL from './selectable_li.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 import { AppContext } from './app_context.jsx';
+import Cover from './cover.jsx';
 
-export type CommonProps = {
+export type SessionHeadProps = {
   className?: string;
   head: t.SessionHead;
-};
-export type ForListProps = CommonProps & {
-  history?: t.SessionHistory;
-  publication?: t.SessionPublication;
-};
-export type ListItemProps = ForListProps & {
-  // onOpen: (id: string) => unknown;
-  // onEdit: (id: string) => unknown;
-  // onFork: (id: string) => unknown;
-  // onLike: (id: string) => unknown;
-  // onDelete: (id: string) => unknown;
-};
-export type NormalProps = CommonProps & {
   withAuthor?: boolean;
 };
 
-export function SessionHead({ className, withAuthor, head }: NormalProps) {
+export function SessionHead({ className, withAuthor, head }: SessionHeadProps) {
   return (
     <WithAvatar className={cn('session-head', className)} username={head.author}>
       <div className="title">{head.title || 'Untitled'}</div>
@@ -44,12 +30,16 @@ export function SessionHead({ className, withAuthor, head }: NormalProps) {
   );
 }
 
+export type SessionListingProps = {
+  className?: string;
+  listing: t.SessionUIListing;
+};
 export type Action = { icon: string; title: string; onClick: () => unknown };
-export class SessionHeadListItem extends React.Component<ListItemProps> {
-  static contextType = AppContext;
-  declare context: React.ContextType<typeof AppContext>;
+export class SessionListing extends React.Component<SessionListingProps> {
+  // static contextType = AppContext;
+  // declare context: React.ContextType<typeof AppContext>;
 
-  clicked = () => postMessage({ type: 'welcome/openSessionInPlayer', sessionId: this.props.head.id });
+  clicked = () => postMessage({ type: 'welcome/openSessionInPlayer', sessionId: this.props.listing.head.id });
   actionClicked = (e: React.MouseEvent, a: Action) => {
     e.preventDefault();
     e.stopPropagation();
@@ -57,15 +47,15 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
   };
 
   render() {
-    const { cache } = this.context;
-    const { className, history, publication, head } = this.props;
+    const { className, listing } = this.props;
+    const { head, publication, local, workspace } = listing;
     // const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
 
     const actions = _.compact<Action>([
-      history?.workspace && {
+      workspace && {
         icon: 'codicon-trash',
         title: 'Delete session and its data',
-        onClick: () => postMessage({ type: 'welcome/deleteSession', sessionId: this.props.head.id }),
+        onClick: () => postMessage({ type: 'welcome/deleteSession', sessionId: head.id }),
       },
       // {
       //   icon: 'codicon-repo-forked',
@@ -80,7 +70,7 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
       {
         icon: 'codicon-edit',
         title: 'Edit: open this project in the Studio',
-        onClick: () => postMessage({ type: 'welcome/openSessionInRecorder', sessionId: this.props.head.id }),
+        onClick: () => postMessage({ type: 'welcome/openSessionInRecorder', sessionId: head.id }),
       },
       {
         icon: 'codicon-heart-filled',
@@ -102,12 +92,9 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
 
     return (
       <div className={cn('session-head-list-item', className)} onClick={this.clicked} tabIndex={0}>
-        {head.hasCover && (
-          <div className="cover-container">
-            {/*<div className="background" style={{ backgroundImage: `url(${coverUri})` }} />*/}
-            <img src={getCoverUri(head.id, cache).toString()} />
-          </div>
-        )}
+        <div className="cover-container">
+          <Cover local={local} head={head} />
+        </div>
         <WithAvatar username={head.author} className="caption" small>
           <div className="title">{head.title || 'Untitled'}</div>
           {/*head.description && (
@@ -157,12 +144,12 @@ export class SessionHeadListItem extends React.Component<ListItemProps> {
   }
 }
 
-export type SessionHeadListProps = {
+export type SessionListingsProps = {
   listings: t.SessionUIListing[];
   className?: string;
 };
 
-export class SessionHeadList extends React.Component<SessionHeadListProps> {
+export class SessionListings extends React.Component<SessionListingsProps> {
   render() {
     const { listings } = this.props;
 
@@ -173,7 +160,7 @@ export class SessionHeadList extends React.Component<SessionHeadListProps> {
     return (
       <div className={cn('session-head-list', this.props.className)}>
         {listingsOrdered.map(listing => (
-          <SessionHeadListItem head={listing.head} history={listing.history} publication={listing.publication} />
+          <SessionListing listing={listing} />
         ))}
       </div>
     );

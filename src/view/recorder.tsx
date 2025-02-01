@@ -12,14 +12,14 @@ import Screen from './screen.jsx';
 import postMessage, { setMediaManager } from './api.js';
 import MediaManager from './media_manager.js';
 import Toolbar from './toolbar.jsx';
-import { cn, getCoverUri } from './misc.js';
+import { cn } from './misc.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeTextArea, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 import Popover, { PopoverProps, usePopover } from './popover.jsx';
-import { AppContext } from './app_context.jsx';
 import path from 'path';
 import { URI } from 'vscode-uri';
 import { PictureInPicture } from './svgs.jsx';
+import Cover from './cover.jsx';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -133,9 +133,6 @@ export default class Recorder extends React.Component<RecorderProps> {
 
 type DetailsViewProps = RecorderProps & TabViewProps & { onLoadRecorder: () => any };
 class DetailsView extends React.Component<DetailsViewProps> {
-  static contextType = AppContext;
-  declare context: React.ContextType<typeof AppContext>;
-
   state = {
     // coverKey: 0,
   };
@@ -193,19 +190,14 @@ class DetailsView extends React.Component<DetailsViewProps> {
   };
 
   render() {
-    const { cache } = this.context;
     const { session, id, className, onLoadRecorder } = this.props;
     // const { coverKey } = this.state;
-    const { head, workspace, temp } = session;
+    const { head, workspace, temp, local } = session;
 
     return (
       <div id={id} className={className}>
         <div className={cn('cover-container', head.hasCover && 'has-cover')}>
-          {head.hasCover ? (
-            <img src={getCoverUri(head.id, cache).toString()} />
-          ) : (
-            <p className="text-weak">NO COVER PHOTO</p>
-          )}
+          <Cover local={local} head={head} />
           <div className="buttons">
             {head.hasCover && (
               <VSCodeButton

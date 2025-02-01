@@ -224,6 +224,7 @@ export type WebviewConfig = {
   webviewUriBase: string;
   debug: boolean;
   extensionWebviewUri: string;
+  server: string;
 };
 
 export type Store = {
@@ -294,6 +295,7 @@ export type PlayerUIState = {
 };
 
 export type SessionUIState = {
+  local: boolean;
   temp: boolean;
   mustScan: boolean;
   loaded: boolean;
@@ -357,7 +359,8 @@ export type SessionPublication = {
 // export type SessionPublicationMap = Record<string, SessionPublication>;
 
 export type SessionListing = {
-  type: 'recent' | 'current' | 'remote';
+  group: 'recent' | 'current' | 'remote';
+  local: boolean;
   head: SessionHead;
   workspace?: string;
 };

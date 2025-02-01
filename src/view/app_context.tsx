@@ -17,6 +17,6 @@ export function AppContextProvider(props: { store: t.Store; children: React.Reac
   return <AppContext.Provider value={contextValue}>{props.children}</AppContext.Provider>;
 }
 
-export function userAppContext(): AppContextValue {
+export function useAppContext(): AppContextValue {
   return useContext(AppContext);
 }

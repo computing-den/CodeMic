@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
-import { SessionHeadList } from './session_head.jsx';
+import { SessionListings } from './session_head.jsx';
 import Screen from './screen.jsx';
 // import LoginBanner from './login_banner.jsx';
 import Section from './section.jsx';
@@ -77,10 +77,10 @@ function WelcomeSessions(props: Props) {
     e.preventDefault();
     postMessage({ type: 'account/open', join: true });
   }
-  const current = welcome.sessions.find(s => s.type === 'current');
-  const recent = welcome.sessions.filter(s => s.type === 'recent' && s.head.id !== current?.head.id);
+  const current = welcome.sessions.find(s => s.group === 'current');
+  const recent = welcome.sessions.filter(s => s.group === 'recent' && s.head.id !== current?.head.id);
   const featured = welcome.sessions.filter(
-    s => s.type === 'remote' && s.head.id !== current?.head.id && !recent.some(r => r.head.id === s.head.id),
+    s => s.group === 'remote' && s.head.id !== current?.head.id && !recent.some(r => r.head.id === s.head.id),
   );
   const empty = !current && recent.length === 0 && featured.length === 0;
 
@@ -135,7 +135,7 @@ function SessionsSection(props: SessionsSectionProps) {
     <Section className="sessions-section" bordered={props.bordered}>
       <Section.Header title={props.title} collapsible />
       <Section.Body>
-        <SessionHeadList listings={listingsOrdered} />
+        <SessionListings listings={listingsOrdered} />
       </Section.Body>
     </Section>
   );
