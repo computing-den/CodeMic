@@ -73,6 +73,37 @@ export function taskQueue<F extends TaskConsumer>(consumer: F, maxConcurrency: n
   return supply as TaskQueue<F>; // didn't find a better way to type this
 }
 
+/**
+ * Similar to lodash's throttle but with leading: false, trailing: true, and unlike
+ * lodash, calls do not resolve until the next trailing edge.
+ */
+export function throttleTrailingAsync(func: () => Promise<void>, wait: number): () => Promise<void> {
+  let timer: any | null = null;
+  let pending: Array<{ resolve: () => void; reject: (reason?: any) => void }> = [];
+
+  async function flush() {
+    timer = null;
+    const currentPending = pending;
+    pending = [];
+
+    try {
+      await func();
+      for (const { resolve } of currentPending) resolve();
+    } catch (err) {
+      for (const { reject } of currentPending) reject(err);
+    }
+  }
+
+  return function throttled(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      pending.push({ resolve, reject });
+      if (!timer) {
+        timer = setTimeout(flush, wait);
+      }
+    });
+  };
+}
+
 export class CancelledError extends Error {
   constructor() {
     super('Cancelled');

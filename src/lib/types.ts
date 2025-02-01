@@ -31,11 +31,6 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'player/seek'; clock: number }; response: OKResponse }
   | { request: { type: 'player/comment'; text: string; clock?: number }; response: OKResponse }
   | { request: { type: 'player/likeSession'; value: boolean }; response: OKResponse }
-  // | { request: { type: 'player/update'; changes: PlayerUpdate }; response: OKResponse }
-  // | {
-  //     request: { type: 'recorder/open'; sessionId?: string; clock?: number; fork?: boolean };
-  //     response: OKResponse;
-  //   }
   | { request: { type: 'recorder/openTab'; tabId: RecorderUITabId }; response: OKResponse }
   | { request: { type: 'recorder/load' }; response: OKResponse }
   | { request: { type: 'recorder/play' }; response: OKResponse }
@@ -65,9 +60,6 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/crop'; clock: number }; response: OKResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
   | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }
-  // | { request: { type: 'confirmForkFromPlayer' }; response: BooleanResponse }
-  // | { request: { type: 'confirmEditFromPlayer'; clock: number }; response: BooleanResponse }
-  | { request: { type: 'test'; value: any }; response: OKResponse }
   | { request: { type: 'audio'; event: FrontendMediaEvent }; response: OKResponse }
   | { request: { type: 'video'; event: FrontendMediaEvent }; response: OKResponse };
 
