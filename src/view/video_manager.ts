@@ -4,6 +4,7 @@ import assert from '../lib/assert.js';
 import postMessage from './api.js';
 import * as misc from './misc.js';
 import _ from 'lodash';
+import config from './config.js';
 
 // export enum MediaStatus {
 //   Init,
@@ -26,7 +27,7 @@ export default class VideoManager {
   }
 
   prepare(video: HTMLVideoElement) {
-    console.log(`VideoManager prepare`);
+    if (config.logWebviewVideoEvents) console.log(`VideoManager prepare`);
     if (this.video !== video) {
       this.video = video;
 
@@ -48,7 +49,7 @@ export default class VideoManager {
   }
 
   loadTrack(videoTrack: t.VideoTrack) {
-    console.log(`VideoManager loadTrack`, videoTrack);
+    if (config.logWebviewVideoEvents) console.log(`VideoManager loadTrack`, videoTrack);
     if (!this.video) return console.error('VideoManager loadTrack: video is not set');
 
     // const track = this.videoTracks?.find(t => t.id === id);
@@ -60,17 +61,17 @@ export default class VideoManager {
   }
 
   async play() {
-    console.log(`VideoManager play`);
+    if (config.logWebviewVideoEvents) console.log(`VideoManager play`);
     await this.video?.play();
   }
 
   pause() {
-    console.log(`VideoManager pause`);
+    if (config.logWebviewVideoEvents) console.log(`VideoManager pause`);
     this.video?.pause();
   }
 
   stop() {
-    console.log(`VideoManager stop`);
+    if (config.logWebviewVideoEvents) console.log(`VideoManager stop`);
     if (this.video) {
       this.video.pause();
       this.video.src = '';
@@ -79,17 +80,17 @@ export default class VideoManager {
   }
 
   seek(clock: number) {
-    console.log(`VideoManager seek`, clock);
+    if (config.logWebviewVideoEvents) console.log(`VideoManager seek`, clock);
     if (this.video) this.video.currentTime = clock;
   }
 
   setPlaybackRate(rate: number) {
-    console.log(`VideoManager setPlaybackRate`, rate);
+    if (config.logWebviewVideoEvents) console.log(`VideoManager setPlaybackRate`, rate);
     if (this.video) this.video.playbackRate = rate;
   }
 
   dispose() {
-    console.log(`VideoManager dispose`);
+    if (config.logWebviewVideoEvents) console.log(`VideoManager dispose`);
     if (this.video) {
       this.video.pause();
       this.video.removeEventListener('volumechange', this.handleVolumeChange);
@@ -103,28 +104,28 @@ export default class VideoManager {
   }
 
   close() {
-    console.log(`VideoManager close`);
+    if (config.logWebviewVideoEvents) console.log(`VideoManager close`);
     this.dispose();
   }
 
   handleGenericEvent = async (e: Event) => {
-    console.log('handleGenericEvent', e.type);
+    if (config.logWebviewVideoEvents) console.log('handleGenericEvent', e.type);
     await postVideoEvent({ type: e.type as (typeof genericEventTypes)[number], id: this.curTrackId! });
   };
 
   handleVolumeChange = async () => {
-    console.log('handleVolumeChange');
+    if (config.logWebviewVideoEvents) console.log('handleVolumeChange');
     // The volumechange event signifies that the volume has changed; that includes being muted.
     await postVideoEvent({ type: 'volumechange', volume: this.video!.volume, id: this.curTrackId! });
   };
 
   handleRateChange = async () => {
-    console.log('handleRateChange');
+    if (config.logWebviewVideoEvents) console.log('handleRateChange');
     await postVideoEvent({ type: 'ratechange', rate: this.video!.playbackRate, id: this.curTrackId! });
   };
 
   handleTimeUpdate = async () => {
-    console.log('handleTimeUpdate');
+    if (config.logWebviewVideoEvents) console.log('handleTimeUpdate');
     // The timeupdate event is triggered every time the currentTime property changes.
     // In practice, this occurs every 250 milliseconds.
     // This event can be used to trigger the displaying of playback progress.

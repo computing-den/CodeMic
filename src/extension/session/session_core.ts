@@ -21,6 +21,8 @@ import ignore from 'ignore';
 import { scaleProgress } from '../misc.js';
 import cache from '../cache.js';
 
+const WRITE_HISTORY_CLOCK_TIMEOUT_MS = 3_000;
+
 export default class SessionCore {
   constructor(public session: Session) {}
 
@@ -323,6 +325,14 @@ export default class SessionCore {
     assert(this.session.isLoaded());
     await this.writeHistory({ lastWatchedClock: this.session.rr.clock });
   }
+
+  writeHistoryClockThrottled = _.throttle(
+    () => {
+      this.writeHistoryClock().catch(console.error);
+    },
+    WRITE_HISTORY_CLOCK_TIMEOUT_MS,
+    { leading: false },
+  );
 
   async writeHistoryOpenClose() {
     await this.writeHistory({ lastWatchedTimestamp: new Date().toISOString() });

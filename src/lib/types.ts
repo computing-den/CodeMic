@@ -213,6 +213,8 @@ export enum Screen {
 }
 
 export type WebviewConfig = {
+  logWebviewVideoEvents: boolean;
+  logWebviewAudioEvents: boolean;
   webviewUriBase: string;
   debug: boolean;
   extensionWebviewUri: string;

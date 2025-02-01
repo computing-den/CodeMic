@@ -2,6 +2,7 @@ import * as t from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
 import _ from 'lodash';
 import { LoadedSession } from './session.js';
+import config from '../config.js';
 
 export default class VideoTrackPlayer {
   videoTrack: t.VideoTrack | undefined;
@@ -26,9 +27,9 @@ export default class VideoTrackPlayer {
   // }
 
   loadTrack(videoTrack: t.VideoTrack) {
-    console.log('VideoTrackPlayers loadTrack');
+    if (config.logBackendVideoEvents) console.log('VideoTrackPlayers loadTrack');
     if (this.videoTrack?.id !== videoTrack.id) {
-      console.log('VideoTrackPlayers loadTrack accepted');
+      if (config.logBackendVideoEvents) console.log('VideoTrackPlayers loadTrack accepted');
       this.loaded = false;
       this.loading = true;
       this.videoTrack = videoTrack;
@@ -46,7 +47,7 @@ export default class VideoTrackPlayer {
   // }
 
   play() {
-    console.log('VideoTrackPlayers play', this.loaded);
+    if (config.logBackendVideoEvents) console.log('VideoTrackPlayers play', this.loaded);
     this.running = true;
     if (this.loaded) {
       this.session.context.postVideoMessage?.({ type: 'video/play' }).catch(this.gotError);
@@ -54,7 +55,7 @@ export default class VideoTrackPlayer {
   }
 
   pause() {
-    console.log('VideoTrackPlayers pause', this.loaded);
+    if (config.logBackendVideoEvents) console.log('VideoTrackPlayers pause', this.loaded);
     this.running = false;
     if (this.loaded) {
       this.session.context.postVideoMessage?.({ type: 'video/pause' }).catch(this.gotError);
@@ -62,7 +63,7 @@ export default class VideoTrackPlayer {
   }
 
   stop() {
-    console.log('VideoTrackPlayers stop', this.loaded);
+    if (config.logBackendVideoEvents) console.log('VideoTrackPlayers stop', this.loaded);
     this.running = false;
     if (this.loaded) {
       this.session.context.postVideoMessage?.({ type: 'video/stop' }).catch(this.gotError);
@@ -71,7 +72,7 @@ export default class VideoTrackPlayer {
   }
 
   seek(clock: number) {
-    console.log('VideoTrackPlayers seek', this.loaded, clock);
+    if (config.logBackendVideoEvents) console.log('VideoTrackPlayers seek', this.loaded, clock);
     this.clock = clock;
     if (!this.loaded) {
       this.seekAfterLoad = true;
@@ -83,32 +84,32 @@ export default class VideoTrackPlayer {
   handleVideoEvent(e: t.FrontendMediaEvent) {
     switch (e.type) {
       case 'loadstart': {
-        console.log('loadstart', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('loadstart', this.videoTrack?.title);
         this.loading = true;
         break;
       }
       case 'durationchange': {
-        console.log('durationchange', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('durationchange', this.videoTrack?.title);
         break;
       }
       case 'loadedmetadata': {
-        console.log('loadedmetadata', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('loadedmetadata', this.videoTrack?.title);
         break;
       }
       case 'loadeddata': {
-        console.log('loadeddata', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('loadeddata', this.videoTrack?.title);
         break;
       }
       case 'progress': {
-        console.log('progress', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('progress', this.videoTrack?.title);
         break;
       }
       case 'canplay': {
-        console.log('canplay', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('canplay', this.videoTrack?.title);
         break;
       }
       case 'canplaythrough': {
-        console.log('canplaythrough', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('canplaythrough', this.videoTrack?.title);
         const isFirstLoad = !this.loaded;
         this.loading = false;
         this.loaded = true;
@@ -127,51 +128,51 @@ export default class VideoTrackPlayer {
         break;
       }
       case 'suspend': {
-        console.log('suspend', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('suspend', this.videoTrack?.title);
         break;
       }
       case 'abort': {
-        console.log('abort', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('abort', this.videoTrack?.title);
         break;
       }
       case 'emptied': {
-        console.log('emptied', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('emptied', this.videoTrack?.title);
         break;
       }
       case 'stalled': {
-        console.log('stalled', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('stalled', this.videoTrack?.title);
         break;
       }
       case 'playing': {
-        console.log('playing', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('playing', this.videoTrack?.title);
         break;
       }
       case 'waiting': {
-        console.log('waiting', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('waiting', this.videoTrack?.title);
         break;
       }
       case 'play': {
-        console.log('play', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('play', this.videoTrack?.title);
         break;
       }
       case 'pause': {
-        console.log('pause', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('pause', this.videoTrack?.title);
         break;
       }
       case 'ended': {
-        console.log('ended', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('ended', this.videoTrack?.title);
         break;
       }
       case 'seeking': {
-        console.log('seeking', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('seeking', this.videoTrack?.title);
         break;
       }
       case 'seeked': {
-        console.log('seeked', this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('seeked', this.videoTrack?.title);
         break;
       }
       case 'timeupdate': {
-        console.log('timeupdate', e.clock, this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('timeupdate', e.clock, this.videoTrack?.title);
         // We might receive progress update before seeking to another position is complete.
         // In which case, just ignore the progress update.
         // if (!this.seeking) {
@@ -181,11 +182,11 @@ export default class VideoTrackPlayer {
         break;
       }
       case 'volumechange': {
-        console.log('volumechange', e.volume, this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('volumechange', e.volume, this.videoTrack?.title);
         break;
       }
       case 'ratechange': {
-        console.log('ratechange', e.rate, this.videoTrack?.title);
+        if (config.logBackendVideoEvents) console.log('ratechange', e.rate, this.videoTrack?.title);
         break;
       }
       case 'error': {

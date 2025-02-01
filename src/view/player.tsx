@@ -20,8 +20,9 @@ import Cover from './cover.jsx';
 
 type Props = { user?: t.User; player: t.PlayerUIState; session: t.SessionUIState };
 export default class Player extends React.Component<Props> {
-  static contextType = AppContext;
-  declare context: React.ContextType<typeof AppContext>;
+  coverHeightInterval?: any;
+  // static contextType = AppContext;
+  // declare context: React.ContextType<typeof AppContext>;
 
   seeking = false;
   mediaManager = new MediaManager();
@@ -140,16 +141,24 @@ export default class Player extends React.Component<Props> {
     setMediaManager(this.mediaManager);
     this.updateResources();
     this.updateCoverContainerHeight();
-    window.addEventListener('resize', this.updateCoverContainerHeight);
+    // window.addEventListener('resize', this.updateCoverContainerHeight);
+
+    // Must use interval instead of listening to resize event because our cover
+    // image (see the Cover component) can change if it fails to load and must
+    // show the fallback photo.
+    // TODO Actually, that may not be the reason. I don't know why the cover photo
+    // requires a resize sometimes.
+    this.coverHeightInterval = setInterval(this.updateCoverContainerHeight, 500);
   }
 
   componentWillUnmount() {
     this.mediaManager.close();
-    window.removeEventListener('resize', this.updateCoverContainerHeight);
+    // window.removeEventListener('resize', this.updateCoverContainerHeight);
+    clearInterval(this.coverHeightInterval);
   }
 
   render() {
-    const { cache } = this.context;
+    // const { cache } = this.context;
     const { session, user } = this.props;
     const { head, publication, local } = session;
 
@@ -229,7 +238,7 @@ export default class Player extends React.Component<Props> {
               duration={head.duration}
             />
             <div id="cover-container" className="cover-container subsection">
-              {head.hasCover && <Cover local={local} head={head} />}
+              <Cover local={local} head={head} />
               <video id="guide-video" />
             </div>
             <SessionDescription className="subsection subsection_spaced" head={head} publication={publication} />

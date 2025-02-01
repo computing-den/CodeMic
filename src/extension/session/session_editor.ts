@@ -26,6 +26,8 @@ type TimelineRange = {
   toc: t.TocItem[];
 };
 
+const SAVE_TIMEOUT_MS = 5_000;
+
 export default class SessionEditor {
   dirty = false;
 
@@ -791,6 +793,39 @@ export default class SessionEditor {
   saved() {
     this.dirty = false;
     // this.session.onChange?.();
+  }
+
+  /**
+   * Session may not be loaded in which case only its head is written.
+   */
+  async write(opts?: { pause?: boolean; ifDirty?: boolean }) {
+    assert(this.session);
+    assert(!this.session.temp);
+    this.writeThrottled.cancel();
+
+    if (opts?.pause && this.session.rr?.running) {
+      this.session.rr.pause();
+    }
+
+    if (!opts?.ifDirty || this.dirty) {
+      await this.session.core.write();
+      await this.session.core.writeHistoryRecording();
+    }
+  }
+
+  writeThrottled = _.throttle(
+    () => {
+      // The session has not changed because writeThrottled is only called
+      // inside recorder and closing recorder calls writeSession which cancels the
+      // throttle queue.
+      this.write({ ifDirty: true }).catch(console.error);
+    },
+    SAVE_TIMEOUT_MS,
+    { leading: false },
+  );
+
+  finishEditing() {
+    this.writeThrottled.cancel();
   }
 
   private insertCmd<T extends t.Cmd>(cmd: T, opts?: { coalescing?: boolean }): T {

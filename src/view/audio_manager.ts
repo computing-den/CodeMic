@@ -3,6 +3,7 @@ import assert from '../lib/assert.js';
 import postMessage from './api.js';
 import _ from 'lodash';
 import * as misc from './misc.js';
+import config from './config.js';
 
 export default class AudioManager {
   trackManagers: { [key: string]: AudioTrackManager } = {};
@@ -93,7 +94,7 @@ export class AudioTrackManager {
     assert(track.file.type === 'local');
     this.audio.src = misc.asWebviewUri(sessionDataPath, 'blobs', track.file.sha1).toString();
     this.audio.preload = 'auto';
-    console.log(`AudioTrackManager: created audio: ${track.id} (${this.audio.src})`);
+    if (config.logWebviewAudioEvents) console.log(`AudioTrackManager: created audio: ${track.id} (${this.audio.src})`);
   }
 
   /**
@@ -103,7 +104,8 @@ export class AudioTrackManager {
    */
   async prepare(audioContext: AudioContext) {
     if (!this.prepared) {
-      console.log(`AudioTrackManager: preparing audio ${this.track.id} (${this.audio.src})`);
+      if (config.logWebviewAudioEvents)
+        console.log(`AudioTrackManager: preparing audio ${this.track.id} (${this.audio.src})`);
 
       assert(audioContext.state === 'suspended');
       this.node = audioContext.createMediaElementSource(this.audio);
@@ -111,32 +113,32 @@ export class AudioTrackManager {
       await this.audio.play();
       this.audio.pause();
       this.prepared = true;
-      console.log(`AudioTrackManager: prepared audio ${this.track.id}`);
+      if (config.logWebviewAudioEvents) console.log(`AudioTrackManager: prepared audio ${this.track.id}`);
     }
   }
 
   async play() {
-    console.log(`AudioTrackManager play`);
+    if (config.logWebviewAudioEvents) console.log(`AudioTrackManager play`);
     await this.audio.play();
   }
 
   pause() {
-    console.log(`AudioTrackManager pause`);
+    if (config.logWebviewAudioEvents) console.log(`AudioTrackManager pause`);
     this.audio.pause();
   }
 
   stop() {
-    console.log(`AudioTrackManager stop`);
+    if (config.logWebviewAudioEvents) console.log(`AudioTrackManager stop`);
     this.audio.pause();
   }
 
   seek(clock: number) {
-    console.log(`AudioTrackManager seek ${clock}`);
+    if (config.logWebviewAudioEvents) console.log(`AudioTrackManager seek ${clock}`);
     this.audio.currentTime = clock;
   }
 
   setPlaybackRate(rate: number) {
-    console.log(`AudioTrackManager setPlaybackRate ${rate}`);
+    if (config.logWebviewAudioEvents) console.log(`AudioTrackManager setPlaybackRate ${rate}`);
     this.audio.playbackRate = rate;
   }
 
@@ -157,18 +159,18 @@ export class AudioTrackManager {
   };
 
   handleVolumeChange = async () => {
-    console.log('handleVolumeChange');
+    if (config.logWebviewAudioEvents) console.log('handleVolumeChange');
     // The volumechange event signifies that the volume has changed; that includes being muted.
     await postAudioEvent({ type: 'volumechange', volume: this.audio.volume, id: this.track.id });
   };
 
   handleRateChange = async () => {
-    console.log('handleRateChange');
+    if (config.logWebviewAudioEvents) console.log('handleRateChange');
     await postAudioEvent({ type: 'ratechange', rate: this.audio.playbackRate, id: this.track.id });
   };
 
   handleTimeUpdate = async () => {
-    console.log('handleTimeUpdate');
+    if (config.logWebviewAudioEvents) console.log('handleTimeUpdate');
     // The timeupdate event is triggered every time the currentTime property changes. In practice, this occurs every 250 milliseconds. This event can be used to trigger the displaying of playback progress.
     await postAudioEvent({ type: 'timeupdate', clock: this.audio.currentTime, id: this.track.id });
   };

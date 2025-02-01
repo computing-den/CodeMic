@@ -15,8 +15,6 @@ import VscWorkspace from './session/vsc_workspace.js';
 import path from 'path';
 import cache from './cache.js';
 
-const SAVE_TIMEOUT_MS = 5_000;
-
 type OpenScreenParams =
   | { screen: t.Screen.Loading }
   | { screen: t.Screen.Account; join?: boolean }
@@ -472,14 +470,14 @@ class CodeMic {
       }
       case 'recorder/save': {
         assert(this.session?.isLoaded());
-        await this.writeSession({ pause: true });
+        await this.session.editor.write({ pause: true });
         this.updateFrontend();
         return ok;
       }
       case 'recorder/publish': {
         try {
           assert(this.session?.isLoaded());
-          await this.writeSession({ pause: true });
+          await this.session.editor.write({ pause: true });
           await this.context.withProgress(
             { title: `Publishing session ${this.session.head.handle}`, cancellable: true },
             async (progress, abortController) => {
@@ -767,7 +765,7 @@ class CodeMic {
 
   async handleSessionProgress() {
     if (this.screen === t.Screen.Player) {
-      await this.session!.core.writeHistoryClock();
+      this.session!.core.writeHistoryClockThrottled();
     }
     await this.updateFrontend();
   }
@@ -775,7 +773,7 @@ class CodeMic {
   async handleSessionChange() {
     await this.updateFrontend();
     if (this.session && !this.session.temp) {
-      this.writeSessionThrottled();
+      this.session.editor.writeThrottled();
     }
   }
 
@@ -876,7 +874,8 @@ class CodeMic {
           if (answer?.title !== exit) return false;
         }
 
-        await this.writeSession({ pause: true });
+        this.session.editor.finishEditing();
+        await this.session.editor.write({ pause: true });
         await this.session.core.gcBlobs();
         this.session = undefined;
         this.recorder = undefined;
@@ -892,31 +891,6 @@ class CodeMic {
     this.setScreen(t.Screen.Loading);
     return true;
   }
-
-  /**
-   * Session may not be loaded in which case only its head is written.
-   */
-  async writeSession(opts?: { pause?: boolean; ifDirty?: boolean }) {
-    assert(this.session);
-    assert(!this.session.temp);
-    this.writeSessionThrottled.cancel();
-
-    if (opts?.pause && this.session.rr?.running) {
-      this.session.rr.pause();
-    }
-
-    if (!opts?.ifDirty || this.session.editor.dirty) {
-      await this.session.core.write();
-      await this.session.core.writeHistoryRecording();
-    }
-  }
-
-  // Defined as arrow function to preserve the value of "this" for _.throttle().
-  writeSessionThrottledCommit = () => {
-    this.writeSession({ ifDirty: true }).catch(console.error);
-  };
-
-  writeSessionThrottled = _.throttle(this.writeSessionThrottledCommit, SAVE_TIMEOUT_MS, { leading: false });
 
   openView() {
     this.context.webviewProvider.show();

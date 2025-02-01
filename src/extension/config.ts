@@ -3,6 +3,10 @@ import path from 'path';
 
 export type Config = {
   server: string;
+  logWebviewVideoEvents: boolean;
+  logBackendVideoEvents: boolean;
+  logWebviewAudioEvents: boolean;
+  logBackendAudioEvents: boolean;
   logRecorderAcceptedVscEvents: boolean;
   logRecorderRawVscEvents: boolean;
   logSessionRRUpdateStep: boolean;

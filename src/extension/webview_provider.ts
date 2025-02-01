@@ -97,6 +97,8 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     // const font = getPath('webview', 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.ttf');
 
     const webviewConfig: t.WebviewConfig = {
+      logWebviewAudioEvents: config.logWebviewAudioEvents,
+      logWebviewVideoEvents: config.logWebviewVideoEvents,
       debug: config.debug,
       webviewUriBase: webview.asWebviewUri(vscode.Uri.file('/')).toString(),
       extensionWebviewUri: webview.asWebviewUri(this.extension.extensionUri).toString(),

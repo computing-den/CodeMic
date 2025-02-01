@@ -3,6 +3,7 @@ import assert from '../../lib/assert.js';
 import * as lib from '../../lib/lib.js';
 import _ from 'lodash';
 import { LoadedSession } from './session.js';
+import config from '../config.js';
 
 export default class AudioTrackPlayer {
   audioTrack: t.AudioTrack;
@@ -80,32 +81,32 @@ export default class AudioTrackPlayer {
   handleAudioEvent(e: t.FrontendMediaEvent) {
     switch (e.type) {
       case 'loadstart': {
-        console.log('loadstart');
+        if (config.logBackendAudioEvents) console.log('loadstart');
         this.loading = true;
         break;
       }
       case 'durationchange': {
-        console.log('durationchange');
+        if (config.logBackendAudioEvents) console.log('durationchange');
         break;
       }
       case 'loadedmetadata': {
-        console.log('loadedmetadata');
+        if (config.logBackendAudioEvents) console.log('loadedmetadata');
         break;
       }
       case 'loadeddata': {
-        console.log('loadeddata');
+        if (config.logBackendAudioEvents) console.log('loadeddata');
         break;
       }
       case 'progress': {
-        console.log('progress');
+        if (config.logBackendAudioEvents) console.log('progress');
         break;
       }
       case 'canplay': {
-        console.log('canplay');
+        if (config.logBackendAudioEvents) console.log('canplay');
         break;
       }
       case 'canplaythrough': {
-        console.log('canplaythrough');
+        if (config.logBackendAudioEvents) console.log('canplaythrough');
         const isFirstLoad = !this.loaded;
         this.loading = false;
         this.loaded = true;
@@ -124,51 +125,51 @@ export default class AudioTrackPlayer {
         break;
       }
       case 'suspend': {
-        console.log('suspend');
+        if (config.logBackendAudioEvents) console.log('suspend');
         break;
       }
       case 'abort': {
-        console.log('abort');
+        if (config.logBackendAudioEvents) console.log('abort');
         break;
       }
       case 'emptied': {
-        console.log('emptied');
+        if (config.logBackendAudioEvents) console.log('emptied');
         break;
       }
       case 'stalled': {
-        console.log('stalled');
+        if (config.logBackendAudioEvents) console.log('stalled');
         break;
       }
       case 'playing': {
-        console.log('playing');
+        if (config.logBackendAudioEvents) console.log('playing');
         break;
       }
       case 'waiting': {
-        console.log('waiting');
+        if (config.logBackendAudioEvents) console.log('waiting');
         break;
       }
       case 'play': {
-        console.log('play');
+        if (config.logBackendAudioEvents) console.log('play');
         break;
       }
       case 'pause': {
-        console.log('pause');
+        if (config.logBackendAudioEvents) console.log('pause');
         break;
       }
       case 'ended': {
-        console.log('ended');
+        if (config.logBackendAudioEvents) console.log('ended');
         break;
       }
       case 'seeking': {
-        console.log('seeking');
+        if (config.logBackendAudioEvents) console.log('seeking');
         break;
       }
       case 'seeked': {
-        console.log('seeked');
+        if (config.logBackendAudioEvents) console.log('seeked');
         break;
       }
       case 'timeupdate': {
-        console.log('timeupdate', e.clock);
+        if (config.logBackendAudioEvents) console.log('timeupdate', e.clock);
         // We might receive progress update before seeking to another position is complete.
         // In which case, just ignore the progress update.
         // if (!this.seeking) {
@@ -178,11 +179,11 @@ export default class AudioTrackPlayer {
         break;
       }
       case 'volumechange': {
-        console.log('volumechange', e.volume);
+        if (config.logBackendAudioEvents) console.log('volumechange', e.volume);
         break;
       }
       case 'ratechange': {
-        console.log('ratechange', e.rate);
+        if (config.logBackendAudioEvents) console.log('ratechange', e.rate);
         break;
       }
       case 'error': {
