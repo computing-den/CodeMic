@@ -223,7 +223,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
           resize="vertical"
           value={head.title}
           onInput={this.titleChanged}
-          placeholder="The title of this project"
+          placeholder="The title of this session"
           autoFocus={!session.loaded}
         >
           Title
@@ -256,7 +256,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
           resize="vertical"
           value={head.description}
           onInput={this.descriptionChanged}
-          placeholder="What is this project about?"
+          placeholder="What is this session about?"
         >
           Description
         </VSCodeTextArea>
@@ -308,7 +308,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
         </div>
         {!session.loaded && (
           <VSCodeButton className="subsection" onClick={onLoadRecorder} autoFocus>
-            {session.mustScan ? 'Scan workspace to start' : 'Load project into workspace'}
+            {session.mustScan ? 'Scan workspace to start' : 'Load session into workspace'}
             <span className="codicon codicon-chevron-right va-top m-left_small" />
           </VSCodeButton>
         )}

@@ -4,7 +4,7 @@ import assert from './assert.js';
 import { URI, Utils } from 'vscode-uri';
 import * as path from 'path';
 
-export const ANONYM_USERNAME = '_'; // minimum valid username is 3 characters
+export const ANONYM_USERNAME = 'anonym'; // NOTE: If you change this, make sure to change it in server too.
 
 // export const COVER_WITH_TO_HEIGHT_RATIO = 16 / 9;
 

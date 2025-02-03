@@ -51,7 +51,7 @@ export default class SessionCore {
     opts?: { mustScan?: boolean; temp?: boolean },
   ): Session {
     head = structuredClone(head);
-    return new Session(context, workspace, head, { local: true, mustScan: opts?.mustScan });
+    return new Session(context, workspace, head, { ...opts, local: true });
   }
 
   /**
@@ -229,23 +229,19 @@ export default class SessionCore {
     );
   }
 
-  verifyAndNormalizeTemp(): string | undefined {
-    if (!this.session.workspace) {
-      return 'Please select a workspace for the session.';
-    }
-    if (!path.isAbsolute(this.session.workspace)) {
-      return 'Please select an absolute path for workspace.';
-    }
+  verifyAndNormalizeTemp() {
+    assert(this.session.workspace, 'Please select a workspace for the session.');
+
+    assert(path.isAbsolute(this.session.workspace), 'Please select an absolute path for workspace.');
 
     // Remove .. and trailing slashes.
     this.session.workspace = path.resolve(this.session.workspace);
 
-    if (!this.session.head.handle) {
-      return 'Please select a handle for the session.';
-    }
-    if (/[^A-Za-z0-9_]/.test(this.session.head.handle)) {
-      return 'Please select a valid handle of format A-Z a-z 0-9 _ (e.g. my_project).';
-    }
+    assert(this.session.head.handle, 'Please select a handle for the session.');
+    assert(
+      !/[^A-Za-z0-9_]/.test(this.session.head.handle),
+      'Please select a valid handle of format A-Z a-z 0-9 _ (e.g. my_project).',
+    );
   }
 
   /**

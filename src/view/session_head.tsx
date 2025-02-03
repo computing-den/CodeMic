@@ -59,12 +59,12 @@ export function SessionListing(props: SessionListingProps) {
     },
     // {
     //   icon: 'codicon-repo-forked',
-    //   title: 'Fork: create a new project based on this one',
+    //   title: 'Fork: create a new session based on this one',
     //   onClick: () => props.onFork(head.id)
     // },
     {
       icon: 'codicon-edit',
-      title: 'Edit: open this project in the Studio',
+      title: 'Edit: open this session in the Studio',
       onClick: () => props.onEdit(head.id),
     },
     publication && {

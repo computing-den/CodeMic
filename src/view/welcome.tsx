@@ -107,7 +107,7 @@ function WelcomeSessions(props: Props) {
               <VSCodeLink href="#" onClick={join}>
                 join
               </VSCodeLink>{' '}
-              to publish your own CodeMics.
+              to publish your own sessions.
             </div>
           )}
         </Section.Body>

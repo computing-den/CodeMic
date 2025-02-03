@@ -18,8 +18,8 @@ import cache from './cache.js';
 type OpenScreenParams =
   | { screen: t.Screen.Loading }
   | { screen: t.Screen.Account; join?: boolean }
-  | { screen: t.Screen.Player; session: Session; prepare?: boolean }
-  | { screen: t.Screen.Recorder; session: Session; tabId: t.RecorderUITabId; clock?: number }
+  | { screen: t.Screen.Player; session: Session; load: boolean }
+  | { screen: t.Screen.Recorder; session: Session; clock?: number }
   | { screen: t.Screen.Welcome };
 
 class CodeMic {
@@ -135,9 +135,9 @@ class CodeMic {
       assert(VscWorkspace.doesVscHaveCorrectWorkspace(session.workspace));
 
       if (screen === t.Screen.Player) {
-        await this.openScreen({ screen, session, prepare: true });
+        await this.openScreen({ screen, session, load: true });
       } else if (screen === t.Screen.Recorder) {
-        await this.openScreen({ screen, session, tabId: recorder!.tabId, clock: recorder!.clock });
+        await this.openScreen({ screen, session, clock: recorder!.clock });
       } else {
         throw new Error('Why did vscode restart?');
       }
@@ -284,7 +284,7 @@ class CodeMic {
         const listing = this.welcome?.sessions.find(s => s.head.id === req.sessionId);
         assert(listing);
         const session = Session.Core.fromListing(this.context, listing);
-        await this.openScreen({ screen: t.Screen.Player, session });
+        await this.openScreen({ screen: t.Screen.Player, session, load: false });
 
         await this.updateFrontend();
         return ok;
@@ -293,7 +293,8 @@ class CodeMic {
         const listing = this.welcome?.sessions.find(s => s.head.id === req.sessionId);
         assert(listing);
         const session = Session.Core.fromListing(this.context, listing);
-        await this.openScreen({ screen: t.Screen.Recorder, session, tabId: 'details-view' });
+        if (!listing.local) await session.download({ skipIfExists: true });
+        await this.openScreen({ screen: t.Screen.Recorder, session });
 
         await this.updateFrontend();
         return ok;
@@ -305,12 +306,16 @@ class CodeMic {
           VscWorkspace.getDefaultVscWorkspace() ??
           path.join(
             paths.getDefaultWorkspaceBasePath(osPaths.home),
-            this.context.user?.username ?? 'anonym',
+            this.context.user?.username ?? lib.ANONYM_USERNAME,
             'new_session',
           );
 
+        if (workspace) {
+          head.handle = path.basename(workspace);
+        }
+
         const session = await Session.Core.fromNew(this.context, workspace, head);
-        await this.openScreen({ screen: t.Screen.Recorder, session, tabId: 'details-view' });
+        await this.openScreen({ screen: t.Screen.Recorder, session });
 
         await this.updateFrontend();
         return ok;
@@ -366,12 +371,8 @@ class CodeMic {
         }
 
         if (!cancel) {
-          await this.openScreen({
-            screen: t.Screen.Recorder,
-            session: this.session,
-            tabId: 'editor-view',
-            clock: this.session.rr?.clock,
-          });
+          if (!this.session.local) await this.session.download({ skipIfExists: true });
+          await this.openScreen({ screen: t.Screen.Recorder, session: this.session, clock: this.session.rr?.clock });
         }
 
         await this.updateFrontend();
@@ -450,7 +451,6 @@ class CodeMic {
         assert(this.session);
         assert(this.recorder);
         assert(this.session.temp);
-        // No need to download since it's a temp session.
         await this.loadRecorder(this.session);
         this.recorder.tabId = 'editor-view';
         await this.updateFrontend();
@@ -698,16 +698,15 @@ class CodeMic {
   }
 
   async loadRecorder(session: Session, clock?: number) {
-    // assert(this.session);
-    // assert(this.recorder);
+    // NOTE: Do not attempt to download the session here.
+    //       After a vscode restart, the session is no longer temp
+    //       but it doesn't yet have a body either until scan is done.
+    //       Calling download with skipIfExists will not actually skip
+    //       because it sees that body doesn't exist.
 
     // Confirm and commit temp session.
     if (session.temp) {
-      const errorMessage = session.core.verifyAndNormalizeTemp();
-      if (errorMessage) {
-        vscode.window.showErrorMessage(errorMessage);
-        return;
-      }
+      session.core.verifyAndNormalizeTemp();
 
       if (await Session.Core.sessionExists(session.workspace)) {
         const confirmTitle = 'Overwrite';
@@ -733,7 +732,7 @@ class CodeMic {
       await session.core.commitTemp();
     } else {
       // Write session before attempting to set up workspace which may trigger a vscode restart.
-      await session.core.write();
+      // await session.core.write();
     }
 
     // Write history. Do it before setUpWorkspace because that may trigger a vscode restart.
@@ -745,13 +744,11 @@ class CodeMic {
     await VscWorkspace.setUpWorkspace_MAY_RESTART_VSCODE(this.context, {
       screen: t.Screen.Recorder,
       workspace: session.workspace,
-      recorder: { tabId: 'editor-view', mustScan: session.mustScan, clock },
+      recorder: { mustScan: session.mustScan, clock },
       userMetadata: this.userMetadata,
     });
 
-    this.setSession(session);
     await session.prepare({ clock });
-    this.enrichSessions([session.head.id]).catch(console.error);
   }
 
   updateViewTitle() {
@@ -818,16 +815,23 @@ class CodeMic {
       case t.Screen.Player: {
         this.setSession(params.session);
         this.setScreen(t.Screen.Player);
-        if (params.prepare) await params.session.prepare();
+        if (params.load) {
+          await params.session.prepare();
+        }
         this.enrichSessions([params.session.head.id]).catch(console.error);
         await this.updateFrontend();
         break;
       }
       case t.Screen.Recorder: {
         params.session.core.assertFormatVersionSupport();
-        await params.session.download({ skipIfExists: true });
-        await this.loadRecorder(params.session, params.clock);
-        this.recorder = { tabId: 'editor-view' };
+        if (params.session.temp) {
+          this.recorder = { tabId: 'details-view' };
+        } else {
+          await this.loadRecorder(params.session, params.clock);
+          this.recorder = { tabId: 'editor-view' };
+          this.enrichSessions([params.session.head.id]).catch(console.error);
+        }
+        this.setSession(params.session);
         this.setScreen(t.Screen.Recorder);
         await this.updateFrontend();
         break;
@@ -888,8 +892,10 @@ class CodeMic {
         }
 
         this.session.editor.finishEditing();
-        await this.session.editor.write({ pause: true });
-        await this.session.core.gcBlobs();
+        if (!this.session.temp) {
+          await this.session.editor.write({ pause: true });
+          await this.session.core.gcBlobs();
+        }
         this.session = undefined;
         this.recorder = undefined;
         break;
@@ -919,6 +925,12 @@ class CodeMic {
     const userDataPath = path.join(osPaths.data, user?.username ?? lib.ANONYM_USERNAME);
     const userSettingsPath = path.join(userDataPath, 'settings.json');
     const settings = await storage.readJSON<t.Settings>(userSettingsPath, CodeMic.makeDefaultSettings);
+
+    // import anonymous user's activities.
+    if (!this.context.user && !_.isEmpty(this.context.settings.history)) {
+      settings.history = { ...this.context.settings.history, ...settings.history };
+      await storage.writeJSON(userSettingsPath, settings);
+    }
 
     this.session = undefined;
     this.context.user = user;

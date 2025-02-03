@@ -29,7 +29,6 @@ export type ProgressReport = (value: { message?: string; increment?: number }) =
 
 export type RecorderRestoreState = {
   mustScan: boolean;
-  tabId: t.RecorderUITabId;
   clock?: number;
 };
 
