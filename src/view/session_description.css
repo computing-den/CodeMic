@@ -6,23 +6,22 @@
   border-radius: calc(var(--corner-radius) * 1px);
   overflow: hidden;
   /* border-radius: var(--card-border-radius); */
+  padding-top: calc(var(--spacing-medium) - var(--button-icon-padding));
 
   > .header {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: var(--spacing-medium);
     align-items: center;
     /* opacity: 0.6; */
 
     > .item {
-      & + .item {
-        margin-left: var(--spacing-medium);
-      }
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-x-small);
 
       &.timestamp {
         font-weight: bold;
-      }
-
-      &.views {
-        margin-left: auto;
       }
     }
   }

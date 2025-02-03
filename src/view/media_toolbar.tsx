@@ -6,12 +6,12 @@ import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 
 export type CommonAction = {
   title: string;
-  onClick: () => void;
+  onClick: () => any;
   disabled?: boolean;
 };
 
 export type PrimaryAction = CommonAction & {
-  type: 'recorder/record' | 'recorder/pause' | 'player/load' | 'player/play' | 'player/pause';
+  type: 'recorder/record' | 'recorder/pause' | 'player/download' | 'player/load' | 'player/play' | 'player/pause';
 };
 export type Action = CommonAction & {
   icon?: string;
@@ -39,6 +39,11 @@ export default class MediaToolbar extends React.Component<Props> {
       case 'recorder/pause': {
         primaryActionIcon = 'codicon-debug-pause';
         primaryActionFor = 'for-recorder';
+        break;
+      }
+      case 'player/download': {
+        primaryActionIcon = 'codicon-cloud-download';
+        primaryActionFor = 'for-player';
         break;
       }
       case 'player/load': {

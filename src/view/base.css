@@ -228,3 +228,7 @@ button {
 .text-weak {
   color: var(--text-weak);
 }
+
+.with-vscode-button-padding {
+  padding: var(--button-icon-padding);
+}

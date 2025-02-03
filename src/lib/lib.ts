@@ -74,17 +74,17 @@ export function taskQueue<F extends TaskConsumer>(consumer: F, maxConcurrency: n
 }
 
 /**
- * Similar to lodash's throttle but with leading: false, trailing: true, and unlike
- * lodash, calls do not resolve until the next trailing edge.
+ * Similar to lodash's throttle but with leading: false, trailing: true.
+ * Unlike lodash, calls do not resolve until the next trailing edge.
  */
 export function throttleTrailingAsync(func: () => Promise<void>, wait: number): () => Promise<void> {
   let timer: any | null = null;
   let pending: Array<{ resolve: () => void; reject: (reason?: any) => void }> = [];
 
   async function flush() {
-    timer = null;
     const currentPending = pending;
     pending = [];
+    timer = null;
 
     try {
       await func();
@@ -184,9 +184,9 @@ export function calcClockAfterMerge(clock: number, range: t.ClockRange): number 
   return range.start;
 }
 
-export function userToUserSummary(user: t.User): t.UserSummary {
-  return _.pick(user, 'username', 'email', 'joinTimestamp');
-}
+// export function userToUserSummary(user: t.User): t.UserSummary {
+//   return _.pick(user, 'username', 'email', 'joinTimestamp');
+// }
 
 // export async function asyncFilter<T>(collection: T[], cb: (x: T, i: number) => Promise<boolean>): Promise<T[]> {
 //   const bools = await Promise.all(collection.map(cb));

@@ -86,7 +86,7 @@ export class CommentList extends React.Component<CommentListProps> {
   render() {
     let { comments, className } = this.props;
 
-    comments = _.orderBy(comments, 'creation_timestamp', 'desc');
+    comments = _.orderBy(comments, c => c.creationTimestamp, 'desc');
 
     return (
       <div className={cn('comment-list', className)}>
@@ -100,7 +100,7 @@ export class CommentList extends React.Component<CommentListProps> {
 
 export type CommentInputProps = {
   className?: string;
-  author: t.UserSummary;
+  author: string;
   onSend: (text: string) => any;
 };
 export function CommentInput(props: CommentInputProps) {
@@ -111,12 +111,20 @@ export function CommentInput(props: CommentInputProps) {
     setText('');
   }
 
+  function cancel() {
+    setText('');
+  }
+
   function keyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      send();
+    } else if (e.key === 'Escape') {
+      cancel();
+    }
   }
 
   return (
-    <WithAvatar className={cn('comment-input', props.className)} username={props.author.username}>
+    <WithAvatar className={cn('comment-input', props.className)} username={props.author}>
       <VSCodeTextArea
         rows={2}
         resize="vertical"
@@ -126,9 +134,14 @@ export function CommentInput(props: CommentInputProps) {
         onKeyDown={keyDown}
       ></VSCodeTextArea>
       {text.trim() && (
-        <VSCodeButton appearance="primary" onClick={send}>
-          Send
-        </VSCodeButton>
+        <div className="buttons">
+          <VSCodeButton appearance="secondary" onClick={cancel}>
+            Cancel
+          </VSCodeButton>
+          <VSCodeButton appearance="primary" onClick={send}>
+            Send
+          </VSCodeButton>
+        </div>
       )}
     </WithAvatar>
   );

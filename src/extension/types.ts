@@ -35,9 +35,8 @@ export type RecorderRestoreState = {
 
 export type WorkspaceChangeGlobalState = {
   screen: t.Screen;
-  // sessionId: string;
-  // sessionHandle: string;
   workspace: string;
+  userMetadata?: t.UserMetadata;
   recorder?: RecorderRestoreState;
 };
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };

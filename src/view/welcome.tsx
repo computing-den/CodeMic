@@ -10,7 +10,7 @@ import postMessage from './api.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeLink, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 
-type Props = { user?: t.User; welcome: t.WelcomeUIState; earlyAccessEmail?: string };
+type Props = { user?: t.UserUI; welcome: t.WelcomeUIState; earlyAccessEmail?: string };
 
 export default function Welcome(props: Props) {
   return props.earlyAccessEmail || props.user ? (
@@ -112,30 +112,38 @@ function WelcomeSessions(props: Props) {
           )}
         </Section.Body>
       </Section>
-      {current && <SessionsSection title="WORKSPACE" listings={[current]} />}
-      {recent.length > 0 && <SessionsSection title="RECENT" listings={recent} />}
-      {featured.length > 0 && <SessionsSection title="FEATURED" listings={featured} />}
+      {current && <SessionsSection user={props.user} title="WORKSPACE" listings={[current]} />}
+      {recent.length > 0 && <SessionsSection user={props.user} title="RECENT" listings={recent} />}
+      {featured.length > 0 && <SessionsSection user={props.user} title="FEATURED" listings={featured} />}
       {welcome.loading && empty && <div className="empty">LOADING ...</div>}
     </Screen>
   );
 }
 
 type SessionsSectionProps = {
+  user?: t.UserUI;
   title: string;
   listings: t.SessionUIListing[];
   bordered?: boolean;
 };
 
 function SessionsSection(props: SessionsSectionProps) {
-  const iteratee = (listing: t.SessionUIListing) =>
-    (listing.history && lib.getSessionHistoryItemLastOpenTimestamp(listing.history)) || '';
-  const listingsOrdered = _.orderBy(props.listings, iteratee, 'desc');
-
+  const clicked = (sessionId: string) => postMessage({ type: 'welcome/openSessionInPlayer', sessionId });
+  const del = (sessionId: string) => postMessage({ type: 'welcome/deleteSession', sessionId });
+  const edit = (sessionId: string) => postMessage({ type: 'welcome/openSessionInRecorder', sessionId });
+  const like = (sessionId: string, value: boolean) => postMessage({ type: 'welcome/likeSession', sessionId, value });
   return (
     <Section className="sessions-section" bordered={props.bordered}>
       <Section.Header title={props.title} collapsible />
       <Section.Body>
-        <SessionListings listings={listingsOrdered} />
+        <SessionListings
+          user={props.user}
+          listings={props.listings}
+          onClick={clicked}
+          onDelete={del}
+          onEdit={edit}
+          onLike={like}
+        />
       </Section.Body>
     </Section>
   );

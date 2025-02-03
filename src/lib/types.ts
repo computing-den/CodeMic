@@ -167,12 +167,16 @@ export type BackendToServerReqRes =
       response: BooleanResponse;
     }
   | {
-      request: { type: 'account/join'; credentials: Credentials };
+      request: { type: 'user/join'; credentials: Credentials };
       response: { type: 'user'; user: User };
     }
   | {
-      request: { type: 'account/login'; credentials: Credentials };
+      request: { type: 'user/login'; credentials: Credentials };
       response: { type: 'user'; user: User };
+    }
+  | {
+      request: { type: 'user/metadata' };
+      response: { type: 'userMetadata'; metadata: UserMetadata };
     }
   | {
       request: { type: 'sessions/featured' };
@@ -183,7 +187,7 @@ export type BackendToServerReqRes =
       };
     }
   | {
-      request: { type: 'sessions/publication'; sessionIds: string[] };
+      request: { type: 'sessions/publications'; sessionIds: string[] };
       response: { type: 'sessionPublications'; publications: Record<string, SessionPublication> };
     }
   | {
@@ -191,7 +195,7 @@ export type BackendToServerReqRes =
       response: OKResponse;
     }
   | {
-      request: { type: 'session/like/toggle'; sessionId: string };
+      request: { type: 'session/like/post'; sessionId: string; value: boolean };
       response: OKResponse;
     };
 export type BackendToServerRequest = BackendToServerReqRes['request'];
@@ -224,7 +228,7 @@ export type WebviewConfig = {
 export type Store = {
   earlyAccessEmail?: string;
   screen: Screen;
-  user?: User;
+  user?: UserUI;
   account?: AccountUIState;
   welcome?: WelcomeUIState;
   recorder?: RecorderUIState;
@@ -244,17 +248,22 @@ export type User = {
   username: string;
   email: string;
   token: string;
-  // avatar?: string;
   joinTimestamp: string;
   tokenTimestamp: string;
 };
 
-export type UserSummary = {
-  username: string;
-  email: string;
-  // avatar?: string;
-  joinTimestamp: string;
+export type UserMetadata = {
+  likes: string[];
 };
+
+export type UserUI = User & { metadata?: UserMetadata };
+
+// export type UserSummary = {
+//   username: string;
+//   email: string;
+//   // avatar?: string;
+//   joinTimestamp: string;
+// };
 
 export type Credentials = {
   username: string;

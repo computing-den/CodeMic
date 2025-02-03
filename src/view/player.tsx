@@ -18,7 +18,7 @@ import { AppContext } from './app_context.jsx';
 import { PictureInPicture } from './svgs.jsx';
 import Cover from './cover.jsx';
 
-type Props = { user?: t.User; player: t.PlayerUIState; session: t.SessionUIState };
+type Props = { user?: t.UserUI; player: t.PlayerUIState; session: t.SessionUIState };
 export default class Player extends React.Component<Props> {
   coverHeightInterval?: any;
   // static contextType = AppContext;
@@ -83,14 +83,6 @@ export default class Player extends React.Component<Props> {
     // }
   };
 
-  edit = async () => {
-    await postMessage({ type: 'player/openInRecorder' });
-  };
-
-  like = async () => {
-    await postMessage({ type: 'player/likeSession', value: true });
-  };
-
   // isStoppedAlmostAtTheEnd(): boolean {
   //   return (
   //     this.props.player.state.status === t.TrackPlayerStatus.Stopped &&
@@ -126,6 +118,10 @@ export default class Player extends React.Component<Props> {
       sessionId: this.props.session.head.id,
       clock: this.props.session.clock,
     });
+  };
+
+  like = async (value: boolean) => {
+    await postMessage({ type: 'player/likeSession', value });
   };
 
   updateResources() {
@@ -167,16 +163,19 @@ export default class Player extends React.Component<Props> {
       primaryAction = { type: 'player/pause', title: 'Pause', onClick: this.pause };
     } else if (session.loaded) {
       primaryAction = { type: 'player/play', title: 'Play', onClick: this.play };
+    } else if (session.local) {
+      primaryAction = { type: 'player/load', title: `Load session into ${session.workspace}`, onClick: this.load };
     } else {
-      const title = session.workspace
-        ? `Load the project into ${session.workspace}`
-        : `Select a directory and load the project into it`;
-      primaryAction = { type: 'player/load', title, onClick: this.load };
+      primaryAction = {
+        type: 'player/download',
+        title: `Download and load session into ${session.workspace}`,
+        onClick: this.load,
+      };
     }
 
-    const toolbarActions = [
+    const toolbarActions = _.compact([
       // {
-      //   title: 'Fork: create a new project based on this one',
+      //   title: 'Fork: create a new session based on this one',
       //   icon: 'codicon-repo-forked',
       //   onClick: this.fork,
       // },
@@ -187,11 +186,11 @@ export default class Player extends React.Component<Props> {
       //     console.log('TODO');
       //   },
       // },
-      {
-        title: 'Like',
-        icon: 'codicon-heart-filled',
-        onClick: this.like,
-      },
+      // publication && {
+      //   title: 'Like',
+      //   icon: liked ? 'codicon-heart-filled' : 'codicon-heart',
+      //   onClick: () => postMessage({ type: 'player/likeSession', value: !liked }),
+      // },
       {
         title: 'Picture-in-Picture',
         children: <PictureInPicture />,
@@ -201,11 +200,11 @@ export default class Player extends React.Component<Props> {
         disabled: !this.getVideoElem()?.src,
       },
       {
-        title: 'Edit: open this project in the Studio',
+        title: 'Edit: open this session in the Studio',
         icon: 'codicon-edit',
-        onClick: this.edit,
+        onClick: () => postMessage({ type: 'player/openInRecorder' }),
       },
-    ];
+    ]);
 
     const tocIndex = _.findLastIndex(head.toc, item => item.clock <= session.clock);
 
@@ -241,7 +240,13 @@ export default class Player extends React.Component<Props> {
               <Cover local={local} head={head} />
               <video id="guide-video" />
             </div>
-            <SessionDescription className="subsection subsection_spaced" head={head} publication={publication} />
+            <SessionDescription
+              className="subsection subsection_spaced"
+              head={head}
+              publication={publication}
+              user={user}
+              onLike={this.like}
+            />
             {/*!player.loaded && (
               <PathField
                 className="subsection"
@@ -282,7 +287,7 @@ export default class Player extends React.Component<Props> {
         <Section className="comments-section">
           <Section.Header title="COMMENTS" collapsible />
           <Section.Body>
-            {user && <CommentInput author={user} onSend={this.sendComment} />}
+            {user && <CommentInput author={user.username} onSend={this.sendComment} />}
             {session.publication && <CommentList comments={session.publication.comments} />}
           </Section.Body>
         </Section>

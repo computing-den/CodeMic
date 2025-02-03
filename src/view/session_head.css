@@ -1,4 +1,4 @@
-.session-head-list {
+.session-listings {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--spacing-medium);
@@ -7,13 +7,15 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .session-head-list-item {
+  .session-listing {
     /* margin-top: var(--spacing-medium); */
     padding: var(--spacing-medium) var(--spacing-large);
+    cursor: pointer;
+
+    /* display: grid; */
+    /* grid-template-rows: subgrid; */
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    cursor: pointer;
 
     &:hover {
       background: var(--vscode-list-hoverBackground);
@@ -23,7 +25,7 @@
       }
     }
 
-    /* + .session-head-list-item { */
+    /* + .session-listing { */
     /*   margin-top: var(--spacing-medium); */
     /* } */
 
@@ -56,6 +58,7 @@
     }
 
     .caption {
+      flex: 1;
       position: relative;
       padding-top: var(--spacing-large);
       /* padding-bottom: var(--spacing-medium); */

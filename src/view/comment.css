@@ -64,9 +64,11 @@
       width: 100%;
     }
 
-    & vscode-button {
-      margin-left: auto;
+    .buttons {
       margin-top: var(--spacing-small);
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--spacing-small);
     }
   }
 }

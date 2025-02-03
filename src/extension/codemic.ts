@@ -33,6 +33,7 @@ class CodeMic {
     loading: boolean;
     error?: string;
   };
+  userMetadata?: t.UserMetadata;
 
   // With the publications in a global map, we don't have to worry about which
   // part of the app mutates session head and if it contains the latest
@@ -85,7 +86,7 @@ class CodeMic {
       vscode.commands.registerCommand('codemic.openHome', () => this.openScreen({ screen: t.Screen.Welcome })),
     );
     this.context.extension.subscriptions.push(
-      vscode.commands.registerCommand('codemic.refreshHome', () => this.openScreen({ screen: t.Screen.Welcome })),
+      vscode.commands.registerCommand('codemic.refreshHome', this.refreshWelcomeScreen.bind(this)),
     );
     this.context.extension.subscriptions.push(
       vscode.commands.registerCommand('codemic.account', () => this.openScreen({ screen: t.Screen.Account })),
@@ -101,10 +102,17 @@ class CodeMic {
     );
 
     // Vscode may restart after changing workspace. Restore state after such restart.
-    if (await this.restoreStateAfterRestart()) return;
+    if (await this.restoreStateAfterRestart()) {
+      // We're done. It restores and prepares session, opens the right screen, and even restores userMetadata.
+    } else {
+      // There was no restart state to restore (or restore failed).
 
-    // If there was no restart state to restore (or restore failed), open welcome.
-    await this.openScreen({ screen: t.Screen.Welcome });
+      // Update userMetadata without waiting.
+      this.updateUserMetadata().catch(console.error);
+
+      // Open welcome.
+      await this.openScreen({ screen: t.Screen.Welcome });
+    }
   }
 
   /**
@@ -119,7 +127,9 @@ class CodeMic {
       console.log('restoreStateAfterRestart(): ', workspaceChange);
       await VscWorkspace.setWorkspaceChangeGlobalState(this.context);
 
-      const { screen, recorder, workspace } = workspaceChange;
+      const { screen, recorder, workspace, userMetadata } = workspaceChange;
+      this.userMetadata = userMetadata;
+
       const session = await Session.Core.readLocal(this.context, workspace, { mustScan: recorder?.mustScan });
       assert(session);
       assert(VscWorkspace.doesVscHaveCorrectWorkspace(session.workspace));
@@ -188,18 +198,18 @@ class CodeMic {
 
     switch (req.type) {
       case 'webviewLoaded': {
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'account/open': {
         await this.openScreen({ screen: t.Screen.Account, join: req.join });
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'account/update': {
         assert(this.account);
         this.account = { ...this.account, ...req.changes };
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'account/join': {
@@ -207,7 +217,7 @@ class CodeMic {
 
         let user: t.User | undefined;
         try {
-          user = (await serverApi.send({ type: 'account/join', credentials: this.account.credentials })).user;
+          user = (await serverApi.send({ type: 'user/join', credentials: this.account.credentials })).user;
         } catch (error) {
           console.error(error);
           this.account.error = (error as Error).message;
@@ -219,7 +229,7 @@ class CodeMic {
           await this.changeUser(user);
         }
 
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'account/login': {
@@ -228,7 +238,7 @@ class CodeMic {
 
         let user: t.User | undefined;
         try {
-          user = (await serverApi.send({ type: 'account/login', credentials: this.account.credentials })).user;
+          user = (await serverApi.send({ type: 'user/login', credentials: this.account.credentials })).user;
         } catch (error) {
           console.error(error);
           if (this.account) this.account.error = (error as Error).message;
@@ -240,17 +250,17 @@ class CodeMic {
           await this.changeUser(user);
         }
 
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'account/logout': {
         await this.changeUser();
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'welcome/open': {
         await this.openScreen({ screen: t.Screen.Welcome });
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'welcome/earlyAccessEmail': {
@@ -267,46 +277,47 @@ class CodeMic {
           this.context.earlyAccessEmail = undefined;
         }
 
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'welcome/openSessionInPlayer': {
-        assert(this.welcome);
-        const listing = this.welcome.sessions.find(s => s.head.id === req.sessionId);
+        const listing = this.welcome?.sessions.find(s => s.head.id === req.sessionId);
         assert(listing);
         const session = Session.Core.fromListing(this.context, listing);
         await this.openScreen({ screen: t.Screen.Player, session });
 
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'welcome/openSessionInRecorder': {
-        assert(this.welcome);
-        const listing = this.welcome.sessions.find(s => s.head.id === req.sessionId);
+        const listing = this.welcome?.sessions.find(s => s.head.id === req.sessionId);
         assert(listing);
         const session = Session.Core.fromListing(this.context, listing);
         await this.openScreen({ screen: t.Screen.Recorder, session, tabId: 'details-view' });
 
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'welcome/openNewSessionInRecorder': {
-        const user = this.context.user && lib.userToUserSummary(this.context.user);
         // For new sessions, user will manually call recorder/load which will call setUpWorkspace.
-        const head = Session.Core.makeNewHead(user?.username);
+        const head = Session.Core.makeNewHead(this.context.user?.username);
         const workspace =
           VscWorkspace.getDefaultVscWorkspace() ??
-          path.join(paths.getDefaultWorkspaceBasePath(osPaths.home), user?.username ?? 'anonym', 'new_session');
+          path.join(
+            paths.getDefaultWorkspaceBasePath(osPaths.home),
+            this.context.user?.username ?? 'anonym',
+            'new_session',
+          );
 
         const session = await Session.Core.fromNew(this.context, workspace, head);
         await this.openScreen({ screen: t.Screen.Recorder, session, tabId: 'details-view' });
 
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'welcome/deleteSession': {
         assert(this.welcome);
-        const listing = this.welcome.sessions.find(s => s.head.id === req.sessionId);
+        const listing = this.welcome?.sessions.find(s => s.head.id === req.sessionId);
         assert(listing);
         const session = Session.Core.fromListing(this.context, listing);
 
@@ -323,16 +334,15 @@ class CodeMic {
           await session.core.delete();
           this.welcome.sessions = this.welcome.sessions.filter(s => s.head.id !== req.sessionId);
         }
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'welcome/likeSession': {
-        assert(this.welcome);
-        const listing = this.welcome.sessions.find(s => s.head.id === req.sessionId);
+        const listing = this.welcome?.sessions.find(s => s.head.id === req.sessionId);
         assert(listing);
         await this.likeSession(listing.head.id, req.value);
 
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
 
@@ -364,7 +374,7 @@ class CodeMic {
           });
         }
 
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'player/load': {
@@ -381,43 +391,45 @@ class CodeMic {
         await VscWorkspace.setUpWorkspace_MAY_RESTART_VSCODE(this.context, {
           screen: t.Screen.Player,
           workspace: this.session.workspace,
+          userMetadata: this.userMetadata,
         });
 
         await this.session.prepare();
-        this.updateFrontend();
+        this.enrichSessions([this.session.head.id]).catch(console.error);
+        await this.updateFrontend();
         return ok;
       }
       case 'player/play': {
         assert(this.session?.isLoaded());
         await this.session.rr.play();
         await this.session.core.writeHistoryOpenClose();
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'player/pause': {
         assert(this.session?.isLoaded());
         this.session.rr.pause();
         await this.session.core.writeHistoryClock();
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'player/seek': {
         assert(this.session?.isLoaded());
         this.session.rr.seek(req.clock);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'player/comment': {
         assert(this.session);
         await this.postComment(this.session, req.text, req.clock);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'player/likeSession': {
         assert(this.session);
         await this.likeSession(this.session.head.id, req.value);
 
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       // case 'player/update': {
@@ -431,7 +443,7 @@ class CodeMic {
         assert(this.recorder);
         assert(req.tabId !== 'editor-view' || this.session.isLoaded());
         this.recorder.tabId = req.tabId;
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/load': {
@@ -441,37 +453,37 @@ class CodeMic {
         // No need to download since it's a temp session.
         await this.loadRecorder(this.session);
         this.recorder.tabId = 'editor-view';
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/record': {
         assert(this.session?.isLoaded());
         await this.session.rr.record();
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/play': {
         assert(this.session?.isLoaded());
         await this.session.rr.play();
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/pause': {
         assert(this.session?.isLoaded());
         this.session.rr.pause();
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/seek': {
         assert(this.session?.isLoaded());
         await this.session.rr.seek(req.clock);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/save': {
         assert(this.session?.isLoaded());
         await this.session.editor.write({ pause: true });
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/publish': {
@@ -490,7 +502,7 @@ class CodeMic {
         } catch (error) {
           this.showError(error as Error);
         }
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'getStore': {
@@ -514,7 +526,7 @@ class CodeMic {
         // const cmds = this.session.editor.undo();
         // await this.session.rr.unapplyCmds(cmds);
         // console.log('Undo: ', cmds);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/redo': {
@@ -523,13 +535,13 @@ class CodeMic {
         // const cmds = this.session.editor.redo();
         // await this.session.rr.applyCmds(cmds);
         // console.log('Redo: ', cmds);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/updateDetails': {
         assert(this.session);
         this.session.editor.updateDetails(req.changes);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/insertAudio': {
@@ -537,7 +549,7 @@ class CodeMic {
         // await this.session.commander.insertAudioTrack(req.uri, req.clock);
         const cmd = await this.session.editor.createInsertAudioTrack(req.uri, req.clock);
         await this.session.commander.applyInsertAudioTrack(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteAudio': {
@@ -545,7 +557,7 @@ class CodeMic {
         // await this.session.commander.deleteAudioTrack(req.id);
         const cmd = this.session.editor.createDeleteAudioTrack(req.id);
         await this.session.commander.applyDeleteAudioTrack(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/updateAudio': {
@@ -553,7 +565,7 @@ class CodeMic {
         // await this.session.commander.updateAudioTrack(req.update);
         const cmd = this.session.editor.createUpdateAudioTrack(req.update);
         if (cmd) await this.session.commander.applyUpdateAudioTrack(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/insertVideo': {
@@ -561,7 +573,7 @@ class CodeMic {
         // await this.session.commander.insertVideoTrack(req.uri, req.clock);
         const cmd = await this.session.editor.createInsertVideoTrack(req.uri, req.clock);
         await this.session.commander.applyInsertVideoTrack(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteVideo': {
@@ -569,7 +581,7 @@ class CodeMic {
         // await this.session.commander.deleteVideoTrack(req.id);
         const cmd = this.session.editor.createDeleteVideoTrack(req.id);
         await this.session.commander.applyDeleteVideoTrack(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/updateVideo': {
@@ -577,20 +589,20 @@ class CodeMic {
         // await this.session.commander.updateVideoTrack(req.update);
         const cmd = this.session.editor.createUpdateVideoTrack(req.update);
         if (cmd) await this.session.commander.applyUpdateVideoTrack(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/setCover': {
         // assert(this.session?.isLoaded());
         assert(this.session);
         await this.session.editor.setCover(req.uri);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteCover': {
         assert(this.session?.isLoaded());
         await this.session.editor.deleteCover();
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/changeSpeed': {
@@ -598,7 +610,7 @@ class CodeMic {
         // await this.session.commander.changeSpeed(req.range, req.factor);
         const cmd = this.session.editor.createChangeSpeed(req.range, req.factor);
         await this.session.commander.applyChangeSpeed(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/merge': {
@@ -606,7 +618,7 @@ class CodeMic {
         // await this.session.commander.merge(req.range);
         const cmd = this.session.editor.createMerge(req.range);
         await this.session.commander.applyMerge(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/insertGap': {
@@ -614,28 +626,28 @@ class CodeMic {
         // await this.session.commander.insertGap(req.clock, req.dur);
         const cmd = this.session.editor.createInsertGap(req.clock, req.dur);
         await this.session.commander.applyInsertGap(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/insertChapter': {
         assert(this.session?.isLoaded());
         const cmd = this.session.editor.createInsertChapter(req.clock, req.title);
         await this.session.commander.applyInsertChapter(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/updateChapter': {
         assert(this.session?.isLoaded());
         const cmd = this.session.editor.createUpdateChapter(req.index, req.update);
         await this.session.commander.applyUpdateChapter(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteChapter': {
         assert(this.session?.isLoaded());
         const cmd = this.session.editor.createDeleteChapter(req.index);
         await this.session.commander.applyDeleteChapter(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       case 'recorder/crop': {
@@ -643,7 +655,7 @@ class CodeMic {
         // await this.session.commander.crop(req.clock);
         const cmd = this.session.editor.createCrop(req.clock);
         await this.session.commander.applyCrop(cmd);
-        this.updateFrontend();
+        await this.updateFrontend();
         return ok;
       }
       // case 'confirmForkFromPlayer': {
@@ -734,11 +746,12 @@ class CodeMic {
       screen: t.Screen.Recorder,
       workspace: session.workspace,
       recorder: { tabId: 'editor-view', mustScan: session.mustScan, clock },
+      userMetadata: this.userMetadata,
     });
 
     this.setSession(session);
-    this.enrichSessions([session.head.id]).catch(console.error);
     await session.prepare({ clock });
+    this.enrichSessions([session.head.id]).catch(console.error);
   }
 
   updateViewTitle() {
@@ -804,9 +817,9 @@ class CodeMic {
       }
       case t.Screen.Player: {
         this.setSession(params.session);
-        this.enrichSessions([params.session.head.id]).catch(console.error);
         this.setScreen(t.Screen.Player);
         if (params.prepare) await params.session.prepare();
+        this.enrichSessions([params.session.head.id]).catch(console.error);
         await this.updateFrontend();
         break;
       }
@@ -963,7 +976,12 @@ class CodeMic {
         console.error(error);
       }
     }
-    return recent;
+
+    const iteratee = (listing: t.SessionListing) => {
+      const history = this.context.settings.history[listing.head.id];
+      return (history && lib.getSessionHistoryItemLastOpenTimestamp(history)) || '';
+    };
+    return _.orderBy(recent, iteratee, 'desc');
   }
 
   async updateFeaturedSessionListings() {
@@ -989,6 +1007,11 @@ class CodeMic {
     }
   }
 
+  async refreshWelcomeScreen() {
+    this.welcome = undefined;
+    await this.openScreen({ screen: t.Screen.Welcome });
+  }
+
   async updateCachesOfLocalSessionListings(listings: t.SessionListing[]) {
     for (const listing of listings) {
       if (listing.workspace) {
@@ -997,39 +1020,46 @@ class CodeMic {
     }
   }
 
+  async updateUserMetadata() {
+    if (!this.context.user) return;
+    const res = await serverApi.send({ type: 'user/metadata' }, this.context.user.token);
+    this.userMetadata = res.metadata;
+    await this.updateFrontend();
+  }
+
   /**
    * Downloads publications.
    */
   async enrichSessions(sessionIds: string[]) {
-    // TODO
-    console.log(`enriching sessions: `, sessionIds.join(', '));
-    await this.updateFrontend();
+    const res = await serverApi.send({ type: 'sessions/publications', sessionIds });
+    for (const [id, publication] of Object.entries(res.publications)) this.publications.set(id, publication);
 
-    // await this.updateFrontend();
+    await this.updateFrontend();
   }
 
   async likeSession(sessionId: string, value: boolean) {
-    // TODO apply locally and then enrich the session which will automatically fetch publication
-    //      also fetch user's list of likes.
-    console.log(`${value ? 'liking' : 'unliking'} session: ${sessionId}`);
-    return;
+    assert(this.context.user, 'Please login to like sessions.');
 
-    // if (!this.context.user) throw new Error('Please join/login to like sessions.');
-    // await serverApi.send({ type: 'session/like/toggle', sessionId: req.sessionId }, this.context.user.token);
-    // await this.enrichSessions([session]);
+    // Optimistic update. Do not wait.
+    this.userMetadata ??= createEmptyUserMetadata();
+    if (value) {
+      this.userMetadata.likes.push(sessionId);
+    } else {
+      this.userMetadata.likes = this.userMetadata.likes.filter(x => x !== sessionId);
+    }
+    serverApi
+      .send({ type: 'session/like/post', sessionId, value }, this.context.user.token)
+      .then(() => this.enrichSessions([sessionId]))
+      .catch((error: Error) => this.showError(error));
   }
 
   async postComment(session: Session, text: string, clock?: number) {
-    // TODO
-    console.log(`commenting on session: ${session.head.handle}`);
-    return;
-
-    // assert(this.context.user, 'Please join/login to post comments.');
-    // await serverApi.send(
-    //   { type: 'session/comment/post', sessionId: this.session.head.id, text: req.text, clock: req.clock },
-    //   this.context.user.token,
-    // );
-    // await this.enrichSessions([session]);
+    assert(this.context.user, 'Please login to post comments.');
+    await serverApi.send(
+      { type: 'session/comment/post', sessionId: session.head.id, text, clock },
+      this.context.user.token,
+    );
+    await this.enrichSessions([session.head.id]);
   }
 
   getStore(): t.Store {
@@ -1073,7 +1103,7 @@ class CodeMic {
     return {
       earlyAccessEmail: this.context.earlyAccessEmail,
       screen: this.screen,
-      user: this.context.user,
+      user: this.context.user && { ...this.context.user, metadata: this.userMetadata },
       account: this.account,
       welcome,
       recorder: this.recorder,
@@ -1086,6 +1116,12 @@ class CodeMic {
       },
     };
   }
+}
+
+function createEmptyUserMetadata(): t.UserMetadata {
+  return {
+    likes: [],
+  };
 }
 
 const SCREEN_TITLES = {

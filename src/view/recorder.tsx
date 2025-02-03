@@ -64,7 +64,7 @@ type TrackSelection = { type: 'track'; trackType: 'audio' | 'video' | 'image'; i
 type ChapterSelection = { type: 'chapter'; index: number };
 type TimelineDrag<T> = { load: T; startClockUnderMouse: number; curClockUnderMouse: number };
 
-type RecorderProps = { user?: t.User; recorder: t.RecorderUIState; session: t.SessionUIState };
+type RecorderProps = { user?: t.UserUI; recorder: t.RecorderUIState; session: t.SessionUIState };
 export default class Recorder extends React.Component<RecorderProps> {
   mediaManager = new MediaManager();
 
