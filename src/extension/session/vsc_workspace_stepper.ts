@@ -55,10 +55,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     await vscode.workspace.applyEdit(edit);
 
     if (e.updateSelection) {
-      const vscTextEditor = await vscode.window.showTextDocument(this.vscWorkspace.uriToVsc(uri), {
-        preview: false,
-        preserveFocus: false,
-      });
+      const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(uri, { preserveFocus: false });
       if (direction === t.Direction.Forwards) {
         vscTextEditor.selections = VscWorkspace.toVscSelections(lib.getSelectionsAfterTextChangeEvent(e));
       } else {
@@ -78,15 +75,13 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
       // vscode.workspace.openTextDocument() will throw if file doesn't exist.
       if (!vscTextDocument && vscUri.scheme === 'file') {
         await this.session.core.writeFileIfNotExists(uri, e.text || '');
-        await vscode.workspace.openTextDocument(vscUri);
+        await this.vscWorkspace.openTextDocumentByUri(uri);
         return;
       }
 
-      if (!vscTextDocument && vscUri.scheme === 'untitled') {
-        vscTextDocument = await this.vscWorkspace.openVscUntitledByName(vscUri.path);
-      }
-
-      assert(vscTextDocument, `Failed to open text document: ${vscUri.toString()}`);
+      // Must be an untitled document.
+      // Open if not already found.
+      vscTextDocument ??= await this.vscWorkspace.openTextDocumentByUri(uri);
 
       // Set text if given.
       if (e.text !== undefined) {
@@ -112,7 +107,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     // if (direction === t.Direction.Forwards) {
     //   await this.vscWorkspace.closeVscTextEditorByUri(uri, true);
     // } else {
-    //   const vscTextDocument = await vscode.workspace.openTextDocument(this.vscWorkspace.uriToVsc(uri));
+    //   const vscTextDocument = await this.vscWorkspace.openTextDocumentByUri(this.vscWorkspace.uriToVsc(uri));
     //   const edit = new vscode.WorkspaceEdit();
     //   edit.replace(
     //     vscTextDocument.uri,
@@ -125,10 +120,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
 
   async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, uri: string, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
-      const vscTextEditor = await vscode.window.showTextDocument(this.vscWorkspace.uriToVsc(uri), {
-        preview: false,
-        preserveFocus: false,
-      });
+      const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(uri, { preserveFocus: false });
       if (e.selections) {
         vscTextEditor.selections = VscWorkspace.toVscSelections(e.selections);
       }
@@ -136,10 +128,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
         await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start, at: 'top' });
       }
     } else if (e.revUri) {
-      const vscTextEditor = await vscode.window.showTextDocument(this.vscWorkspace.uriToVsc(e.revUri), {
-        preview: false,
-        preserveFocus: false,
-      });
+      const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(e.revUri, { preserveFocus: false });
       if (e.revSelections) {
         vscTextEditor.selections = VscWorkspace.toVscSelections(e.revSelections);
       }
@@ -153,10 +142,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     if (direction === t.Direction.Forwards) {
       await this.vscWorkspace.closeVscTextEditorByUri(uri, true);
     } else {
-      const vscTextEditor = await vscode.window.showTextDocument(this.vscWorkspace.uriToVsc(uri), {
-        preview: false,
-        preserveFocus: false,
-      });
+      const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(uri, { preserveFocus: false });
       if (e.revSelections) {
         vscTextEditor.selections = VscWorkspace.toVscSelections(e.revSelections);
       }
@@ -167,10 +153,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
   }
 
   async applySelectEvent(e: t.SelectEvent, uri: string, direction: t.Direction) {
-    const vscTextEditor = await vscode.window.showTextDocument(this.vscWorkspace.uriToVsc(uri), {
-      preview: false,
-      preserveFocus: false,
-    });
+    const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(uri, { preserveFocus: false });
 
     if (direction === t.Direction.Forwards) {
       vscTextEditor.selections = VscWorkspace.toVscSelections(e.selections);
@@ -182,7 +165,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
   }
 
   async applyScrollEvent(e: t.ScrollEvent, uri: string, direction: t.Direction) {
-    await vscode.window.showTextDocument(this.vscWorkspace.uriToVsc(uri), { preview: false, preserveFocus: false });
+    await this.vscWorkspace.showTextDocumentByUri(uri, { preserveFocus: false });
 
     if (direction === t.Direction.Forwards) {
       await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start, at: 'top' });
@@ -192,7 +175,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
   }
 
   async applySaveEvent(e: t.SaveEvent, uri: string, direction: t.Direction) {
-    const vscTextDocument = await vscode.workspace.openTextDocument(this.vscWorkspace.uriToVsc(uri));
+    const vscTextDocument = await this.vscWorkspace.openTextDocumentByUri(uri);
     if (!(await vscTextDocument.save())) {
       throw new Error(`Could not save ${uri}`);
     }

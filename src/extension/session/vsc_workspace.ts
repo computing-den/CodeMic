@@ -293,7 +293,8 @@ export default class VscWorkspace {
 
     // for each targetUri
     //   if it doesn't exist in internalWorkspace.worktree, it's already been deleted above, so ignore it
-    //   if there's a text editor open in vscode, replace its content
+    //   if it's an untitled document, open it and replace its content
+    //   if it has an associated text editor open in vscode, replace its content
     //   if it's a directory, mkdir
     //   else, mkdir and write to file
     // NOTE: changing documents with WorkspaceEdit without immediately saving them causes them to be
@@ -309,10 +310,10 @@ export default class VscWorkspace {
           continue;
         }
 
-        // Handle text documents that have an associated text editor or have untitled schema
+        // Handle text documents that are untitled or have an associated text editor.
         let vscTextDocument: vscode.TextDocument | undefined;
         if (URI.parse(targetUri).scheme === 'untitled') {
-          vscTextDocument = await this.openVscUntitledByName(URI.parse(targetUri).path);
+          vscTextDocument = await this.openUntitledVscTextDocumentByUri(targetUri);
         } else if (this.findTabInputTextByUri(targetUri)) {
           vscTextDocument = this.findVscTextDocumentByUri(targetUri);
         }
@@ -348,12 +349,9 @@ export default class VscWorkspace {
       const tabUris = this.getRelevantTabUris();
       for (const textEditor of internalWorkspace.textEditors) {
         if (!tabUris.includes(textEditor.document.uri)) {
-          const vscUri = this.uriToVsc(textEditor.document.uri);
-          await vscode.window.showTextDocument(vscUri, {
-            preview: false,
+          await this.showTextDocumentByUri(textEditor.document.uri, {
             preserveFocus: true,
             selection: VscWorkspace.toVscSelection(textEditor.selections[0]),
-            viewColumn: vscode.ViewColumn.One,
           });
         }
       }
@@ -361,12 +359,9 @@ export default class VscWorkspace {
 
     // show this.activeTextEditor
     if (internalWorkspace.activeTextEditor) {
-      const vscUri = this.uriToVsc(internalWorkspace.activeTextEditor.document.uri);
-      await vscode.window.showTextDocument(vscUri, {
-        preview: false,
+      await this.showTextDocumentByUri(internalWorkspace.activeTextEditor.document.uri, {
         preserveFocus: false,
         selection: VscWorkspace.toVscSelection(internalWorkspace.activeTextEditor.selections[0]),
-        viewColumn: vscode.ViewColumn.One,
       });
     }
   }
@@ -392,21 +387,53 @@ export default class VscWorkspace {
     }
   }
 
-  async openVscUntitledByName(untitledName: string): Promise<vscode.TextDocument> {
-    // The problem is that when we do something like =vscode.workspace.openTextDocument('untitled:Untitled-1')= it
-    // creates a document with associated resource, a document with a path that will be saved to file =./Untitled-1=
-    // even if its content is empty.
-    // If instead we use =await vscode.commands.executeCommand('workbench.action.files.newUntitledFile')= we get an
-    // untitled file without an associated resource which will not prompt to save when the content is empty.
-    // However, the URI of the new document will be picked by vscode. For example, if Untitled-1 and Untitled-3 are
-    // already open, when we open a new untitled file, vscode will name it Untitled-2.
-    // So, we must make sure that when opening Untitled-X, every untitled number less than X is already open
-    // and then try to open a new file.
-    // Another thing is that just because there is no tab currently with that name, doesn't necessarily mean that
-    // there is no document open with that name.
+  /**
+   * Use this instead of vscode.window.showTextDocument() because it handles opening untitled uris properly.
+   */
+  async showTextDocumentByVscUri(
+    uri: vscode.Uri,
+    options?: { preserveFocus?: boolean; selection?: vscode.Range },
+  ): Promise<vscode.TextEditor> {
+    const vscTextDocument = await this.openTextDocumentByVscUri(uri);
+    return vscode.window.showTextDocument(vscTextDocument, {
+      ...options,
+      preview: false,
+      viewColumn: vscode.ViewColumn.One,
+    });
+  }
+
+  /**
+   * Use this instead of vscode.window.showTextDocument() because it handles opening untitled uris properly.
+   */
+  async showTextDocumentByUri(
+    uri: string,
+    options?: { preserveFocus?: boolean; selection?: vscode.Range },
+  ): Promise<vscode.TextEditor> {
+    return this.showTextDocumentByVscUri(this.uriToVsc(uri), options);
+  }
+
+  /**
+   * The problem is that when we do something like =vscode.workspace.openTextDocument('untitled:Untitled-1')= it
+   * creates a document with associated resource, a document with a path that will be saved to file =./Untitled-1=
+   * even if its content is empty.
+   * If instead we use =await vscode.commands.executeCommand('workbench.action.files.newUntitledFile')= we get an
+   * untitled file without an associated resource which will not prompt to save when the content is empty.
+   * However, the URI of the new document will be picked by vscode. For example, if Untitled-1 and Untitled-3 are
+   * already open, when we open a new untitled file, vscode will name it Untitled-2.
+   * So, we must make sure that when opening Untitled-X, every untitled number less than X is already open
+   * and then try to open a new file.
+   * Another thing is that just because there is no tab currently with that name, doesn't necessarily mean that
+   * there is no document open with that name.
+   */
+  private async openUntitledVscTextDocumentByVscUri(uri: vscode.Uri): Promise<vscode.TextDocument> {
+    if (!/^Untitled-\d+$/.test(uri.path)) {
+      console.error(
+        `openUntitledVscTextDocumentByVscUri: untitled URI with invalid path: ${uri.path}. Opening as file...`,
+      );
+      return await vscode.workspace.openTextDocument(uri);
+    }
 
     // Gather all the untitled names.
-
     const untitledNames: string[] = vscode.workspace.textDocuments.map(d => d.uri.path);
 
     // console.log('XXX untitled names: ', untitledNames.join(', '));
@@ -416,13 +443,35 @@ export default class VscWorkspace {
       if (!untitledNames.includes(name)) {
         await vscode.commands.executeCommand('workbench.action.files.newUntitledFile');
       }
-      if (untitledName === name) break;
+      if (uri.path === name) break;
     }
 
     // Now its text document should be open.
-    const textDocument = this.findVscTextDocumentByVscUri(vscode.Uri.from({ scheme: 'untitled', path: untitledName }));
-    assert(textDocument, `openVscUntitledUri failed to open untitled file named ${untitledName}`);
+    const textDocument = this.findVscTextDocumentByVscUri(uri);
+    assert(textDocument, `openVscUntitledUri failed to open untitled file named ${uri.path}`);
     return textDocument;
+  }
+
+  private async openUntitledVscTextDocumentByUri(uri: string): Promise<vscode.TextDocument | undefined> {
+    return this.openUntitledVscTextDocumentByVscUri(this.uriToVsc(uri));
+  }
+
+  /**
+   * Use this instead of vscode.workspace.openTextDocument() because it handled
+   * untitled documents properly.
+   */
+  async openTextDocumentByVscUri(uri: vscode.Uri): Promise<vscode.TextDocument> {
+    if (uri.scheme === 'untitled') {
+      return this.openUntitledVscTextDocumentByVscUri(uri);
+    } else if (uri.scheme === 'file') {
+      return vscode.workspace.openTextDocument(uri);
+    } else {
+      throw new Error(`Cannot open text document with scheme ${uri.scheme}`);
+    }
+  }
+
+  async openTextDocumentByUri(uri: string): Promise<vscode.TextDocument> {
+    return this.openTextDocumentByVscUri(this.uriToVsc(uri));
   }
 
   shouldRecordVscUri(vscUri: vscode.Uri): boolean {
@@ -506,7 +555,7 @@ export default class VscWorkspace {
     assert(tab.input instanceof vscode.TabInputText);
 
     if (skipConfirmation) {
-      const vscTextDocument = await vscode.workspace.openTextDocument(tab.input.uri);
+      const vscTextDocument = await this.openTextDocumentByVscUri(tab.input.uri);
       // console.log('XXX ', vscTextDocument.uri.toString(), 'isDirty: ', vscTextDocument.isDirty);
       if (tab.input.uri.scheme === 'untitled') {
         // Sometimes isDirty is false for untitled document even though it should be true.
