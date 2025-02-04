@@ -286,7 +286,7 @@ class CodeMic {
         const session = Session.Core.fromListing(this.context, listing);
         await this.openScreen({ screen: t.Screen.Player, session, load: false });
 
-        await this.updateFrontend();
+        // await this.updateFrontend();
         return ok;
       }
       case 'welcome/openSessionInRecorder': {
@@ -296,7 +296,7 @@ class CodeMic {
         if (!listing.local) await session.download({ skipIfExists: true });
         await this.openScreen({ screen: t.Screen.Recorder, session });
 
-        await this.updateFrontend();
+        // await this.updateFrontend();
         return ok;
       }
       case 'welcome/openNewSessionInRecorder': {
@@ -317,7 +317,7 @@ class CodeMic {
         const session = await Session.Core.fromNew(this.context, workspace, head);
         await this.openScreen({ screen: t.Screen.Recorder, session });
 
-        await this.updateFrontend();
+        // await this.updateFrontend();
         return ok;
       }
       case 'welcome/deleteSession': {
@@ -451,8 +451,9 @@ class CodeMic {
         assert(this.session);
         assert(this.recorder);
         assert(this.session.temp);
-        await this.loadRecorder(this.session);
-        this.recorder.tabId = 'editor-view';
+        if (await this.loadRecorder(this.session)) {
+          this.recorder.tabId = 'editor-view';
+        }
         await this.updateFrontend();
         return ok;
       }
@@ -697,7 +698,7 @@ class CodeMic {
     }
   }
 
-  async loadRecorder(session: Session, clock?: number) {
+  async loadRecorder(session: Session, clock?: number): Promise<boolean> {
     // NOTE: Do not attempt to download the session here.
     //       After a vscode restart, the session is no longer temp
     //       but it doesn't yet have a body either until scan is done.
@@ -716,7 +717,7 @@ class CodeMic {
           { title: 'Cancel', isCloseAffordance: true },
           { title: confirmTitle },
         );
-        if (answer?.title !== confirmTitle) return;
+        if (answer?.title !== confirmTitle) return false;
       } else {
         const confirmTitle = 'Continue';
         const answer = await vscode.window.showWarningMessage(
@@ -725,7 +726,7 @@ class CodeMic {
           { title: 'Cancel', isCloseAffordance: true },
           { title: confirmTitle },
         );
-        if (answer?.title !== confirmTitle) return;
+        if (answer?.title !== confirmTitle) return false;
       }
 
       // Commit the temp session. Copies the temp session to its final destination based on workspace and handle.
@@ -749,6 +750,7 @@ class CodeMic {
     });
 
     await session.prepare({ clock });
+    return true;
   }
 
   updateViewTitle() {
@@ -824,16 +826,18 @@ class CodeMic {
       }
       case t.Screen.Recorder: {
         params.session.core.assertFormatVersionSupport();
-        if (params.session.temp) {
-          this.recorder = { tabId: 'details-view' };
-        } else {
-          await this.loadRecorder(params.session, params.clock);
-          this.recorder = { tabId: 'editor-view' };
-          this.enrichSessions([params.session.head.id]).catch(console.error);
+        if (params.session.temp || (await this.loadRecorder(params.session, params.clock))) {
+          if (params.session.temp) {
+            this.recorder = { tabId: 'details-view' };
+          } else {
+            this.recorder = { tabId: 'editor-view' };
+            this.enrichSessions([params.session.head.id]).catch(console.error);
+          }
+
+          this.setSession(params.session);
+          this.setScreen(t.Screen.Recorder);
+          await this.updateFrontend();
         }
-        this.setSession(params.session);
-        this.setScreen(t.Screen.Recorder);
-        await this.updateFrontend();
         break;
       }
       case t.Screen.Welcome: {
