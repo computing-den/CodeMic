@@ -46,6 +46,21 @@ class WorkspaceRecorder {
     // update focus
     // this.updateFocus();
 
+    // {
+    //   const disposable = vscode.window.tabGroups.onDidChangeTabGroups(async tabGroupChangeEvent => {
+    //     console.log('onDidChangeTabGroups');
+    //   });
+    //   this.disposables.push(disposable);
+    // }
+
+    // Listen to tabs opening/closing/changing.
+    {
+      const disposable = vscode.window.tabGroups.onDidChangeTabs(async tabChangeEvent => {
+        await this.changeTabs(tabChangeEvent);
+      });
+      this.disposables.push(disposable);
+    }
+
     // listen for open document events
     {
       const disposable = vscode.workspace.onDidOpenTextDocument(async vscTextDocument => {
@@ -326,6 +341,46 @@ class WorkspaceRecorder {
     }
   }
 
+  private async changeTabs(tabChangeEvent: vscode.TabChangeEvent) {
+    logRawEvent(`event: changeTabs`);
+    // Collect the URIs that have been closed and no other instance of them
+    // exist in the currently opened tabs.
+    const existingUris = this.vscWorkspace.getRelevantTabVscUris();
+    const closedUris: vscode.Uri[] = [];
+    for (let tab of tabChangeEvent.closed) {
+      if (tab.input instanceof vscode.TabInputText) {
+        const uri = tab.input.uri;
+        if (
+          this.vscWorkspace.shouldRecordVscUri(uri) &&
+          !existingUris.some(eUri => eUri.toString() === uri.toString())
+        ) {
+          closedUris.push(tab.input.uri);
+        }
+      }
+    }
+
+    if (closedUris.length === 0) return;
+
+    const uris = closedUris.map(uri => this.vscWorkspace.uriFromVsc(uri));
+    for (const uri of uris) {
+      logAcceptedEvent(`accepted closeTextEditor for ${uri}`);
+      const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
+      const revSelections = irTextEditor?.selections;
+      const revVisibleRange = irTextEditor?.visibleRange;
+      this.internalWorkspace.closeTextEditorByUri(uri);
+      this.insertEvent(
+        {
+          type: 'closeTextEditor',
+          clock: this.clock,
+          revSelections,
+          revVisibleRange,
+        },
+        uri,
+        { coalescing: false },
+      );
+    }
+  }
+
   private async openTextDocument(vscTextDocument: vscode.TextDocument) {
     logRawEvent(`event: openTextDocument ${vscTextDocument.uri}`);
     if (!this.vscWorkspace.shouldRecordVscUri(vscTextDocument.uri)) return;
@@ -339,47 +394,56 @@ class WorkspaceRecorder {
   private async closeTextDocument(vscTextDocument: vscode.TextDocument) {
     // When user closes a tab without saving it, vscode issues a textChange event
     // to restore the original content before issuing a closeTextDocument
-
-    logRawEvent(`event: closeTextDocument ${vscTextDocument.uri}`);
-    if (!this.vscWorkspace.shouldRecordVscUri(vscTextDocument.uri)) return;
-
-    const uri = this.vscWorkspace.uriFromVsc(vscTextDocument.uri);
-    let irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
-    const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
-
-    if (!irTextDocument) return;
-
-    logAcceptedEvent(`accepted closeTextDocument for ${uri}`);
-
-    const revSelections = irTextEditor?.selections;
-    const revVisibleRange = irTextEditor?.visibleRange;
-    this.internalWorkspace.closeTextEditorByUri(uri);
-    this.insertEvent(
-      {
-        type: 'closeTextEditor',
-        clock: this.clock,
-        revSelections,
-        revVisibleRange,
-      },
-      uri,
-      { coalescing: false },
-    );
-
-    // No reason to remove/close the text document if it's not an untitled.
-    if (vscTextDocument.uri.scheme === 'untitled') {
-      const revText = irTextDocument.getText();
-      this.internalWorkspace.closeAndRemoveTextDocumentByUri(uri);
-      this.insertEvent(
-        {
-          type: 'closeTextDocument',
-          clock: this.clock,
-          revText,
-          revEol: irTextDocument.eol,
-        },
-        uri,
-        { coalescing: true },
-      );
-    }
+    // This also happens for untitled documents when closed without saving.
+    //
+    // When the languageId of a document changes (may happen automatically),
+    // vscode will close the document and reopen it. If we actually close and
+    // remove the document internally, we'd lose its unsaved content while vscode
+    // retains the content.
+    //
+    // When user closes the document without saving, vscode
+    // first issues a text change event to empty the content.
+    //
+    //
+    //
+    // logRawEvent(`event: closeTextDocument ${vscTextDocument.uri}`);
+    // if (!this.vscWorkspace.shouldRecordVscUri(vscTextDocument.uri)) return;
+    // const uri = this.vscWorkspace.uriFromVsc(vscTextDocument.uri);
+    // let irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
+    // const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
+    // if (!irTextDocument) return;
+    // logAcceptedEvent(`accepted closeTextDocument for ${uri}`);
+    // const revSelections = irTextEditor?.selections;
+    // const revVisibleRange = irTextEditor?.visibleRange;
+    // this.internalWorkspace.closeTextEditorByUri(uri);
+    // this.insertEvent(
+    //   {
+    //     type: 'closeTextEditor',
+    //     clock: this.clock,
+    //     revSelections,
+    //     revVisibleRange,
+    //   },
+    //   uri,
+    //   { coalescing: false },
+    // );
+    //
+    //
+    //
+    //
+    // if (vscTextDocument.uri.scheme === 'untitled') {
+    //   const revText = irTextDocument.getText();
+    //   this.internalWorkspace.closeAndRemoveTextDocumentByUri(uri);
+    //   this.insertEvent(
+    //     {
+    //       type: 'closeTextDocument',
+    //       clock: this.clock,
+    //       revText,
+    //       revEol: irTextDocument.eol,
+    //     },
+    //     uri,
+    //     { coalescing: true },
+    //   );
+    // }
   }
 
   private async showTextEditor(vscTextEditor: vscode.TextEditor) {

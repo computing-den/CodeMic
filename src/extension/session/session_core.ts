@@ -540,7 +540,7 @@ export default class SessionCore {
 
   assertFormatVersionSupport() {
     if (this.session.head.formatVersion > SessionCore.LATEST_FORMAT_VERSION) {
-      throw new Error('You need a more recent version of CodeMic to load this session. Please update CodeMic.');
+      throw new Error('Please update CodeMic to load this session. It uses features not available in this version.');
     }
   }
 }

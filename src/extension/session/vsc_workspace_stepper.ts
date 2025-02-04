@@ -105,20 +105,22 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
   }
 
   async applyCloseTextDocumentEvent(e: t.CloseTextDocumentEvent, uri: string, direction: t.Direction) {
-    assert(URI.parse(uri).scheme === 'untitled', 'Must only record closeTextDocument for untitled URIs');
+    throw new Error('TODO');
 
-    if (direction === t.Direction.Forwards) {
-      await this.vscWorkspace.closeVscTextEditorByUri(uri, true);
-    } else {
-      const vscTextDocument = await vscode.workspace.openTextDocument(this.vscWorkspace.uriToVsc(uri));
-      const edit = new vscode.WorkspaceEdit();
-      edit.replace(
-        vscTextDocument.uri,
-        VscWorkspace.toVscRange(this.vscWorkspace.getVscTextDocumentRange(vscTextDocument)),
-        e.revText,
-      );
-      await vscode.workspace.applyEdit(edit);
-    }
+    // assert(URI.parse(uri).scheme === 'untitled', 'Must only record closeTextDocument for untitled URIs');
+
+    // if (direction === t.Direction.Forwards) {
+    //   await this.vscWorkspace.closeVscTextEditorByUri(uri, true);
+    // } else {
+    //   const vscTextDocument = await vscode.workspace.openTextDocument(this.vscWorkspace.uriToVsc(uri));
+    //   const edit = new vscode.WorkspaceEdit();
+    //   edit.replace(
+    //     vscTextDocument.uri,
+    //     VscWorkspace.toVscRange(this.vscWorkspace.getVscTextDocumentRange(vscTextDocument)),
+    //     e.revText,
+    //   );
+    //   await vscode.workspace.applyEdit(edit);
+    // }
   }
 
   async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, uri: string, direction: t.Direction) {

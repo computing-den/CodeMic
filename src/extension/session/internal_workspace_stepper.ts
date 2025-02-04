@@ -84,15 +84,16 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     direction: t.Direction,
     uriSet?: t.UriSet,
   ) {
-    if (uriSet) uriSet.add(uri);
+    throw new Error('TODO');
+    // if (uriSet) uriSet.add(uri);
 
-    assert(URI.parse(uri).scheme === 'untitled', 'Must only record closeTextDocument for untitled URIs');
+    // assert(URI.parse(uri).scheme === 'untitled', 'Must only record closeTextDocument for untitled URIs');
 
-    if (direction === t.Direction.Forwards) {
-      this.internalWorkspace.closeAndRemoveTextDocumentByUri(uri);
-    } else {
-      this.internalWorkspace.insertTextDocument(InternalTextDocument.fromText(uri, e.revText, e.revEol));
-    }
+    // if (direction === t.Direction.Forwards) {
+    //   this.internalWorkspace.closeAndRemoveTextDocumentByUri(uri);
+    // } else {
+    //   this.internalWorkspace.insertTextDocument(InternalTextDocument.fromText(uri, e.revText, e.revEol));
+    // }
   }
 
   async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
