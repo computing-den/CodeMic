@@ -398,6 +398,7 @@ export default class SessionCore {
     const fsPath = URI.parse(this.resolveUri(uri)).fsPath;
 
     if (!(await storage.pathExists(fsPath))) {
+      fs.mkdirSync(path.dirname(fsPath), { recursive: true });
       fs.writeFileSync(fsPath, text, { flush: true });
     }
   }
@@ -407,6 +408,7 @@ export default class SessionCore {
   }
 
   async writeBlob(sha1: string, data: string | NodeJS.ArrayBufferView) {
+    fs.mkdirSync(path.join(this.dataPath, 'blobs'), { recursive: true });
     fs.writeFileSync(path.join(this.dataPath, 'blobs', sha1), data, { flush: true, encoding: 'utf8' });
   }
 

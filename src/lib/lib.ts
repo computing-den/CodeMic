@@ -3,6 +3,7 @@ import * as t from './types.js';
 import assert from './assert.js';
 import { URI, Utils } from 'vscode-uri';
 import * as path from 'path';
+import { isWindows } from './platform.js';
 
 export const ANONYM_USERNAME = 'anonym'; // NOTE: If you change this, make sure to change it in server too.
 
@@ -439,6 +440,15 @@ export function deepFreeze(arg: any) {
   }
 
   return Object.freeze(arg);
+}
+
+/**
+ * VSCode's URI always returns fsPath on windows with lowercase drive letter.
+ * But its uri.path is uppercase letter (but starts with \C:\\) and os.homedir()
+ * is also uppercase drive.
+ */
+export function normalizeWindowsDriveLetter(p: string): string {
+  return isWindows && /^[A-Za-z]:/.test(p) ? p[0].toUpperCase() + p.slice(1) : p;
 }
 
 export const defaultIgnorePatterns = `# Ignore the .git directory

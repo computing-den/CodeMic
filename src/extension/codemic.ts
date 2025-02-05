@@ -127,13 +127,19 @@ class CodeMic {
       console.log('restoreStateAfterRestart(): ', workspaceChange);
       await VscWorkspace.setWorkspaceChangeGlobalState(this.context);
 
-      const { screen, recorder, workspace, userMetadata } = workspaceChange;
+      let { screen, recorder, workspace, userMetadata } = workspaceChange;
+
+      // Make sure vscode has the right workspace folder.
+      VscWorkspace.testWorkspace(workspace);
+
+      // Restore user metadata.
       this.userMetadata = userMetadata;
 
+      // Open session.
       const session = await Session.Core.readLocal(this.context, workspace, { mustScan: recorder?.mustScan });
-      assert(session);
-      assert(VscWorkspace.doesVscHaveCorrectWorkspace(session.workspace));
+      assert(session, 'Failed to read sesion after setting workspace folder');
 
+      // Open screen. This is also load the session.
       if (screen === t.Screen.Player) {
         await this.openScreen({ screen, session, load: true });
       } else if (screen === t.Screen.Recorder) {

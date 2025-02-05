@@ -38,7 +38,7 @@ export default class VscWorkspace {
 
   static async setUpWorkspace_MAY_RESTART_VSCODE(context: Context, state: WorkspaceChangeGlobalState) {
     // Return if workspace is already up-to-date.
-    if (VscWorkspace.doesVscHaveCorrectWorkspace(state.workspace)) return;
+    if (this.testWorkspace(state.workspace)) return;
 
     // TODO should this even be here?
     // Save first so that we can restore it after vscode restart.
@@ -68,7 +68,21 @@ export default class VscWorkspace {
     await this.setWorkspaceChangeGlobalState(context);
 
     // Make sure workspace is updated properly.
-    assert(VscWorkspace.doesVscHaveCorrectWorkspace(state.workspace));
+    this.assertWorkspace(state.workspace);
+  }
+
+  static assertWorkspace(workspace: string) {
+    workspace = lib.normalizeWindowsDriveLetter(path.resolve(workspace));
+    const vscWorkspace = VscWorkspace.getDefaultVscWorkspace();
+    assert(
+      workspace === vscWorkspace,
+      `Failed to open workspace folder. Expected ${workspace}, but current workspace folder is ${vscWorkspace}`,
+    );
+  }
+  static testWorkspace(workspace: string): boolean {
+    workspace = lib.normalizeWindowsDriveLetter(path.resolve(workspace));
+    const vscWorkspace = VscWorkspace.getDefaultVscWorkspace();
+    return workspace === vscWorkspace;
   }
 
   static async getGitAPI(): Promise<git.API> {
@@ -83,16 +97,15 @@ export default class VscWorkspace {
     // .uri can be undefined after user deletes the only folder from workspace
     // probably because it doesn't cause a vscode restart.
     const uri = vscode.workspace.workspaceFolders?.[0]?.uri;
-    return uri?.scheme === 'file' ? uri.fsPath : undefined;
+    return uri?.scheme === 'file' ? lib.normalizeWindowsDriveLetter(path.resolve(uri.fsPath)) : undefined;
   }
 
-  static doesVscHaveCorrectWorkspace(workspace: string): boolean {
-    const vscWorkspace = VscWorkspace.getDefaultVscWorkspace();
-    const vscWorkspaceResolved = vscWorkspace && path.resolve(vscWorkspace);
-    const workspaceResolved = path.resolve(workspace);
-    console.log('doesVscHaveCorrectWorkspace: ', vscWorkspace, vscWorkspaceResolved, workspaceResolved);
-    return Boolean(vscWorkspaceResolved === workspaceResolved);
-  }
+  // static doesVscHaveCorrectWorkspace(workspace: string): boolean {
+  //   workspace = lib.normalizeWindowsDriveLetter(path.resolve(workspace));
+  //   const vscWorkspace = VscWorkspace.getDefaultVscWorkspace();
+  //   console.log('doesVscHaveCorrectWorkspace: ', vscWorkspace, workspace);
+  //   return Boolean(vscWorkspace === workspace);
+  // }
 
   static toVscPosition(position: Position): vscode.Position {
     return new vscode.Position(position.line, position.character);
