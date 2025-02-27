@@ -954,11 +954,13 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   };
 
   autoScroll = () => {
+    const markerRecording = document.getElementById('marker_recording');
+    if (!markerRecording) return;
+
     const timeline = document.getElementById('timeline')!;
-    const atBottom = timeline.scrollTop + timeline.clientHeight >= timeline.scrollHeight;
-    if (!atBottom) {
-      timeline.scrollTo({ top: timeline.scrollHeight, behavior: 'instant' });
-    }
+    const timelineRect = timeline.getBoundingClientRect();
+    const markerRecordingRect = markerRecording.getBoundingClientRect();
+    timeline.scrollTop -= timelineRect.bottom - markerRecordingRect.top - 50;
   };
 
   scrollAfterZoom = () => {
@@ -1551,6 +1553,7 @@ const MarkerUI = forwardRef(function MarkerUI(props: MarkerProps, ref: React.Ref
   return (
     <div
       ref={ref}
+      id={`marker_${props.id}`}
       className={cn('marker', `marker_${props.type}`, props.active && 'marker_active', props.draggable && 'draggable')}
       style={style}
       onClick={props.onClick}
