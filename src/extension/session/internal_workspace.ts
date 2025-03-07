@@ -1,6 +1,8 @@
+import * as path from 'path';
+import { URI, Utils as URIUtils } from 'vscode-uri';
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
-import { LineRange, Selection } from '../../lib/lib.js';
+import { LineRange, Selection, workspaceUri } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import { LoadedSession } from './session.js';
 import InternalWorkspaceStepper from './internal_workspace_stepper.js';
@@ -24,15 +26,16 @@ export type SeekData = { steps: SeekStep[]; direction: t.Direction };
 // Not every InternalTextDocument may be attached to a InternalTextEditor. At least not until the
 // TextEditor is opened.
 export default class InternalWorkspace {
-  // If a InternalTextDocument is in this.textDocuments, it is also in this.worktree.
-  // If a InternalTextEditor is in this.textEditors, it is also in this.worktree.
   // eventIndex represents the index of the last event that was executed. That is, the effects of that event are visible.
   eventIndex: number;
-  worktree: LiveWorktree;
-  textDocuments: InternalTextDocument[];
-  textEditors: InternalTextEditor[];
   activeTextEditor?: InternalTextEditor;
   stepper: InternalWorkspaceStepper;
+  textDocuments: InternalTextDocument[];
+  textEditors: InternalTextEditor[];
+
+  // If a InternalTextDocument is in this.textDocuments, it is also in this.worktree.
+  // If a InternalTextEditor is in this.textEditors, it is also in this.worktree.
+  private worktree: LiveWorktree;
 
   constructor(public session: LoadedSession) {
     this.eventIndex = -1;
@@ -128,11 +131,40 @@ export default class InternalWorkspace {
     return textDocument;
   }
 
-  insertTextDocument(textDocument: InternalTextDocument) {
-    const item = this.worktree.get(textDocument.uri) ?? { file: { type: 'empty' } };
+  insertFile(uri: string, file: t.File): LiveWorktreeItem {
+    let item = this.worktree.get(uri);
+    if (item) {
+      item.file = file;
+    } else {
+      console.log('XXX insertFile: ', uri);
+
+      // insert parent directories
+      const uriParsed = URI.parse(uri);
+      if (uriParsed.scheme === 'workspace') {
+        const components = uriParsed.fsPath.split('/');
+        for (let i = 0; i < components.length - 1; i++) {
+          const p = path.join(...components.slice(0, i + 1));
+          const parentUri = workspaceUri(p);
+          if (!this.worktree.has(parentUri)) {
+            console.log('XXX insertFile parent: ', parentUri);
+            this.worktree.set(parentUri, { file: { type: 'dir' } });
+          }
+        }
+      }
+
+      item = { file };
+      this.worktree.set(uri, item);
+    }
+    return item;
+  }
+
+  insertTextDocument(textDocument: InternalTextDocument): LiveWorktreeItem {
+    const item = this.worktree.get(textDocument.uri) ?? this.insertFile(textDocument.uri, { type: 'empty' });
     item.document = textDocument;
-    this.worktree.set(textDocument.uri, item);
-    this.textDocuments.push(textDocument);
+    if (!this.textDocuments.includes(textDocument)) {
+      this.textDocuments.push(textDocument);
+    }
+    return item;
   }
 
   async openTextEditorByUri(
@@ -159,14 +191,13 @@ export default class InternalWorkspace {
     return textEditor;
   }
 
-  insertTextEditor(textEditor: InternalTextEditor) {
-    const item = this.worktree.get(textEditor.document.uri) ?? {
-      file: { type: 'empty' },
-      document: textEditor.document,
-    };
+  insertTextEditor(textEditor: InternalTextEditor): LiveWorktreeItem {
+    let item = this.worktree.get(textEditor.document.uri) ?? this.insertTextDocument(textEditor.document);
     item.editor = textEditor;
-    this.worktree.set(textEditor.document.uri, item);
-    this.textEditors.push(textEditor);
+    if (!this.textEditors.includes(textEditor)) {
+      this.textEditors.push(textEditor);
+    }
+    return item;
   }
 
   // toWorkspaceUri(p: string): string {

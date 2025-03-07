@@ -24,7 +24,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
   async applyInitEvent(e: t.InitEvent, uri: string, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(uri);
     if (direction === t.Direction.Forwards) {
-      this.internalWorkspace.worktree.set(uri, { file: e.file });
+      this.internalWorkspace.insertFile(uri, e.file);
     } else {
       // If we want to reverse the init event, we must delete it from worktree as well as text documents and text editors.
       throw new Error('Cannot reverse init event');
