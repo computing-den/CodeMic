@@ -93,9 +93,11 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
           e.text,
         );
         await vscode.workspace.applyEdit(edit);
+
+        await this.vscWorkspace.saveVscTextDocument(vscTextDocument);
       }
     } else {
-      await this.vscWorkspace.closeVscTextEditorByUri(uri, true);
+      await this.vscWorkspace.closeVscTextEditorByUri(uri, { skipConfirmation: true });
     }
   }
 
@@ -140,7 +142,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
 
   async applyCloseTextEditorEvent(e: t.CloseTextEditorEvent, uri: string, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
-      await this.vscWorkspace.closeVscTextEditorByUri(uri, true);
+      await this.vscWorkspace.closeVscTextEditorByUri(uri, { skipConfirmation: true });
     } else {
       const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(uri, { preserveFocus: false });
       if (e.revSelections) {
@@ -175,9 +177,13 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
   }
 
   async applySaveEvent(e: t.SaveEvent, uri: string, direction: t.Direction) {
-    const vscTextDocument = await this.vscWorkspace.openTextDocumentByUri(uri);
-    if (!(await vscTextDocument.save())) {
-      throw new Error(`Could not save ${uri}`);
+    // NOTE: if we open an untitled document and then save it, the save event
+    //       sometimes comes before the openTextDocument event. In that case,
+    //       just ignore it and let openTextDocument event handle it by creating
+    //       the file on disk.
+    const vscTextDocument = this.vscWorkspace.findVscTextDocumentByUri(uri);
+    if (vscTextDocument) {
+      this.vscWorkspace.saveVscTextDocument(vscTextDocument);
     }
   }
 

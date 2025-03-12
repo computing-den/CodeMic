@@ -257,7 +257,7 @@ export default class VscWorkspace {
     for (const tab of this.getTabsWithInputText()) {
       if (this.shouldRecordVscUri(tab.input.uri)) {
         if (!internalWorkspace.findTextEditorByUri(this.uriFromVsc(tab.input.uri))) {
-          await this.closeVscTabInputText(tab, true);
+          await this.closeVscTextEditorByVscUri(tab.input.uri, { skipConfirmation: true });
         }
       }
     }
@@ -379,12 +379,46 @@ export default class VscWorkspace {
     }
   }
 
+  async closeVscTextEditorByVscUri(uri: vscode.Uri, options?: { skipConfirmation?: boolean }) {
+    const activeUri = vscode.window.activeTextEditor?.document.uri;
+    await vscode.commands.executeCommand('vscode.open', uri);
+
+    assert(
+      vscode.window.activeTextEditor?.document.uri.toString() === uri.toString(),
+      `Failed to open editor for ${uri.toString()}`,
+    );
+    if (options?.skipConfirmation) {
+      await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    } else {
+      await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+    }
+    if (activeUri && activeUri.toString() !== uri.toString()) {
+      await vscode.commands.executeCommand('vscode.open', activeUri);
+    }
+  }
+
+  async closeVscTextEditorByUri(uri: string, options?: { skipConfirmation?: boolean }) {
+    return this.closeVscTextEditorByVscUri(this.uriToVsc(uri), options);
+  }
+
+  /**
+   * Use this to save without triggering any onsave events that would cause
+   * the auto formatter to run for example.
+   */
+  async saveVscTextDocument(vscTextDocument: vscode.TextDocument) {
+    await fs.promises.writeFile(vscTextDocument.uri.fsPath, vscTextDocument.getText());
+    await vscode.commands.executeCommand('vscode.open', vscTextDocument.uri);
+    await vscode.commands.executeCommand('workbench.action.files.revert');
+  }
+
   async saveAllRelevantVscTabs() {
     const uris = this.getRelevantTabVscUris();
     for (const uri of uris) {
       if (uri.scheme === 'file') {
         const vscTextDocument = this.findVscTextDocumentByVscUri(uri);
-        await vscTextDocument?.save();
+        if (vscTextDocument) {
+          await this.saveVscTextDocument(vscTextDocument);
+        }
       }
     }
   }
@@ -395,7 +429,7 @@ export default class VscWorkspace {
   async closeIrrelevantVscTabs() {
     for (const tab of this.getTabsWithInputText()) {
       if (!this.shouldRecordVscUri(tab.input.uri)) {
-        await this.closeVscTabInputText(tab);
+        await this.closeVscTextEditorByVscUri(tab.input.uri);
       }
     }
   }
@@ -555,49 +589,40 @@ export default class VscWorkspace {
     );
   }
 
-  async closeVscTextEditorByUri(uri: string, skipConfirmation: boolean = false) {
-    uri = this.session.core.resolveUri(uri);
-    for (const tab of this.getTabsWithInputText()) {
-      if (tab.input.uri.toString() === uri) {
-        this.closeVscTabInputText(tab, skipConfirmation);
-      }
-    }
-  }
+  // async closeVscTabInputText(tab: vscode.Tab, skipConfirmation: boolean = false) {
+  //   assert(tab.input instanceof vscode.TabInputText);
 
-  async closeVscTabInputText(tab: vscode.Tab, skipConfirmation: boolean = false) {
-    assert(tab.input instanceof vscode.TabInputText);
+  //   if (skipConfirmation) {
+  //     const vscTextDocument = await this.openTextDocumentByVscUri(tab.input.uri);
+  //     // console.log('XXX ', vscTextDocument.uri.toString(), 'isDirty: ', vscTextDocument.isDirty);
+  //     if (tab.input.uri.scheme === 'untitled') {
+  //       // Sometimes isDirty is false for untitled document even though it should be true.
+  //       // So, don't check isDirty for untitled.
+  //       // For untitled scheme, empty it first, then can close without confirmation.
+  //       const edit = new vscode.WorkspaceEdit();
+  //       edit.replace(vscTextDocument.uri, VscWorkspace.toVscRange(this.getVscTextDocumentRange(vscTextDocument)), '');
+  //       await vscode.workspace.applyEdit(edit);
+  //     } else if (tab.input.uri.scheme === 'file' && vscTextDocument.isDirty) {
+  //       // .save() returns false if document was not dirty
+  //       // Sometimes .save() fails and returns false. No idea why.
+  //       for (let i = 0; i < 5; i++) {
+  //         if (await vscTextDocument.save()) break;
+  //         console.error('closeVscTabInputText Failed to save:', tab.input.uri.toString());
+  //         await lib.timeout(100 * i + 100);
+  //       }
+  //     }
+  //   }
 
-    if (skipConfirmation) {
-      const vscTextDocument = await this.openTextDocumentByVscUri(tab.input.uri);
-      // console.log('XXX ', vscTextDocument.uri.toString(), 'isDirty: ', vscTextDocument.isDirty);
-      if (tab.input.uri.scheme === 'untitled') {
-        // Sometimes isDirty is false for untitled document even though it should be true.
-        // So, don't check isDirty for untitled.
-        // For untitled scheme, empty it first, then can close without confirmation.
-        const edit = new vscode.WorkspaceEdit();
-        edit.replace(vscTextDocument.uri, VscWorkspace.toVscRange(this.getVscTextDocumentRange(vscTextDocument)), '');
-        await vscode.workspace.applyEdit(edit);
-      } else if (tab.input.uri.scheme === 'file' && vscTextDocument.isDirty) {
-        // .save() returns false if document was not dirty
-        // Sometimes .save() fails and returns false. No idea why.
-        for (let i = 0; i < 5; i++) {
-          if (await vscTextDocument.save()) break;
-          console.error('closeVscTabInputText Failed to save:', tab.input.uri.toString());
-          await lib.timeout(100 * i + 100);
-        }
-      }
-    }
-
-    // Sometimes when save() fails the first time, closing the tab throws this error:
-    // Error: Tab close: Invalid tab not found!
-    // Maybe it automatically closes it? I don't know.
-    const newTab = this.findTabInputTextByVscUri(tab.input.uri);
-    if (newTab) {
-      // console.log('XXX trying to close', tab.input.uri.toString());
-      await vscode.window.tabGroups.close(newTab);
-      // console.log('XXX closed', tab.input.uri.toString());
-    }
-  }
+  //   // Sometimes when save() fails the first time, closing the tab throws this error:
+  //   // Error: Tab close: Invalid tab not found!
+  //   // Maybe it automatically closes it? I don't know.
+  //   const newTab = this.findTabInputTextByVscUri(tab.input.uri);
+  //   if (newTab) {
+  //     // console.log('XXX trying to close', tab.input.uri.toString());
+  //     await vscode.window.tabGroups.close(newTab);
+  //     // console.log('XXX closed', tab.input.uri.toString());
+  //   }
+  // }
 
   // makeTextEditorSnapshotFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {
   //   return ih.makeTextEditorSnapshot(
