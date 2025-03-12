@@ -954,12 +954,12 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   };
 
   autoScroll = () => {
-    const markerRecording = document.getElementById('marker_recording');
-    if (!markerRecording) return;
+    const marker = document.getElementById(this.props.session.playing ? 'marker_clock' : 'marker_recording');
+    if (!marker) return;
 
     const timeline = document.getElementById('timeline')!;
     const timelineRect = timeline.getBoundingClientRect();
-    const markerRecordingRect = markerRecording.getBoundingClientRect();
+    const markerRecordingRect = marker.getBoundingClientRect();
     timeline.scrollTop -= timelineRect.bottom - markerRecordingRect.top - 50;
   };
 
@@ -1073,7 +1073,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   }
 
   componentDidUpdate(prevProps: TimelineProps, prevState: TimelineState) {
-    if (this.props.session.recording) {
+    if (this.props.session.recording /* || this.props.session.playing*/) {
       this.autoScroll();
     }
 
