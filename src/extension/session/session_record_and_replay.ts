@@ -338,6 +338,15 @@ export default class SessionRecordAndReplay {
     }
   }
 
+  // private setInRangeAudiosPlaybackRate() {
+  //   for (const c of this.audioTrackPlayers) {
+  //     if (this.isTrackInRange(c.audioTrack)) {
+  //       const rate = this.getAdjustedPlaybackRate(lib.clockToGlobal(c.lastReportedClock, c.audioTrack.clockRange));
+  //       c.setPlaybackRate(rate);
+  //     }
+  //   }
+  // }
+
   private pauseAudios() {
     for (const c of this.audioTrackPlayers) {
       if (c.running) c.pause();
@@ -389,6 +398,27 @@ export default class SessionRecordAndReplay {
       this.videoTrackPlayer.play();
     }
   }
+
+  // private setInRangeVideoPlaybackRate() {
+  //   if (this.videoTrackPlayer.videoTrack && this.isTrackInRange(this.videoTrackPlayer.videoTrack)) {
+  //     const rate = this.getAdjustedPlaybackRate(
+  //       lib.clockToGlobal(this.videoTrackPlayer.lastReportedClock, this.videoTrackPlayer.videoTrack.clockRange),
+  //     );
+  //     this.videoTrackPlayer.setPlaybackRate(rate);
+  //   }
+  // }
+
+  // private getAdjustedPlaybackRate(clock: number): number {
+  //   const diff = this.clock - clock;
+  //   const threshold = 0.5;
+  //   if (diff > threshold) {
+  //     return 1.05;
+  //   } else if (diff < threshold) {
+  //     return 0.95;
+  //   } else {
+  //     return 1;
+  //   }
+  // }
 
   private clearTimeout() {
     clearTimeout(this.timeout);
@@ -446,7 +476,9 @@ export default class SessionRecordAndReplay {
       this.loadInRangeVideoAndSeekIfDifferent();
       if (this.running) {
         this.playInRangeAudios();
+        // this.setInRangeAudiosPlaybackRate();
         this.playInRangeVideo();
+        // this.setInRangeVideoPlaybackRate();
       }
       this.pauseOutOfRangeAudios();
       this.stopOutOfRangeVideo();
@@ -456,22 +488,6 @@ export default class SessionRecordAndReplay {
       }
 
       this.session.onProgress?.();
-    }
-
-    if (config.logMasterAndTracksTimeUpdates) {
-      const videoClock = this.videoTrackPlayer.videoTrack && {
-        title: this.videoTrackPlayer.videoTrack?.title || '',
-        clock: lib.clockToGlobal(this.videoTrackPlayer.lastReportedClock, this.videoTrackPlayer.videoTrack.clockRange),
-      };
-      const audioClocks = this.audioTrackPlayers.map(p => ({
-        title: p.audioTrack.title,
-        clock: lib.clockToGlobal(p.lastReportedClock, p.audioTrack.clockRange),
-      }));
-      const trackClocksStr = _.compact([videoClock, ...audioClocks])
-        .map(t => t.title + ': ' + t.clock.toFixed(2))
-        .join(' | ');
-
-      console.log(`master clock: ${this.clock.toFixed(2)} | ${trackClocksStr}`);
     }
 
     if (this.running) {

@@ -9,7 +9,6 @@ export default class AudioTrackPlayer {
   audioTrack: t.AudioTrack;
   running = false;
   onError?: (error: Error) => any;
-  lastReportedClock = 0;
   loading = false;
 
   private session: LoadedSession;
@@ -55,6 +54,19 @@ export default class AudioTrackPlayer {
     } else {
       this.session.context
         .postAudioMessage?.({ type: 'audio/seek', id: this.audioTrack.id, clock })
+        .catch(this.gotError);
+    }
+  }
+
+  /**
+   * It's private because we're using it internally when the clock from timeupdate is way off.
+   * TODO make it public by multiplying the user-requested rate by the adjustment rate.
+   */
+  private setPlaybackRate(rate: number) {
+    if (config.logBackendAudioEvents) console.log('AudioTrackPlayers rate', this.loaded, rate);
+    if (this.loaded) {
+      this.session.context
+        .postAudioMessage?.({ type: 'audio/setPlaybackRate', id: this.audioTrack.id, rate })
         .catch(this.gotError);
     }
   }
@@ -170,8 +182,27 @@ export default class AudioTrackPlayer {
         break;
       }
       case 'timeupdate': {
-        this.lastReportedClock = e.clock;
         if (config.logBackendAudioEvents) console.log('timeupdate', e.clock);
+
+        // Adjust the playback rate if clock is off.
+        const trackGlobalClock = lib.clockToGlobal(e.clock, this.audioTrack.clockRange);
+        const diff = this.session.rr.clock - trackGlobalClock;
+
+        if (config.logMasterAndTracksTimeUpdates) {
+          console.log(
+            `CLOCKS | session: ${this.session.rr.clock.toFixed(2)}, ` +
+              `${this.audioTrack.title}: ${trackGlobalClock.toFixed(2)}, ` +
+              `diff: ${diff.toFixed(2)}`,
+          );
+        }
+
+        if (Math.abs(diff) > 0.6) {
+          this.setPlaybackRate(Math.sign(diff) * 0.05 + 1);
+        }
+        if (Math.abs(diff) < 0.3) {
+          this.setPlaybackRate(1);
+        }
+
         // We might receive progress update before seeking to another position is complete.
         // In which case, just ignore the progress update.
         // if (!this.seeking) {
