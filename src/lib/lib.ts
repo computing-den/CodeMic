@@ -211,6 +211,21 @@ export function isLoadedSession(session: t.SessionUIState): session is t.LoadedS
   return session.loaded;
 }
 
+export function adjustTrackPlaybackRate(sessionClock: number, trackClock: number): number | undefined {
+  const diff = sessionClock - trackClock;
+  if (Math.abs(diff) > 3.0) {
+    return Math.sign(diff) * 1 + 1;
+  } else if (Math.abs(diff) > 2.0) {
+    return Math.sign(diff) * 0.4 + 1;
+  } else if (Math.abs(diff) > 1.0) {
+    return Math.sign(diff) * 0.2 + 1;
+  } else if (Math.abs(diff) > 0.6) {
+    return Math.sign(diff) * 0.1 + 1;
+  } else if (Math.abs(diff) < 0.3) {
+    return 1;
+  }
+}
+
 export class Vec2 {
   constructor(public x: number, public y: number) {}
   sub(p: Vec2): Vec2 {

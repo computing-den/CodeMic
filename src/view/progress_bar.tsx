@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Popover, { PointXY, PopoverProps, usePopover } from './popover.jsx';
 import { URI } from 'vscode-uri';
 import path from 'path';
+import _ from 'lodash';
 
 export type Props = {
   className?: string;
@@ -19,6 +20,7 @@ type UnderMouse = {
   clock: number;
   yNorm: number;
   focus?: t.Focus;
+  tocItem?: t.TocItem;
 };
 
 export default function ProgressBar(props: Props) {
@@ -51,8 +53,9 @@ export default function ProgressBar(props: Props) {
         // }
 
         const focus = lib.findFocusByClock(props.workspaceFocusTimeline ?? [], clock);
+        const tocItem = _.findLast(props.toc, item => item.clock <= clock);
 
-        setUnderMouse({ yNorm, clock, focus });
+        setUnderMouse({ yNorm, clock, focus, tocItem });
       }
     }
 
@@ -77,6 +80,8 @@ export default function ProgressBar(props: Props) {
     top: `${(item.clock / props.duration) * 100}%`,
   }));
 
+  const focusUri = underMouse?.focus && path.basename(URI.parse(underMouse.focus.uri).fsPath);
+
   return (
     <div className={cn('progress-bar', props.className)} ref={ref}>
       <Popover
@@ -84,16 +89,15 @@ export default function ProgressBar(props: Props) {
         className="progress-bar-focus-popover"
         anchor={ref}
         pointOnPopover="center-right"
-        pointOnAnchor={{ x: 0.4, y: underMouse?.yNorm ?? 0 }}
+        pointOnAnchor={{ x: 0, y: underMouse?.yNorm ?? 0 }}
         showOnAnchorHover
       >
-        <div className="row">
-          <div className="document-focus">
-            {underMouse?.focus ? path.basename(URI.parse(underMouse.focus.uri).fsPath) : ''}
-          </div>
-          <div className="clock">{lib.formatTimeSeconds(underMouse?.clock ?? 0)}</div>
+        <div className="with-clock">
+          <div className="truncate">{underMouse?.tocItem?.title || 'Unknown section'}</div>
+          <div>{lib.formatTimeSeconds(underMouse?.clock ?? 0)}</div>
         </div>
-        <div className="line-focus">{underMouse?.focus?.text || ''}</div>
+        <div className="truncate">{focusUri || 'Unknown file'}</div>
+        <div className="truncate">{underMouse?.focus?.text || 'Unknown line'}</div>
       </Popover>
       <div className="bar" onClick={clicked}>
         <div className="shadow" style={{ height: `${(underMouse?.yNorm ?? 0) * 100}%` }} />

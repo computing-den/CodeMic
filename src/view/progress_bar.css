@@ -83,19 +83,18 @@
   width: 250px;
   max-width: 95vw;
   flex-direction: column;
+  gap: var(--spacing-small);
 
-  * {
-    white-space: nowrap;
-  }
-
-  .row {
+  .with-clock {
     display: flex;
-    font-weight: bold;
     justify-content: space-between;
+    gap: var(--spacing-small);
+    font-weight: bold;
   }
-  .line-focus {
-    margin-top: var(--spacing-small);
+
+  .truncate {
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
