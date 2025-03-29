@@ -11,6 +11,7 @@ export type Config = {
   logRecorderRawVscEvents: boolean;
   logSessionRRUpdateStep: boolean;
   logTrackPlayerUpdateStep: boolean;
+  logMasterAndTracksTimeUpdates: boolean;
   debug: boolean;
 };
 

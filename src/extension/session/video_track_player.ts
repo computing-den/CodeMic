@@ -8,11 +8,12 @@ export default class VideoTrackPlayer {
   videoTrack: t.VideoTrack | undefined;
   running = false;
   onError?: (error: Error) => any;
+  lastReportedClock = 0;
+  loading = false;
 
   private session: LoadedSession;
-  private clock = 0;
+  private seekClock = 0;
   private loaded = false;
-  private loading = false;
   private seekAfterLoad = false;
 
   constructor(session: LoadedSession) {
@@ -73,7 +74,7 @@ export default class VideoTrackPlayer {
 
   seek(clock: number) {
     if (config.logBackendVideoEvents) console.log('VideoTrackPlayers seek', this.loaded, clock);
-    this.clock = clock;
+    this.seekClock = clock;
     if (!this.loaded) {
       this.seekAfterLoad = true;
     } else {
@@ -117,7 +118,7 @@ export default class VideoTrackPlayer {
         if (isFirstLoad) {
           if (this.seekAfterLoad) {
             this.seekAfterLoad = false;
-            this.seek(this.clock);
+            this.seek(this.seekClock);
           }
 
           if (this.running) {
@@ -172,6 +173,7 @@ export default class VideoTrackPlayer {
         break;
       }
       case 'timeupdate': {
+        this.lastReportedClock = e.clock;
         if (config.logBackendVideoEvents) console.log('timeupdate', e.clock, this.videoTrack?.title);
         // We might receive progress update before seeking to another position is complete.
         // In which case, just ignore the progress update.

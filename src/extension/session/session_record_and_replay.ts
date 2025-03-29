@@ -10,7 +10,6 @@ import WorkspacePlayer from './workspace_player.js';
 import WorkspaceRecorder from './workspace_recorder.js';
 import VscWorkspace from './vsc_workspace.js';
 import _ from 'lodash';
-import { Progress } from '../types.js';
 
 enum Status {
   Init,
@@ -421,37 +420,59 @@ export default class SessionRecordAndReplay {
    */
   private updateStep = async (now?: number) => {
     const timeAtUpdate = now ?? performance.now();
-    this.clock += (timeAtUpdate - this.timeoutTimestamp) / 1000;
-
-    if (this.mode.recordingEditor) {
-      if (config.logSessionRRUpdateStep) {
-        console.log(
-          `SessionRecordAndReplay duration ${this.session.head.duration} -> ${Math.max(
-            this.session.head.duration,
-            this.clock,
-          )}`,
-        );
-      }
-      this.session.editor.updateDuration(Math.max(this.session.head.duration, this.clock), { coalescing: true });
+    const isLoading = this.videoTrackPlayer.loading || this.audioTrackPlayers.some(p => p.loading);
+    if (isLoading) {
+      this.videoTrackPlayer.pause();
+      for (const c of this.audioTrackPlayers) c.pause();
     } else {
-      this.clock = Math.min(this.session.head.duration, this.clock);
+      this.clock += (timeAtUpdate - this.timeoutTimestamp) / 1000;
+
+      if (this.mode.recordingEditor) {
+        if (config.logSessionRRUpdateStep) {
+          console.log(
+            `SessionRecordAndReplay duration ${this.session.head.duration} -> ${Math.max(
+              this.session.head.duration,
+              this.clock,
+            )}`,
+          );
+        }
+        this.session.editor.updateDuration(Math.max(this.session.head.duration, this.clock), { coalescing: true });
+      } else {
+        this.clock = Math.min(this.session.head.duration, this.clock);
+      }
+
+      await this.seekEditor();
+      this.seekInRangeAudiosThatAreNotRunning();
+      this.loadInRangeVideoAndSeekIfDifferent();
+      if (this.running) {
+        this.playInRangeAudios();
+        this.playInRangeVideo();
+      }
+      this.pauseOutOfRangeAudios();
+      this.stopOutOfRangeVideo();
+
+      if (!this.mode.recordingEditor && this.clock === this.session.head.duration) {
+        this.pause();
+      }
+
+      this.session.onProgress?.();
     }
 
-    await this.seekEditor();
-    this.seekInRangeAudiosThatAreNotRunning();
-    this.loadInRangeVideoAndSeekIfDifferent();
-    if (this.running) {
-      this.playInRangeAudios();
-      this.playInRangeVideo();
-    }
-    this.pauseOutOfRangeAudios();
-    this.stopOutOfRangeVideo();
+    if (config.logMasterAndTracksTimeUpdates) {
+      const videoClock = this.videoTrackPlayer.videoTrack && {
+        title: this.videoTrackPlayer.videoTrack?.title || '',
+        clock: lib.clockToGlobal(this.videoTrackPlayer.lastReportedClock, this.videoTrackPlayer.videoTrack.clockRange),
+      };
+      const audioClocks = this.audioTrackPlayers.map(p => ({
+        title: p.audioTrack.title,
+        clock: lib.clockToGlobal(p.lastReportedClock, p.audioTrack.clockRange),
+      }));
+      const trackClocksStr = _.compact([videoClock, ...audioClocks])
+        .map(t => t.title + ': ' + t.clock.toFixed(2))
+        .join(' | ');
 
-    if (!this.mode.recordingEditor && this.clock === this.session.head.duration) {
-      this.pause();
+      console.log(`master clock: ${this.clock.toFixed(2)} | ${trackClocksStr}`);
     }
-
-    this.session.onProgress?.();
 
     if (this.running) {
       this.timeoutTimestamp = timeAtUpdate;
