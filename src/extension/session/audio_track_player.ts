@@ -196,10 +196,13 @@ export default class AudioTrackPlayer {
           );
         }
 
-        if (Math.abs(diff) > 0.6) {
-          this.setPlaybackRate(Math.sign(diff) * 0.05 + 1);
-        }
-        if (Math.abs(diff) < 0.3) {
+        if (Math.abs(diff) > 2.0) {
+          this.setPlaybackRate(Math.sign(diff) * 0.4 + 1);
+        } else if (Math.abs(diff) > 1.0) {
+          this.setPlaybackRate(Math.sign(diff) * 0.2 + 1);
+        } else if (Math.abs(diff) > 0.6) {
+          this.setPlaybackRate(Math.sign(diff) * 0.1 + 1);
+        } else if (Math.abs(diff) < 0.3) {
           this.setPlaybackRate(1);
         }
 

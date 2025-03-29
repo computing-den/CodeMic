@@ -476,9 +476,7 @@ export default class SessionRecordAndReplay {
       this.loadInRangeVideoAndSeekIfDifferent();
       if (this.running) {
         this.playInRangeAudios();
-        // this.setInRangeAudiosPlaybackRate();
         this.playInRangeVideo();
-        // this.setInRangeVideoPlaybackRate();
       }
       this.pauseOutOfRangeAudios();
       this.stopOutOfRangeVideo();

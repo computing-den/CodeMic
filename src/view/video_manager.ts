@@ -74,7 +74,12 @@ export default class VideoManager {
     if (config.logWebviewVideoEvents) console.log(`VideoManager stop`);
     if (this.video) {
       this.video.pause();
-      this.video.src = '';
+
+      // Setting video.src = '' is like setting video.src to the website URL and that's
+      // exactly what you get if you then try to read video.src
+      this.video.removeAttribute('src');
+      this.video.load();
+
       this.curTrackId = undefined;
     }
   }
@@ -110,18 +115,22 @@ export default class VideoManager {
 
   handleGenericEvent = async (e: Event) => {
     if (config.logWebviewVideoEvents) console.log('handleGenericEvent', e.type);
-    await postVideoEvent({ type: e.type as (typeof genericEventTypes)[number], id: this.curTrackId! });
+
+    // NOTE: loadstart is triggered after we stop and set src=''.
+    if (this.video?.src) {
+      await postVideoEvent({ type: e.type as (typeof genericEventTypes)[number], id: this.curTrackId });
+    }
   };
 
   handleVolumeChange = async () => {
     if (config.logWebviewVideoEvents) console.log('handleVolumeChange');
     // The volumechange event signifies that the volume has changed; that includes being muted.
-    await postVideoEvent({ type: 'volumechange', volume: this.video!.volume, id: this.curTrackId! });
+    await postVideoEvent({ type: 'volumechange', volume: this.video!.volume, id: this.curTrackId });
   };
 
   handleRateChange = async () => {
     if (config.logWebviewVideoEvents) console.log('handleRateChange');
-    await postVideoEvent({ type: 'ratechange', rate: this.video!.playbackRate, id: this.curTrackId! });
+    await postVideoEvent({ type: 'ratechange', rate: this.video!.playbackRate, id: this.curTrackId });
   };
 
   handleTimeUpdate = async () => {
@@ -129,15 +138,14 @@ export default class VideoManager {
     // The timeupdate event is triggered every time the currentTime property changes.
     // In practice, this occurs every 250 milliseconds.
     // This event can be used to trigger the displaying of playback progress.
-    await postVideoEvent({ type: 'timeupdate', clock: this.video!.currentTime, id: this.curTrackId! });
+    await postVideoEvent({ type: 'timeupdate', clock: this.video!.currentTime, id: this.curTrackId });
   };
 
   handleError = async (e: ErrorEvent) => {
-    if (!this.curTrackId) return; // Happens after stop() is called and src is set to ''.
     // An error is encountered while media data is being downloaded.
     console.error(e.error);
     console.error(e.message);
-    await postVideoEvent({ type: 'error', error: e.message, id: this.curTrackId! });
+    await postVideoEvent({ type: 'error', error: e.message, id: this.curTrackId });
   };
 }
 

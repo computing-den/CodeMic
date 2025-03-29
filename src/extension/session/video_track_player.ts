@@ -142,14 +142,17 @@ export default class VideoTrackPlayer {
         break;
       }
       case 'suspend': {
+        this.loading = false;
         if (config.logBackendVideoEvents) console.log('suspend', this.videoTrack?.title);
         break;
       }
       case 'abort': {
+        this.loading = false;
         if (config.logBackendVideoEvents) console.log('abort', this.videoTrack?.title);
         break;
       }
       case 'emptied': {
+        this.loaded = false;
         if (config.logBackendVideoEvents) console.log('emptied', this.videoTrack?.title);
         break;
       }
@@ -201,10 +204,13 @@ export default class VideoTrackPlayer {
             );
           }
 
-          if (Math.abs(diff) > 0.6) {
-            this.setPlaybackRate(Math.sign(diff) * 0.05 + 1);
-          }
-          if (Math.abs(diff) < 0.3) {
+          if (Math.abs(diff) > 2.0) {
+            this.setPlaybackRate(Math.sign(diff) * 0.4 + 1);
+          } else if (Math.abs(diff) > 1.0) {
+            this.setPlaybackRate(Math.sign(diff) * 0.2 + 1);
+          } else if (Math.abs(diff) > 0.6) {
+            this.setPlaybackRate(Math.sign(diff) * 0.1 + 1);
+          } else if (Math.abs(diff) < 0.3) {
             this.setPlaybackRate(1);
           }
         }

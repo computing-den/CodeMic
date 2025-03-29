@@ -64,28 +64,28 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'video'; event: FrontendMediaEvent }; response: OKResponse };
 
 export type FrontendMediaEvent =
-  | { type: 'loadstart'; id: string }
-  | { type: 'durationchange'; id: string }
-  | { type: 'loadedmetadata'; id: string }
-  | { type: 'loadeddata'; id: string }
-  | { type: 'progress'; id: string }
-  | { type: 'canplay'; id: string }
-  | { type: 'canplaythrough'; id: string }
-  | { type: 'suspend'; id: string }
-  | { type: 'abort'; id: string }
-  | { type: 'error'; id: string; error: string }
-  | { type: 'emptied'; id: string }
-  | { type: 'stalled'; id: string }
-  | { type: 'timeupdate'; id: string; clock: number }
-  | { type: 'playing'; id: string }
-  | { type: 'waiting'; id: string }
-  | { type: 'play'; id: string }
-  | { type: 'pause'; id: string }
-  | { type: 'ended'; id: string }
-  | { type: 'volumechange'; id: string; volume: number }
-  | { type: 'ratechange'; id: string; rate: number }
-  | { type: 'seeking'; id: string }
-  | { type: 'seeked'; id: string };
+  | { type: 'loadstart'; id?: string }
+  | { type: 'durationchange'; id?: string }
+  | { type: 'loadedmetadata'; id?: string }
+  | { type: 'loadeddata'; id?: string }
+  | { type: 'progress'; id?: string }
+  | { type: 'canplay'; id?: string }
+  | { type: 'canplaythrough'; id?: string }
+  | { type: 'suspend'; id?: string }
+  | { type: 'abort'; id?: string }
+  | { type: 'error'; id?: string; error: string }
+  | { type: 'emptied'; id?: string }
+  | { type: 'stalled'; id?: string }
+  | { type: 'timeupdate'; id?: string; clock: number }
+  | { type: 'playing'; id?: string }
+  | { type: 'waiting'; id?: string }
+  | { type: 'play'; id?: string }
+  | { type: 'pause'; id?: string }
+  | { type: 'ended'; id?: string }
+  | { type: 'volumechange'; id?: string; volume: number }
+  | { type: 'ratechange'; id?: string; rate: number }
+  | { type: 'seeking'; id?: string }
+  | { type: 'seeked'; id?: string };
 
 export type BackendToFrontendReqRes =
   | { request: { type: 'updateStore'; store: Store }; response: OKResponse }
