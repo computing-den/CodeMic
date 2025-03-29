@@ -67,7 +67,9 @@ export default class Player extends React.Component<Props> {
 
   tocItemClicked = async (e: React.MouseEvent, item: t.TocItem) => {
     e.preventDefault();
-    await this.seek(item.clock);
+    if (this.props.session.loaded) {
+      await this.seek(item.clock);
+    }
   };
 
   fork = async () => {
@@ -273,7 +275,7 @@ export default class Player extends React.Component<Props> {
                 {head.toc.map((item, i) => (
                   <div
                     tabIndex={0}
-                    className={cn('item', i === tocIndex && session.loaded && 'active')}
+                    className={cn('item', session.loaded && 'selectable', i === tocIndex && session.loaded && 'active')}
                     onClick={e => this.tocItemClicked(e, item)}
                   >
                     <div className="title">{item.title}</div>

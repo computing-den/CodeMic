@@ -83,7 +83,6 @@
         margin-left: calc(var(--spacing-small) * -1);
         margin-right: calc(var(--spacing-small) * -1);
         padding: var(--spacing-small);
-        cursor: pointer;
 
         &.active {
           > .title {
@@ -94,7 +93,8 @@
           }
         }
 
-        &:hover {
+        &.selectable:hover {
+          cursor: pointer;
           background: var(--vscode-list-hoverBackground);
         }
 
