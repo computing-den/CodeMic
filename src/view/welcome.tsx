@@ -58,6 +58,13 @@ function WelcomeAskEarlyAccessEmail(props: Props) {
               OK
             </VSCodeButton>
           </div>
+          <div className="more-info-subsection subsection">
+            Visit{' '}
+            <a className="unstyled" href="https://CodeMic.io">
+              CodeMic.io
+            </a>{' '}
+            for more info
+          </div>
         </Section.Body>
       </Section>
     </Screen>

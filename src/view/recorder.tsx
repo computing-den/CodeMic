@@ -142,7 +142,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
   };
 
   handleChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
-    const changes = { handle: (e.target as HTMLInputElement).value.replace(/[^A-Za-z0-9_]/g, '') };
+    const changes = { handle: (e.target as HTMLInputElement).value.replace(/[^A-Za-z0-9_-]/g, '') };
     await postMessage({ type: 'recorder/updateDetails', changes });
   };
 
@@ -243,7 +243,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
         </p>
         <VSCodeTextField
           className="subsection"
-          placeholder="A-Z a-z 0-9 _ (e.g. my_project)"
+          placeholder="A-Z a-z 0-9 - _ (e.g. my_project)"
           value={head.handle}
           onInput={this.handleChanged}
           disabled={!temp}

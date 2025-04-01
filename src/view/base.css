@@ -137,7 +137,7 @@ body {
   margin: 0;
 }
 & p + p {
-  margin-top: 4px;
+  margin-top: var(--spacing-medium);
 }
 
 .bump-left {
@@ -151,6 +151,10 @@ ul.unstyled {
 
   & li {
   }
+}
+
+a.unstyled {
+  text-decoration: none;
 }
 
 .m-right {

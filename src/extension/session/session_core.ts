@@ -239,8 +239,8 @@ export default class SessionCore {
 
     assert(this.session.head.handle, 'Please select a handle for the session.');
     assert(
-      !/[^A-Za-z0-9_]/.test(this.session.head.handle),
-      'Please select a valid handle of format A-Z a-z 0-9 _ (e.g. my_project).',
+      !/[^A-Za-z0-9_-]/.test(this.session.head.handle),
+      'Please select a valid handle of format A-Z a-z 0-9 - _ (e.g. my_project).',
     );
   }
 

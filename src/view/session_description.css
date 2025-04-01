@@ -27,5 +27,8 @@
   }
   > .body {
     margin-top: var(--spacing-small);
+
+    & a.expand {
+    }
   }
 }

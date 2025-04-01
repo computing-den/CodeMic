@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 // import FakeMedia from './fake_media.jsx';
@@ -65,8 +65,7 @@ export default class Player extends React.Component<Props> {
     return document.getElementById('cover-container')!;
   };
 
-  tocItemClicked = async (e: React.MouseEvent, item: t.TocItem) => {
-    e.preventDefault();
+  tocItemClicked = async (item: t.TocItem) => {
     if (this.props.session.loaded) {
       await this.seek(item.clock);
     }
@@ -208,8 +207,6 @@ export default class Player extends React.Component<Props> {
       },
     ]);
 
-    const tocIndex = _.findLastIndex(head.toc, item => item.clock <= session.clock);
-
     return (
       <Screen className="player">
         {lib.isLoadedSession(session) && (
@@ -271,18 +268,7 @@ export default class Player extends React.Component<Props> {
               </div>
               )*/}
             {head.toc.length > 0 && (
-              <div className="subsection toc">
-                {head.toc.map((item, i) => (
-                  <div
-                    tabIndex={0}
-                    className={cn('item', session.loaded && 'selectable', i === tocIndex && session.loaded && 'active')}
-                    onClick={e => this.tocItemClicked(e, item)}
-                  >
-                    <div className="title">{item.title}</div>
-                    <div className="clock">{lib.formatTimeSeconds(item.clock)}</div>
-                  </div>
-                ))}
-              </div>
+              <TableOfContent head={head} onClick={this.tocItemClicked} clock={session.clock} loaded={session.loaded} />
             )}
           </Section.Body>
         </Section>
@@ -307,6 +293,48 @@ export default class Player extends React.Component<Props> {
       </Screen>
     );
   }
+}
+
+function TableOfContent(props: {
+  head: t.SessionHead;
+  onClick: (item: t.TocItem) => any;
+  loaded: boolean;
+  clock: number;
+}) {
+  function clicked(e: React.MouseEvent, item: t.TocItem) {
+    e.preventDefault();
+    props.onClick(item);
+  }
+  const tocIndex = _.findLastIndex(props.head.toc, item => item.clock <= props.clock);
+
+  const EXPAND_THRESHOLD = 10;
+  const [expanded, setExpanded] = useState(false);
+  const expandable = props.head.toc.length > EXPAND_THRESHOLD;
+  const toc = expandable && !expanded ? props.head.toc.slice(0, EXPAND_THRESHOLD) : props.head.toc;
+
+  function toggleExpansion(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpanded(!expanded);
+  }
+
+  return (
+    <div className="subsection toc">
+      {toc.map((item, i) => (
+        <div
+          tabIndex={0}
+          className={cn('item', props.loaded && 'selectable', i === tocIndex && props.loaded && 'active')}
+          onClick={e => clicked(e, item)}
+        >
+          <div className="title">{item.title}</div>
+          <div className="clock">{lib.formatTimeSeconds(item.clock)}</div>
+        </div>
+      ))}
+      <a className="expand" href="#" onClick={toggleExpansion}>
+        {expanded ? 'less' : 'more'}
+      </a>
+    </div>
+  );
 }
 
 // class DevTrackPlayer extends React.Component<{ p: t.TrackPlayerSummary }> {

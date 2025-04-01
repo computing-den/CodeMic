@@ -78,6 +78,7 @@ export function SessionListing(props: SessionListingProps) {
     <div className={cn('session-listing', props.className)} onClick={() => props.onClick(head.id)} tabIndex={0}>
       <div className="cover-container">
         <Cover local={local} head={head} />
+        <div className="duration">{lib.formatTimeSeconds(head.duration)}</div>
       </div>
       <WithAvatar username={head.author} className="caption" small>
         <div className="title">{head.title || 'Untitled'}</div>

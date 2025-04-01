@@ -55,6 +55,17 @@
         height: 100%;
         width: 100%;
       }
+
+      & .duration {
+        position: absolute;
+        bottom: var(--spacing-small);
+        right: var(--spacing-small);
+        padding: var(--spacing-small);
+        color: white;
+        border-radius: 5px;
+        background: #000000aa;
+        z-index: 1;
+      }
     }
 
     .caption {

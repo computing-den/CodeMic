@@ -3,8 +3,10 @@ import * as lib from '../lib/lib.js';
 import TimeFromNow from './time_from_now.js';
 import { cn } from './misc.js';
 import TextToParagraphs from './text_to_paragraphs.jsx';
-import React from 'react';
+import React, { useState } from 'react';
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react/index.js';
+
+const EXPAND_THRESHOLD = 300;
 
 export type Props = {
   className?: string;
@@ -16,6 +18,17 @@ export type Props = {
 export default function SessionDescription(props: Props) {
   const { className, head, publication, user, onLike } = props;
   const liked = user?.metadata?.likes.includes(head.id);
+
+  const [expanded, setExpanded] = useState(false);
+  const expandable = head.description.length > EXPAND_THRESHOLD;
+  const description =
+    expandable && !expanded ? head.description.substring(0, EXPAND_THRESHOLD) + '...' : head.description;
+
+  function toggleExpansion(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpanded(!expanded);
+  }
 
   return (
     <div className={cn('session-description', className)}>
@@ -45,7 +58,12 @@ export default function SessionDescription(props: Props) {
         </>
       </div>
       <div className="body">
-        <TextToParagraphs text={head.description} />
+        <TextToParagraphs text={description} />
+        {expandable && (
+          <a className="expand" href="#" onClick={toggleExpansion}>
+            {expanded ? 'less' : 'more'}
+          </a>
+        )}
       </div>
     </div>
   );
