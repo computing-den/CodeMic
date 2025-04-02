@@ -35,6 +35,10 @@ const sourcemap = production ? false : 'inline';
 
 const common = {
   bundle: true,
+  // When using the build API, all process.env.NODE_ENV expressions are
+  // automatically defined to "production" if all minification options are
+  // enabled and "development" otherwise. This only happens if process,
+  // process.env, and process.env.NODE_ENV are not already defined.
   minify: production,
   sourcemap,
   logLevel: 'silent', // silent the default logger
