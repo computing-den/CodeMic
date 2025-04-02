@@ -13,6 +13,7 @@ type HeaderProps = {
   title: string;
   collapsible?: boolean;
   buttons?: any[];
+  loading?: boolean;
 };
 
 type ExitButtonProps = {
@@ -36,6 +37,7 @@ class Header extends React.Component<HeaderProps> {
       <div className={`section-header ${this.props.collapsible ? 'collapsible' : ''}`}>
         <span className="collapse-icon codicon codicon-chevron-down m-right_x-small va-top" />
         <h3>{this.props.title}</h3>
+        {this.props.loading && <span className="codicon codicon-loading codicon-modifier-spin m-left_small va-top " />}
         {!_.isEmpty(this.props.buttons) && <div className="actions">{this.props.buttons}</div>}
       </div>
     );
@@ -70,9 +72,14 @@ export class Body extends React.Component<BodyProps> {
   }
 }
 
+export function Message(props: { children: React.ReactNode }) {
+  return <div className="message">{props.children}</div>;
+}
+
 export default class Section extends React.Component<SectionProps> {
   static Header = Header;
   static Body = Body;
+  static Message = Message;
   render() {
     return (
       <div className={`section ${this.props.bordered ? 'bordered' : ''} ${this.props.className || ''}`}>

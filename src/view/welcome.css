@@ -113,12 +113,4 @@
     /*   } */
     /* } */
   }
-
-  .empty {
-    font-size: 1.5rem;
-    color: var(--text-weak);
-    margin: 30vh 1rem 1rem;
-    text-align: center;
-    letter-spacing: 2px;
-  }
 }

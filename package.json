@@ -74,6 +74,14 @@
           "light": "./resources/light/account.svg",
           "dark": "./resources/dark/account.svg"
         }
+      },
+      {
+        "command": "codemic.reportIssue",
+        "title": "CodeMic report issue",
+        "icon": {
+          "light": "./resources/light/question.svg",
+          "dark": "./resources/dark/question.svg"
+        }
       }
     ],
     "menus": {
@@ -89,9 +97,14 @@
           "group": "navigation@2"
         },
         {
-          "command": "codemic.account",
+          "command": "codemic.reportIssue",
           "when": "view == codemic-view",
           "group": "navigation@3"
+        },
+        {
+          "command": "codemic.account",
+          "when": "view == codemic-view",
+          "group": "navigation@4"
         }
       ]
     }

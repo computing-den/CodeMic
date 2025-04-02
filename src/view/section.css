@@ -50,6 +50,14 @@
   .section-body {
     display: flex;
     flex-direction: column;
+
+    .message {
+      font-size: 1.5rem;
+      color: var(--text-weak);
+      margin: 2rem 1rem 2rem;
+      text-align: center;
+      letter-spacing: 2px;
+    }
   }
 }
 

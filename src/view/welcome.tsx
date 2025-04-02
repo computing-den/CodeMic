@@ -119,10 +119,9 @@ function WelcomeSessions(props: Props) {
           )}
         </Section.Body>
       </Section>
-      {current && <SessionsSection user={props.user} title="WORKSPACE" listings={[current]} />}
+      <SessionsSection user={props.user} title="WORKSPACE" listings={_.compact([current])} />
       {recent.length > 0 && <SessionsSection user={props.user} title="RECENT" listings={recent} />}
-      {featured.length > 0 && <SessionsSection user={props.user} title="FEATURED" listings={featured} />}
-      {welcome.loading && empty && <div className="empty">LOADING ...</div>}
+      <SessionsSection user={props.user} title="FEATURED" listings={featured} loading={welcome.loadingFeatured} />
     </Screen>
   );
 }
@@ -132,6 +131,7 @@ type SessionsSectionProps = {
   title: string;
   listings: t.SessionUIListing[];
   bordered?: boolean;
+  loading?: boolean;
 };
 
 function SessionsSection(props: SessionsSectionProps) {
@@ -141,16 +141,19 @@ function SessionsSection(props: SessionsSectionProps) {
   const like = (sessionId: string, value: boolean) => postMessage({ type: 'welcome/likeSession', sessionId, value });
   return (
     <Section className="sessions-section" bordered={props.bordered}>
-      <Section.Header title={props.title} collapsible />
+      <Section.Header title={props.title} loading={props.loading} collapsible />
       <Section.Body>
-        <SessionListings
-          user={props.user}
-          listings={props.listings}
-          onClick={clicked}
-          onDelete={del}
-          onEdit={edit}
-          onLike={like}
-        />
+        {props.listings.length > 0 && (
+          <SessionListings
+            user={props.user}
+            listings={props.listings}
+            onClick={clicked}
+            onDelete={del}
+            onEdit={edit}
+            onLike={like}
+          />
+        )}
+        {props.listings.length === 0 && !props.loading && <Section.Message>Empty</Section.Message>}
       </Section.Body>
     </Section>
   );

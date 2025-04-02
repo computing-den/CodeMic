@@ -30,7 +30,7 @@ class CodeMic {
   recorder?: { tabId: t.RecorderUITabId };
   welcome?: {
     sessions: t.SessionListing[];
-    loading: boolean;
+    loadingFeatured: boolean;
     error?: string;
   };
   userMetadata?: t.UserMetadata;
@@ -90,6 +90,9 @@ class CodeMic {
     );
     this.context.extension.subscriptions.push(
       vscode.commands.registerCommand('codemic.account', () => this.openScreen({ screen: t.Screen.Account })),
+    );
+    this.context.extension.subscriptions.push(
+      vscode.commands.registerCommand('codemic.reportIssue', () => this.reportIssue()),
     );
 
     // Set up webview.
@@ -851,7 +854,7 @@ class CodeMic {
         const recent = await this.getRecentSessionListings();
         this.welcome = {
           sessions: _.compact([current, ...recent]),
-          loading: true,
+          loadingFeatured: true,
         };
 
         // Update caches.
@@ -1017,14 +1020,14 @@ class CodeMic {
       if (this.welcome) {
         this.welcome.sessions = this.welcome.sessions.filter(s => s.group !== 'remote');
         this.welcome.sessions.push(
-          ...heads.map(head => ({ head, group: 'remote', local: false } satisfies t.SessionListing)),
+          ...heads.map(head => ({ head, group: 'remote', local: false }) satisfies t.SessionListing),
         );
       }
     } catch (error) {
       console.error(error);
       this.showError(error as Error);
     } finally {
-      if (this.welcome) this.welcome.loading = false;
+      if (this.welcome) this.welcome.loadingFeatured = false;
       this.updateFrontend().catch(console.error);
     }
   }
@@ -1084,6 +1087,11 @@ class CodeMic {
     await this.enrichSessions([session.head.id]);
   }
 
+  async reportIssue() {
+    const url = vscode.Uri.parse('https://github.com/computing-den/CodeMic/issues');
+    await vscode.env.openExternal(url);
+  }
+
   getStore(): t.Store {
     let session: t.SessionUIState | undefined;
     if (this.session) {
@@ -1117,7 +1125,7 @@ class CodeMic {
           history: this.context.settings.history[s.head.id],
           publication: this.publications.get(s.head.id),
         })),
-        loading: this.welcome.loading,
+        loadingFeatured: this.welcome.loadingFeatured,
         error: this.welcome.error,
       };
     }

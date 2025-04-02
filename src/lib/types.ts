@@ -283,7 +283,7 @@ export type AccountUpdate = Partial<AccountState>;
 
 export type WelcomeUIState = {
   sessions: SessionUIListing[];
-  loading: boolean;
+  loadingFeatured: boolean;
   error?: string;
 };
 
