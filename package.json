@@ -2,19 +2,23 @@
   "name": "codemic",
   "displayName": "CodeMic",
   "version": "0.9.0",
-  "description": "",
+  "description": "A new way to talk about code",
+  "publisher": "ComputingDen",
+  "license": "MIT",
+  "repository": "github:computing-den/CodeMic",
   "scripts": {
     "compile": "tsc && node esbuild.mjs",
     "compile:metafile": "tsc && node esbuild.mjs --metafile",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.mjs --watch",
     "watch:tsc": "tsc --watch",
-    "vscode:prepublish": "npm run package",
+    "vscode:prepublish": "npm run bundle",
     "bundle": "tsc && node esbuild.mjs --production",
-    "package": "npm run bundle && vsce package",
+    "package": "vsce package",
     "ls": "vsce ls"
   },
   "files": [
+    "doc",
     "dist",
     "resources",
     "config.json"
