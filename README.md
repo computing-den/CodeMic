@@ -13,7 +13,7 @@ CodeMic is a Visual Studio Code extension that enables developers to create inte
 
 ## Installation
 
-Install from [Visual Studio Code Marketplace](https://marketplace.visualstudio.com/search?term=CodeMic&target=VS&category=All%20categories&vsVersion=&sortBy=Relevance).
+Install from [Visual Studio Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ComputingDen.codemic).
 
 ## License
 
