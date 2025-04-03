@@ -1,7 +1,7 @@
 {
   "name": "codemic",
   "displayName": "CodeMic",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "A new way to talk about code",
   "publisher": "ComputingDen",
   "license": "MIT",
@@ -30,6 +30,7 @@
     "vscode": "^1.82.0"
   },
   "categories": [
+    "Education",
     "Other"
   ],
   "main": "./dist/extension.js",
