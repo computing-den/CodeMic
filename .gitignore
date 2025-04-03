@@ -8,3 +8,4 @@
 .emacs.desktop.lock
 .emacs.desktop
 #*
+*.vsix
