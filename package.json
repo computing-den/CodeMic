@@ -1,11 +1,12 @@
 {
   "name": "codemic",
   "displayName": "CodeMic",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "A new way to talk about code",
   "publisher": "ComputingDen",
   "license": "MIT",
   "repository": "github:computing-den/CodeMic",
+  "icon": "resources/icon.png",
   "scripts": {
     "compile": "tsc && node esbuild.mjs",
     "compile:metafile": "tsc && node esbuild.mjs --metafile",
