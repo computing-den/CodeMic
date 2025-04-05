@@ -149,7 +149,7 @@
 }
 
 .session-head {
-  margin-left: -7px;
+  /* margin-left: -7px; */
 
   .avatar {
     margin-bottom: -2px;
@@ -163,7 +163,7 @@
 
     .title {
       font-weight: bold;
-      font-size: 1.1em;
+      /* font-size: 1.1em; */
     }
 
     .description {
@@ -179,6 +179,7 @@
       display: flex;
       align-items: center;
       font-weight: bold;
+      color: var(--text-weak);
 
       .footer-item {
         /* white-space: nowrap; */

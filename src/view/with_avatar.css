@@ -6,6 +6,7 @@
     height: 30px;
   }
 
+  gap: var(--spacing-medium);
   > .avatar {
     display: flex;
     align-items: flex-start;
@@ -20,7 +21,6 @@
       flex-shrink: 0;
       object-fit: cover;
       object-position: center top;
-      margin-right: var(--spacing-medium);
       border-radius: 50%;
       border: 1px solid var(--vscode-input-border, var(--popover-border));
 
@@ -30,7 +30,6 @@
       @media (max-width: 250px) {
         width: 30px;
         height: 30px;
-        margin-right: var(--spacing-medium);
       }
     }
   }

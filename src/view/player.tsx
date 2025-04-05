@@ -227,7 +227,6 @@ export default class Player extends React.Component<Props> {
           />
             */}
           <Section.Body>
-            <SessionHead className="subsection subsection_spaced" head={head} withAuthor />
             <MediaToolbar
               className="subsection subsection_spaced"
               primaryAction={primaryAction}
@@ -239,6 +238,7 @@ export default class Player extends React.Component<Props> {
               <Cover local={local} head={head} />
               <video id="guide-video" />
             </div>
+            <SessionHead className="subsection subsection_spaced" head={head} withAuthor />
             <SessionDescription
               className="subsection subsection_spaced"
               head={head}
