@@ -47,14 +47,19 @@
   }
 }
 
-.comment-list {
-  .comment {
-    padding: var(--spacing-medium) var(--container-padding);
-  }
+.comments-section .section-body {
+  padding: var(--spacing-medium) var(--container-padding);
+  gap: var(--spacing-medium);
 }
 
+/* .comment-list { */
+/*   .comment { */
+/*     padding: var(--spacing-medium) var(--container-padding); */
+/*   } */
+/* } */
+
 .comment-input {
-  padding: var(--spacing-medium) var(--container-padding);
+  /* padding: var(--spacing-medium) var(--container-padding); */
 
   > .body {
     flex: 1;

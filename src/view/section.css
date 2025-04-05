@@ -76,7 +76,7 @@
   margin-top: var(--spacing-medium);
 }
 
-.subsection + .subsection.subsection_spaced,
+.subs ection + .subsection.subsection_spaced,
 .subsection.subsection_spaced + .subsection,
 .subsection.subsection_spaced + .subsection.subsection_spaced {
   margin-top: var(--spacing-large);

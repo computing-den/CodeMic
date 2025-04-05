@@ -17,6 +17,7 @@ import _ from 'lodash';
 import { AppContext } from './app_context.jsx';
 import { PictureInPicture } from './svgs.jsx';
 import Cover from './cover.jsx';
+import { VSCodeLink } from '@vscode/webview-ui-toolkit/react/index.js';
 
 type Props = { user?: t.UserUI; player: t.PlayerUIState; session: t.SessionUIState };
 export default class Player extends React.Component<Props> {
@@ -123,6 +124,17 @@ export default class Player extends React.Component<Props> {
 
   like = async (value: boolean) => {
     await postMessage({ type: 'player/likeSession', value });
+  };
+
+  login = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    postMessage({ type: 'account/open' });
+  };
+  join = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    postMessage({ type: 'account/open', join: true });
   };
 
   updateResources() {
@@ -234,13 +246,13 @@ export default class Player extends React.Component<Props> {
               clock={session.clock}
               duration={head.duration}
             />
-            <div id="cover-container" className="cover-container subsection">
+            <div id="cover-container" className="cover-container subsection subsection_spaced">
               <Cover local={local} head={head} />
               <video id="guide-video" />
             </div>
             <SessionHead className="subsection subsection_spaced" head={head} withAuthor />
             <SessionDescription
-              className="subsection subsection_spaced"
+              className="subsection"
               head={head}
               publication={publication}
               user={user}
@@ -276,6 +288,18 @@ export default class Player extends React.Component<Props> {
           <Section.Header title="COMMENTS" collapsible />
           <Section.Body>
             {user && <CommentInput author={user.username} onSend={this.sendComment} />}
+            {!user && (
+              <div>
+                <VSCodeLink href="#" onClick={this.login}>
+                  Log in
+                </VSCodeLink>{' '}
+                or{' '}
+                <VSCodeLink href="#" onClick={this.join}>
+                  join
+                </VSCodeLink>{' '}
+                to comment.
+              </div>
+            )}
             {session.publication && <CommentList comments={session.publication.comments} />}
           </Section.Body>
         </Section>
