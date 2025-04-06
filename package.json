@@ -1,8 +1,8 @@
 {
   "name": "codemic",
   "displayName": "CodeMic",
-  "version": "0.9.4",
-  "description": "A new way to talk about code",
+  "version": "0.9.5",
+  "description": "Play coding tutorials *inside* your IDE with audio/video guide and code navigation.",
   "publisher": "ComputingDen",
   "license": "MIT",
   "repository": "github:computing-den/CodeMic",
