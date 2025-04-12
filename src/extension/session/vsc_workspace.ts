@@ -171,12 +171,18 @@ export default class VscWorkspace {
     for (const [p, stat] of pathsWithStats) {
       const uri = lib.workspaceUri(p);
       if (stat.isDirectory()) {
-        events.push({ uri, event: { type: 'init', clock: 0, file: { type: 'dir' } } });
+        events.push({
+          uri,
+          event: { type: 'init', id: lib.nextId(), clock: 0, file: { type: 'dir' } },
+        });
       } else {
         const data = await fs.promises.readFile(path.join(this.session.workspace, p));
         const sha1 = await misc.computeSHA1(data);
         await this.session.core.copyToBlob(path.join(this.session.workspace, p), sha1);
-        events.push({ uri, event: { type: 'init', clock: 0, file: { type: 'local', sha1 } } });
+        events.push({
+          uri,
+          event: { type: 'init', id: lib.nextId(), clock: 0, file: { type: 'local', sha1 } },
+        });
       }
     }
 
@@ -189,7 +195,7 @@ export default class VscWorkspace {
       const data = new TextEncoder().encode(vscTextDocument.getText());
       const sha1 = await misc.computeSHA1(data);
       await this.session.core.writeBlob(sha1, data);
-      events.push({ uri, event: { type: 'init', clock: 0, file: { type: 'local', sha1 } } });
+      events.push({ uri, event: { type: 'init', id: lib.nextId(), clock: 0, file: { type: 'local', sha1 } } });
     }
 
     // Walk through text documents and create openTextDocument events.
@@ -208,6 +214,7 @@ export default class VscWorkspace {
         uri: this.uriFromVsc(vscTextDocument.uri),
         event: {
           type: 'openTextDocument',
+          id: lib.nextId(),
           clock: 0,
           eol: VscWorkspace.eolFromVsc(vscTextDocument.eol),
           isInWorktree: false,
@@ -237,6 +244,7 @@ export default class VscWorkspace {
         uri,
         event: {
           type: 'showTextEditor',
+          id: lib.nextId(),
           clock: 0,
           preserveFocus: !isActiveEditor,
           selections,

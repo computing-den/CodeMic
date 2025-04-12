@@ -1,5 +1,5 @@
 import * as t from '../../lib/types.js';
-import { Range, LineRange, Selection, ContentChange, Position } from '../../lib/lib.js';
+import { Range, LineRange, Selection, ContentChange, Position, nextId } from '../../lib/lib.js';
 import _ from 'lodash';
 
 export function serializeSessionBodyJSON(body: t.SessionBodyJSON): t.SessionBodyCompact {
@@ -132,10 +132,11 @@ function serializeFocus(focus: t.Focus): t.FocusCompact {
 }
 
 export function deserializeSessionBody(compact: t.SessionBodyCompact): t.SessionBodyJSON {
+  const editorTracks = _.mapValues(compact.editorTracks, t => t.map(deserializeEditorEvent));
   return {
     audioTracks: compact.audioTracks,
     videoTracks: compact.videoTracks,
-    editorTracks: _.mapValues(compact.editorTracks, t => t.map(deserializeEditorEvent)),
+    editorTracks,
     defaultEol: compact.defaultEol,
     focusTimeline: compact.focusTimeline.map(deserializeFocus),
   };
@@ -146,12 +147,14 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
     case 0:
       return {
         type: 'init',
+        id: nextId(),
         clock: deserializeClock(e.c),
         file: e.f,
       };
     case 1:
       return {
         type: 'textChange',
+        id: nextId(),
         clock: deserializeClock(e.c),
         contentChanges: e.cc.map(deserializeContentChange),
         revContentChanges: e.rcc.map(deserializeContentChange),
@@ -160,6 +163,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
     case 2:
       return {
         type: 'openTextDocument',
+        id: nextId(),
         clock: deserializeClock(e.c),
         text: e.x,
         eol: e.e,
@@ -168,6 +172,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
     case 3:
       return {
         type: 'closeTextDocument',
+        id: nextId(),
         clock: deserializeClock(e.c),
         revText: e.rt,
         revEol: e.re,
@@ -175,6 +180,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
     case 4:
       return {
         type: 'showTextEditor',
+        id: nextId(),
         clock: deserializeClock(e.c),
         preserveFocus: e.p ?? false,
         selections: e.s?.map(deserializeSelection),
@@ -186,6 +192,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
     case 5:
       return {
         type: 'closeTextEditor',
+        id: nextId(),
         clock: deserializeClock(e.c),
         revSelections: e.rs?.map(deserializeSelection),
         revVisibleRange: e.rv && deserializeLineRange(e.rv),
@@ -193,6 +200,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
     case 6:
       return {
         type: 'select',
+        id: nextId(),
         clock: deserializeClock(e.c),
         selections: e.s.map(deserializeSelection),
         // visibleRange: deserializeRange(e.v),
@@ -202,6 +210,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
     case 7:
       return {
         type: 'scroll',
+        id: nextId(),
         clock: deserializeClock(e.c),
         visibleRange: deserializeLineRange(e.v),
         revVisibleRange: deserializeLineRange(e.rv),
@@ -209,11 +218,13 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
     case 8:
       return {
         type: 'save',
+        id: nextId(),
         clock: deserializeClock(e.c),
       };
     case 9:
       return {
         type: 'textInsert',
+        id: nextId(),
         clock: deserializeClock(e.c),
         text: e.x,
         revRange: deserializeRange(e.r),

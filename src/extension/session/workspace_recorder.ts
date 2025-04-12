@@ -284,6 +284,7 @@ class WorkspaceRecorder {
         // revContentChanges: [{"range":{"start":{"line":0,"character":5},"end":{"line":1,"character":1}},"text":""}]
         irEvent = {
           type: 'textInsert',
+          id: lib.nextId(),
           clock: this.clock,
           revRange: irRevContentChanges[0].range, // range.start is the position before text insert, while range.end is the position after text insert
           text: irContentChanges[0].text,
@@ -304,6 +305,7 @@ class WorkspaceRecorder {
       } else {
         irEvent = {
           type: 'textChange',
+          id: lib.nextId(),
           clock: this.clock,
           contentChanges: irContentChanges,
           revContentChanges: irRevContentChanges,
@@ -371,6 +373,7 @@ class WorkspaceRecorder {
       this.insertEvent(
         {
           type: 'closeTextEditor',
+          id: lib.nextId(),
           clock: this.clock,
           revSelections,
           revVisibleRange,
@@ -465,6 +468,7 @@ class WorkspaceRecorder {
     this.insertEvent(
       {
         type: 'showTextEditor',
+        id: lib.nextId(),
         preserveFocus: false,
         clock: this.clock,
         selections: irTextEditor.selections,
@@ -544,6 +548,7 @@ class WorkspaceRecorder {
     this.insertEvent(
       {
         type: 'select',
+        id: lib.nextId(),
         clock: this.clock,
         selections,
         revSelections,
@@ -564,6 +569,7 @@ class WorkspaceRecorder {
     this.insertEvent(
       {
         type: 'save',
+        id: lib.nextId(),
         clock: this.clock,
       },
       uri,
@@ -616,6 +622,7 @@ class WorkspaceRecorder {
     this.insertEvent(
       {
         type: 'scroll',
+        id: lib.nextId(),
         clock: this.clock,
         visibleRange,
         revVisibleRange,
@@ -670,6 +677,7 @@ class WorkspaceRecorder {
       this.insertEvent(
         {
           type: 'textChange',
+          id: lib.nextId(),
           clock: this.clock,
           contentChanges: irContentChanges,
           revContentChanges: irRevContentChanges,
@@ -684,6 +692,7 @@ class WorkspaceRecorder {
       this.insertEvent(
         {
           type: 'openTextDocument',
+          id: lib.nextId(),
           clock: this.clock,
           text: irText === vscText ? undefined : vscText,
           eol: irTextDocument.eol,

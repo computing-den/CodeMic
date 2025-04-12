@@ -500,12 +500,14 @@ export type EditorEventWithUri = { event: EditorEvent; uri: string };
 
 export type InitEvent = {
   type: 'init';
+  id: number;
   clock: number;
   file: File;
 };
 
 export type TextChangeEvent = {
   type: 'textChange';
+  id: number;
   clock: number;
   contentChanges: ContentChange[];
   revContentChanges: ContentChange[];
@@ -514,6 +516,7 @@ export type TextChangeEvent = {
 
 export type OpenTextDocumentEvent = {
   type: 'openTextDocument';
+  id: number;
   clock: number;
   text?: string;
   eol: EndOfLine;
@@ -522,6 +525,7 @@ export type OpenTextDocumentEvent = {
 
 export type CloseTextDocumentEvent = {
   type: 'closeTextDocument';
+  id: number;
   clock: number;
   revText: string;
   revEol: EndOfLine;
@@ -529,6 +533,7 @@ export type CloseTextDocumentEvent = {
 
 export type ShowTextEditorEvent = {
   type: 'showTextEditor';
+  id: number;
   clock: number;
   preserveFocus: boolean;
   selections?: Selection[];
@@ -541,6 +546,7 @@ export type ShowTextEditorEvent = {
 
 export type CloseTextEditorEvent = {
   type: 'closeTextEditor';
+  id: number;
   clock: number;
   revSelections?: Selection[];
   revVisibleRange?: LineRange;
@@ -549,6 +555,7 @@ export type CloseTextEditorEvent = {
 
 export type SelectEvent = {
   type: 'select';
+  id: number;
   clock: number;
   selections: Selection[];
   // visibleRange: Range;
@@ -558,6 +565,7 @@ export type SelectEvent = {
 
 export type ScrollEvent = {
   type: 'scroll';
+  id: number;
   clock: number;
   visibleRange: LineRange;
   revVisibleRange: LineRange;
@@ -565,11 +573,13 @@ export type ScrollEvent = {
 
 export type SaveEvent = {
   type: 'save';
+  id: number;
   clock: number;
 };
 
 export type TextInsertEvent = {
   type: 'textInsert';
+  id: number;
   clock: number;
   text: string;
   revRange: Range; // range.start is the position before text insert, while range.end is the position after text insert
