@@ -151,7 +151,7 @@ class WorkspaceRecorder {
     const irTextEditor = this.internalWorkspace.activeTextEditor;
     if (!irTextEditor) return;
 
-    const cmd = this.session.editor.createSetFocus(
+    this.session.editor.setFocus(
       {
         clock: this.clock,
         uri: irTextEditor.document.uri,
@@ -160,7 +160,6 @@ class WorkspaceRecorder {
       },
       irTextEditor.document.isEmpty,
     );
-    if (cmd) this.session.editor.applySetFocus(cmd);
   }
   // private updateFocus() {
   //   const { documents, lines } = this.session.body.focusTimeline;
@@ -285,6 +284,7 @@ class WorkspaceRecorder {
         irEvent = {
           type: 'textInsert',
           id: lib.nextId(),
+          uri,
           clock: this.clock,
           revRange: irRevContentChanges[0].range, // range.start is the position before text insert, while range.end is the position after text insert
           text: irContentChanges[0].text,
@@ -306,6 +306,7 @@ class WorkspaceRecorder {
         irEvent = {
           type: 'textChange',
           id: lib.nextId(),
+          uri,
           clock: this.clock,
           contentChanges: irContentChanges,
           revContentChanges: irRevContentChanges,
@@ -313,7 +314,7 @@ class WorkspaceRecorder {
         };
       }
 
-      this.insertEvent(irEvent, uri, { coalescing });
+      this.insertEvent(irEvent, { coalescing });
       this.setFocus();
 
       // DEBUG
@@ -374,11 +375,11 @@ class WorkspaceRecorder {
         {
           type: 'closeTextEditor',
           id: lib.nextId(),
+          uri,
           clock: this.clock,
           revSelections,
           revVisibleRange,
         },
-        uri,
         { coalescing: false },
       );
     }
@@ -469,6 +470,7 @@ class WorkspaceRecorder {
       {
         type: 'showTextEditor',
         id: lib.nextId(),
+        uri,
         preserveFocus: false,
         clock: this.clock,
         selections: irTextEditor.selections,
@@ -477,7 +479,6 @@ class WorkspaceRecorder {
         revSelections,
         revVisibleRange,
       },
-      uri,
       { coalescing: false },
     );
     this.setFocus();
@@ -498,21 +499,21 @@ class WorkspaceRecorder {
       return;
     }
 
-    const lastEvent = this.session.body.eventContainer.getTrack(uri)?.at(-1);
+    const lastEventIndex = this.session.body.editorEvents.length - 1;
+    const lastEvent = this.session.body.editorEvents[lastEventIndex];
     const revSelections = irTextEditor.selections;
     irTextEditor.select(selections);
 
     // Avoid inserting unnecessary select event if the selections can be calculated
     // from the last textChange event.
-    if (lastEvent?.type === 'textChange' && lastEvent.clock > this.clock - 1) {
+    if (lastEvent?.uri === uri && lastEvent.type === 'textChange' && lastEvent.clock > this.clock - 1) {
       const calculatedSelections = lib.getSelectionsAfterTextChangeEvent(lastEvent);
       const calculatedRevSelections = lib.getSelectionsBeforeTextChangeEvent(lastEvent);
       if (
         Selection.areEqual(calculatedSelections, irTextEditor.selections) &&
         Selection.areEqual(calculatedRevSelections, revSelections)
       ) {
-        const cmd = this.session.editor.createUpdateTrackLastEvent(uri, { updateSelection: true });
-        if (cmd) this.session.editor.applyUpdateTrackLastEvent(cmd);
+        this.session.editor.updateEventAt({ updateSelection: true }, lastEventIndex);
         this.setFocus();
         return;
       }
@@ -520,25 +521,23 @@ class WorkspaceRecorder {
 
     // Avoid inserting unnecessary select event if the selections can be calculated
     // from the last textInsert event.
-    if (lastEvent?.type === 'textInsert' && lastEvent.clock > this.clock - 1) {
+    if (lastEvent?.uri === uri && lastEvent.type === 'textInsert' && lastEvent.clock > this.clock - 1) {
       const calculatedSelections = lib.getSelectionsAfterTextInsertEvent(lastEvent);
       const calculatedRevSelections = lib.getSelectionsBeforeTextInsertEvent(lastEvent);
       if (
         Selection.areEqual(calculatedSelections, irTextEditor.selections) &&
         Selection.areEqual(calculatedRevSelections, revSelections)
       ) {
-        const cmd = this.session.editor.createUpdateTrackLastEvent(uri, { updateSelection: true });
-        if (cmd) this.session.editor.applyUpdateTrackLastEvent(cmd);
+        this.session.editor.updateEventAt({ updateSelection: true }, lastEventIndex);
         this.setFocus();
         return;
       }
     }
 
     // Merge successive select events.
-    if (lastEvent?.type === 'select' && lastEvent.clock > this.clock - 0.5) {
+    if (lastEvent?.uri === uri && lastEvent.type === 'select' && lastEvent.clock > this.clock - 0.5) {
       logAcceptedEvent(`accepted select for ${uri} (SHORTCUT)`);
-      const cmd = this.session.editor.createUpdateTrackLastEvent(uri, { selections });
-      if (cmd) this.session.editor.applyUpdateTrackLastEvent(cmd);
+      this.session.editor.updateEventAt({ selections }, lastEventIndex);
       this.setFocus();
       return;
     }
@@ -549,11 +548,11 @@ class WorkspaceRecorder {
       {
         type: 'select',
         id: lib.nextId(),
+        uri,
         clock: this.clock,
         selections,
         revSelections,
       },
-      uri,
       { coalescing: false },
     );
     this.setFocus();
@@ -570,9 +569,9 @@ class WorkspaceRecorder {
       {
         type: 'save',
         id: lib.nextId(),
+        uri,
         clock: this.clock,
       },
-      uri,
       { coalescing: false },
     );
   }
@@ -607,13 +606,13 @@ class WorkspaceRecorder {
     irTextEditor.scroll(visibleRange);
 
     // Merge successive scrolls.
-    const lastEvent = this.session.body.eventContainer.getTrack(uri)?.at(-1);
-    if (lastEvent?.type === 'scroll' && lastEvent.clock > this.clock - 0.5) {
+    const lastEventIndex = this.session.body.editorEvents.length - 1;
+    const lastEvent = this.session.body.editorEvents[lastEventIndex];
+    if (lastEvent?.uri === uri && lastEvent.type === 'scroll' && lastEvent.clock > this.clock - 0.5) {
       logAcceptedEvent(
         `accepted scroll for ${uri} visible range: ${visibleRange.start}:${visibleRange.end} (SHORTCUT)`,
       );
-      const cmd = this.session.editor.createUpdateTrackLastEvent(uri, { visibleRange });
-      if (cmd) this.session.editor.applyUpdateTrackLastEvent(cmd);
+      this.session.editor.updateEventAt({ visibleRange }, lastEventIndex);
       return;
     }
 
@@ -623,24 +622,17 @@ class WorkspaceRecorder {
       {
         type: 'scroll',
         id: lib.nextId(),
+        uri,
         clock: this.clock,
         visibleRange,
         revVisibleRange,
       },
-      uri,
       { coalescing: true },
     );
   }
 
-  private insertEvent(e: t.EditorEvent, uri: string, opts: { coalescing: boolean }) {
-    // if (e.type !== 'scroll') {
-    //   this.scrolling = false;
-    //   this.scrollStartRange = undefined;
-    // }
-
-    const cmd = this.session.editor.createInsertEvent(e, uri, opts);
-    this.session.editor.applyInsertEvent(cmd);
-    // this.onChange?.();
+  private insertEvent(e: t.EditorEvent, opts: { coalescing: boolean }) {
+    this.session.editor.insertEvent(e, opts);
   }
 
   /**
@@ -678,12 +670,12 @@ class WorkspaceRecorder {
         {
           type: 'textChange',
           id: lib.nextId(),
+          uri,
           clock: this.clock,
           contentChanges: irContentChanges,
           revContentChanges: irRevContentChanges,
           updateSelection: false,
         },
-        uri,
         { coalescing: false },
       );
     } else if (!irTextDocument) {
@@ -693,12 +685,12 @@ class WorkspaceRecorder {
         {
           type: 'openTextDocument',
           id: lib.nextId(),
+          uri,
           clock: this.clock,
           text: irText === vscText ? undefined : vscText,
           eol: irTextDocument.eol,
           isInWorktree,
         },
-        uri,
         { coalescing: false },
       );
     }

@@ -342,7 +342,7 @@ export default class SessionCore {
     download?: boolean;
     progress?: Progress;
     abortController?: AbortController;
-  }): Promise<t.SessionBodyJSON> {
+  }): Promise<t.SessionBody> {
     this.assertFormatVersionSupport();
 
     if (options?.download) {

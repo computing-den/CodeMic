@@ -397,24 +397,21 @@ export type ClockRange = {
 
 export type ClockRangeCompact = [number, number];
 
-export type SessionBodyJSON = {
+export type SessionBody = {
+  editorEvents: EditorEvent[];
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
-  editorTracks: InternalEditorTracksJSON;
   focusTimeline: Focus[];
   defaultEol: EndOfLine;
 };
 
 export type SessionBodyCompact = {
+  editorEvents: EditorEvent[];
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
-  editorTracks: InternalEditorTracksCompact;
   focusTimeline: FocusCompact[];
   defaultEol: EndOfLine;
 };
-
-export type InternalEditorTracksJSON = Record<string, EditorEvent[]>;
-export type InternalEditorTracksCompact = Record<string, EditorEventCompact[]>;
 
 export type Focus = {
   uri: string;
@@ -496,11 +493,12 @@ export type EditorEvent =
   | SaveEvent
   | TextInsertEvent;
 
-export type EditorEventWithUri = { event: EditorEvent; uri: string };
+// export type EditorEventWithUri = { event: EditorEvent; uri: string };
 
 export type InitEvent = {
   type: 'init';
   id: number;
+  uri: string;
   clock: number;
   file: File;
 };
@@ -508,6 +506,7 @@ export type InitEvent = {
 export type TextChangeEvent = {
   type: 'textChange';
   id: number;
+  uri: string;
   clock: number;
   contentChanges: ContentChange[];
   revContentChanges: ContentChange[];
@@ -517,6 +516,7 @@ export type TextChangeEvent = {
 export type OpenTextDocumentEvent = {
   type: 'openTextDocument';
   id: number;
+  uri: string;
   clock: number;
   text?: string;
   eol: EndOfLine;
@@ -526,6 +526,7 @@ export type OpenTextDocumentEvent = {
 export type CloseTextDocumentEvent = {
   type: 'closeTextDocument';
   id: number;
+  uri: string;
   clock: number;
   revText: string;
   revEol: EndOfLine;
@@ -534,6 +535,7 @@ export type CloseTextDocumentEvent = {
 export type ShowTextEditorEvent = {
   type: 'showTextEditor';
   id: number;
+  uri: string;
   clock: number;
   preserveFocus: boolean;
   selections?: Selection[];
@@ -547,6 +549,7 @@ export type ShowTextEditorEvent = {
 export type CloseTextEditorEvent = {
   type: 'closeTextEditor';
   id: number;
+  uri: string;
   clock: number;
   revSelections?: Selection[];
   revVisibleRange?: LineRange;
@@ -556,6 +559,7 @@ export type CloseTextEditorEvent = {
 export type SelectEvent = {
   type: 'select';
   id: number;
+  uri: string;
   clock: number;
   selections: Selection[];
   // visibleRange: Range;
@@ -566,6 +570,7 @@ export type SelectEvent = {
 export type ScrollEvent = {
   type: 'scroll';
   id: number;
+  uri: string;
   clock: number;
   visibleRange: LineRange;
   revVisibleRange: LineRange;
@@ -574,12 +579,14 @@ export type ScrollEvent = {
 export type SaveEvent = {
   type: 'save';
   id: number;
+  uri: string;
   clock: number;
 };
 
 export type TextInsertEvent = {
   type: 'textInsert';
   id: number;
+  uri: string;
   clock: number;
   text: string;
   revRange: Range; // range.start is the position before text insert, while range.end is the position after text insert
@@ -688,165 +695,187 @@ export enum Direction {
 
 export type UriSet = Set<string>;
 
-export type Cmd =
-  | InsertEventCmd
-  | UpdateTrackLastEventCmd
-  | InsertFocusCmd
-  | UpdateLastFocusCmd
-  | InsertAudioTrackCmd
-  | DeleteAudioTrackCmd
-  | UpdateAudioTrackCmd
-  | InsertVideoTrackCmd
-  | DeleteVideoTrackCmd
-  | UpdateVideoTrackCmd
-  | ChangeSpeedCmd
-  | MergeCmd
-  | InsertGapCmd
-  | InsertChapterCmd
-  | UpdateChapterCmd
-  | DeleteChapterCmd
-  | CropCmd
-  | UpdateDurationCmd;
-
-export type InsertEventCmd = {
-  type: 'insertEvent';
+export type SessionChange = {
+  // Only some fields of the head are changed in the editor.
+  // The rest are changed in the session detail whose undo/redo
+  // is tracked separately if at all.
+  head: SessionChangeHead;
+  body: SessionBody;
   // coalescing: boolean;
-  index: number;
-  uri: string;
-  event: EditorEvent;
+  // description: string;
+  // affectedUris: string[];
 };
 
-export type UpdateTrackLastEventCmd = {
-  type: 'updateTrackLastEvent';
-  // coalescing: boolean;
-  uri: string;
-  update: Partial<EditorEvent>;
-  revUpdate: Partial<EditorEvent>;
+export type SessionChangeHead = {
+  duration: number;
+  modificationTimestamp: string;
+  toc: TocItem[];
 };
 
-export type InsertFocusCmd = {
-  type: 'insertFocus';
-  // coalescing: boolean;
-  focus: Focus;
+export type SessionPatch = {
+  head?: Partial<SessionChangeHead>;
+  body?: Partial<SessionBody>;
 };
 
-export type UpdateLastFocusCmd = {
-  type: 'updateLastFocus';
-  // coalescing: boolean;
-  update: Partial<Focus>;
-  revUpdate: Partial<Focus>;
-};
+// export type Cmd =
+//   | InsertEventCmd
+//   | UpdateTrackLastEventCmd
+//   | InsertFocusCmd
+//   | UpdateLastFocusCmd
+//   | InsertAudioTrackCmd
+//   | DeleteAudioTrackCmd
+//   | UpdateAudioTrackCmd
+//   | InsertVideoTrackCmd
+//   | DeleteVideoTrackCmd
+//   | UpdateVideoTrackCmd
+//   | ChangeSpeedCmd
+//   | MergeCmd
+//   | InsertGapCmd
+//   | InsertChapterCmd
+//   | UpdateChapterCmd
+//   | DeleteChapterCmd
+//   | CropCmd
+//   | UpdateDurationCmd;
 
-export type InsertAudioTrackCmd = {
-  type: 'insertAudioTrack';
-  // coalescing: boolean;
-  index: number;
-  audioTrack: AudioTrack;
-  sessionDuration: number;
-  revSessionDuration: number;
-};
-export type DeleteAudioTrackCmd = {
-  type: 'deleteAudioTrack';
-  // coalescing: boolean;
-  index: number;
-  audioTrack: AudioTrack;
-};
-export type UpdateAudioTrackCmd = {
-  type: 'updateAudioTrack';
-  // coalescing: boolean;
-  id: string;
-  update: Partial<AudioTrack>;
-  revUpdate: Partial<AudioTrack>;
-};
-export type InsertVideoTrackCmd = {
-  type: 'insertVideoTrack';
-  // coalescing: boolean;
-  index: number;
-  videoTrack: VideoTrack;
-  sessionDuration: number;
-  revSessionDuration: number;
-};
-export type DeleteVideoTrackCmd = {
-  type: 'deleteVideoTrack';
-  // coalescing: boolean;
-  index: number;
-  videoTrack: VideoTrack;
-};
-export type UpdateVideoTrackCmd = {
-  type: 'updateVideoTrack';
-  // coalescing: boolean;
-  id: string;
-  update: Partial<VideoTrack>;
-  revUpdate: Partial<VideoTrack>;
-};
-export type ChangeSpeedCmd = {
-  type: 'changeSpeed';
-  // coalescing: boolean;
-  range: ClockRange;
-  factor: number;
-  firstEventIndex: number;
-  firstFocusIndex: number;
-  firstTocIndex: number;
-  revEventClocks: number[];
-  revFocusClocks: number[];
-  revTocClocks: number[];
-  revRrClock: number;
-};
-export type MergeCmd = {
-  type: 'merge';
-  // coalescing: boolean;
-  range: ClockRange;
-  firstEventIndex: number;
-  firstFocusIndex: number;
-  firstTocIndex: number;
-  revEventClocks: number[];
-  revFocusClocks: number[];
-  revTocClocks: number[];
-  revRrClock: number;
-};
+// export type InsertEventCmd = {
+//   type: 'insertEvent';
+//   // coalescing: boolean;
+//   index: number;
+//   uri: string;
+//   event: EditorEvent;
+// };
+
+// export type UpdateTrackLastEventCmd = {
+//   type: 'updateTrackLastEvent';
+//   // coalescing: boolean;
+//   uri: string;
+//   update: Partial<EditorEvent>;
+//   revUpdate: Partial<EditorEvent>;
+// };
+
+// export type InsertFocusCmd = {
+//   type: 'insertFocus';
+//   // coalescing: boolean;
+//   focus: Focus;
+// };
+
+// export type UpdateLastFocusCmd = {
+//   type: 'updateLastFocus';
+//   // coalescing: boolean;
+//   update: Partial<Focus>;
+//   revUpdate: Partial<Focus>;
+// };
+
+// export type InsertAudioTrackCmd = {
+//   type: 'insertAudioTrack';
+//   // coalescing: boolean;
+//   index: number;
+//   audioTrack: AudioTrack;
+//   sessionDuration: number;
+//   revSessionDuration: number;
+// };
+// export type DeleteAudioTrackCmd = {
+//   type: 'deleteAudioTrack';
+//   // coalescing: boolean;
+//   index: number;
+//   audioTrack: AudioTrack;
+// };
+// export type UpdateAudioTrackCmd = {
+//   type: 'updateAudioTrack';
+//   // coalescing: boolean;
+//   id: string;
+//   update: Partial<AudioTrack>;
+//   revUpdate: Partial<AudioTrack>;
+// };
+// export type InsertVideoTrackCmd = {
+//   type: 'insertVideoTrack';
+//   // coalescing: boolean;
+//   index: number;
+//   videoTrack: VideoTrack;
+//   sessionDuration: number;
+//   revSessionDuration: number;
+// };
+// export type DeleteVideoTrackCmd = {
+//   type: 'deleteVideoTrack';
+//   // coalescing: boolean;
+//   index: number;
+//   videoTrack: VideoTrack;
+// };
+// export type UpdateVideoTrackCmd = {
+//   type: 'updateVideoTrack';
+//   // coalescing: boolean;
+//   id: string;
+//   update: Partial<VideoTrack>;
+//   revUpdate: Partial<VideoTrack>;
+// };
+// export type ChangeSpeedCmd = {
+//   type: 'changeSpeed';
+//   // coalescing: boolean;
+//   range: ClockRange;
+//   factor: number;
+//   firstEventIndex: number;
+//   firstFocusIndex: number;
+//   firstTocIndex: number;
+//   revEventClocks: number[];
+//   revFocusClocks: number[];
+//   revTocClocks: number[];
+//   revRrClock: number;
+// };
 // export type MergeCmd = {
 //   type: 'merge';
-//   coalescing: boolean;
+//   // coalescing: boolean;
+//   range: ClockRange;
+//   firstEventIndex: number;
+//   firstFocusIndex: number;
+//   firstTocIndex: number;
+//   revEventClocks: number[];
+//   revFocusClocks: number[];
+//   revTocClocks: number[];
+//   revRrClock: number;
 // };
-export type InsertGapCmd = {
-  type: 'insertGap';
-  clock: number;
-  duration: number;
-};
-export type InsertChapterCmd = {
-  type: 'insertChapter';
-  clock: number;
-  title: string;
-};
-export type UpdateChapterCmd = {
-  type: 'updateChapter';
-  index: number;
-  update: Partial<TocItem>;
-  revUpdate: Partial<TocItem>;
-};
-export type DeleteChapterCmd = {
-  type: 'deleteChapter';
-  index: number;
-  chapter: TocItem;
-};
-export type CropCmd = {
-  type: 'crop';
-  clock: number;
-  firstEventIndex: number;
-  firstFocusIndex: number;
-  firstTocIndex: number;
-  revEvents: EditorEventWithUri[];
-  revFocusTimeline: Focus[];
-  revDuration: number;
-  revToc: TocItem[];
-  revRrClock: number;
-};
-export type UpdateDurationCmd = {
-  type: 'updateDuration';
-  // coalescing: boolean;
-  duration: number;
-  revDuration: number;
-};
+// // export type MergeCmd = {
+// //   type: 'merge';
+// //   coalescing: boolean;
+// // };
+// export type InsertGapCmd = {
+//   type: 'insertGap';
+//   clock: number;
+//   duration: number;
+// };
+// export type InsertChapterCmd = {
+//   type: 'insertChapter';
+//   clock: number;
+//   title: string;
+// };
+// export type UpdateChapterCmd = {
+//   type: 'updateChapter';
+//   index: number;
+//   update: Partial<TocItem>;
+//   revUpdate: Partial<TocItem>;
+// };
+// export type DeleteChapterCmd = {
+//   type: 'deleteChapter';
+//   index: number;
+//   chapter: TocItem;
+// };
+// export type CropCmd = {
+//   type: 'crop';
+//   clock: number;
+//   firstEventIndex: number;
+//   firstFocusIndex: number;
+//   firstTocIndex: number;
+//   revEvents: EditorEventWithUri[];
+//   revFocusTimeline: Focus[];
+//   revDuration: number;
+//   revToc: TocItem[];
+//   revRrClock: number;
+// };
+// export type UpdateDurationCmd = {
+//   type: 'updateDuration';
+//   // coalescing: boolean;
+//   duration: number;
+//   revDuration: number;
+// };
 
 export interface InternalEditor {
   document: InternalDocument;

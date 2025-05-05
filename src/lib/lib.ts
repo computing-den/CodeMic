@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import * as t from './types.js';
 import assert from './assert.js';
-import { URI, Utils } from 'vscode-uri';
+import { URI } from 'vscode-uri';
 import * as path from 'path';
 import { isWindows } from './platform.js';
 
@@ -190,6 +190,14 @@ export function calcClockAfterMerge(clock: number, range: t.ClockRange): number 
   return range.start;
 }
 
+/**
+ * If we insert gap at clock 0, it won't affect the init events whose clock is 0.
+ */
+export function calcClockAfterInsertGap(clock: number, gapClock: number, gapDuration: number): number {
+  if (clock < gapClock) return clock;
+  return clock + gapDuration;
+}
+
 // export function userToUserSummary(user: t.User): t.UserSummary {
 //   return _.pick(user, 'username', 'email', 'joinTimestamp');
 // }
@@ -209,6 +217,27 @@ export function insertIntoArray<T>(array: T[], newItems: T[], at: number = array
     array[at + i] = newItems[i];
   }
 }
+
+export function insertIntoImmutableArray<T>(array: T[], newItems: T[], at: number = array.length): T[] {
+  let newArray = array.slice();
+  insertIntoArray(newArray, newItems, at);
+  return newArray;
+}
+
+export function spliceImmutable<T>(array: T[], at: number, delCount: number, ...newItems: T[]): T[] {
+  const newArray = array.slice();
+  newArray.splice(at, delCount, ...newItems);
+  return newArray;
+}
+
+// export function spliceImmutable<T>(collection: T[], at: number, delCount: number, newItems?: T[]): T[] {
+//   if (at < 0) at += collection.length;
+//   const newItemCount = newItems?.length ?? 0;
+//   const result = new Array(collection.length + newItemCount - delCount);
+//   for (let i=0; i<at; i++) result[i] = collection[i];
+//   for (let i=0; i<newItemCount; i++) result[at + i] = newItems![i];
+//   for (let i=0; i<collection.length - at; i++) result[at + newItemCount + i] = newItems![i];
+// }
 
 // export function getOrSetMap<T,U>(map: Map<T,U>, key: T, make: () => U):
 
@@ -232,22 +261,14 @@ export function adjustTrackPlaybackRate(sessionClock: number, trackClock: number
 }
 
 export class Vec2 {
-  constructor(
-    public x: number,
-    public y: number,
-  ) {}
+  constructor(public x: number, public y: number) {}
   sub(p: Vec2): Vec2 {
     return new Vec2(this.x - p.x, this.y - p.y);
   }
 }
 
 export class Rect {
-  constructor(
-    public top: number,
-    public right: number,
-    public bottom: number,
-    public left: number,
-  ) {}
+  constructor(public top: number, public right: number, public bottom: number, public left: number) {}
 
   get height(): number {
     return this.bottom - this.top;
@@ -275,10 +296,7 @@ export class Rect {
 }
 
 export class Position {
-  constructor(
-    public line: number,
-    public character: number,
-  ) {
+  constructor(public line: number, public character: number) {
     assert(line >= 0, 'Position line must be >= 0');
     assert(character >= 0, 'Position character must be >= 0');
   }
@@ -313,10 +331,7 @@ export class Position {
 }
 
 export class Range {
-  constructor(
-    public start: Position,
-    public end: Position,
-  ) {}
+  constructor(public start: Position, public end: Position) {}
 
   isEqual(other: Range) {
     return this.start.isEqual(other.start) && this.end.isEqual(other.end);
@@ -324,10 +339,7 @@ export class Range {
 }
 
 export class Selection {
-  constructor(
-    public anchor: Position,
-    public active: Position,
-  ) {}
+  constructor(public anchor: Position, public active: Position) {}
 
   get start(): Position {
     return this.anchor.isBeforeOrEqual(this.active) ? this.anchor : this.active;
@@ -350,17 +362,11 @@ export class Selection {
 }
 
 export class ContentChange {
-  constructor(
-    public text: string,
-    public range: Range,
-  ) {}
+  constructor(public text: string, public range: Range) {}
 }
 
 export class LineRange {
-  constructor(
-    public start: number,
-    public end: number,
-  ) {}
+  constructor(public start: number, public end: number) {}
   isEqual(other: LineRange) {
     return this.start === other.start && this.end === other.end;
   }
@@ -507,3 +513,66 @@ __pycache__
 *$py.class
 
 `;
+
+/**
+ * Binary search array. It'll return the last index where item could be inserted.
+ * For example:
+ * lastSortedIndex([{clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5}], 2)
+ * => 3
+ * lastSortedIndex([{clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5}], 2.5)
+ * => 3
+ */
+export function lastSortedIndex<T, U>(array: T[], key: U, getKey: (x: T) => U): number {
+  let low = 0;
+  let high = array.length;
+
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    const computed = getKey(array[mid]);
+
+    if (computed <= key) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  return high;
+}
+
+/**
+ * Binary search array. It'll return the first index where item could be inserted.
+ * For example:
+ * sortedIndex([{clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5}], 2)
+ * => 2
+ * sortedIndex([{clock: 0}, {clock: 1}, {clock: 2}, {clock: 3}, {clock: 4}, {clock: 5}], 2.5)
+ * => 3
+ */
+export function sortedIndex<T, U>(array: T[], key: U, getKey: (x: T) => U): number {
+  let low = 0;
+  let high = array.length;
+
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    const computed = getKey(array[mid]);
+
+    if (computed < key) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  return high;
+}
+
+export function binarySearch<T, U, V>(
+  array: T[],
+  key: U,
+  getKey: (x: T) => U,
+  value: V,
+  getValue: (a: T) => V,
+): number {
+  for (let j = sortedIndex(array, key, getKey); j < array.length && getKey(array[j]) === key; j++) {
+    if (value === getValue(array[j])) return j;
+  }
+  return -1;
+}

@@ -2,17 +2,16 @@ import * as t from '../../lib/types.js';
 import assert from '../../lib/assert.js';
 import type { Context } from '../types.js';
 import SessionCore from './session_core.js';
-import SessionBody from './session_body.js';
 import SessionRecordAndReplay from './session_record_and_replay.js';
 import SessionEditor from './session_editor.js';
 import SessionCommander from './session_commander.js';
-import _ from 'lodash';
 import { scaleProgress } from '../misc.js';
+import _ from 'lodash';
+import os from 'node:os';
 
 export type LoadedSession = Session & {
-  body: SessionBody;
+  body: t.SessionBody;
   rr: SessionRecordAndReplay;
-  commander: SessionCommander;
 };
 
 export class Session {
@@ -30,9 +29,8 @@ export class Session {
   head: t.SessionHead;
   core: SessionCore;
   editor: SessionEditor;
-  body?: SessionBody;
+  body?: t.SessionBody;
   rr?: SessionRecordAndReplay;
-  commander?: SessionCommander;
 
   onChange?: () => any;
   onProgress?: () => any;
@@ -94,14 +92,13 @@ export class Session {
     await this.context.withProgress(
       { title: `Loading session ${this.head.handle}`, cancellable: true },
       async (progress, abortController) => {
-        const bodyJSON = await this.core.readBody({
+        this.body = await this.core.readBody({
           download: true,
           progress: scaleProgress(progress, 0.8),
           abortController,
         });
 
         progress.report({ message: 'reading' });
-        this.body = new SessionBody(bodyJSON);
         this.rr = new SessionRecordAndReplay(this as LoadedSession);
         this.commander = new SessionCommander(this as LoadedSession);
 
@@ -120,7 +117,13 @@ export class Session {
     await this.context.withProgress(
       { title: `Scanning session ${this.head.handle}`, cancellable: false },
       async (progress, abortController) => {
-        this.body = new SessionBody();
+        this.body = {
+          editorEvents: [],
+          audioTracks: [],
+          videoTracks: [],
+          focusTimeline: [],
+          defaultEol: os.EOL as t.EndOfLine,
+        };
         this.rr = new SessionRecordAndReplay(this as LoadedSession);
         this.commander = new SessionCommander(this as LoadedSession);
         await this.rr.scan();

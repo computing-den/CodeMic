@@ -183,9 +183,9 @@ export default class SessionRecordAndReplay {
     this.pauseEditor();
   }
 
-  async fastSync() {
-    await this.seek(this.clock);
-  }
+  // async fastSync() {
+  //   await this.seek(this.clock);
+  // }
 
   /**
    * If in recorder mode, it will pause and switch to player mode.
@@ -255,19 +255,19 @@ export default class SessionRecordAndReplay {
     this.videoTrackPlayer.handleVideoEvent(e);
   }
 
-  async applyInsertEvent(cmd: t.InsertEventCmd) {
-    if (this.internalWorkspace.eventIndex === cmd.index - 1) {
-      this.internalWorkspace.eventIndex++;
-      await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Forwards);
-    }
-  }
+  // async applyInsertEvent(cmd: t.InsertEventCmd) {
+  //   if (this.internalWorkspace.eventIndex === cmd.index - 1) {
+  //     this.internalWorkspace.eventIndex++;
+  //     await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Forwards);
+  //   }
+  // }
 
-  async unapplyInsertEvent(cmd: t.InsertEventCmd) {
-    if (this.internalWorkspace.eventIndex === cmd.index) {
-      this.internalWorkspace.eventIndex--;
-      await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Backwards);
-    }
-  }
+  // async unapplyInsertEvent(cmd: t.InsertEventCmd) {
+  //   if (this.internalWorkspace.eventIndex === cmd.index) {
+  //     this.internalWorkspace.eventIndex--;
+  //     await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Backwards);
+  //   }
+  // }
 
   updateAudioTrack(audioTrack: t.AudioTrack) {
     const audioTrackPlayer = this.audioTrackPlayers.find(p => p.audioTrack.id === audioTrack.id);
@@ -444,9 +444,9 @@ export default class SessionRecordAndReplay {
   }
 
   /**
-   * When called immediately (from this.fastSync() for example), we pass the
-   * timestamp so that the few nanosecond difference won't cause the clock to
-   * change from 0. Because the frontend has special logic for clock === 0.
+   * When called directly, we pass this.timeoutTimestamp so that the difference
+   * will be exactly 0 instead of a few nanoseconds because the frontend has
+   * special logic for clock === 0.
    */
   private updateStep = async (now?: number) => {
     const timeAtUpdate = now ?? performance.now();
