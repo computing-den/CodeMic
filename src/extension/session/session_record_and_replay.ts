@@ -208,8 +208,8 @@ export default class SessionRecordAndReplay {
   //   }
   // }
 
-  async enqueueSyncAfterSessionChange(change: t.SessionChange, dir?: t.Direction) {
-    await this.stopOnError(this.queue.enqueue(this.syncAfterSessionChange.bind(this), change, dir));
+  async enqueueSyncAfterSessionChange(change: t.SessionChange) {
+    await this.stopOnError(this.queue.enqueue(this.syncAfterSessionChange.bind(this), change));
   }
 
   async enqueueSyncMedia() {
@@ -492,27 +492,32 @@ export default class SessionRecordAndReplay {
   /**
    * Used by undo/redo to update the internal and vsc workspace.
    */
-  private async syncAfterSessionChange(change: t.SessionChange, dir: t.Direction = t.Direction.Forwards) {
-    // Apply changes to the internal workspace first.
+  private async syncAfterSessionChange(change: t.SessionChange) {
     const uriSet: t.UriSet = new Set();
-    const effects = dir === t.Direction.Forwards ? change.effects : change.effects.slice().reverse();
-    for (const effect of effects) {
-      await this.applySessionChangeEffect(effect, dir, uriSet);
+
+    // Apply session effects.
+    // Makes sure internal workspace stays consistent.
+    // May also update this.clock (after speed change, merge, etc.).
+    if (change.direction === t.Direction.Forwards) {
+      for (const effect of change.next.effects) {
+        await this.applySessionEffect(change, effect, uriSet);
+      }
+    } else {
+      for (const effect of change.cur.effects.slice().reverse()) {
+        await this.applySessionEffect(change, effect, uriSet);
+      }
     }
 
-    // Duration may have changed. Pull back if so.
-    // const isIndexPastEnd = this.internalWorkspace.eventIndex >= this.session.body.editorEvents.length;
-    // const isDurPastEnd = (this.internalWorkspace.getCurrentEvent()?.clock ?? 0) > this.session.head.duration;
-    // if (isDurPastEnd) {
-    // await this.internalWorkspace.seek(this.session.head.duration, uriSet);
-    // }
+    // If clock was at the end, stay at the end.
+    if (this.clock === change.cur.head.duration) {
+      this.clock = this.session.head.duration;
+    }
 
-    // TODO if clock was at the end, make sure it stays at the end.
-
-    // Duration may have changed. Update clock.
+    // Duration may have changed. Make sure it's not past the end.
     this.clock = Math.min(this.session.head.duration, this.clock);
 
-    // Sync vscode
+    // Make sure internal workspace and vsc are in sync at this.clock.
+    await this.internalWorkspace.seek(this.clock, uriSet);
     await this.vscWorkspace.sync(Array.from(uriSet));
 
     // Sync media
@@ -520,19 +525,16 @@ export default class SessionRecordAndReplay {
   }
 
   /**
-   * Maintain this.internalWorkspace in sync based on the effects caused by a change in session head/body.
+   * Maintains this.internalWorkspace based on the effects caused by a change in session head/body.
+   * Updates this.clock (after speed change, merge, etc.).
    */
-  private async applySessionChangeEffect(effect: t.SessionChangeEffect, dir: t.Direction, uriSet: t.UriSet) {
+  private async applySessionEffect(change: t.SessionChange, effect: t.SessionEffect, uriSet: t.UriSet) {
     switch (effect.type) {
       case 'insertEditorEvent': {
-        if (dir === t.Direction.Forwards) {
-          if (this.internalWorkspace.eventIndex === effect.index - 1) {
-            // apply event
-            const step: SeekStep = { event: effect.event, index: effect.index };
-            await this.internalWorkspace.applySeekStep(step, t.Direction.Forwards, uriSet);
-            // this.clock = effect.event.clock;
-          }
+        if (change.direction === t.Direction.Forwards) {
+          assert(this.internalWorkspace.eventIndex < effect.index);
         } else {
+          assert(this.internalWorkspace.eventIndex <= effect.index);
           if (this.internalWorkspace.eventIndex === effect.index) {
             // unapply event
             const step: SeekStep = { event: effect.event, index: effect.index };
@@ -546,7 +548,8 @@ export default class SessionRecordAndReplay {
         // If event clocks are not the same, then we should update this.clock.
         assert(effect.eventAfter.clock === effect.eventBefore.clock);
 
-        if (dir === t.Direction.Forwards) {
+        if (change.direction === t.Direction.Forwards) {
+          assert(this.internalWorkspace.eventIndex <= effect.index);
           if (this.internalWorkspace.eventIndex === effect.index) {
             // unapply eventBefore
             const step1: SeekStep = { event: effect.eventBefore, index: effect.index };
@@ -557,6 +560,7 @@ export default class SessionRecordAndReplay {
             await this.internalWorkspace.applySeekStep(step2, t.Direction.Forwards, uriSet);
           }
         } else {
+          assert(this.internalWorkspace.eventIndex <= effect.index);
           if (this.internalWorkspace.eventIndex === effect.index) {
             // unapply eventAfter
             const step1: SeekStep = { event: effect.eventAfter, index: effect.index };
@@ -571,7 +575,7 @@ export default class SessionRecordAndReplay {
         break;
       }
       case 'cropEditorEvents': {
-        if (dir === t.Direction.Forwards) {
+        if (change.direction === t.Direction.Forwards) {
           if (this.internalWorkspace.eventIndex >= effect.index) {
             // Unapply cropped events except those after current eventIndex
             // indexes         0  1  2  3  4  5  6
@@ -588,12 +592,63 @@ export default class SessionRecordAndReplay {
             await this.internalWorkspace.seekWithData(seekData, uriSet);
           }
         } else {
-          if (this.internalWorkspace.eventIndex === effect.index - 1) {
-            // Apply cropped events
-            const steps: SeekStep[] = effect.events.map((event, i) => ({ event, index: effect.index + i }));
-            const seekData: SeekData = { steps, direction: t.Direction.Forwards };
-            await this.internalWorkspace.seekWithData(seekData, uriSet);
-            // this.clock = this.internalWorkspace.getCurrentEvent()?.clock ?? this.clock;
+          assert(this.internalWorkspace.eventIndex < effect.index);
+
+          // if rr.clock used to be after the crop point, restore it.
+          if (effect.rrClock > effect.clock) {
+            this.clock = effect.rrClock;
+          }
+        }
+
+        break;
+      }
+      case 'changeSpeed': {
+        if (change.direction === t.Direction.Forwards) {
+          this.clock = lib.calcClockAfterSpeedChange(this.clock, effect.range, effect.factor);
+        } else {
+          const inverse = lib.invertSpeedChange(effect.range, effect.factor);
+          // If rr.clock used to be inside the range, restore the exact clock
+          // without losing precision. Otherwise, calculate the new clock.
+          if (lib.isClockInRange(effect.rrClock, effect.range)) {
+            this.clock = effect.rrClock;
+          } else {
+            this.clock = lib.calcClockAfterSpeedChange(this.clock, inverse.range, inverse.factor);
+          }
+        }
+
+        break;
+      }
+      case 'merge': {
+        if (change.direction === t.Direction.Forwards) {
+          this.clock = lib.calcClockAfterMerge(this.clock, effect.range);
+        } else {
+          // If rr.clock used to be inside the range, restore the exact
+          // clock. Otherwise, treat the undo as an insert gap.
+          if (lib.isClockInRange(effect.rrClock, effect.range)) {
+            this.clock = effect.rrClock;
+          } else {
+            this.clock = lib.calcClockAfterInsertGap(
+              this.clock,
+              effect.range.start,
+              effect.range.end - effect.range.start,
+            );
+          }
+        }
+
+        break;
+      }
+      case 'insertGap': {
+        const range = { start: effect.clock, end: effect.clock + effect.duration };
+
+        if (change.direction === t.Direction.Forwards) {
+          this.clock = lib.calcClockAfterInsertGap(this.clock, effect.clock, effect.duration);
+        } else {
+          // If rr.clock used to be inside the range, restore the exact
+          // clock. Otherwise, treat the undo as an insert gap.
+          if (lib.isClockInRange(effect.rrClock, range)) {
+            this.clock = effect.rrClock;
+          } else {
+            this.clock = lib.calcClockAfterMerge(this.clock, range);
           }
         }
 

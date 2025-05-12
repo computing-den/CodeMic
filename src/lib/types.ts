@@ -700,31 +700,38 @@ export enum Direction {
 
 export type UriSet = Set<string>;
 
-export type SessionChange = {
+export type SessionSnapshot = {
   // Only some fields of the head are changed in the editor.
   // The rest are changed in the session detail whose undo/redo
   // is tracked separately if at all.
-  head: SessionChangeHead;
+  head: EditableSessionHead;
   body: SessionBody;
-  effects: SessionChangeEffect[];
+  effects: SessionEffect[];
   // coalescing: boolean;
   // description: string;
   // affectedUris: string[];
 };
 
 export type SessionPatch = {
-  head?: Partial<SessionChangeHead>;
+  head?: Partial<EditableSessionHead>;
   body?: Partial<SessionBody>;
-  effects?: SessionChangeEffect[];
+  effects?: SessionEffect[];
 };
 
-export type SessionChangeHead = {
+export type SessionChange = {
+  cur: SessionSnapshot;
+  next: SessionSnapshot;
+  direction: Direction;
+  isTriggeredByUndoRedo: boolean;
+};
+
+export type EditableSessionHead = {
   duration: number;
   modificationTimestamp: string;
   toc: TocItem[];
 };
 
-export type SessionChangeEffect =
+export type SessionEffect =
   | {
       type: 'insertEditorEvent';
       event: EditorEvent;
@@ -738,8 +745,27 @@ export type SessionChangeEffect =
     }
   | {
       type: 'cropEditorEvents';
+      clock: number;
       events: EditorEvent[];
       index: number;
+      rrClock: number;
+    }
+  | {
+      type: 'changeSpeed';
+      range: ClockRange;
+      factor: number;
+      rrClock: number;
+    }
+  | {
+      type: 'merge';
+      range: ClockRange;
+      rrClock: number;
+    }
+  | {
+      type: 'insertGap';
+      clock: number;
+      duration: number;
+      rrClock: number;
     };
 
 export interface InternalEditor {

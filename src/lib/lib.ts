@@ -117,8 +117,13 @@ export function clockToGlobal(clock: number, range: t.ClockRange): number {
   return clock + range.start;
 }
 
-export function calcClockAfterRangeSpeedChange(clock: number, range: t.ClockRange, factor: number): number {
+export function calcClockAfterSpeedChange(clock: number, range: t.ClockRange, factor: number): number {
   return clock + getClockRangeOverlapDur(range, { start: 0, end: clock }) * (1 / factor - 1);
+}
+
+export function invertSpeedChange(range: t.ClockRange, factor: number): { range: t.ClockRange; factor: number } {
+  const end = calcClockAfterSpeedChange(range.end, range, factor);
+  return { range: { start: range.start, end }, factor: 1 / factor };
 }
 
 export function calcClockAfterMerge(clock: number, range: t.ClockRange): number {

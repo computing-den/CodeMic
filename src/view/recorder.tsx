@@ -492,8 +492,8 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
     updateState(state => {
       state.selection = {
         type: 'editor',
-        focus: lib.calcClockAfterRangeSpeedChange(selection.focus, range, factor),
-        anchor: lib.calcClockAfterRangeSpeedChange(selection.anchor, range, factor),
+        focus: lib.calcClockAfterSpeedChange(selection.focus, range, factor),
+        anchor: lib.calcClockAfterSpeedChange(selection.anchor, range, factor),
       };
     });
 

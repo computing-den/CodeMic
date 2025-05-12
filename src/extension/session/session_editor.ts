@@ -16,47 +16,49 @@ const SAVE_TIMEOUT_MS = 5_000;
 export default class SessionEditor {
   dirty = false;
 
-  private sessionChanges: t.SessionChange[] = [];
+  private sessionSnapshots: t.SessionSnapshot[] = [];
   // The index of the last update whose effects are visible.
-  private curSessionChange: number = -1;
+  private sessionSnapshotIndex: number = -1;
 
   constructor(public session: Session) {}
 
   /**
-   * Disallows undoing the very first change (initial events).
+   * Disallows undoing the very first snapshot (initial events).
    */
   get canUndo(): boolean {
-    return this.curSessionChange > 0;
+    return this.sessionSnapshotIndex > 0;
   }
 
   get canRedo(): boolean {
-    return this.curSessionChange < this.sessionChanges.length - 1;
+    return this.sessionSnapshotIndex < this.sessionSnapshots.length - 1;
   }
 
   undo(): t.SessionChange | undefined {
     if (!this.canUndo) return;
 
-    const curChange = this.sessionChanges[this.curSessionChange];
-    this.curSessionChange--;
-    const prevChange = this.sessionChanges[this.curSessionChange];
+    const cur = this.sessionSnapshots[this.sessionSnapshotIndex];
+    this.sessionSnapshotIndex--;
+    const next = this.sessionSnapshots[this.sessionSnapshotIndex];
 
-    this.applySessionChange(prevChange);
-    return curChange;
+    this.applySessionSnapshot(next);
+    return { cur, next, direction: t.Direction.Backwards, isTriggeredByUndoRedo: true };
   }
 
   redo(): t.SessionChange | undefined {
     if (!this.canRedo) return;
 
-    const change = this.sessionChanges[++this.curSessionChange];
-    this.applySessionChange(change);
-    return change;
+    const cur = this.sessionSnapshots[this.sessionSnapshotIndex];
+    this.sessionSnapshotIndex++;
+    const next = this.sessionSnapshots[this.sessionSnapshotIndex];
+    this.applySessionSnapshot(next);
+    return { cur, next, direction: t.Direction.Forwards, isTriggeredByUndoRedo: true };
   }
 
   initialize(body: t.SessionBody) {
     assert(!this.session.isLoaded());
     this.session.body = body;
-    this.curSessionChange = 0;
-    this.sessionChanges = [{ head: this.session.head, body, effects: [] }];
+    this.sessionSnapshotIndex = 0;
+    this.sessionSnapshots = [{ head: this.session.head, body, effects: [] }];
   }
 
   updateDetails(patch: t.SessionDetailsUpdate) {
@@ -77,7 +79,7 @@ export default class SessionEditor {
   insertScannedEvents(editorEvents: t.EditorEvent[]) {
     assert(this.session.isLoaded());
     assert(this.session.body.editorEvents.length === 0);
-    assert(this.sessionChanges.length === 1, 'Editor must be just initialized before inserting scanned events');
+    assert(this.sessionSnapshots.length === 1, 'Editor must be just initialized before inserting scanned events');
     this.insertApplySessionPatch({ body: { editorEvents } }, { coalescing: true });
   }
 
@@ -232,21 +234,25 @@ export default class SessionEditor {
     this.updateSessionDetailsDirectly({ hasCover: false });
   }
 
-  changeSpeed(range: t.ClockRange, factor: number) {
+  changeSpeed(range: t.ClockRange, factor: number): t.SessionChange {
     assert(this.session.isLoaded());
 
     function withUpdatedClock<T extends { clock: number }>(x: T): T {
-      return { ...x, clock: lib.calcClockAfterRangeSpeedChange(x.clock, range, factor) };
+      return { ...x, clock: lib.calcClockAfterSpeedChange(x.clock, range, factor) };
     }
 
     const editorEvents = this.session.body.editorEvents.map(withUpdatedClock);
     const focusTimeline = this.session.body.focusTimeline.map(withUpdatedClock);
     const toc = this.session.head.toc.map(withUpdatedClock);
-    const duration = lib.calcClockAfterRangeSpeedChange(this.session.head.duration, range, factor);
-    this.insertApplySessionPatch({ head: { toc, duration }, body: { editorEvents, focusTimeline } });
+    const duration = lib.calcClockAfterSpeedChange(this.session.head.duration, range, factor);
+    return this.insertApplySessionPatch({
+      head: { toc, duration },
+      body: { editorEvents, focusTimeline },
+      effects: [{ type: 'changeSpeed', range, factor, rrClock: this.session.rr.clock }],
+    });
   }
 
-  merge(range: t.ClockRange) {
+  merge(range: t.ClockRange): t.SessionChange {
     assert(this.session.isLoaded());
 
     function withUpdatedClock<T extends { clock: number }>(x: T): T {
@@ -257,10 +263,15 @@ export default class SessionEditor {
     const focusTimeline = this.session.body.focusTimeline.map(withUpdatedClock);
     const toc = this.session.head.toc.map(withUpdatedClock);
     const duration = lib.calcClockAfterMerge(this.session.head.duration, range);
-    this.insertApplySessionPatch({ head: { toc, duration }, body: { editorEvents, focusTimeline } });
+
+    return this.insertApplySessionPatch({
+      head: { toc, duration },
+      body: { editorEvents, focusTimeline },
+      effects: [{ type: 'merge', range, rrClock: this.session.rr.clock }],
+    });
   }
 
-  insertGap(clock: number, gapDuration: number) {
+  insertGap(clock: number, gapDuration: number): t.SessionChange {
     assert(this.session.isLoaded());
 
     function withUpdatedClock<T extends { clock: number }>(x: T): T {
@@ -271,7 +282,11 @@ export default class SessionEditor {
     const focusTimeline = this.session.body.focusTimeline.map(withUpdatedClock);
     const toc = this.session.head.toc.map(withUpdatedClock);
     const duration = lib.calcClockAfterInsertGap(this.session.head.duration, clock, gapDuration);
-    this.insertApplySessionPatch({ head: { toc, duration }, body: { editorEvents, focusTimeline } });
+    return this.insertApplySessionPatch({
+      head: { toc, duration },
+      body: { editorEvents, focusTimeline },
+      effects: [{ type: 'insertGap', clock, duration: gapDuration, rrClock: this.session.rr.clock }],
+    });
   }
 
   insertChapter(clock: number, title: string) {
@@ -309,7 +324,15 @@ export default class SessionEditor {
     return this.insertApplySessionPatch({
       head: { toc, duration },
       body: { editorEvents, focusTimeline },
-      effects: [{ type: 'cropEditorEvents', events: croppedEvents, index: editorEvents.length }],
+      effects: [
+        {
+          type: 'cropEditorEvents',
+          events: croppedEvents,
+          index: editorEvents.length,
+          clock,
+          rrClock: this.session.rr.clock,
+        },
+      ],
     });
   }
 
@@ -353,35 +376,36 @@ export default class SessionEditor {
     this.writeThrottled.cancel();
   }
 
-  private insertApplySessionChange(patch: t.SessionPatch, opts?: { coalescing?: boolean }): t.SessionChange {
+  private insertApplySessionSnapshot(patch: t.SessionPatch, opts?: { coalescing?: boolean }): t.SessionChange {
     assert(this.session.isLoaded());
-    const change = this.createSessionChange(patch);
-    this.insertSessionChange(change, opts);
-    this.applySessionChange(change);
-    return change;
+    const cur = this.sessionSnapshots[this.sessionSnapshotIndex];
+    const next = this.createSessionSnapshot(patch);
+    this.insertSessionSnapshot(next, opts);
+    this.applySessionSnapshot(next);
+    return { cur, next, direction: t.Direction.Forwards, isTriggeredByUndoRedo: false };
   }
 
   private insertApplySessionPatch(patch: t.SessionPatch, opts?: { coalescing?: boolean }): t.SessionChange {
     assert(this.session.isLoaded());
-    return this.insertApplySessionChange(this.createSessionChange(patch), opts);
+    return this.insertApplySessionSnapshot(this.createSessionSnapshot(patch), opts);
   }
 
-  private insertSessionChange(change: t.SessionChange, opts?: { coalescing?: boolean }) {
+  private insertSessionSnapshot(snapshot: t.SessionSnapshot, opts?: { coalescing?: boolean }) {
     assert(this.session.isLoaded());
-    if (!opts?.coalescing || this.curSessionChange === -1) {
-      this.curSessionChange++;
-      this.sessionChanges.length = this.curSessionChange;
-      this.sessionChanges.push(change);
+    if (!opts?.coalescing || this.sessionSnapshotIndex === -1) {
+      this.sessionSnapshotIndex++;
+      this.sessionSnapshots.length = this.sessionSnapshotIndex;
+      this.sessionSnapshots.push(snapshot);
     } else {
-      // Merge changes.
-      this.sessionChanges.length = this.curSessionChange + 1;
-      const oldChange = this.sessionChanges[this.curSessionChange];
-      const effects = oldChange.effects.concat(change.effects);
-      this.sessionChanges[this.curSessionChange] = { ...change, effects };
+      // Merge snapshots.
+      this.sessionSnapshots.length = this.sessionSnapshotIndex + 1;
+      const old = this.sessionSnapshots[this.sessionSnapshotIndex];
+      const effects = old.effects.concat(snapshot.effects);
+      this.sessionSnapshots[this.sessionSnapshotIndex] = { ...snapshot, effects };
     }
   }
 
-  private createSessionChange(patch: t.SessionPatch): t.SessionChange {
+  private createSessionSnapshot(patch: t.SessionPatch): t.SessionSnapshot {
     assert(this.session.isLoaded());
     let body = this.session.body;
     if (patch.body) {
@@ -399,10 +423,10 @@ export default class SessionEditor {
     return { head, body, effects };
   }
 
-  private applySessionChange(change: t.SessionChange) {
+  private applySessionSnapshot(snapshot: t.SessionSnapshot) {
     assert(this.session.isLoaded());
-    this.session.head = { ...this.session.head, ...change.head, modificationTimestamp: new Date().toISOString() };
-    this.session.body = change.body;
+    this.session.head = { ...this.session.head, ...snapshot.head, modificationTimestamp: new Date().toISOString() };
+    this.session.body = snapshot.body;
     this.dirty = true;
     this.session.onChange?.();
   }

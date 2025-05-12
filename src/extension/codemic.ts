@@ -535,14 +535,14 @@ class CodeMic {
       case 'recorder/undo': {
         assert(this.session?.isLoaded());
         const change = this.session.editor.undo();
-        if (change) await this.session.rr.enqueueSyncAfterSessionChange(change, t.Direction.Backwards);
+        if (change) await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/redo': {
         assert(this.session?.isLoaded());
         const change = this.session.editor.redo();
-        if (change) await this.session.rr.enqueueSyncAfterSessionChange(change, t.Direction.Forwards);
+        if (change) await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
@@ -608,22 +608,22 @@ class CodeMic {
       }
       case 'recorder/changeSpeed': {
         assert(this.session?.isLoaded());
-        this.session.editor.changeSpeed(req.range, req.factor);
-        // await this.session.rr.enqueueSyncAfterSessionChange();
+        const change = this.session.editor.changeSpeed(req.range, req.factor);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/merge': {
         assert(this.session?.isLoaded());
-        this.session.editor.merge(req.range);
-        // await this.session.rr.enqueueSyncAfterSessionChange();
+        const change = this.session.editor.merge(req.range);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/insertGap': {
         assert(this.session?.isLoaded());
-        this.session.editor.insertGap(req.clock, req.dur);
-        // await this.session.rr.enqueueSyncAfterSessionChange();
+        const change = this.session.editor.insertGap(req.clock, req.dur);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
