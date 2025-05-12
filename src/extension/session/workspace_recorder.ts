@@ -15,11 +15,13 @@ import VscWorkspace from './vsc_workspace.js';
 
 class WorkspaceRecorder {
   recording = false;
-  onError?: (error: Error) => any;
+  // onError?: (error: Error) => any;
 
   private session: LoadedSession;
+
+  private internalWorkspace: InternalWorkspace;
   private vscWorkspace: VscWorkspace;
-  private clock = 0;
+
   private disposables: vscode.Disposable[] = [];
   // private scrolling: boolean = false;
   // private scrollStartRange?: Range;
@@ -27,19 +29,18 @@ class WorkspaceRecorder {
   // private lastPosition?: Position;
   // private lastLine: number | undefined;
 
-  get internalWorkspace(): InternalWorkspace {
-    return this.session.rr.internalWorkspace;
+  private get clock(): number {
+    return this.session.rr.clock;
   }
 
-  constructor(session: LoadedSession, vscWorkspace: VscWorkspace) {
+  constructor(session: LoadedSession, internalWorkspace: InternalWorkspace, vscWorkspace: VscWorkspace) {
     this.session = session;
+    this.internalWorkspace = internalWorkspace;
     this.vscWorkspace = vscWorkspace;
   }
 
   async record() {
     if (this.recording) return;
-
-    await this.vscWorkspace.sync();
 
     this.recording = true;
 
@@ -134,13 +135,13 @@ class WorkspaceRecorder {
     this.dispose();
   }
 
-  setClock(clock: number) {
-    this.clock = clock;
+  // setClock(clock: number) {
+  //   this.clock = clock;
 
-    // if (this.recording) {
-    //   this.updateFocus();
-    // }
-  }
+  //   // if (this.recording) {
+  //   //   this.updateFocus();
+  //   // }
+  // }
 
   dispose() {
     for (const d of this.disposables) d.dispose();
@@ -325,14 +326,14 @@ class WorkspaceRecorder {
         );
 
         const debugNextIrText = irTextDocument.getText();
-        await this.internalWorkspace.stepper.applyEditorEvent(irEvent, uri, t.Direction.Backwards);
+        await this.internalWorkspace.stepper.applyEditorEvent(irEvent, t.Direction.Backwards);
         const debugReInitIrText = irTextDocument.getText();
         assert(
           debugInitIrText === debugReInitIrText,
           "textChange: text doesn't match what it was after applying changes in reverse",
         );
 
-        await this.internalWorkspace.stepper.applyEditorEvent(irEvent, uri, t.Direction.Forwards);
+        await this.internalWorkspace.stepper.applyEditorEvent(irEvent, t.Direction.Forwards);
         assert(
           debugNextIrText === irTextDocument.getText(),
           "textChange: text doesn't match what it was after applying changes again",
@@ -632,7 +633,8 @@ class WorkspaceRecorder {
   }
 
   private insertEvent(e: t.EditorEvent, opts: { coalescing: boolean }) {
-    this.session.editor.insertEvent(e, opts);
+    const i = this.session.editor.insertEvent(e, opts);
+    this.internalWorkspace.eventIndex = i;
   }
 
   /**

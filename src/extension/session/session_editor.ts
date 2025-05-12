@@ -33,34 +33,52 @@ export default class SessionEditor {
     return this.curSessionChange < this.sessionChanges.length - 1;
   }
 
-  undo() {
+  undo(): t.SessionChange | undefined {
     if (!this.canUndo) return;
 
-    const change = this.sessionChanges[--this.curSessionChange];
-    this.applySessionChange(change);
+    const curChange = this.sessionChanges[this.curSessionChange];
+    this.curSessionChange--;
+    const prevChange = this.sessionChanges[this.curSessionChange];
+
+    this.applySessionChange(prevChange);
+    return curChange;
   }
 
-  redo() {
+  redo(): t.SessionChange | undefined {
     if (!this.canRedo) return;
 
     const change = this.sessionChanges[++this.curSessionChange];
     this.applySessionChange(change);
+    return change;
+  }
+
+  initialize(body: t.SessionBody) {
+    assert(!this.session.isLoaded());
+    this.session.body = body;
+    this.curSessionChange = 0;
+    this.sessionChanges = [{ head: this.session.head, body, effects: [] }];
   }
 
   updateDetails(patch: t.SessionDetailsUpdate) {
-    this.updateSessionHeadWithoutUndo(patch);
+    this.updateSessionDetailsDirectly(patch);
   }
 
-  insertInitialEvents(events: t.EditorEvent[]) {
-    assert(this.session.isLoaded());
-    this.insertApplySessionPatch({ body: { editorEvents: events } });
-  }
-
-  insertEvent(e: t.EditorEvent, opts: { coalescing: boolean }) {
+  insertEvent(e: t.EditorEvent, opts: { coalescing: boolean }): number {
     assert(this.session.isLoaded());
     const i = lib.lastSortedIndex(this.session.body.editorEvents, e.clock, x => x.clock);
     const editorEvents = lib.spliceImmutable(this.session.body.editorEvents, i, 0, e);
-    this.insertApplySessionPatch({ body: { editorEvents } }, opts);
+    this.insertApplySessionPatch(
+      { body: { editorEvents }, effects: [{ type: 'insertEditorEvent', event: e, index: i }] },
+      opts,
+    );
+    return i;
+  }
+
+  insertScannedEvents(editorEvents: t.EditorEvent[]) {
+    assert(this.session.isLoaded());
+    assert(this.session.body.editorEvents.length === 0);
+    assert(this.sessionChanges.length === 1, 'Editor must be just initialized before inserting scanned events');
+    this.insertApplySessionPatch({ body: { editorEvents } }, { coalescing: true });
   }
 
   /**
@@ -76,9 +94,13 @@ export default class SessionEditor {
     const newEvent = { ...e, ...update } as t.EditorEvent;
     if (_.isEqual(e, newEvent)) return;
 
-    this.insertApplySessionPatch({
-      body: { editorEvents: lib.spliceImmutable(this.session.body.editorEvents, at, 1, newEvent) },
-    });
+    this.insertApplySessionPatch(
+      {
+        body: { editorEvents: lib.spliceImmutable(this.session.body.editorEvents, at, 1, newEvent) },
+        effects: [{ type: 'updateEditorEvent', eventBefore: e, eventAfter: newEvent, index: at }],
+      },
+      { coalescing: true },
+    );
   }
 
   setFocus(focus: t.Focus, isDocumentEmpty: boolean) {
@@ -201,13 +223,13 @@ export default class SessionEditor {
   async setCover(uri: string) {
     await fs.promises.copyFile(URI.parse(uri).fsPath, path.join(this.session.core.dataPath, 'cover'));
     await cache.copyCover(this.session.core.dataPath, this.session.head.id);
-    this.updateSessionHeadWithoutUndo({ hasCover: true });
+    this.updateSessionDetailsDirectly({ hasCover: true });
   }
 
   async deleteCover() {
     await fs.promises.rm(path.join(this.session.core.dataPath, 'cover'), { force: true });
     await cache.deleteCover(this.session.head.id);
-    this.updateSessionHeadWithoutUndo({ hasCover: false });
+    this.updateSessionDetailsDirectly({ hasCover: false });
   }
 
   changeSpeed(range: t.ClockRange, factor: number) {
@@ -272,18 +294,23 @@ export default class SessionEditor {
     this.insertApplySessionPatch({ head: { toc } });
   }
 
-  crop(clock: number) {
+  crop(clock: number): t.SessionChange {
     assert(this.session.isLoaded());
 
     function pred<T extends { clock: number }>(x: T): boolean {
       return x.clock < clock;
     }
 
-    const editorEvents = this.session.body.editorEvents.filter(pred);
+    const [editorEvents, croppedEvents] = _.partition(this.session.body.editorEvents, pred);
     const focusTimeline = this.session.body.focusTimeline.filter(pred);
     const toc = this.session.head.toc.filter(pred);
     const duration = clock;
-    this.insertApplySessionPatch({ head: { toc, duration }, body: { editorEvents, focusTimeline } });
+
+    return this.insertApplySessionPatch({
+      head: { toc, duration },
+      body: { editorEvents, focusTimeline },
+      effects: [{ type: 'cropEditorEvents', events: croppedEvents, index: editorEvents.length }],
+    });
   }
 
   /**
@@ -326,16 +353,17 @@ export default class SessionEditor {
     this.writeThrottled.cancel();
   }
 
-  private insertApplySessionChange(patch: t.SessionPatch, opts?: { coalescing?: boolean }) {
+  private insertApplySessionChange(patch: t.SessionPatch, opts?: { coalescing?: boolean }): t.SessionChange {
     assert(this.session.isLoaded());
     const change = this.createSessionChange(patch);
     this.insertSessionChange(change, opts);
     this.applySessionChange(change);
+    return change;
   }
 
-  private insertApplySessionPatch(patch: t.SessionPatch, opts?: { coalescing?: boolean }) {
+  private insertApplySessionPatch(patch: t.SessionPatch, opts?: { coalescing?: boolean }): t.SessionChange {
     assert(this.session.isLoaded());
-    this.insertApplySessionChange(this.createSessionChange(patch), opts);
+    return this.insertApplySessionChange(this.createSessionChange(patch), opts);
   }
 
   private insertSessionChange(change: t.SessionChange, opts?: { coalescing?: boolean }) {
@@ -345,8 +373,11 @@ export default class SessionEditor {
       this.sessionChanges.length = this.curSessionChange;
       this.sessionChanges.push(change);
     } else {
+      // Merge changes.
       this.sessionChanges.length = this.curSessionChange + 1;
-      this.sessionChanges[this.curSessionChange] = change;
+      const oldChange = this.sessionChanges[this.curSessionChange];
+      const effects = oldChange.effects.concat(change.effects);
+      this.sessionChanges[this.curSessionChange] = { ...change, effects };
     }
   }
 
@@ -362,7 +393,10 @@ export default class SessionEditor {
       modificationTimestamp: patch.head?.modificationTimestamp ?? this.session.head.modificationTimestamp,
       toc: patch.head?.toc ?? this.session.head.toc,
     };
-    return { head, body };
+
+    const effects = patch.effects ?? [];
+
+    return { head, body, effects };
   }
 
   private applySessionChange(change: t.SessionChange) {
@@ -373,8 +407,10 @@ export default class SessionEditor {
     this.session.onChange?.();
   }
 
-  private updateSessionHeadWithoutUndo(patch: Partial<t.SessionHead>) {
-    this.session.head = { ...this.session.head, ...patch, modificationTimestamp: new Date().toISOString() };
+  private updateSessionDetailsDirectly(patch: Partial<t.SessionHead> & { workspace?: string }) {
+    const { workspace, ...head } = patch;
+    if (workspace !== undefined) this.session.workspace = workspace;
+    this.session.head = { ...this.session.head, ...head, modificationTimestamp: new Date().toISOString() };
     this.dirty = true;
     this.session.onChange?.();
   }

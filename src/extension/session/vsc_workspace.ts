@@ -5,23 +5,22 @@ import { Position, Range, Selection, LineRange } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import * as misc from '../misc.js';
 import * as storage from '../storage.js';
-import type { Context, Progress, WorkspaceChangeGlobalState } from '../types.js';
-import Session, { LoadedSession } from './session.js';
-import * as serverApi from '../server_api.js';
+import type { Context, WorkspaceChangeGlobalState } from '../types.js';
+import { LoadedSession } from './session.js';
 import * as git from '../git';
 import fs from 'fs';
 import _ from 'lodash';
 import vscode from 'vscode';
-import SessionCore from './session_core.js';
 import path from 'path';
 import { URI } from 'vscode-uri';
+import InternalWorkspace from './internal_workspace.js';
 
 type TabWithInputText = Omit<vscode.Tab, 'input'> & {
   readonly input: vscode.TabInputText;
 };
 
 export default class VscWorkspace {
-  constructor(public session: LoadedSession) {}
+  constructor(public session: LoadedSession, private internalWorkspace: InternalWorkspace) {}
 
   // static getCoverUri(session: Session): string {
   //   return session.context
@@ -153,11 +152,11 @@ export default class VscWorkspace {
     return eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
   }
 
-  async scanDirAndVsc(): Promise<t.EditorEventWithUri[]> {
+  async scanDirAndVsc(): Promise<t.EditorEvent[]> {
     assert(this.session.isLoaded(), 'Session must be loaded before it can be scanned.'); // make sure session has body
     assert(this.session.mustScan, 'Session is not meant for scan.');
-    assert(this.session.body.eventContainer.isEmpty(), 'Scanning a non-empty session.');
-    const events: t.EditorEventWithUri[] = [];
+    assert(this.session.body.editorEvents.length === 0, 'Scanning a non-empty session.');
+    const events: t.EditorEvent[] = [];
 
     // for (const vscTextDocument of vscode.workspace.textDocuments) {
     //   if (vscTextDocument.dirty) {
@@ -172,16 +171,22 @@ export default class VscWorkspace {
       const uri = lib.workspaceUri(p);
       if (stat.isDirectory()) {
         events.push({
+          type: 'init',
+          id: lib.nextId(),
           uri,
-          event: { type: 'init', id: lib.nextId(), clock: 0, file: { type: 'dir' } },
+          clock: 0,
+          file: { type: 'dir' },
         });
       } else {
         const data = await fs.promises.readFile(path.join(this.session.workspace, p));
         const sha1 = await misc.computeSHA1(data);
         await this.session.core.copyToBlob(path.join(this.session.workspace, p), sha1);
         events.push({
+          type: 'init',
+          id: lib.nextId(),
           uri,
-          event: { type: 'init', id: lib.nextId(), clock: 0, file: { type: 'local', sha1 } },
+          clock: 0,
+          file: { type: 'local', sha1 },
         });
       }
     }
@@ -195,7 +200,7 @@ export default class VscWorkspace {
       const data = new TextEncoder().encode(vscTextDocument.getText());
       const sha1 = await misc.computeSHA1(data);
       await this.session.core.writeBlob(sha1, data);
-      events.push({ uri, event: { type: 'init', id: lib.nextId(), clock: 0, file: { type: 'local', sha1 } } });
+      events.push({ type: 'init', id: lib.nextId(), uri, clock: 0, file: { type: 'local', sha1 } });
     }
 
     // Walk through text documents and create openTextDocument events.
@@ -211,14 +216,12 @@ export default class VscWorkspace {
       }
 
       events.push({
+        type: 'openTextDocument',
+        id: lib.nextId(),
         uri: this.uriFromVsc(vscTextDocument.uri),
-        event: {
-          type: 'openTextDocument',
-          id: lib.nextId(),
-          clock: 0,
-          eol: VscWorkspace.eolFromVsc(vscTextDocument.eol),
-          isInWorktree: false,
-        },
+        clock: 0,
+        eol: VscWorkspace.eolFromVsc(vscTextDocument.eol),
+        isInWorktree: false,
       });
     }
 
@@ -230,7 +233,7 @@ export default class VscWorkspace {
 
       // Ignore if we don't have an openTextDocument event.
       const uri = this.uriFromVsc(tab.input.uri);
-      if (!events.some(e => e.uri === uri && e.event.type === 'openTextDocument')) continue;
+      if (!events.some(e => e.uri === uri && e.type === 'openTextDocument')) continue;
 
       // Create showTextEditor event.
       // vscode.window.visibleTextEditors does not include tabs that exist but are not currently open.
@@ -241,15 +244,13 @@ export default class VscWorkspace {
       const activeVscUri = vscode.window.activeTextEditor?.document.uri;
       const isActiveEditor = activeVscUri?.toString() === tab.input.uri.toString();
       events.push({
+        type: 'showTextEditor',
+        id: lib.nextId(),
         uri,
-        event: {
-          type: 'showTextEditor',
-          id: lib.nextId(),
-          clock: 0,
-          preserveFocus: !isActiveEditor,
-          selections,
-          visibleRange,
-        },
+        clock: 0,
+        preserveFocus: !isActiveEditor,
+        selections,
+        visibleRange,
       });
     }
 
@@ -259,7 +260,7 @@ export default class VscWorkspace {
   async sync(targetUris?: string[]) {
     // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
 
-    const { internalWorkspace } = this.session.rr;
+    const { internalWorkspace } = this;
 
     // all text editor tabs that are not in internalWorkspace's textEditors should be closed
     for (const tab of this.getTabsWithInputText()) {

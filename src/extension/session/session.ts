@@ -4,7 +4,6 @@ import type { Context } from '../types.js';
 import SessionCore from './session_core.js';
 import SessionRecordAndReplay from './session_record_and_replay.js';
 import SessionEditor from './session_editor.js';
-import SessionCommander from './session_commander.js';
 import { scaleProgress } from '../misc.js';
 import _ from 'lodash';
 import os from 'node:os';
@@ -65,6 +64,7 @@ export class Session {
   }
 
   async download(options?: { skipIfExists?: boolean }) {
+    this.core.assertFormatVersionSupport();
     if (options?.skipIfExists && (await this.core.bodyExists())) return;
 
     await this.context.withProgress(
@@ -81,29 +81,30 @@ export class Session {
     // another video DOM in recorder screen. Same for the audio context.
     // That's why we must reload the media track players.
     if (this.isLoaded()) {
-      this.rr.reloadMedia();
+      // this.rr.reloadMedia();
       return;
     }
 
     // assert(!this.isLoaded(), 'Already loaded.');
     assert(!this.mustScan, 'Must be scanned, not loaded.');
     assert(!this.temp, 'Cannot load a temp session.');
+    this.core.assertFormatVersionSupport();
 
     await this.context.withProgress(
       { title: `Loading session ${this.head.handle}`, cancellable: true },
       async (progress, abortController) => {
-        this.body = await this.core.readBody({
+        const body = await this.core.readBody({
           download: true,
           progress: scaleProgress(progress, 0.8),
           abortController,
         });
+        this.editor.initialize(body);
 
         progress.report({ message: 'reading' });
         this.rr = new SessionRecordAndReplay(this as LoadedSession);
-        this.commander = new SessionCommander(this as LoadedSession);
 
         progress.report({ message: 'loading', increment: 10 });
-        await this.rr.loadWorkspace(options);
+        await this.rr.enqueueLoadWorkspace(options);
 
         progress.report({ message: 'done', increment: 10 });
       },
@@ -117,16 +118,15 @@ export class Session {
     await this.context.withProgress(
       { title: `Scanning session ${this.head.handle}`, cancellable: false },
       async (progress, abortController) => {
-        this.body = {
+        this.editor.initialize({
           editorEvents: [],
           audioTracks: [],
           videoTracks: [],
           focusTimeline: [],
           defaultEol: os.EOL as t.EndOfLine,
-        };
+        });
         this.rr = new SessionRecordAndReplay(this as LoadedSession);
-        this.commander = new SessionCommander(this as LoadedSession);
-        await this.rr.scan();
+        await this.rr.enqueueScan();
       },
     );
   }

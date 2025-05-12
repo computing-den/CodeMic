@@ -14,6 +14,7 @@ import * as paths from '../lib/paths.js';
 import VscWorkspace from './session/vsc_workspace.js';
 import path from 'path';
 import cache from './cache.js';
+import SessionCore from './session/session_core.js';
 
 type OpenScreenParams =
   | { screen: t.Screen.Loading }
@@ -362,6 +363,7 @@ class CodeMic {
 
       case 'player/openInRecorder': {
         assert(this.session);
+        this.session.core.assertFormatVersionSupport();
         let cancel = false;
         if (this.session.rr?.playing) {
           this.session.rr.pause();
@@ -376,7 +378,7 @@ class CodeMic {
             { title: confirmTitle },
           );
           cancel = answer?.title != confirmTitle;
-          if (cancel) await this.session.rr.play();
+          if (cancel) await this.session.rr.enqueuePlay();
         }
 
         if (!cancel) {
@@ -411,7 +413,7 @@ class CodeMic {
       }
       case 'player/play': {
         assert(this.session?.isLoaded());
-        await this.session.rr.play();
+        await this.session.rr.enqueuePlay();
         await this.session.core.writeHistoryOpenClose();
         await this.updateFrontend();
         return ok;
@@ -425,7 +427,7 @@ class CodeMic {
       }
       case 'player/seek': {
         assert(this.session?.isLoaded());
-        this.session.rr.seek(req.clock);
+        this.session.rr.enqueueSeek(req.clock);
         await this.updateFrontend();
         return ok;
       }
@@ -468,13 +470,13 @@ class CodeMic {
       }
       case 'recorder/record': {
         assert(this.session?.isLoaded());
-        await this.session.rr.record();
+        await this.session.rr.enqueueRecord();
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/play': {
         assert(this.session?.isLoaded());
-        await this.session.rr.play();
+        await this.session.rr.enqueuePlay();
         await this.updateFrontend();
         return ok;
       }
@@ -486,7 +488,7 @@ class CodeMic {
       }
       case 'recorder/seek': {
         assert(this.session?.isLoaded());
-        await this.session.rr.seek(req.clock);
+        await this.session.rr.enqueueSeek(req.clock);
         await this.updateFrontend();
         return ok;
       }
@@ -532,15 +534,15 @@ class CodeMic {
       }
       case 'recorder/undo': {
         assert(this.session?.isLoaded());
-        this.session.editor.undo();
-        await this.session.rr.sync();
+        const change = this.session.editor.undo();
+        if (change) await this.session.rr.enqueueSyncAfterSessionChange(change, t.Direction.Backwards);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/redo': {
         assert(this.session?.isLoaded());
-        this.session.editor.redo();
-        await this.session.rr.sync();
+        const change = this.session.editor.redo();
+        if (change) await this.session.rr.enqueueSyncAfterSessionChange(change, t.Direction.Forwards);
         await this.updateFrontend();
         return ok;
       }
@@ -553,42 +555,42 @@ class CodeMic {
       case 'recorder/insertAudio': {
         assert(this.session?.isLoaded());
         await this.session.editor.insertAudioTrack(req.uri, req.clock);
-        await this.session.rr.syncMedia();
+        await this.session.rr.enqueueSyncMedia();
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteAudio': {
         assert(this.session?.isLoaded());
         this.session.editor.deleteAudioTrack(req.id);
-        await this.session.rr.syncMedia();
+        await this.session.rr.enqueueSyncMedia();
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/updateAudio': {
         assert(this.session?.isLoaded());
         this.session.editor.updateAudioTrack(req.update);
-        await this.session.rr.syncMedia();
+        await this.session.rr.enqueueSyncMedia();
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/insertVideo': {
         assert(this.session?.isLoaded());
         await this.session.editor.insertVideoTrack(req.uri, req.clock);
-        await this.session.rr.syncMedia();
+        await this.session.rr.enqueueSyncMedia();
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteVideo': {
         assert(this.session?.isLoaded());
         this.session.editor.deleteVideoTrack(req.id);
-        await this.session.rr.syncMedia();
+        await this.session.rr.enqueueSyncMedia();
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/updateVideo': {
         assert(this.session?.isLoaded());
         this.session.editor.updateVideoTrack(req.update);
-        await this.session.rr.syncMedia();
+        await this.session.rr.enqueueSyncMedia();
         await this.updateFrontend();
         return ok;
       }
@@ -607,21 +609,21 @@ class CodeMic {
       case 'recorder/changeSpeed': {
         assert(this.session?.isLoaded());
         this.session.editor.changeSpeed(req.range, req.factor);
-        await this.session.rr.sync();
+        // await this.session.rr.enqueueSyncAfterSessionChange();
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/merge': {
         assert(this.session?.isLoaded());
         this.session.editor.merge(req.range);
-        await this.session.rr.sync();
+        // await this.session.rr.enqueueSyncAfterSessionChange();
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/insertGap': {
         assert(this.session?.isLoaded());
         this.session.editor.insertGap(req.clock, req.dur);
-        await this.session.rr.sync();
+        // await this.session.rr.enqueueSyncAfterSessionChange();
         await this.updateFrontend();
         return ok;
       }
@@ -645,8 +647,8 @@ class CodeMic {
       }
       case 'recorder/crop': {
         assert(this.session?.isLoaded());
-        this.session.editor.crop(req.clock);
-        await this.session.rr.sync();
+        const change = this.session.editor.crop(req.clock);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
@@ -695,6 +697,8 @@ class CodeMic {
     //       but it doesn't yet have a body either until scan is done.
     //       Calling download with skipIfExists will not actually skip
     //       because it sees that body doesn't exist.
+
+    session.core.assertFormatVersionSupport();
 
     // Confirm and commit temp session.
     if (session.temp) {
@@ -816,7 +820,6 @@ class CodeMic {
         break;
       }
       case t.Screen.Recorder: {
-        params.session.core.assertFormatVersionSupport();
         if (params.session.temp || (await this.loadRecorder(params.session, params.clock))) {
           if (params.session.temp) {
             this.recorder = { tabId: 'details-view' };
@@ -1125,6 +1128,9 @@ class CodeMic {
         avatarsPath: cache.avatarsPath,
         coversPath: cache.coversPath,
         version: cache.version,
+      },
+      dev: {
+        lastestFormatVersion: SessionCore.LATEST_FORMAT_VERSION,
       },
     };
   }

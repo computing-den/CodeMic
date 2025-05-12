@@ -3,13 +3,16 @@ import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import type { LoadedSession } from './session.js';
 import config from '../config.js';
-import AudioTrackPlayer from './audio_track_player.js';
-import VideoTrackPlayer from './video_track_player.js';
-import InternalWorkspace from './internal_workspace.js';
+// import AudioTrackPlayer from './audio_track_player.js';
+// import VideoTrackPlayer from './video_track_player.js';
+import InternalWorkspace, { SeekData, SeekStep } from './internal_workspace.js';
 import WorkspacePlayer from './workspace_player.js';
 import WorkspaceRecorder from './workspace_recorder.js';
 import VscWorkspace from './vsc_workspace.js';
+import QueueRunner from '../../lib/queue_runner.js';
 import _ from 'lodash';
+import { UpdateLoopAsync } from '../../lib/update_loop_async.js';
+import { isDuration } from 'moment';
 
 enum Status {
   Init,
@@ -20,39 +23,48 @@ enum Status {
 
 type Mode = {
   status: Status;
-  recordingEditor: boolean;
+  recorder: boolean;
 };
+
+const UPDATE_LOOP_INTERVAL_MS = 100;
 
 export default class SessionRecordAndReplay {
   session: LoadedSession;
-  internalWorkspace: InternalWorkspace;
-  audioTrackPlayers: AudioTrackPlayer[];
-  videoTrackPlayer: VideoTrackPlayer;
-  workspacePlayer: WorkspacePlayer;
-  workspaceRecorder: WorkspaceRecorder;
-  vscWorkspace: VscWorkspace;
   clock = 0;
+
+  private internalWorkspace: InternalWorkspace;
+  private vscWorkspace: VscWorkspace;
+
+  private workspacePlayer: WorkspacePlayer;
+  private workspaceRecorder: WorkspaceRecorder;
+
+  private queue = new QueueRunner();
+
+  // private audioTrackPlayers: AudioTrackPlayer[];
+  // private videoTrackPlayer: VideoTrackPlayer;
 
   private mode: Mode = {
     status: Status.Init,
-    recordingEditor: false,
+    recorder: false,
   };
-  private timeout: any;
-  private timeoutTimestamp = 0;
+
+  private updateLoop: UpdateLoopAsync;
 
   constructor(session: LoadedSession) {
     this.session = session;
     this.internalWorkspace = new InternalWorkspace(session);
-    this.vscWorkspace = new VscWorkspace(session);
-    this.audioTrackPlayers = session.body.audioTracks.map(audioTrack => new AudioTrackPlayer(this.session, audioTrack));
-    this.videoTrackPlayer = new VideoTrackPlayer(this.session);
-    this.workspacePlayer = new WorkspacePlayer(this.session, this.vscWorkspace);
-    this.workspaceRecorder = new WorkspaceRecorder(this.session, this.vscWorkspace);
+    this.vscWorkspace = new VscWorkspace(session, this.internalWorkspace);
+    // this.audioTrackPlayers = session.body.audioTracks.map(audioTrack => new AudioTrackPlayer(this.session, audioTrack));
+    // this.videoTrackPlayer = new VideoTrackPlayer(this.session);
+    this.workspacePlayer = new WorkspacePlayer(this.session, this.internalWorkspace, this.vscWorkspace);
+    this.workspaceRecorder = new WorkspaceRecorder(this.session, this.internalWorkspace, this.vscWorkspace);
 
-    for (const c of this.audioTrackPlayers) this.initAudioPlayer(c);
-    this.initVideoPlayer();
-    this.workspacePlayer.onError = this.gotError.bind(this);
-    this.workspaceRecorder.onError = this.gotError.bind(this);
+    this.updateLoop = new UpdateLoopAsync(this.enqueueUpdate.bind(this), UPDATE_LOOP_INTERVAL_MS);
+
+    // for (const c of this.audioTrackPlayers) this.initAudioPlayer(c);
+    // this.initVideoPlayer();
+    // this.workspacePlayer.onError = this.gotError.bind(this);
+    // this.workspaceRecorder.onError = this.gotError.bind(this);
   }
 
   get running(): boolean {
@@ -60,14 +72,282 @@ export default class SessionRecordAndReplay {
   }
 
   get recording(): boolean {
-    return Boolean(this.running && this.mode.recordingEditor);
+    return Boolean(this.running && this.mode.recorder);
   }
 
   get playing(): boolean {
-    return Boolean(this.running && !this.mode.recordingEditor);
+    return Boolean(this.running && !this.mode.recorder);
   }
 
-  async loadWorkspace(options?: { clock?: number }) {
+  async enqueueLoadWorkspace(options?: { clock?: number }) {
+    await this.stopOnError(this.queue.enqueue(this.loadWorkspace.bind(this), options));
+  }
+
+  // reloadMedia() {
+  //   this.audioTrackPlayers.forEach(p => this.disposeAudioPlayer(p));
+  //   this.disposeVideoPlayer();
+
+  //   this.audioTrackPlayers = this.session.body.audioTracks.map(
+  //     audioTrack => new AudioTrackPlayer(this.session, audioTrack),
+  //   );
+  //   this.videoTrackPlayer = new VideoTrackPlayer(this.session);
+  // }
+
+  async enqueueScan() {
+    await this.stopOnError(this.queue.enqueue(this.scan.bind(this)));
+  }
+
+  async enqueuePlay() {
+    await this.stopOnError(this.queue.enqueue(this.play.bind(this)));
+  }
+
+  async enqueueRecord() {
+    await this.stopOnError(this.queue.enqueue(this.record.bind(this)));
+  }
+
+  async enqueueSeek(clock: number) {
+    await this.stopOnError(this.queue.enqueue(this.seek.bind(this), clock));
+  }
+
+  /**
+   * This may be called from gotError which may be called from inside a queue
+   * task. So it must not be queued itself.
+   */
+  pause() {
+    this.updateLoop.stop();
+    this.queue.clear();
+    this.mode.status = Status.Paused;
+    // this.pauseAudios();
+    // this.pauseVideo();
+    if (this.mode.recorder) {
+      this.workspaceRecorder.pause();
+    } else {
+      this.workspacePlayer.pause();
+    }
+  }
+
+  // async fastSync() {
+  //   await this.seek(this.clock);
+  // }
+
+  // setClock(clock: number) {
+  //   this.clock = clock;
+  //   this.workspaceRecorder.setClock(this.clock);
+  //   this.workspacePlayer.setClock(this.clock);
+  // }
+
+  // loadAudioTrack(audioTrack: t.AudioTrack) {
+  //   const audioTrackPlayer = new AudioTrackPlayer(this.session, audioTrack);
+  //   this.audioTrackPlayers.push(audioTrackPlayer);
+  //   this.initAudioPlayer(audioTrackPlayer);
+  //   // audioTrackPlayer.load();
+  // }
+
+  // unloadAudioTrack(id: string) {
+  //   const i = this.audioTrackPlayers.findIndex(c => c.audioTrack.id === id);
+  //   if (i === -1) {
+  //     console.error(`SessionRecordAndReplay deleteAudio did not find audio track with id ${id}`);
+  //     return;
+  //   }
+
+  //   this.audioTrackPlayers[i].pause();
+  //   this.disposeAudioPlayer(this.audioTrackPlayers[i]);
+  //   this.audioTrackPlayers.splice(i, 1);
+  // }
+
+  // loadVideoTrack(videoTrack: t.VideoTrack) {
+  //   // Maybe load if video is in range?
+  // }
+
+  // unloadVideoTrack(id: string) {
+  //   if (this.videoTrackPlayer.videoTrack?.id === id) {
+  //     this.videoTrackPlayer.stop();
+  //   }
+  //   this.disposeVideoPlayer();
+  // }
+
+  handleFrontendAudioEvent(e: t.FrontendMediaEvent) {
+    // TODO
+    //   const audioPlayer = this.audioTrackPlayers.find(a => a.audioTrack.id === e.id);
+    //   if (audioPlayer) {
+    //     audioPlayer.handleAudioEvent(e);
+    //   } else {
+    //     console.error(`handleFrontendAudioEvent audio track player with id ${e.id} not found`);
+    //   }
+  }
+
+  handleFrontendVideoEvent(e: t.FrontendMediaEvent) {
+    // TODO
+    //   this.videoTrackPlayer.handleVideoEvent(e);
+  }
+
+  // async applyInsertEvent(cmd: t.InsertEventCmd) {
+  //   if (this.internalWorkspace.eventIndex === cmd.index - 1) {
+  //     this.internalWorkspace.eventIndex++;
+  //     await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Forwards);
+  //   }
+  // }
+
+  // async unapplyInsertEvent(cmd: t.InsertEventCmd) {
+  //   if (this.internalWorkspace.eventIndex === cmd.index) {
+  //     this.internalWorkspace.eventIndex--;
+  //     await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Backwards);
+  //   }
+  // }
+
+  // updateAudioTrack(audioTrack: t.AudioTrack) {
+  //   const audioTrackPlayer = this.audioTrackPlayers.find(p => p.audioTrack.id === audioTrack.id);
+  //   if (audioTrackPlayer) {
+  //     audioTrackPlayer.audioTrack = audioTrack;
+  //   }
+  // }
+
+  // updateVideoTrack(videoTrack: t.VideoTrack) {
+  //   if (this.videoTrackPlayer.videoTrack?.id === videoTrack.id) {
+  //     this.videoTrackPlayer.videoTrack = videoTrack;
+  //   }
+  // }
+
+  async enqueueSyncAfterSessionChange(change: t.SessionChange, dir?: t.Direction) {
+    await this.stopOnError(this.queue.enqueue(this.syncAfterSessionChange.bind(this), change, dir));
+  }
+
+  async enqueueSyncMedia() {
+    await this.stopOnError(this.queue.enqueue(this.syncMedia.bind(this)));
+  }
+
+  // private initAudioPlayer(c: AudioTrackPlayer) {
+  //   c.onError = this.gotError.bind(this);
+  // }
+
+  // private initVideoPlayer() {
+  //   this.videoTrackPlayer.onError = this.gotError.bind(this);
+  // }
+
+  // private disposeAudioPlayer(c: AudioTrackPlayer) {
+  //   c.onError = undefined;
+  // }
+
+  // private disposeVideoPlayer() {
+  //   this.videoTrackPlayer.onError = undefined;
+  // }
+
+  // private seekInRangeAudios() {
+  //   for (const c of this.audioTrackPlayers) {
+  //     if (this.isTrackInRange(c.audioTrack)) this.seekAudio(c);
+  //   }
+  // }
+
+  // private seekInRangeAudiosThatAreNotRunning() {
+  //   for (const c of this.audioTrackPlayers) {
+  //     if (!c.running && this.isTrackInRange(c.audioTrack)) this.seekAudio(c);
+  //   }
+  // }
+
+  // private seekAudio(c: AudioTrackPlayer) {
+  //   c.seek(this.globalClockToTrackLocal(c.audioTrack));
+  // }
+
+  // private playInRangeAudios() {
+  //   for (const c of this.audioTrackPlayers) {
+  //     if (!c.running && this.isTrackInRange(c.audioTrack)) c.play();
+  //   }
+  // }
+
+  // private setInRangeAudiosPlaybackRate() {
+  //   for (const c of this.audioTrackPlayers) {
+  //     if (this.isTrackInRange(c.audioTrack)) {
+  //       const rate = this.getAdjustedPlaybackRate(lib.clockToGlobal(c.lastReportedClock, c.audioTrack.clockRange));
+  //       c.setPlaybackRate(rate);
+  //     }
+  //   }
+  // }
+
+  // private pauseAudios() {
+  //   for (const c of this.audioTrackPlayers) {
+  //     if (c.running) c.pause();
+  //   }
+  // }
+
+  // private pauseOutOfRangeAudios() {
+  //   for (const c of this.audioTrackPlayers) {
+  //     if (c.running && !this.isTrackInRange(c.audioTrack)) c.pause();
+  //   }
+  // }
+
+  // private stopOutOfRangeVideo() {
+  //   const c = this.videoTrackPlayer;
+  //   if (c.videoTrack && !this.isTrackInRange(c.videoTrack)) c.stop();
+  // }
+
+  // private pauseVideo() {
+  //   this.videoTrackPlayer.pause();
+  // }
+
+  // private loadInRangeVideoAndSeek() {
+  //   const videoTrack = this.findInRangeVideoTrack();
+  //   if (videoTrack) {
+  //     this.videoTrackPlayer.loadTrack(videoTrack);
+  //     this.videoTrackPlayer.seek(this.globalClockToTrackLocal(videoTrack));
+  //   }
+  // }
+
+  // private loadInRangeVideoAndSeekIfDifferent() {
+  //   const videoTrack = this.findInRangeVideoTrack();
+  //   // console.log('loadInRangeVideoAndSeekIfDifferent videoTrack', videoTrack);
+  //   if (videoTrack && (this.videoTrackPlayer.videoTrack !== videoTrack || !this.videoTrackPlayer.running)) {
+  //     this.videoTrackPlayer.loadTrack(videoTrack);
+  //     this.videoTrackPlayer.seek(this.globalClockToTrackLocal(videoTrack));
+  //   }
+  // }
+
+  // private findInRangeVideoTrack(): t.VideoTrack | undefined {
+  //   return _.findLast(this.session.body.videoTracks, t => this.isTrackInRange(t));
+  // }
+
+  // private playInRangeVideo() {
+  //   if (
+  //     !this.videoTrackPlayer.running &&
+  //     this.videoTrackPlayer.videoTrack &&
+  //     this.isTrackInRange(this.videoTrackPlayer.videoTrack)
+  //   ) {
+  //     this.videoTrackPlayer.play();
+  //   }
+  // }
+
+  // private setInRangeVideoPlaybackRate() {
+  //   if (this.videoTrackPlayer.videoTrack && this.isTrackInRange(this.videoTrackPlayer.videoTrack)) {
+  //     const rate = this.getAdjustedPlaybackRate(
+  //       lib.clockToGlobal(this.videoTrackPlayer.lastReportedClock, this.videoTrackPlayer.videoTrack.clockRange),
+  //     );
+  //     this.videoTrackPlayer.setPlaybackRate(rate);
+  //   }
+  // }
+
+  // private getAdjustedPlaybackRate(clock: number): number {
+  //   const diff = this.clock - clock;
+  //   const threshold = 0.5;
+  //   if (diff > threshold) {
+  //     return 1.05;
+  //   } else if (diff < threshold) {
+  //     return 0.95;
+  //   } else {
+  //     return 1;
+  //   }
+  // }
+
+  private async enqueueUpdate(diffMs: number) {
+    await this.stopOnError(this.queue.enqueue(this.update.bind(this, diffMs)));
+  }
+
+  private async seek(clock: number) {
+    this.clock = Math.min(this.session.head.duration, clock);
+    await this.workspacePlayer.seek(clock);
+    await this.syncMedia();
+    this.updateLoop.resetDiff();
+  }
+
+  private async loadWorkspace(options?: { clock?: number }) {
     // Create workspace directory.
     await this.session.core.createWorkspaceDir();
 
@@ -92,8 +372,7 @@ export default class SessionRecordAndReplay {
     let targetUris: string[] | undefined;
     if (options?.clock) {
       const uriSet: t.UriSet = new Set();
-      const seekData = this.internalWorkspace.getSeekData(options.clock);
-      await this.internalWorkspace.seek(seekData, uriSet);
+      await this.internalWorkspace.seek(options.clock, uriSet);
       targetUris = Array.from(uriSet);
     }
 
@@ -105,37 +384,13 @@ export default class SessionRecordAndReplay {
     await this.vscWorkspace.closeIrrelevantVscTabs();
   }
 
-  // /**
-  //  * This must be called after loadWorkspace() and after the media manager and
-  //  * the video element have been mounted on the page.
-  //  * It's an optimization to preload mainly the video and not strictly necessary.
-  //  */
-  // loadMedia() {
-  //   // Load media tracks so that they're ready to play when they come into range.
-  //   // for (const p of this.audioTrackPlayers) p.load();
-
-  //   // Load video.
-  //   const videoTrack = this.findInRangeVideoTrack();
-  //   if (videoTrack) this.videoTrackPlayer.loadTrack(videoTrack);
-  // }
-
-  reloadMedia() {
-    this.audioTrackPlayers.forEach(p => this.disposeAudioPlayer(p));
-    this.disposeVideoPlayer();
-
-    this.audioTrackPlayers = this.session.body.audioTracks.map(
-      audioTrack => new AudioTrackPlayer(this.session, audioTrack),
-    );
-    this.videoTrackPlayer = new VideoTrackPlayer(this.session);
-  }
-
-  async scan() {
+  private async scan() {
     // Create workspace directory.
     await this.session.core.createWorkspaceDir();
 
     // Scan VSCode & filesystem.
     const events = await this.vscWorkspace.scanDirAndVsc();
-    this.session.editor.insertInitialEvents(events);
+    this.session.editor.insertScannedEvents(events);
 
     // TODO insert focus document and focus line.
 
@@ -146,283 +401,221 @@ export default class SessionRecordAndReplay {
     this.session.temp = false;
   }
 
-  async play() {
+  private async play() {
     assert(!this.running);
 
-    this.mode.recordingEditor = false;
+    this.mode.recorder = false;
     this.mode.status = Status.Running;
 
+    // Seek and sync.
     if (this.isAlmostAtTheEnd()) {
-      await this.seek(0, { noUpdate: true });
+      this.clock = 0;
+      await this.internalWorkspace.seek(0);
     }
+    await this.vscWorkspace.sync();
 
     await this.workspacePlayer.play();
-    this.update();
+    this.updateLoop.start();
   }
 
-  async record() {
+  private async record() {
     assert(!this.running);
 
-    if (this.clock !== this.session.head.duration) {
-      await this.seek(this.session.head.duration, { noUpdate: false });
-    }
-
-    this.mode.recordingEditor = true;
+    this.mode.recorder = true;
     this.mode.status = Status.Running;
 
+    // Seek and sync.
+    this.clock = this.session.head.duration;
+    await this.internalWorkspace.seek(this.session.head.duration);
+    await this.vscWorkspace.sync();
+
     await this.workspaceRecorder.record();
-
-    this.update();
+    this.updateLoop.start();
   }
-
-  pause() {
-    this.clearTimeout();
-    this.mode.status = Status.Paused;
-    this.pauseAudios();
-    this.pauseVideo();
-    this.pauseEditor();
-  }
-
-  // async fastSync() {
-  //   await this.seek(this.clock);
-  // }
 
   /**
-   * If in recorder mode, it will pause and switch to player mode.
+   * Only meant to be called by the update loop. Don't call it directly or make
+   * it do anything special when diffMs is 0.
+   * On error, it will call this.session.onError and also throw.
    */
-  async seek(clock: number, options?: { noUpdate: boolean }) {
-    const noUpdate = options?.noUpdate ?? false;
+  private async update(diffMs: number) {
+    try {
+      // const isLoading = this.videoTrackPlayer.loading || this.audioTrackPlayers.some(p => p.loading);
+      // if (isLoading) {
+      //   this.videoTrackPlayer.pause();
+      //   for (const c of this.audioTrackPlayers) c.pause();
+      //   return;
+      // }
+      this.clock += diffMs / 1000;
 
-    if (this.mode.recordingEditor) {
-      this.pause();
-      this.mode.recordingEditor = false;
-    }
+      if (this.mode.recorder) {
+        if (config.logSessionRRUpdateStep) {
+          console.log(
+            `SessionRecordAndReplay duration ${this.session.head.duration} -> ${Math.max(
+              this.session.head.duration,
+              this.clock,
+            )}`,
+          );
+        }
+        this.session.editor.updateDuration(Math.max(this.session.head.duration, this.clock), { coalescing: true });
+        // this.internalWorkspace.setEventIndexByClock(this.clock);
+      } else {
+        this.clock = Math.min(this.session.head.duration, this.clock);
+        await this.workspacePlayer.seek(this.clock);
+      }
 
-    this.clock = clock;
-    this.seekInRangeAudios();
-    this.loadInRangeVideoAndSeek();
-    await this.seekEditor();
+      await this.syncMedia();
 
-    if (!noUpdate) await this.update(); // Will clear previous timeouts.
-  }
+      if (!this.mode.recorder && this.clock === this.session.head.duration) {
+        this.pause();
+      }
 
-  setClock(clock: number) {
-    this.clock = clock;
-    this.workspaceRecorder.setClock(this.clock);
-    this.workspacePlayer.setClock(this.clock);
-  }
-
-  loadAudioTrack(audioTrack: t.AudioTrack) {
-    const audioTrackPlayer = new AudioTrackPlayer(this.session, audioTrack);
-    this.audioTrackPlayers.push(audioTrackPlayer);
-    this.initAudioPlayer(audioTrackPlayer);
-    // audioTrackPlayer.load();
-  }
-
-  unloadAudioTrack(id: string) {
-    const i = this.audioTrackPlayers.findIndex(c => c.audioTrack.id === id);
-    if (i === -1) {
-      console.error(`SessionRecordAndReplay deleteAudio did not find audio track with id ${id}`);
-      return;
-    }
-
-    this.audioTrackPlayers[i].pause();
-    this.disposeAudioPlayer(this.audioTrackPlayers[i]);
-    this.audioTrackPlayers.splice(i, 1);
-  }
-
-  loadVideoTrack(videoTrack: t.VideoTrack) {
-    // Maybe load if video is in range?
-  }
-
-  unloadVideoTrack(id: string) {
-    if (this.videoTrackPlayer.videoTrack?.id === id) {
-      this.videoTrackPlayer.stop();
-    }
-    this.disposeVideoPlayer();
-  }
-
-  handleFrontendAudioEvent(e: t.FrontendMediaEvent) {
-    const audioPlayer = this.audioTrackPlayers.find(a => a.audioTrack.id === e.id);
-    if (audioPlayer) {
-      audioPlayer.handleAudioEvent(e);
-    } else {
-      console.error(`handleFrontendAudioEvent audio track player with id ${e.id} not found`);
+      this.session.onProgress?.();
+    } catch (error) {
+      this.session.onError?.(error as Error);
+      throw error;
     }
   }
 
-  handleFrontendVideoEvent(e: t.FrontendMediaEvent) {
-    this.videoTrackPlayer.handleVideoEvent(e);
+  private async syncMedia() {
+    // TODO
+    // this.seekInRangeAudiosThatAreNotRunning();
+    // this.loadInRangeVideoAndSeekIfDifferent();
+    // if (this.running) {
+    //   this.playInRangeAudios();
+    //   this.playInRangeVideo();
+    // }
+    // this.pauseOutOfRangeAudios();
+    // this.stopOutOfRangeVideo();
   }
 
-  // async applyInsertEvent(cmd: t.InsertEventCmd) {
-  //   if (this.internalWorkspace.eventIndex === cmd.index - 1) {
-  //     this.internalWorkspace.eventIndex++;
-  //     await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Forwards);
-  //   }
-  // }
+  /**
+   * Used by undo/redo to update the internal and vsc workspace.
+   */
+  private async syncAfterSessionChange(change: t.SessionChange, dir: t.Direction = t.Direction.Forwards) {
+    // Apply changes to the internal workspace first.
+    const uriSet: t.UriSet = new Set();
+    const effects = dir === t.Direction.Forwards ? change.effects : change.effects.slice().reverse();
+    for (const effect of effects) {
+      await this.applySessionChangeEffect(effect, dir, uriSet);
+    }
 
-  // async unapplyInsertEvent(cmd: t.InsertEventCmd) {
-  //   if (this.internalWorkspace.eventIndex === cmd.index) {
-  //     this.internalWorkspace.eventIndex--;
-  //     await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Backwards);
-  //   }
-  // }
+    // Duration may have changed. Pull back if so.
+    // const isIndexPastEnd = this.internalWorkspace.eventIndex >= this.session.body.editorEvents.length;
+    // const isDurPastEnd = (this.internalWorkspace.getCurrentEvent()?.clock ?? 0) > this.session.head.duration;
+    // if (isDurPastEnd) {
+    // await this.internalWorkspace.seek(this.session.head.duration, uriSet);
+    // }
 
-  updateAudioTrack(audioTrack: t.AudioTrack) {
-    const audioTrackPlayer = this.audioTrackPlayers.find(p => p.audioTrack.id === audioTrack.id);
-    if (audioTrackPlayer) {
-      audioTrackPlayer.audioTrack = audioTrack;
+    // TODO if clock was at the end, make sure it stays at the end.
+
+    // Duration may have changed. Update clock.
+    this.clock = Math.min(this.session.head.duration, this.clock);
+
+    // Sync vscode
+    await this.vscWorkspace.sync(Array.from(uriSet));
+
+    // Sync media
+    await this.syncMedia();
+  }
+
+  /**
+   * Maintain this.internalWorkspace in sync based on the effects caused by a change in session head/body.
+   */
+  private async applySessionChangeEffect(effect: t.SessionChangeEffect, dir: t.Direction, uriSet: t.UriSet) {
+    switch (effect.type) {
+      case 'insertEditorEvent': {
+        if (dir === t.Direction.Forwards) {
+          if (this.internalWorkspace.eventIndex === effect.index - 1) {
+            // apply event
+            const step: SeekStep = { event: effect.event, index: effect.index };
+            await this.internalWorkspace.applySeekStep(step, t.Direction.Forwards, uriSet);
+            // this.clock = effect.event.clock;
+          }
+        } else {
+          if (this.internalWorkspace.eventIndex === effect.index) {
+            // unapply event
+            const step: SeekStep = { event: effect.event, index: effect.index };
+            await this.internalWorkspace.applySeekStep(step, t.Direction.Backwards, uriSet);
+          }
+        }
+
+        break;
+      }
+      case 'updateEditorEvent': {
+        // If event clocks are not the same, then we should update this.clock.
+        assert(effect.eventAfter.clock === effect.eventBefore.clock);
+
+        if (dir === t.Direction.Forwards) {
+          if (this.internalWorkspace.eventIndex === effect.index) {
+            // unapply eventBefore
+            const step1: SeekStep = { event: effect.eventBefore, index: effect.index };
+            await this.internalWorkspace.applySeekStep(step1, t.Direction.Backwards, uriSet);
+
+            // apply eventAfter
+            const step2: SeekStep = { event: effect.eventAfter, index: effect.index };
+            await this.internalWorkspace.applySeekStep(step2, t.Direction.Forwards, uriSet);
+          }
+        } else {
+          if (this.internalWorkspace.eventIndex === effect.index) {
+            // unapply eventAfter
+            const step1: SeekStep = { event: effect.eventAfter, index: effect.index };
+            await this.internalWorkspace.applySeekStep(step1, t.Direction.Backwards, uriSet);
+
+            // apply eventBefore
+            const step2: SeekStep = { event: effect.eventBefore, index: effect.index };
+            await this.internalWorkspace.applySeekStep(step2, t.Direction.Forwards, uriSet);
+          }
+        }
+
+        break;
+      }
+      case 'cropEditorEvents': {
+        if (dir === t.Direction.Forwards) {
+          if (this.internalWorkspace.eventIndex >= effect.index) {
+            // Unapply cropped events except those after current eventIndex
+            // indexes         0  1  2  3  4  5  6
+            // ei                             |
+            // effect.events            |________|
+            // effect.index             |
+            // unapply                  |_____|
+            // final ei              |
+            const steps: SeekStep[] = effect.events
+              .map((event, i) => ({ event, index: effect.index + i }))
+              .filter(s => s.index <= this.internalWorkspace.eventIndex)
+              .reverse();
+            const seekData: SeekData = { steps, direction: t.Direction.Backwards };
+            await this.internalWorkspace.seekWithData(seekData, uriSet);
+          }
+        } else {
+          if (this.internalWorkspace.eventIndex === effect.index - 1) {
+            // Apply cropped events
+            const steps: SeekStep[] = effect.events.map((event, i) => ({ event, index: effect.index + i }));
+            const seekData: SeekData = { steps, direction: t.Direction.Forwards };
+            await this.internalWorkspace.seekWithData(seekData, uriSet);
+            // this.clock = this.internalWorkspace.getCurrentEvent()?.clock ?? this.clock;
+          }
+        }
+
+        break;
+      }
+      default:
+        lib.unreachable(effect, 'Unknown effect type');
     }
   }
 
-  updateVideoTrack(videoTrack: t.VideoTrack) {
-    if (this.videoTrackPlayer.videoTrack?.id === videoTrack.id) {
-      this.videoTrackPlayer.videoTrack = videoTrack;
+  private async stopOnError<T>(promise: Promise<T>): Promise<T> {
+    try {
+      return await promise;
+    } catch (error) {
+      this.gotError();
+      throw error;
     }
   }
 
-  private initAudioPlayer(c: AudioTrackPlayer) {
-    c.onError = this.gotError.bind(this);
-  }
-
-  private initVideoPlayer() {
-    this.videoTrackPlayer.onError = this.gotError.bind(this);
-  }
-
-  private disposeAudioPlayer(c: AudioTrackPlayer) {
-    c.onError = undefined;
-  }
-
-  private disposeVideoPlayer() {
-    this.videoTrackPlayer.onError = undefined;
-  }
-
-  private async seekEditor() {
-    this.workspaceRecorder.setClock(this.clock);
-
-    if (this.mode.recordingEditor) {
-      this.workspacePlayer.setClock(this.clock);
-    } else {
-      await this.workspacePlayer.seek(this.clock);
-    }
-  }
-
-  private pauseEditor() {
-    if (this.mode.recordingEditor) {
-      this.workspaceRecorder.pause();
-    } else {
-      this.workspacePlayer.pause();
-    }
-  }
-
-  private seekInRangeAudios() {
-    for (const c of this.audioTrackPlayers) {
-      if (this.isTrackInRange(c.audioTrack)) this.seekAudio(c);
-    }
-  }
-
-  private seekInRangeAudiosThatAreNotRunning() {
-    for (const c of this.audioTrackPlayers) {
-      if (!c.running && this.isTrackInRange(c.audioTrack)) this.seekAudio(c);
-    }
-  }
-
-  private seekAudio(c: AudioTrackPlayer) {
-    c.seek(this.globalClockToTrackLocal(c.audioTrack));
-  }
-
-  private playInRangeAudios() {
-    for (const c of this.audioTrackPlayers) {
-      if (!c.running && this.isTrackInRange(c.audioTrack)) c.play();
-    }
-  }
-
-  // private setInRangeAudiosPlaybackRate() {
-  //   for (const c of this.audioTrackPlayers) {
-  //     if (this.isTrackInRange(c.audioTrack)) {
-  //       const rate = this.getAdjustedPlaybackRate(lib.clockToGlobal(c.lastReportedClock, c.audioTrack.clockRange));
-  //       c.setPlaybackRate(rate);
-  //     }
-  //   }
-  // }
-
-  private pauseAudios() {
-    for (const c of this.audioTrackPlayers) {
-      if (c.running) c.pause();
-    }
-  }
-
-  private pauseOutOfRangeAudios() {
-    for (const c of this.audioTrackPlayers) {
-      if (c.running && !this.isTrackInRange(c.audioTrack)) c.pause();
-    }
-  }
-
-  private stopOutOfRangeVideo() {
-    const c = this.videoTrackPlayer;
-    if (c.videoTrack && !this.isTrackInRange(c.videoTrack)) c.stop();
-  }
-
-  private pauseVideo() {
-    this.videoTrackPlayer.pause();
-  }
-
-  private loadInRangeVideoAndSeek() {
-    const videoTrack = this.findInRangeVideoTrack();
-    if (videoTrack) {
-      this.videoTrackPlayer.loadTrack(videoTrack);
-      this.videoTrackPlayer.seek(this.globalClockToTrackLocal(videoTrack));
-    }
-  }
-
-  private loadInRangeVideoAndSeekIfDifferent() {
-    const videoTrack = this.findInRangeVideoTrack();
-    // console.log('loadInRangeVideoAndSeekIfDifferent videoTrack', videoTrack);
-    if (videoTrack && (this.videoTrackPlayer.videoTrack !== videoTrack || !this.videoTrackPlayer.running)) {
-      this.videoTrackPlayer.loadTrack(videoTrack);
-      this.videoTrackPlayer.seek(this.globalClockToTrackLocal(videoTrack));
-    }
-  }
-
-  private findInRangeVideoTrack(): t.VideoTrack | undefined {
-    return _.findLast(this.session.body.videoTracks, t => this.isTrackInRange(t));
-  }
-
-  private playInRangeVideo() {
-    if (
-      !this.videoTrackPlayer.running &&
-      this.videoTrackPlayer.videoTrack &&
-      this.isTrackInRange(this.videoTrackPlayer.videoTrack)
-    ) {
-      this.videoTrackPlayer.play();
-    }
-  }
-
-  // private setInRangeVideoPlaybackRate() {
-  //   if (this.videoTrackPlayer.videoTrack && this.isTrackInRange(this.videoTrackPlayer.videoTrack)) {
-  //     const rate = this.getAdjustedPlaybackRate(
-  //       lib.clockToGlobal(this.videoTrackPlayer.lastReportedClock, this.videoTrackPlayer.videoTrack.clockRange),
-  //     );
-  //     this.videoTrackPlayer.setPlaybackRate(rate);
-  //   }
-  // }
-
-  // private getAdjustedPlaybackRate(clock: number): number {
-  //   const diff = this.clock - clock;
-  //   const threshold = 0.5;
-  //   if (diff > threshold) {
-  //     return 1.05;
-  //   } else if (diff < threshold) {
-  //     return 0.95;
-  //   } else {
-  //     return 1;
-  //   }
-  // }
-
-  private clearTimeout() {
-    clearTimeout(this.timeout);
-    this.timeout = 0;
+  private gotError() {
+    this.pause();
+    this.mode.status = Status.Error;
   }
 
   private isAlmostAtTheEnd() {
@@ -435,68 +628,5 @@ export default class SessionRecordAndReplay {
 
   private globalClockToTrackLocal(t: t.RangedTrack): number {
     return lib.clockToLocal(this.clock, t.clockRange);
-  }
-
-  private async update() {
-    this.clearTimeout();
-    this.timeoutTimestamp = performance.now();
-    await this.updateStep(this.timeoutTimestamp);
-  }
-
-  /**
-   * When called directly, we pass this.timeoutTimestamp so that the difference
-   * will be exactly 0 instead of a few nanoseconds because the frontend has
-   * special logic for clock === 0.
-   */
-  private updateStep = async (now?: number) => {
-    const timeAtUpdate = now ?? performance.now();
-    const isLoading = this.videoTrackPlayer.loading || this.audioTrackPlayers.some(p => p.loading);
-    if (isLoading) {
-      this.videoTrackPlayer.pause();
-      for (const c of this.audioTrackPlayers) c.pause();
-    } else {
-      this.clock += (timeAtUpdate - this.timeoutTimestamp) / 1000;
-
-      if (this.mode.recordingEditor) {
-        if (config.logSessionRRUpdateStep) {
-          console.log(
-            `SessionRecordAndReplay duration ${this.session.head.duration} -> ${Math.max(
-              this.session.head.duration,
-              this.clock,
-            )}`,
-          );
-        }
-        this.session.editor.updateDuration(Math.max(this.session.head.duration, this.clock), { coalescing: true });
-      } else {
-        this.clock = Math.min(this.session.head.duration, this.clock);
-      }
-
-      await this.seekEditor();
-      this.seekInRangeAudiosThatAreNotRunning();
-      this.loadInRangeVideoAndSeekIfDifferent();
-      if (this.running) {
-        this.playInRangeAudios();
-        this.playInRangeVideo();
-      }
-      this.pauseOutOfRangeAudios();
-      this.stopOutOfRangeVideo();
-
-      if (!this.mode.recordingEditor && this.clock === this.session.head.duration) {
-        this.pause();
-      }
-
-      this.session.onProgress?.();
-    }
-
-    if (this.running) {
-      this.timeoutTimestamp = timeAtUpdate;
-      this.timeout = setTimeout(this.updateStep, 100);
-    }
-  };
-
-  private gotError(error: Error) {
-    this.pause();
-    this.mode.status = Status.Error;
-    this.session.onError?.(error);
   }
 }

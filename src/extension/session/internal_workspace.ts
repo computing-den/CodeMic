@@ -1,8 +1,8 @@
 import * as path from 'path';
-import { URI, Utils as URIUtils } from 'vscode-uri';
+import { URI } from 'vscode-uri';
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
-import { LineRange, Selection, workspaceUri } from '../../lib/lib.js';
+import { LineRange, Selection, workspaceUri, lastSortedIndex } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import { LoadedSession } from './session.js';
 import InternalWorkspaceStepper from './internal_workspace_stepper.js';
@@ -20,7 +20,7 @@ import InternalTextDocument from './internal_text_document.js';
 type LiveWorktree = Map<string, LiveWorktreeItem>;
 type LiveWorktreeItem = { file: t.File; document?: t.InternalDocument; editor?: t.InternalEditor };
 
-export type SeekStep = t.EditorEventWithUri & { newEventIndex: number };
+export type SeekStep = { event: t.EditorEvent; index: number };
 export type SeekData = { steps: SeekStep[]; direction: t.Direction };
 
 // Not every InternalTextDocument may be attached to a InternalTextEditor. At least not until the
@@ -42,14 +42,14 @@ export default class InternalWorkspace {
     this.worktree = new Map();
     this.textDocuments = [];
     this.textEditors = [];
-    this.stepper = new InternalWorkspaceStepper(session);
+    this.stepper = new InternalWorkspaceStepper(session, this);
   }
 
   /**
    * Returns the last event that was executed. That is, the effects of that event are visible.
    */
-  getCurrentEvent(): t.EditorEventWithUri | undefined {
-    return this.session.body.eventContainer.at(this.eventIndex);
+  getCurrentEvent(): t.EditorEvent | undefined {
+    return this.session.body.editorEvents.at(this.eventIndex);
   }
 
   async restoreInitState() {
@@ -58,7 +58,7 @@ export default class InternalWorkspace {
     this.textEditors = [];
 
     // Apply all events whose clock is 0.
-    await this.seek(this.getSeekData(0));
+    await this.seek(0);
   }
 
   doesUriExist(uri: string): boolean {
@@ -233,40 +233,99 @@ export default class InternalWorkspace {
   // }
 
   getSeekData(toClock: number): SeekData {
-    // FORWARD
+    const finalIndex = lastSortedIndex(this.session.body.editorEvents, toClock, e => e.clock) - 1;
+    return this.getSeekDataByIndex(finalIndex);
+  }
 
-    const ec = this.session.body.eventContainer;
+  getSeekDataByIndex(finalIndex: number): SeekData {
+    // NO MOVEMENT:
+    // index          0   1   2   3   4   5   6   7
+    // clock          0   1   2   3   4   5   6   7
+    // cur index                  |
+    // toClock                    |
+    // final index                |
+    // ---
+    // cur index === final index
 
-    const end = ec.getIndexAfterClock(toClock);
+    // GOING FORWARD:
+    // index          0   1   2   3   4   5   6   7
+    // clock          0   1   2   3   4   4   6   7
+    // cur index                  |
+    // toClock                        |   |
+    // final index                        |
+    // ----
+    // cur index < final index
+    // apply events at: [cur index + 1, final index]
+
+    // GOING FORWARD:
+    // index          0   1   2   3   4   5   6   7
+    // clock          0   1   2   3   3   5   6   7
+    // cur index                  |
+    // toClock                    |   |
+    // final index                    |
+    // ----
+    // cur index < final index
+    // apply events at: [cur index + 1, final index]
+
+    // GOING BACKWARD:
+    // index          0   1   2   3   4   5   6   7
+    // clock          0   1   1   3   4   5   6   7
+    // cur index                  |
+    // toClock            |   |
+    // final index            |
+    // ----
+    // cur index > final index
+    // unapply events at: [final index + 1, cur index] in reverse order
+
+    const { editorEvents } = this.session.body;
     let direction = t.Direction.Forwards;
-    const steps: SeekStep[] = [];
+    let steps: SeekStep[] = [];
 
-    if (this.eventIndex < end) {
+    if (this.eventIndex < finalIndex) {
       // Go forward
-      const from = this.eventIndex + 1;
-      ec.forEachExc(from, end, (e, i) => steps.push({ ...e, newEventIndex: i }));
-    } else if (this.eventIndex > end) {
+      const events = editorEvents.slice(this.eventIndex + 1, finalIndex + 1);
+      steps = events.map((e, i) => ({ event: e, index: this.eventIndex + i + 1 }));
+    } else if (this.eventIndex > finalIndex) {
       // Go backward
-      ec.forEachExc(this.eventIndex, end - 1, (e, i) => steps.push({ ...e, newEventIndex: i - 1 }));
+      const events = editorEvents.slice(finalIndex + 1, this.eventIndex + 1).reverse();
+      steps = events.map((e, i) => ({ event: e, index: this.eventIndex - i }));
       direction = t.Direction.Backwards;
     }
 
     return { steps, direction };
   }
 
-  async seek(seekData: SeekData, uriSet?: t.UriSet) {
+  async seek(toClock: number, uriSet?: t.UriSet) {
+    await this.seekWithData(this.getSeekData(toClock), uriSet);
+  }
+
+  async seekWithData(seekData: SeekData, uriSet?: t.UriSet) {
     for (const step of seekData.steps) {
       await this.applySeekStep(step, seekData.direction, uriSet);
     }
-    this.finalizeSeek(seekData);
+    // this.finalizeSeek(seekData);
   }
 
   async applySeekStep(step: SeekStep, direction: t.Direction, uriSet?: t.UriSet) {
-    await this.stepper.applyEditorEvent(step.event, step.uri, direction, uriSet);
-    this.eventIndex = step.newEventIndex;
+    await this.stepper.applyEditorEvent(step.event, direction, uriSet);
+    this.eventIndex = step.index;
+    if (direction === t.Direction.Backwards) {
+      this.eventIndex--;
+    }
   }
 
-  finalizeSeek(seekData: SeekData) {
-    this.eventIndex = seekData.steps.at(-1)?.newEventIndex ?? this.eventIndex;
-  }
+  // finalizeSeek(seekData: SeekData) {
+  //   this.eventIndex = seekData.steps.at(-1)?.newEventIndex ?? this.eventIndex;
+  // }
 }
+
+// export function seekHelper(
+//   eventIndex: number,
+//   finalIndex: number,
+// ): { slice: [number, number]; direction: t.Direction } {
+//   if (eventIndex <= finalIndex) {
+//     return { slice: [eventIndex + 1, finalIndex + 1], direction: t.Direction.Forwards };
+//   } else {
+//     return { slice: [finalIndex + 1, eventIndex + 1], direction: t.Direction.Backwards };
+//   }
+// }

@@ -2,35 +2,48 @@ import * as t from '../../lib/types.js';
 import { Range, LineRange, Selection, ContentChange, Position, nextId } from '../../lib/lib.js';
 import _ from 'lodash';
 
-export function serializeSessionBodyJSON(body: t.SessionBodyJSON): t.SessionBodyCompact {
+type UriMap = Map<string, number>;
+
+export function serializeSessionBody(body: t.SessionBody): t.SessionBodyCompact {
+  const uris = _.uniq(
+    _.concat(
+      body.editorEvents.map(e => e.uri),
+      body.focusTimeline.map(e => e.uri),
+    ),
+  );
+  const uriMap = new Map(uris.map((uri, i) => [uri, i])); // URI to number
   return {
+    uris,
+    editorEvents: _.map(body.editorEvents, t => serializeEditorEvent(t, uriMap)),
     audioTracks: body.audioTracks,
     videoTracks: body.videoTracks,
-    editorTracks: _.mapValues(body.editorTracks, t => t.map(serializeEditorEvent)),
     defaultEol: body.defaultEol,
-    focusTimeline: body.focusTimeline.map(serializeFocus),
+    focusTimeline: body.focusTimeline.map(f => serializeFocus(f, uriMap)),
   };
 }
 
-function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
+function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCompact {
   switch (e.type) {
     case 'init':
       return {
         t: 0,
+        u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
         f: e.file,
       };
     case 'textChange':
       return {
         t: 1,
+        u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
         cc: e.contentChanges.map(serializeContentChange),
         rcc: e.revContentChanges.map(serializeContentChange),
-        u: e.updateSelection ? undefined : false,
+        us: e.updateSelection ? undefined : false,
       };
     case 'openTextDocument':
       return {
         t: 2,
+        u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
         x: e.text,
         e: e.eol,
@@ -40,6 +53,7 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
     case 'closeTextDocument':
       return {
         t: 3,
+        u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
         rt: e.revText,
         re: e.revEol,
@@ -48,6 +62,7 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
     case 'showTextEditor':
       return {
         t: 4,
+        u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
         p: e.preserveFocus ? true : undefined,
         s: e.selections?.map(serializeSelection),
@@ -60,6 +75,7 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
     case 'closeTextEditor':
       return {
         t: 5,
+        u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
         rs: e.revSelections?.map(serializeSelection),
         rv: e.revVisibleRange && serializeLineRange(e.revVisibleRange),
@@ -67,6 +83,7 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
     case 'select':
       return {
         t: 6,
+        u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
         s: e.selections.map(serializeSelection),
         // v: serializeRange(e.visibleRange),
@@ -77,6 +94,7 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
     case 'scroll':
       return {
         t: 7,
+        u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
         v: serializeLineRange(e.visibleRange),
         rv: e.revVisibleRange && serializeLineRange(e.revVisibleRange),
@@ -85,15 +103,17 @@ function serializeEditorEvent(e: t.EditorEvent): t.EditorEventCompact {
     case 'save':
       return {
         t: 8,
+        u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
       };
     case 'textInsert':
       return {
         t: 9,
+        u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
         x: e.text,
         r: serializeRange(e.revRange),
-        u: e.updateSelection ? undefined : false,
+        us: e.updateSelection ? undefined : false,
       };
   }
 }
@@ -122,32 +142,32 @@ function serializeClockRange(r: t.ClockRange): t.ClockRangeCompact {
   return [serializeClock(r.start), serializeClock(r.end)];
 }
 
-function serializeFocus(focus: t.Focus): t.FocusCompact {
+function serializeFocus(focus: t.Focus, uriMap: UriMap): t.FocusCompact {
   return {
     c: serializeClock(focus.clock),
-    u: focus.uri,
+    u: uriMap.get(focus.uri)!,
     t: focus.text,
     n: focus.number,
   };
 }
 
-export function deserializeSessionBody(compact: t.SessionBodyCompact): t.SessionBodyJSON {
-  const editorTracks = _.mapValues(compact.editorTracks, t => t.map(deserializeEditorEvent));
+export function deserializeSessionBody(compact: t.SessionBodyCompact): t.SessionBody {
   return {
+    editorEvents: _.map(compact.editorEvents, t => deserializeEditorEvent(t, compact.uris)),
     audioTracks: compact.audioTracks,
     videoTracks: compact.videoTracks,
-    editorTracks,
     defaultEol: compact.defaultEol,
-    focusTimeline: compact.focusTimeline.map(deserializeFocus),
+    focusTimeline: compact.focusTimeline.map(f => deserializeFocus(f, compact.uris)),
   };
 }
 
-function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
+function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.EditorEvent {
   switch (e.t) {
     case 0:
       return {
         type: 'init',
         id: nextId(),
+        uri: uris[e.u],
         clock: deserializeClock(e.c),
         file: e.f,
       };
@@ -155,15 +175,17 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
       return {
         type: 'textChange',
         id: nextId(),
+        uri: uris[e.u],
         clock: deserializeClock(e.c),
         contentChanges: e.cc.map(deserializeContentChange),
         revContentChanges: e.rcc.map(deserializeContentChange),
-        updateSelection: e.u ?? true,
+        updateSelection: e.us ?? true,
       };
     case 2:
       return {
         type: 'openTextDocument',
         id: nextId(),
+        uri: uris[e.u],
         clock: deserializeClock(e.c),
         text: e.x,
         eol: e.e,
@@ -173,6 +195,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
       return {
         type: 'closeTextDocument',
         id: nextId(),
+        uri: uris[e.u],
         clock: deserializeClock(e.c),
         revText: e.rt,
         revEol: e.re,
@@ -181,6 +204,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
       return {
         type: 'showTextEditor',
         id: nextId(),
+        uri: uris[e.u],
         clock: deserializeClock(e.c),
         preserveFocus: e.p ?? false,
         selections: e.s?.map(deserializeSelection),
@@ -193,6 +217,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
       return {
         type: 'closeTextEditor',
         id: nextId(),
+        uri: uris[e.u],
         clock: deserializeClock(e.c),
         revSelections: e.rs?.map(deserializeSelection),
         revVisibleRange: e.rv && deserializeLineRange(e.rv),
@@ -201,6 +226,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
       return {
         type: 'select',
         id: nextId(),
+        uri: uris[e.u],
         clock: deserializeClock(e.c),
         selections: e.s.map(deserializeSelection),
         // visibleRange: deserializeRange(e.v),
@@ -211,6 +237,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
       return {
         type: 'scroll',
         id: nextId(),
+        uri: uris[e.u],
         clock: deserializeClock(e.c),
         visibleRange: deserializeLineRange(e.v),
         revVisibleRange: deserializeLineRange(e.rv),
@@ -219,16 +246,18 @@ function deserializeEditorEvent(e: t.EditorEventCompact): t.EditorEvent {
       return {
         type: 'save',
         id: nextId(),
+        uri: uris[e.u],
         clock: deserializeClock(e.c),
       };
     case 9:
       return {
         type: 'textInsert',
         id: nextId(),
+        uri: uris[e.u],
         clock: deserializeClock(e.c),
         text: e.x,
         revRange: deserializeRange(e.r),
-        updateSelection: e.u ?? true,
+        updateSelection: e.us ?? true,
       };
   }
 }
@@ -257,10 +286,10 @@ function deserializeClockRange(r: t.ClockRangeCompact): t.ClockRange {
   return { start: deserializeClock(r[0]), end: deserializeClock(r[1]) };
 }
 
-function deserializeFocus(focus: t.FocusCompact): t.Focus {
+function deserializeFocus(focus: t.FocusCompact, uris: string[]): t.Focus {
   return {
     clock: deserializeClock(focus.c),
-    uri: focus.u,
+    uri: uris[focus.u],
     number: focus.n,
     text: focus.t,
   };

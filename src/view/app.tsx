@@ -16,7 +16,7 @@ type AppProps = {
 export default function App({ store }: AppProps) {
   const renderers = {
     [t.Screen.Account]: (
-      <Account user={store.user} account={store.account!} earlyAccessEmail={store.earlyAccessEmail} />
+      <Account user={store.user} account={store.account!} earlyAccessEmail={store.earlyAccessEmail} dev={store.dev} />
     ),
     [t.Screen.Welcome]: (
       <Welcome user={store.user} welcome={store.welcome!} earlyAccessEmail={store.earlyAccessEmail} />

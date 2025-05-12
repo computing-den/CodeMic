@@ -579,8 +579,18 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
   }
 
   const toolbarActions = [
-    <Toolbar.Button title="Undo" icon="fa-solid fa-rotate-left" disabled={!session.canUndo} onClick={undo} />,
-    <Toolbar.Button title="Redo" icon="fa-solid fa-rotate-right" disabled={!session.canRedo} onClick={redo} />,
+    <Toolbar.Button
+      title="Undo"
+      icon="fa-solid fa-rotate-left"
+      disabled={!session.canUndo || session.playing || session.recording}
+      onClick={undo}
+    />,
+    <Toolbar.Button
+      title="Redo"
+      icon="fa-solid fa-rotate-right"
+      disabled={!session.canRedo || session.playing || session.recording}
+      onClick={redo}
+    />,
     <Toolbar.Separator />,
     <Toolbar.Button
       title="Insert audio"

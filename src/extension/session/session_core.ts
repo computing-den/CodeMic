@@ -1,4 +1,4 @@
-import { deserializeSessionBody, serializeSessionBodyJSON } from './serialization.js';
+import { deserializeSessionBody, serializeSessionBody } from './serialization.js';
 import config from '../config.js';
 import * as lib from '../../lib/lib.js';
 import * as t from '../../lib/types.js';
@@ -26,7 +26,7 @@ const WRITE_HISTORY_CLOCK_TIMEOUT_MS = 3_000;
 export default class SessionCore {
   constructor(public session: Session) {}
 
-  static LATEST_FORMAT_VERSION = 1;
+  static LATEST_FORMAT_VERSION = 2;
 
   static async readLocalHead(workspace: string): Promise<t.SessionHead | undefined> {
     return await storage.readJSONOptional<t.SessionHead>(path.join(SessionCore.getDataPath(workspace), 'head.json'));
@@ -272,16 +272,16 @@ export default class SessionCore {
 
     this.session.editor.saved();
 
-    if (config.debug) {
-      console.log('XXX DEBUG Reading head again to make sure');
-      try {
-        await SessionCore.readLocal(this.session.context, this.session.workspace);
-        console.log('XXX DEBUG head was written correctly');
-      } catch (error) {
-        debugger;
-        console.error('XXX DEBUG head was not written correctly', error);
-      }
-    }
+    // if (config.debug) {
+    //   console.log('XXX DEBUG Reading head again to make sure');
+    //   try {
+    //     await SessionCore.readLocal(this.session.context, this.session.workspace);
+    //     console.log('XXX DEBUG head was written correctly');
+    //   } catch (error) {
+    //     debugger;
+    //     console.error('XXX DEBUG head was not written correctly', error);
+    //   }
+    // }
   }
 
   async writeHead() {
@@ -292,10 +292,7 @@ export default class SessionCore {
 
   async writeBody() {
     assert(this.session.isLoaded(), 'writeBody: body is not yet loaded.');
-    await storage.writeJSON(
-      path.join(this.dataPath, 'body.json'),
-      serializeSessionBodyJSON(this.session.body.toJSON()),
-    );
+    await storage.writeJSON(path.join(this.dataPath, 'body.json'), serializeSessionBody(this.session.body));
     this.session.local = true;
     console.log('Wrote session body');
   }
@@ -492,14 +489,12 @@ export default class SessionCore {
 
   async getUsedBlobs(): Promise<Set<string>> {
     assert(this.session.local, 'Session does not exist on disk');
-    const body = this.session.body?.toJSON() ?? (await this.readBody());
+    const body = this.session.body ?? (await this.readBody());
     const blobs = new Set<string>();
 
     // Find blobs in editor tracks.
-    for (const track of Object.values(body.editorTracks)) {
-      for (const e of track) {
-        if (e.type === 'init' && e.file.type === 'local') blobs.add(e.file.sha1);
-      }
+    for (const e of body.editorEvents) {
+      if (e.type === 'init' && e.file.type === 'local') blobs.add(e.file.sha1);
     }
 
     // Find blobs in audio and video tracks.

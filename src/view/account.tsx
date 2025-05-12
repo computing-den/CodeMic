@@ -6,8 +6,9 @@ import postMessage from './api.js';
 import _ from 'lodash';
 import moment from 'moment';
 import { VSCodeButton, VSCodeLink, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
+import config from './config.js';
 
-type Props = { user?: t.UserUI; account: t.AccountUIState; earlyAccessEmail?: string };
+type Props = { user?: t.UserUI; account: t.AccountUIState; earlyAccessEmail?: string; dev: t.DevUIState };
 export default class Account extends React.Component<Props> {
   fieldChanged = async (field: keyof t.AccountUpdate, value: any) => {
     await postMessage({ type: 'account/update', changes: { [field]: value } });
@@ -47,7 +48,7 @@ export default class Account extends React.Component<Props> {
   };
 
   render() {
-    const { user, account, earlyAccessEmail } = this.props;
+    const { user, account, earlyAccessEmail, dev } = this.props;
     const { credentials, join, error } = account;
 
     const wrap = (body: JSX.Element) => (
@@ -56,6 +57,7 @@ export default class Account extends React.Component<Props> {
           <Section.Body>
             <div className="heading-subsection subsection">
               <h1>CodeMic</h1>
+              {`format version: ${dev.lastestFormatVersion}`}
             </div>
             {body}
           </Section.Body>
