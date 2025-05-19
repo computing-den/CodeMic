@@ -546,6 +546,18 @@ class CodeMic {
         await this.updateFrontend();
         return ok;
       }
+      case 'recorder/setSelection': {
+        assert(this.session?.isLoaded());
+        this.session.editor.setSelection(req.selection);
+        await this.updateFrontend();
+        return ok;
+      }
+      case 'recorder/extendSelection': {
+        assert(this.session?.isLoaded());
+        this.session.editor.extendSelection(req.clock);
+        await this.updateFrontend();
+        return ok;
+      }
       case 'recorder/updateDetails': {
         assert(this.session);
         this.session.editor.updateDetails(req.changes);
@@ -554,43 +566,43 @@ class CodeMic {
       }
       case 'recorder/insertAudio': {
         assert(this.session?.isLoaded());
-        await this.session.editor.insertAudioTrack(req.uri, req.clock);
-        await this.session.rr.enqueueSyncMedia();
+        const change = await this.session.editor.insertAudioTrack(req.uri, req.clock);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteAudio': {
         assert(this.session?.isLoaded());
-        this.session.editor.deleteAudioTrack(req.id);
-        await this.session.rr.enqueueSyncMedia();
+        const change = this.session.editor.deleteAudioTrack(req.id);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/updateAudio': {
         assert(this.session?.isLoaded());
-        this.session.editor.updateAudioTrack(req.update);
-        await this.session.rr.enqueueSyncMedia();
+        const change = this.session.editor.updateAudioTrack(req.update);
+        if (change) await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/insertVideo': {
         assert(this.session?.isLoaded());
-        await this.session.editor.insertVideoTrack(req.uri, req.clock);
-        await this.session.rr.enqueueSyncMedia();
+        const change = await this.session.editor.insertVideoTrack(req.uri, req.clock);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteVideo': {
         assert(this.session?.isLoaded());
-        this.session.editor.deleteVideoTrack(req.id);
-        await this.session.rr.enqueueSyncMedia();
+        const change = this.session.editor.deleteVideoTrack(req.id);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/updateVideo': {
         assert(this.session?.isLoaded());
-        this.session.editor.updateVideoTrack(req.update);
-        await this.session.rr.enqueueSyncMedia();
+        const change = this.session.editor.updateVideoTrack(req.update);
+        if (change) await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
@@ -629,19 +641,22 @@ class CodeMic {
       }
       case 'recorder/insertChapter': {
         assert(this.session?.isLoaded());
-        this.session.editor.insertChapter(req.clock, req.title);
+        const change = this.session.editor.insertChapter(req.clock, req.title);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/updateChapter': {
         assert(this.session?.isLoaded());
-        this.session.editor.updateChapter(req.index, req.update);
+        const change = this.session.editor.updateChapter(req.index, req.update);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/deleteChapter': {
         assert(this.session?.isLoaded());
-        this.session.editor.deleteChapter(req.index);
+        const change = this.session.editor.deleteChapter(req.index);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
@@ -1085,8 +1100,6 @@ class CodeMic {
         temp: this.session.temp,
         mustScan: this.session.mustScan,
         loaded: this.session.isLoaded(),
-        canUndo: this.session.editor.canUndo,
-        canRedo: this.session.editor.canRedo,
         playing: this.session.rr?.playing ?? false,
         recording: this.session.rr?.recording ?? false,
         head: this.session.head,
@@ -1115,13 +1128,24 @@ class CodeMic {
       };
     }
 
+    let recorder: t.RecorderUIState | undefined;
+    if (this.recorder) {
+      assert(this.session);
+      recorder = {
+        ...this.recorder,
+        canUndo: this.session.editor.canUndo,
+        canRedo: this.session.editor.canRedo,
+        selection: this.session.editor.selection,
+      };
+    }
+
     return {
       earlyAccessEmail: this.context.earlyAccessEmail,
       screen: this.screen,
       user: this.context.user && { ...this.context.user, metadata: this.userMetadata },
       account: this.account,
       welcome,
-      recorder: this.recorder,
+      recorder,
       player: {},
       session,
       cache: {

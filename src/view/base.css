@@ -52,6 +52,7 @@ body.vscode-light {
 
   --marker-label-color: white;
   --marker-chapter-color-hover: #bd6c47;
+  --marker-chapter-color-active: #b25931;
 
   --popover-border-color: #aaa;
   --popover-background: #1f1f1f;
@@ -85,6 +86,7 @@ body.vscode-dark {
 
   --marker-label-color: #333;
   --marker-chapter-color-hover: #f8b394;
+  --marker-chapter-color-active: #ffcbb3;
 
   --popover-border-color: #aaa;
   --popover-background: #1f1f1f;

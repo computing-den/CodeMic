@@ -41,6 +41,8 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/publish' }; response: OKResponse }
   | { request: { type: 'recorder/undo' }; response: OKResponse }
   | { request: { type: 'recorder/redo' }; response: OKResponse }
+  | { request: { type: 'recorder/setSelection'; selection?: RecorderSelection }; response: OKResponse }
+  | { request: { type: 'recorder/extendSelection'; clock: number }; response: OKResponse }
   | { request: { type: 'recorder/updateDetails'; changes: SessionDetailsUpdate }; response: OKResponse }
   // | { request: { type: 'recorder/updateDuration'; duration: number }; response: OKResponse }
   | { request: { type: 'recorder/insertAudio'; uri: string; clock: number }; response: OKResponse }
@@ -294,8 +296,16 @@ export type WelcomeUIState = {
 export type RecorderUIState = {
   workspace?: string;
   tabId: RecorderUITabId;
+  canUndo: boolean;
+  canRedo: boolean;
+  selection?: RecorderSelection;
 };
 export type RecorderUITabId = 'editor-view' | 'details-view';
+
+export type RecorderSelection = RecorderSelectionEditor | RecorderSelectionTrack | RecorderSelectionChapter;
+export type RecorderSelectionEditor = { type: 'editor'; focus: number; anchor: number };
+export type RecorderSelectionTrack = { type: 'track'; trackType: 'audio' | 'video' | 'image'; id: string };
+export type RecorderSelectionChapter = { type: 'chapter'; index: number };
 
 export type PlayerUIState = {
   // nothing yet.
@@ -308,8 +318,6 @@ export type SessionUIState = {
   loaded: boolean;
   playing: boolean;
   recording: boolean;
-  canUndo: boolean;
-  canRedo: boolean;
   head: SessionHead;
   clock: number;
   workspace: string;
@@ -766,6 +774,11 @@ export type SessionEffect =
       clock: number;
       duration: number;
       rrClock: number;
+    }
+  | {
+      type: 'setSelection';
+      before?: RecorderSelection;
+      after?: RecorderSelection;
     };
 
 export interface InternalEditor {

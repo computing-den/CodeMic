@@ -497,7 +497,7 @@ export default class SessionRecordAndReplay {
 
     // Apply session effects.
     // Makes sure internal workspace stays consistent.
-    // May also update this.clock (after speed change, merge, etc.).
+    // May also update this.clock and editor.selection after speed change, merge, etc.
     if (change.direction === t.Direction.Forwards) {
       for (const effect of change.next.effects) {
         await this.applySessionEffect(change, effect, uriSet);
@@ -526,7 +526,7 @@ export default class SessionRecordAndReplay {
 
   /**
    * Maintains this.internalWorkspace based on the effects caused by a change in session head/body.
-   * Updates this.clock (after speed change, merge, etc.).
+   * Updates this.clock and editor.selection after speed change, merge, etc.
    */
   private async applySessionEffect(change: t.SessionChange, effect: t.SessionEffect, uriSet: t.UriSet) {
     switch (effect.type) {
@@ -650,6 +650,15 @@ export default class SessionRecordAndReplay {
           } else {
             this.clock = lib.calcClockAfterMerge(this.clock, range);
           }
+        }
+
+        break;
+      }
+      case 'setSelection': {
+        if (change.direction === t.Direction.Forwards) {
+          this.session.editor.setSelection(effect.after);
+        } else {
+          this.session.editor.setSelection(effect.before);
         }
 
         break;

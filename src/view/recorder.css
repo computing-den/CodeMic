@@ -343,20 +343,23 @@
                 &.marker_chapter {
                   border-color: var(--marker-chapter-color);
                   border-width: 3px;
-                }
-                &.marker_chapter {
-                  border-color: var(--marker-chapter-color);
-                  border-width: 3px;
-                  .label {
+                  .content {
                     background: var(--marker-chapter-color);
                   }
 
-                  &.marker_active,
                   &:hover {
                     border-color: var(--marker-chapter-color-hover);
                     border-width: 3px;
-                    .label {
+                    .content {
                       background: var(--marker-chapter-color-hover);
+                    }
+                  }
+
+                  &.marker_active,
+                  &.marker_active:hover {
+                    border-color: var(--marker-chapter-color-active);
+                    .content {
+                      background: var(--marker-chapter-color-active);
                     }
                   }
                 }
@@ -380,24 +383,49 @@
                   border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--popover-border));
                   text-align: center;
                 }
-                .label {
+                .content {
                   position: absolute;
                   right: 0;
                   /* background: var(--vscode-sideBar-background); */
                   background: #777;
                   top: 0px;
-                  font-size: 0.9em;
-                  padding: 1px 5px 3px 5px;
-                  text-align: right;
+                  padding: 0 5px 3px 5px;
                   max-width: 80%;
-                  text-overflow: ellipsis;
-                  display: inline-block;
-                  white-space: nowrap;
-                  overflow: hidden;
+                  display: flex;
+                  align-items: center;
+                  gap: var(--spacing-small);
                   z-index: -1;
-                  font-weight: bold;
-                  color: var(--marker-label-color);
                   transition: background 0.2s ease-in-out;
+
+                  .label {
+                    flex: 1;
+                    white-space: nowrap;
+                    text-overflow: ellipsis;
+                    overflow: hidden;
+                    text-align: right;
+                    font-size: 0.9em;
+                    font-weight: bold;
+                    color: var(--marker-label-color);
+                  }
+
+                  .buttons {
+                    display: flex;
+                    gap: var(--spacing-small);
+
+                    & vscode-button {
+                      color: var(--marker-label-color);
+
+                      &::part(control) {
+                        padding: var(--spacing-small);
+                      }
+
+                      .codicon {
+                        width: auto;
+                        height: auto;
+                        font-size: 0.9em;
+                      }
+                    }
+                  }
                 }
               }
             }

@@ -15,6 +15,7 @@ const SAVE_TIMEOUT_MS = 5_000;
 
 export default class SessionEditor {
   dirty = false;
+  selection: t.RecorderSelection | undefined;
 
   private sessionSnapshots: t.SessionSnapshot[] = [];
   // The index of the last update whose effects are visible.
@@ -59,6 +60,25 @@ export default class SessionEditor {
     this.session.body = body;
     this.sessionSnapshotIndex = 0;
     this.sessionSnapshots = [{ head: this.session.head, body, effects: [] }];
+  }
+
+  setSelection(selection?: t.RecorderSelection) {
+    this.selection = selection;
+  }
+
+  /**
+   * Since selection is stored on the backend, updating the selection from the
+   * frontend is an async operation. So when quickly selecting a region by
+   * clicking and dragging the mouse, the mouse-move handler is called before
+   * the initial click is handled and the selection updated. This will make it
+   * hard to detect where the anchor should be. That's why we have the
+   * extendSelection method which will not touch the anchor but only update the
+   * focus.
+   */
+  extendSelection(clock: number) {
+    if (this.selection?.type === 'editor') {
+      this.selection.focus = clock;
+    }
   }
 
   updateDetails(patch: t.SessionDetailsUpdate) {
@@ -131,15 +151,16 @@ export default class SessionEditor {
     }
   }
 
-  async insertAudioTrack(uri: string, clock: number) {
+  async insertAudioTrack(uri: string, clock: number): Promise<t.SessionChange> {
     assert(this.session.isLoaded());
     const fsPath = URI.parse(uri).fsPath;
     const data = await fs.promises.readFile(fsPath);
     const duration = getMp3Duration(data);
     const sha1 = await misc.computeSHA1(data);
     await this.session.core.copyToBlob(fsPath, sha1);
+    const id = uuid();
     const audioTrack: t.AudioTrack = {
-      id: uuid(),
+      id,
       type: 'audio',
       clockRange: { start: clock, end: clock + duration },
       file: { type: 'local', sha1: sha1 },
@@ -149,24 +170,40 @@ export default class SessionEditor {
     let { audioTracks } = this.session.body;
     audioTracks = lib.spliceImmutable(audioTracks, audioTracks.length - 1, 0, audioTrack);
     const sessionDuration = Math.max(this.session.head.duration, audioTrack.clockRange.end);
-    this.insertApplySessionPatch({ body: { audioTracks }, head: { duration: sessionDuration } });
+    return this.insertApplySessionPatch({
+      body: { audioTracks },
+      head: { duration: sessionDuration },
+      effects: [{ type: 'setSelection', after: { type: 'track', trackType: 'audio', id } }],
+    });
   }
 
-  deleteAudioTrack(id: string) {
+  deleteAudioTrack(id: string): t.SessionChange {
     assert(this.session.isLoaded());
     const audioTracks = this.session.body.audioTracks.filter(t => t.id !== id);
-    this.insertApplySessionPatch({ body: { audioTracks } });
+    return this.insertApplySessionPatch({
+      body: { audioTracks },
+      effects: [{ type: 'setSelection', before: { type: 'track', trackType: 'audio', id } }],
+    });
   }
 
-  updateAudioTrack(update: Partial<t.AudioTrack>) {
+  updateAudioTrack(update: Partial<t.AudioTrack>): t.SessionChange | undefined {
     assert(this.session.isLoaded());
     assert(update.id);
     const audioTracks = this.session.body.audioTracks.map(t => (t.id === update.id ? { ...t, ...update } : t));
     if (_.isEqual(audioTracks, this.session.body.audioTracks)) return;
-    this.insertApplySessionPatch({ body: { audioTracks } });
+    return this.insertApplySessionPatch({
+      body: { audioTracks },
+      effects: [
+        {
+          type: 'setSelection',
+          before: { type: 'track', trackType: 'audio', id: update.id },
+          after: { type: 'track', trackType: 'audio', id: update.id },
+        },
+      ],
+    });
   }
 
-  async insertVideoTrack(uri: string, clock: number) {
+  async insertVideoTrack(uri: string, clock: number): Promise<t.SessionChange> {
     assert(this.session.isLoaded());
     const fsPath = URI.parse(uri).fsPath;
     const data = await fs.promises.readFile(fsPath);
@@ -190,8 +227,9 @@ export default class SessionEditor {
     const duration = metadata.duration / metadata.timescale;
     const sha1 = await misc.computeSHA1(data);
     await this.session.core.copyToBlob(fsPath, sha1);
+    const id = uuid();
     const videoTrack: t.VideoTrack = {
-      id: uuid(),
+      id,
       type: 'video',
       clockRange: { start: clock, end: clock + duration },
       file: { type: 'local', sha1: sha1 },
@@ -201,21 +239,37 @@ export default class SessionEditor {
     let { videoTracks } = this.session.body;
     videoTracks = lib.spliceImmutable(videoTracks, videoTracks.length - 1, 0, videoTrack);
     const sessionDuration = Math.max(this.session.head.duration, videoTrack.clockRange.end);
-    this.insertApplySessionPatch({ body: { videoTracks }, head: { duration: sessionDuration } });
+    return this.insertApplySessionPatch({
+      body: { videoTracks },
+      head: { duration: sessionDuration },
+      effects: [{ type: 'setSelection', after: { type: 'track', trackType: 'video', id } }],
+    });
   }
 
-  deleteVideoTrack(id: string) {
+  deleteVideoTrack(id: string): t.SessionChange {
     assert(this.session.isLoaded());
     const videoTracks = this.session.body.videoTracks.filter(t => t.id !== id);
-    this.insertApplySessionPatch({ body: { videoTracks } });
+    return this.insertApplySessionPatch({
+      body: { videoTracks },
+      effects: [{ type: 'setSelection', before: { type: 'track', trackType: 'video', id } }],
+    });
   }
 
-  updateVideoTrack(update: Partial<t.VideoTrack>) {
+  updateVideoTrack(update: Partial<t.VideoTrack>): t.SessionChange | undefined {
     assert(this.session.isLoaded());
     assert(update.id);
     const videoTracks = this.session.body.videoTracks.map(t => (t.id === update.id ? { ...t, ...update } : t));
     if (_.isEqual(videoTracks, this.session.body.videoTracks)) return;
-    this.insertApplySessionPatch({ body: { videoTracks } });
+    return this.insertApplySessionPatch({
+      body: { videoTracks },
+      effects: [
+        {
+          type: 'setSelection',
+          before: { type: 'track', trackType: 'video', id: update.id },
+          after: { type: 'track', trackType: 'video', id: update.id },
+        },
+      ],
+    });
   }
 
   updateDuration(duration: number, opts?: { coalescing?: boolean }) {
@@ -245,10 +299,18 @@ export default class SessionEditor {
     const focusTimeline = this.session.body.focusTimeline.map(withUpdatedClock);
     const toc = this.session.head.toc.map(withUpdatedClock);
     const duration = lib.calcClockAfterSpeedChange(this.session.head.duration, range, factor);
+    const inverse = lib.invertSpeedChange(range, factor);
     return this.insertApplySessionPatch({
       head: { toc, duration },
       body: { editorEvents, focusTimeline },
-      effects: [{ type: 'changeSpeed', range, factor, rrClock: this.session.rr.clock }],
+      effects: [
+        { type: 'changeSpeed', range, factor, rrClock: this.session.rr.clock },
+        {
+          type: 'setSelection',
+          before: { type: 'editor', anchor: range.start, focus: range.end },
+          after: { type: 'editor', anchor: inverse.range.start, focus: inverse.range.end },
+        },
+      ],
     });
   }
 
@@ -267,7 +329,14 @@ export default class SessionEditor {
     return this.insertApplySessionPatch({
       head: { toc, duration },
       body: { editorEvents, focusTimeline },
-      effects: [{ type: 'merge', range, rrClock: this.session.rr.clock }],
+      effects: [
+        { type: 'merge', range, rrClock: this.session.rr.clock },
+        {
+          type: 'setSelection',
+          before: { type: 'editor', anchor: range.start, focus: range.end },
+          after: { type: 'editor', anchor: range.start, focus: range.start },
+        },
+      ],
     });
   }
 
@@ -285,28 +354,44 @@ export default class SessionEditor {
     return this.insertApplySessionPatch({
       head: { toc, duration },
       body: { editorEvents, focusTimeline },
-      effects: [{ type: 'insertGap', clock, duration: gapDuration, rrClock: this.session.rr.clock }],
+      effects: [
+        { type: 'insertGap', clock, duration: gapDuration, rrClock: this.session.rr.clock },
+        {
+          type: 'setSelection',
+          before: { type: 'editor', anchor: clock, focus: clock },
+          after: { type: 'editor', anchor: clock, focus: clock + gapDuration },
+        },
+      ],
     });
   }
 
-  insertChapter(clock: number, title: string) {
+  insertChapter(clock: number, title: string): t.SessionChange {
     const item: t.TocItem = { clock: clock, title: title };
     const i = lib.lastSortedIndex(this.session.head.toc, clock, x => x.clock);
     const toc = lib.spliceImmutable(this.session.head.toc, i, 0, item);
-    this.insertApplySessionPatch({ head: { toc } });
+    return this.insertApplySessionPatch({
+      head: { toc },
+      effects: [{ type: 'setSelection', after: { type: 'chapter', index: i } }],
+    });
   }
 
-  updateChapter(index: number, patch: Partial<t.TocItem>) {
+  updateChapter(index: number, patch: Partial<t.TocItem>): t.SessionChange {
     assert(this.session.head.toc[index]);
     const chapter = { ...this.session.head.toc[index], ...patch };
     const toc = lib.spliceImmutable(this.session.head.toc, index, 1, chapter);
-    this.insertApplySessionPatch({ head: { toc } });
+    return this.insertApplySessionPatch({
+      head: { toc },
+      effects: [{ type: 'setSelection', before: { type: 'chapter', index }, after: { type: 'chapter', index } }],
+    });
   }
 
-  deleteChapter(index: number) {
+  deleteChapter(index: number): t.SessionChange {
     assert(this.session.head.toc[index]);
     const toc = lib.spliceImmutable(this.session.head.toc, index, 1);
-    this.insertApplySessionPatch({ head: { toc } });
+    return this.insertApplySessionPatch({
+      head: { toc },
+      effects: [{ type: 'setSelection', before: { type: 'chapter', index } }],
+    });
   }
 
   crop(clock: number): t.SessionChange {
@@ -331,6 +416,11 @@ export default class SessionEditor {
           index: editorEvents.length,
           clock,
           rrClock: this.session.rr.clock,
+        },
+        {
+          type: 'setSelection',
+          before: { type: 'editor', anchor: clock, focus: clock },
+          after: { type: 'editor', anchor: clock, focus: clock },
         },
       ],
     });

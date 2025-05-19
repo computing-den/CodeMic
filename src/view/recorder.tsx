@@ -49,19 +49,7 @@ type EditorViewProps = RecorderProps &
     onRecord: () => Promise<void>;
     onPlay: (clock?: number) => Promise<void>;
   };
-type EditorViewStateRecipe = (draft: Draft<EditorViewState>) => EditorViewState | void;
-type EditorViewState = {
-  cursor?: number;
-  // anchor: Marker | undefined;
-  // focus: Marker | undefined;
-  // markers: Marker[];
-  // trackSelection: TrackSelection | undefined;
-  selection?: Selection;
-};
-type Selection = EditorSelection | TrackSelection | ChapterSelection;
-type EditorSelection = { type: 'editor'; focus: number; anchor: number };
-type TrackSelection = { type: 'track'; trackType: 'audio' | 'video' | 'image'; id: string };
-type ChapterSelection = { type: 'chapter'; index: number };
+
 type TimelineDrag<T> = { load: T; startClockUnderMouse: number; curClockUnderMouse: number };
 
 type RecorderProps = { user?: t.UserUI; recorder: t.RecorderUIState; session: t.SessionUIState };
@@ -317,21 +305,26 @@ class DetailsView extends React.Component<DetailsViewProps> {
   }
 }
 
-function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProps) {
+function EditorView({ id, session, className, onRecord, onPlay, recorder }: EditorViewProps) {
   const { head } = session;
-
-  const [state, setState] = useState<EditorViewState>({});
-
-  // const toolbarRef = useRef(null);
+  const { canUndo, canRedo, selection } = recorder;
+  const [cursor, setCursor] = useState<number>();
   const guideVideoRef = useRef<HTMLVideoElement>(null);
 
-  const selectionClockRange = getSelectionClockRange(session, state.selection);
-  const selectedChapterIndex = state.selection?.type === 'chapter' ? state.selection.index : undefined;
+  const selectionClockRange = getSelectionClockRange(session, selection);
+  const selectedChapterIndex = selection?.type === 'chapter' ? selection.index : undefined;
   const selectedChapter = selectedChapterIndex !== undefined ? head.toc[selectedChapterIndex] : undefined;
-  const hasEditorSelection = Boolean(getNonEmptyEditorSelection(state.selection));
+  const hasEditorSelection = Boolean(getNonEmptyEditorSelection(selection));
+
+  async function setSelection(selection?: t.RecorderSelection) {
+    await postMessage({ type: 'recorder/setSelection', selection });
+  }
+  async function extendSelection(clock: number) {
+    await postMessage({ type: 'recorder/extendSelection', clock });
+  }
 
   async function deleteSelection() {
-    switch (state.selection?.type) {
+    switch (selection?.type) {
       case 'track':
         return deleteTrack();
       case 'chapter':
@@ -342,23 +335,21 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
   }
 
   async function deleteTrack() {
-    assert(state.selection?.type === 'track');
+    assert(selection?.type === 'track');
 
-    if (state.selection.trackType === 'audio') {
-      await postMessage({ type: 'recorder/deleteAudio', id: state.selection.id });
-    } else if (state.selection.trackType === 'video') {
-      await postMessage({ type: 'recorder/deleteVideo', id: state.selection.id });
+    if (selection.trackType === 'audio') {
+      await postMessage({ type: 'recorder/deleteAudio', id: selection.id });
+    } else if (selection.trackType === 'video') {
+      await postMessage({ type: 'recorder/deleteVideo', id: selection.id });
     } else {
       throw new Error('TODO');
     }
-    updateState(state => void (state.selection = undefined));
   }
 
   async function deleteChapter() {
-    assert(state.selection?.type === 'chapter');
+    assert(selection?.type === 'chapter');
 
-    await postMessage({ type: 'recorder/deleteChapter', index: state.selection.index });
-    updateState(state => void (state.selection = undefined));
+    await postMessage({ type: 'recorder/deleteChapter', index: selection.index });
   }
 
   function keyDown(e: KeyboardEvent) {
@@ -385,10 +376,6 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
     document.addEventListener('keydown', keyDown);
     return () => document.removeEventListener('keydown', keyDown);
   }, [keyDown]);
-
-  function updateState(recipe: EditorViewStateRecipe) {
-    setState(state => produce(state, recipe));
-  }
 
   async function insertAudio() {
     const { uris } = await postMessage({
@@ -481,21 +468,12 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
   const speedUpButtonRef = useRef(null);
 
   async function changeSpeed(factor: number) {
-    const selection = state.selection;
     assert(selection?.type === 'editor');
     const range = getNonEmptyEditorSelection(selection);
     assert(range);
 
     // TODO disable speed control popover buttons till done.
     await postMessage({ type: 'recorder/changeSpeed', range, factor });
-
-    updateState(state => {
-      state.selection = {
-        type: 'editor',
-        focus: lib.calcClockAfterSpeedChange(selection.focus, range, factor),
-        anchor: lib.calcClockAfterSpeedChange(selection.anchor, range, factor),
-      };
-    });
 
     slowDownPopover.close();
     speedUpPopover.close();
@@ -509,19 +487,15 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
   }
 
   async function merge() {
-    const selection = state.selection;
     assert(selection?.type === 'editor');
     const range = getNonEmptyEditorSelection(selection);
     assert(range);
 
     await postMessage({ type: 'recorder/merge', range });
-    updateState(state => {
-      state.selection = { type: 'editor', anchor: range.start, focus: range.start };
-    });
   }
 
   async function crop() {
-    // assert(state.selection?.type === 'editor');
+    // assert(selection?.type === 'editor');
     const clock = selectionClockRange?.end;
     assert(clock !== undefined);
     await postMessage({ type: 'recorder/crop', clock });
@@ -535,9 +509,6 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
     assert(clock !== undefined);
     await postMessage({ type: 'recorder/insertGap', clock, dur });
     insertGapPopover.close();
-    updateState(state => {
-      state.selection = { type: 'editor', anchor: clock, focus: clock + dur };
-    });
   }
 
   async function insertOrUpdateChapter(title: string, index?: number) {
@@ -559,11 +530,8 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
     chapterPopover.close();
   }
 
-  function selectChapter(index: number) {
-    updateState(state => {
-      state.selection = { type: 'chapter', index };
-    });
-    chapterPopover.toggle();
+  function editChapter(index: number) {
+    setSelection({ type: 'chapter', index }).then(() => chapterPopover.toggle());
   }
 
   const chapterPopover = usePopover();
@@ -582,13 +550,13 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
     <Toolbar.Button
       title="Undo"
       icon="fa-solid fa-rotate-left"
-      disabled={!session.canUndo || session.playing || session.recording}
+      disabled={!canUndo || session.playing || session.recording}
       onClick={undo}
     />,
     <Toolbar.Button
       title="Redo"
       icon="fa-solid fa-rotate-right"
-      disabled={!session.canRedo || session.playing || session.recording}
+      disabled={!canRedo || session.playing || session.recording}
       onClick={redo}
     />,
     <Toolbar.Separator />,
@@ -659,7 +627,7 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
         session.playing ||
         session.recording ||
         hasEditorSelection ||
-        (state.selection?.type !== 'track' && state.selection?.type !== 'chapter')
+        (selection?.type !== 'track' && selection?.type !== 'chapter')
       }
       onClick={deleteSelection}
     />,
@@ -686,13 +654,16 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
       <Timeline
         session={session}
         // markers={state.markers}
-        cursor={state.cursor}
+        cursor={cursor}
         // anchor={state.anchor}
         // focus={state.focus}
         // trackSelection={state.trackSelection}
-        selection={state.selection}
-        onChange={updateState}
-        onChapterSelect={selectChapter}
+        setSelection={setSelection}
+        extendSelection={extendSelection}
+        setCursor={setCursor}
+        selection={selection}
+        // onChange={updateState}
+        editChapter={editChapter}
         selectionRef={selectionRef}
       />
       <SpeedControlPopover
@@ -729,9 +700,11 @@ function EditorView({ id, session, className, onRecord, onPlay }: EditorViewProp
 type TimelineProps = {
   session: t.SessionUIState;
   cursor?: number;
-  selection?: Selection;
-  onChange: (draft: EditorViewStateRecipe) => any;
-  onChapterSelect: (index: number) => any;
+  selection?: t.RecorderSelection;
+  setSelection: (selection: t.RecorderSelection) => Promise<void>;
+  extendSelection: (clock: number) => Promise<void>;
+  setCursor: (clock?: number) => any;
+  editChapter: (index: number) => any;
   selectionRef: Ref<any>;
 };
 type TimelineState = {
@@ -831,43 +804,28 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     const clock = this.getClockUnderMouse(e);
 
     if (this.mouseIsDown && clock !== undefined) {
-      this.props.onChange(state => {
-        state.cursor = undefined;
-        state.selection = {
-          type: 'editor',
-          anchor: state.selection?.type === 'editor' ? state.selection.anchor : clock,
-          focus: clock,
-        };
-      });
+      this.props.setCursor();
+      this.props.extendSelection(clock);
     } else {
-      this.props.onChange(state => {
-        if (clock === undefined || !this.isMouseOverEmptySpaceInTimeline(e)) {
-          state.cursor = undefined;
-        } else {
-          state.cursor = clock;
-        }
-      });
+      if (clock === undefined || !this.isMouseOverEmptySpaceInTimeline(e)) {
+        this.props.setCursor();
+      } else {
+        this.props.setCursor(clock);
+      }
     }
   };
 
   mouseLeft = (e: MouseEvent) => {
-    // console.log('mouseLeft', e.target);
-    this.props.onChange(state => {
-      state.cursor = undefined;
-    });
+    this.props.setCursor();
   };
 
-  mouseOut = (e: MouseEvent) => {
-    // console.log('mouseOut', e.target);
-  };
+  mouseOut = (e: MouseEvent) => {};
 
   mouseDown = (e: MouseEvent) => {
     const clock = this.getClockUnderMouse(e, { emptySpace: true });
     if (clock !== undefined) {
       this.mouseIsDown = true;
-      this.props.onChange(state => {
-        state.selection = { type: 'editor', anchor: clock, focus: clock };
-      });
+      this.props.setSelection({ type: 'editor', anchor: clock, focus: clock });
     }
   };
 
@@ -880,7 +838,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     //   if (clock !== undefined && lib.approxEqual(clock, anchor.clock, tolerance)) {
     //     this.props.onChange(state => {
     //       state.anchor = undefined;
-    //       state.selection = {fromClock: anchor.clock, toClock: clock, active}
+    //       selection = {fromClock: anchor.clock, toClock: clock, active}
     //     })
     //   }
     // }
@@ -891,9 +849,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   // };
 
   trackClicked = (e: React.MouseEvent, track: t.RangedTrack) => {
-    this.props.onChange(state => {
-      state.selection = { type: 'track', trackType: track.type, id: track.id };
-    });
+    this.props.setSelection({ type: 'track', trackType: track.type, id: track.id });
   };
 
   trackDragStarted = (e: React.DragEvent, track: t.RangedTrack) => {
@@ -929,8 +885,13 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     }
   };
 
+  editChapter = (e: React.MouseEvent, i: number) => {
+    e.stopPropagation();
+    this.props.editChapter(i);
+  };
+
   chapterClicked = (e: React.MouseEvent, i: number) => {
-    this.props.onChapterSelect(i);
+    this.props.setSelection({ type: 'chapter', index: i });
   };
 
   chapterDragStarted = (e: React.DragEvent, i: number) => {
@@ -961,6 +922,10 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     if (curClockUnderMouse !== undefined && this.state.markerDrag) {
       this.setState({ markerDrag: { ...this.state.markerDrag, curClockUnderMouse } });
     }
+  };
+
+  clockClicked = (e: React.MouseEvent) => {
+    this.props.setSelection({ type: 'editor', anchor: this.props.session.clock, focus: this.props.session.clock });
   };
 
   autoScroll = () => {
@@ -1093,7 +1058,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   }
 
   render() {
-    const { cursor, selection, session, onChange, selectionRef } = this.props;
+    const { cursor, selection, session, setSelection, editChapter, selectionRef } = this.props;
     const { pxToSecRatio, trackDrag, markerDrag } = this.state;
     // const clockMarker: Marker | undefined =
     //   session.clock > 0 && session.clock !== session.head.duration && !session.recording
@@ -1137,7 +1102,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
               timelineDuration={timelineDuration}
               // timelineHeightPx={timelineHeightPx}
               pxToSecRatio={pxToSecRatio}
-              onChange={onChange}
+              setSelection={setSelection}
             />
             <RangedTracksUI
               timelineDuration={timelineDuration}
@@ -1174,6 +1139,17 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
                   timelineDuration={timelineDuration}
                   active={selection?.type === 'chapter' && selection.index === i}
                   label={entry.title}
+                  buttons={[
+                    <VSCodeButton
+                      appearance="icon"
+                      title="Edit"
+                      onClick={e => {
+                        this.editChapter(e, i);
+                      }}
+                    >
+                      <span className="codicon codicon-edit" />
+                    </VSCodeButton>,
+                  ]}
                   hideTime
                   markerDrag={markerDrag}
                   draggable
@@ -1185,7 +1161,13 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
                 />
               ))}
               {session.clock > 0 && session.clock !== session.head.duration && !session.recording && (
-                <MarkerUI id="clock" type="clock" clock={session.clock} timelineDuration={timelineDuration} />
+                <MarkerUI
+                  id="clock"
+                  type="clock"
+                  clock={session.clock}
+                  timelineDuration={timelineDuration}
+                  onClick={this.clockClicked}
+                />
               )}
               {session.recording && (
                 <MarkerUI
@@ -1220,7 +1202,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 type RangedTracksUIProps = {
   timelineDuration: number;
   tracks: t.RangedTrack[];
-  selection?: Selection;
+  selection?: t.RecorderSelection;
   onClick: (e: React.MouseEvent, track: t.RangedTrack) => any;
   onDragStart: (e: React.DragEvent, track: t.RangedTrack) => any;
   onDragEnd: (e: React.DragEvent, track: t.RangedTrack) => any;
@@ -1340,10 +1322,10 @@ type EditorTrackUIProps = {
   timelineDuration: number;
   pxToSecRatio: number;
   workspaceFocusTimeline?: t.Focus[];
-  onChange: (draft: EditorViewStateRecipe) => any;
+  setSelection: (selection: t.RecorderSelection) => Promise<void>;
 };
 function EditorTrackUI(props: EditorTrackUIProps) {
-  const { sessionDuration, timelineDuration, pxToSecRatio, workspaceFocusTimeline, onChange } = props;
+  const { sessionDuration, timelineDuration, pxToSecRatio, workspaceFocusTimeline, setSelection } = props;
 
   // const lineFocusItems:t.LineFocus [] = [];
   // if (workspaceFocusTimeline) {
@@ -1424,12 +1406,10 @@ function EditorTrackUI(props: EditorTrackUIProps) {
     <div className="editor-track">
       {documentFocusTimeline.map(documentFocus => {
         function documentFocusClicked() {
-          onChange(state => {
-            state.selection = {
-              type: 'editor',
-              anchor: documentFocus.clockRange.start,
-              focus: documentFocus.clockRange.end,
-            };
+          setSelection({
+            type: 'editor',
+            anchor: documentFocus.clockRange.start,
+            focus: documentFocus.clockRange.end,
           });
         }
 
@@ -1447,9 +1427,7 @@ function EditorTrackUI(props: EditorTrackUIProps) {
       })}
       {lineFocusTimeline.map(lineFocus => {
         function lineFocusClicked() {
-          onChange(state => {
-            state.selection = { type: 'editor', anchor: lineFocus.clockRange.start, focus: lineFocus.clockRange.end };
-          });
+          setSelection({ type: 'editor', anchor: lineFocus.clockRange.start, focus: lineFocus.clockRange.end });
         }
         const style = {
           top: `calc(${(lineFocus.clockRange.start / timelineDuration) * 100}% + ${lineFocus.offsetPx}px)`,
@@ -1537,7 +1515,8 @@ type MarkerProps = {
   type: MarkerType;
   clock: number;
   timelineDuration: number;
-  label?: string;
+  label?: React.ReactNode;
+  buttons?: React.ReactNode[];
   hideTime?: boolean;
   active?: boolean;
   draggable?: boolean;
@@ -1578,7 +1557,12 @@ const MarkerUI = forwardRef(function MarkerUI(props: MarkerProps, ref: React.Ref
           {/*marker.label ? ' ' + marker.label : ''*/}
         </div>
       )}
-      {props.label && <div className="label">{props.label}</div>}
+      {(props.label || props.buttons) && (
+        <div className="content">
+          {props.label && <div className="label">{props.label}</div>}
+          {!_.isEmpty(props.buttons) && <div className="buttons">{props.buttons}</div>}
+        </div>
+      )}
     </div>
   );
 });
@@ -1682,7 +1666,7 @@ function ChapterPopover(
 
   useEffect(() => {
     setTitle(props.chapter?.title ?? '');
-  }, [props.popover.isOpen]);
+  }, [props.popover.isOpen, props.chapter?.title]);
 
   return (
     <Popover {...props} className="chapter-popover">
@@ -1755,7 +1739,7 @@ function getClockOfTimelineDrag(baseClock: number, markerDrag: TimelineDrag<any>
 
 function getSelectionClockRange(
   session: t.SessionUIState,
-  selection?: Selection,
+  selection?: t.RecorderSelection,
 ): { start: number; end: number } | undefined {
   if (selection) {
     switch (selection.type) {
@@ -1786,7 +1770,7 @@ function getSelectionClockRange(
   }
 }
 
-function getNonEmptyEditorSelection(selection?: Selection): t.ClockRange | undefined {
+function getNonEmptyEditorSelection(selection?: t.RecorderSelection): t.ClockRange | undefined {
   if (selection?.type === 'editor' && selection.focus !== selection.anchor) {
     return {
       start: Math.min(selection.focus, selection.anchor),
