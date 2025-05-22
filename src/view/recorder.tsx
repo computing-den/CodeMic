@@ -9,8 +9,8 @@ import assert from '../lib/assert.js';
 import PathField from './path_field.jsx';
 import Tabs, { type TabViewProps } from './tabs.jsx';
 import Screen from './screen.jsx';
-import postMessage, { setMediaManager } from './api.js';
-import MediaManager from './media_manager.js';
+import postMessage from './api.js';
+import { mediaManager } from './media_manager.js';
 import Toolbar from './toolbar.jsx';
 import { cn } from './misc.js';
 import _ from 'lodash';
@@ -54,8 +54,6 @@ type TimelineDrag<T> = { load: T; startClockUnderMouse: number; curClockUnderMou
 
 type RecorderProps = { user?: t.UserUI; recorder: t.RecorderUIState; session: t.SessionUIState };
 export default class Recorder extends React.Component<RecorderProps> {
-  mediaManager = new MediaManager();
-
   tabs = [
     { id: 'details-view', label: 'DETAILS' },
     { id: 'editor-view', label: 'EDITOR' },
@@ -70,36 +68,30 @@ export default class Recorder extends React.Component<RecorderProps> {
   };
 
   play = async (clock?: number) => {
-    await this.mediaManager.prepare(this.getVideoElem());
+    await mediaManager.prepare();
     if (clock !== undefined) await postMessage({ type: 'recorder/seek', clock });
     await postMessage({ type: 'recorder/play' });
   };
 
   record = async () => {
-    await this.mediaManager.prepare(this.getVideoElem());
-    // if (clock !== undefined) await postMessage({ type: 'recorder/seek', clock });
+    await mediaManager.prepare();
     await postMessage({ type: 'recorder/record' });
   };
 
-  getVideoElem = (): HTMLVideoElement => {
-    return document.querySelector('#guide-video')!;
-  };
-
-  updateResources() {
-    this.mediaManager.updateResources(this.props.session);
-  }
-
-  componentDidUpdate() {
-    this.updateResources();
+  componentDidUpdate(prevProps: RecorderProps) {
+    if (this.props.session.loaded && !prevProps.session.loaded) {
+      postMessage({ type: 'readyToLoadMedia' }).catch(console.error);
+    }
   }
 
   componentDidMount() {
-    setMediaManager(this.mediaManager);
-    this.updateResources();
+    if (this.props.session.loaded) {
+      postMessage({ type: 'readyToLoadMedia' }).catch(console.error);
+    }
   }
 
   componentWillUnmount() {
-    this.mediaManager.close();
+    mediaManager.dispose().catch(console.error);
   }
 
   render() {

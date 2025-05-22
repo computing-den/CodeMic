@@ -10,14 +10,14 @@ import SessionDescription from './session_description.jsx';
 import { CommentInput, CommentList } from './comment.jsx';
 import Screen from './screen.jsx';
 import Section from './section.jsx';
-import postMessage, { setMediaManager } from './api.js';
-import MediaManager from './media_manager.js';
+import postMessage from './api.js';
 import { cn } from './misc.js';
 import _ from 'lodash';
 import { AppContext } from './app_context.jsx';
 import { PictureInPicture } from './svgs.jsx';
 import Cover from './cover.jsx';
 import { VSCodeLink } from '@vscode/webview-ui-toolkit/react/index.js';
+import { mediaManager } from './media_manager.js';
 
 type Props = { user?: t.UserUI; player: t.PlayerUIState; session: t.SessionUIState };
 export default class Player extends React.Component<Props> {
@@ -26,14 +26,13 @@ export default class Player extends React.Component<Props> {
   // declare context: React.ContextType<typeof AppContext>;
 
   seeking = false;
-  mediaManager = new MediaManager();
 
   load = async () => {
     await postMessage({ type: 'player/load' });
   };
 
   play = async () => {
-    await this.prepareMedia();
+    await mediaManager.prepare();
     await postMessage({ type: 'player/play' });
   };
 
@@ -50,12 +49,8 @@ export default class Player extends React.Component<Props> {
       console.error(`Cannot seek track that is not loaded`);
       return;
     }
-    await this.prepareMedia();
+    await mediaManager.prepare();
     await postMessage({ type: 'player/seek', clock });
-  };
-
-  prepareMedia = async () => {
-    await this.mediaManager.prepare(this.getVideoElem()!);
   };
 
   getVideoElem = (): HTMLVideoElement | undefined => {
@@ -137,19 +132,19 @@ export default class Player extends React.Component<Props> {
     postMessage({ type: 'account/open', join: true });
   };
 
-  updateResources() {
-    this.mediaManager.updateResources(this.props.session);
-  }
-
-  componentDidUpdate() {
-    this.updateResources();
+  componentDidUpdate(prevProps: Props) {
     this.updateCoverContainerHeight();
+
+    if (this.props.session.loaded && !prevProps.session.loaded) {
+      postMessage({ type: 'readyToLoadMedia' }).catch(console.error);
+    }
   }
 
   componentDidMount() {
-    setMediaManager(this.mediaManager);
-    this.updateResources();
-    this.updateCoverContainerHeight();
+    if (this.props.session.loaded) {
+      postMessage({ type: 'readyToLoadMedia' }).catch(console.error);
+    }
+
     // window.addEventListener('resize', this.updateCoverContainerHeight);
 
     // Must use interval instead of listening to resize event because our cover
@@ -158,10 +153,11 @@ export default class Player extends React.Component<Props> {
     // TODO Actually, that may not be the reason. I don't know why the cover photo
     // requires a resize sometimes.
     this.coverHeightInterval = setInterval(this.updateCoverContainerHeight, 500);
+    this.updateCoverContainerHeight();
   }
 
   componentWillUnmount() {
-    this.mediaManager.close();
+    mediaManager.dispose().catch(console.error);
     // window.removeEventListener('resize', this.updateCoverContainerHeight);
     clearInterval(this.coverHeightInterval);
   }

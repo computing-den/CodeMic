@@ -168,7 +168,7 @@ export default class SessionEditor {
     };
 
     let { audioTracks } = this.session.body;
-    audioTracks = lib.spliceImmutable(audioTracks, audioTracks.length - 1, 0, audioTrack);
+    audioTracks = lib.spliceImmutable(audioTracks, audioTracks.length, 0, audioTrack);
     const sessionDuration = Math.max(this.session.head.duration, audioTrack.clockRange.end);
     return this.insertApplySessionPatch({
       body: { audioTracks },
@@ -237,7 +237,7 @@ export default class SessionEditor {
     };
 
     let { videoTracks } = this.session.body;
-    videoTracks = lib.spliceImmutable(videoTracks, videoTracks.length - 1, 0, videoTrack);
+    videoTracks = lib.spliceImmutable(videoTracks, videoTracks.length, 0, videoTrack);
     const sessionDuration = Math.max(this.session.head.duration, videoTrack.clockRange.end);
     return this.insertApplySessionPatch({
       body: { videoTracks },

@@ -165,8 +165,8 @@ class CodeMic {
    */
   async viewOpened() {
     try {
-      this.context.postAudioMessage = this.postAudioMessage.bind(this);
-      this.context.postVideoMessage = this.postVideoMessage.bind(this);
+      // this.context.postAudioMessage = this.postAudioMessage.bind(this);
+      // this.context.postVideoMessage = this.postVideoMessage.bind(this);
       this.context.updateFrontend = this.updateFrontend.bind(this);
       this.updateViewTitle();
       // await this.updateFrontend();
@@ -690,14 +690,18 @@ class CodeMic {
       // }
       // case 'confirmEditFromPlayer': {
       // }
-      case 'audio': {
+      // case 'video': {
+      //   assert(this.session?.isLoaded());
+      //   this.session.rr.handleFrontendVideoEvent(req.event);
+      //   return ok;
+      // }
+      case 'readyToLoadMedia': {
         assert(this.session?.isLoaded());
-        this.session.rr.handleFrontendAudioEvent(req.event);
+        this.session.rr.enqueueSyncMedia();
         return ok;
       }
-      case 'video': {
-        assert(this.session?.isLoaded());
-        this.session.rr.handleFrontendVideoEvent(req.event);
+      case 'media/error': {
+        this.showError(new Error(`Error for ${req.mediaType} track: ${req.error}`));
         return ok;
       }
       default: {
@@ -967,14 +971,6 @@ class CodeMic {
 
   showError(error: Error) {
     vscode.window.showErrorMessage(error.message);
-  }
-
-  async postAudioMessage(req: t.BackendAudioRequest): Promise<t.FrontendAudioResponse> {
-    return this.context.webviewProvider.postMessage(req);
-  }
-
-  async postVideoMessage(req: t.BackendVideoRequest): Promise<t.FrontendVideoResponse> {
-    return this.context.webviewProvider.postMessage(req);
   }
 
   async getSessionListingOfDefaultVscWorkspace(): Promise<t.SessionListing | undefined> {

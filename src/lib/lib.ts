@@ -187,6 +187,9 @@ export function isLoadedSession(session: t.SessionUIState): session is t.LoadedS
   return session.loaded;
 }
 
+/**
+ * Returns undefined if playback rate shouldn't change.
+ */
 export function adjustTrackPlaybackRate(sessionClock: number, trackClock: number): number | undefined {
   const diff = sessionClock - trackClock;
   if (Math.abs(diff) > 3.0) {
@@ -197,7 +200,11 @@ export function adjustTrackPlaybackRate(sessionClock: number, trackClock: number
     return Math.sign(diff) * 0.2 + 1;
   } else if (Math.abs(diff) > 0.6) {
     return Math.sign(diff) * 0.1 + 1;
-  } else if (Math.abs(diff) < 0.3) {
+  } else if (Math.abs(diff) > 0.3) {
+    return Math.sign(diff) * 0.02 + 1;
+  } else if (Math.abs(diff) > 0.1) {
+    return Math.sign(diff) * 0.01 + 1;
+  } else if (Math.abs(diff) < 0.05) {
     return 1;
   }
 }

@@ -21,6 +21,8 @@ export default class QueueRunner {
     this.queue.length = 0;
   }
 
+  async wait(): Promise<void> {}
+
   private async run() {
     if (this.running) return;
     this.running = true;

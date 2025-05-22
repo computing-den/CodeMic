@@ -44,7 +44,6 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/setSelection'; selection?: RecorderSelection }; response: OKResponse }
   | { request: { type: 'recorder/extendSelection'; clock: number }; response: OKResponse }
   | { request: { type: 'recorder/updateDetails'; changes: SessionDetailsUpdate }; response: OKResponse }
-  // | { request: { type: 'recorder/updateDuration'; duration: number }; response: OKResponse }
   | { request: { type: 'recorder/insertAudio'; uri: string; clock: number }; response: OKResponse }
   | { request: { type: 'recorder/deleteAudio'; id: string }; response: OKResponse }
   | { request: { type: 'recorder/updateAudio'; update: Partial<AudioTrack> }; response: OKResponse }
@@ -62,61 +61,38 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/crop'; clock: number }; response: OKResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
   | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }
-  | { request: { type: 'audio'; event: FrontendMediaEvent }; response: OKResponse }
-  | { request: { type: 'video'; event: FrontendMediaEvent }; response: OKResponse };
-
-export type FrontendMediaEvent =
-  | { type: 'loadstart'; id?: string }
-  | { type: 'durationchange'; id?: string }
-  | { type: 'loadedmetadata'; id?: string }
-  | { type: 'loadeddata'; id?: string }
-  | { type: 'progress'; id?: string }
-  | { type: 'canplay'; id?: string }
-  | { type: 'canplaythrough'; id?: string }
-  | { type: 'suspend'; id?: string }
-  | { type: 'abort'; id?: string }
-  | { type: 'error'; id?: string; error: string }
-  | { type: 'emptied'; id?: string }
-  | { type: 'stalled'; id?: string }
-  | { type: 'timeupdate'; id?: string; clock: number }
-  | { type: 'playing'; id?: string }
-  | { type: 'waiting'; id?: string }
-  | { type: 'play'; id?: string }
-  | { type: 'pause'; id?: string }
-  | { type: 'ended'; id?: string }
-  | { type: 'volumechange'; id?: string; volume: number }
-  | { type: 'ratechange'; id?: string; rate: number }
-  | { type: 'seeking'; id?: string }
-  | { type: 'seeked'; id?: string };
+  | { request: { type: 'readyToLoadMedia' }; response: OKResponse }
+  | { request: { type: 'media/error'; id: string; mediaType: MediaType; error: string }; response: OKResponse };
 
 export type BackendToFrontendReqRes =
   | { request: { type: 'updateStore'; store: Store }; response: OKResponse }
-  // | { request: { type: 'updateCacheVersion'; version: number }; response: OKResponse }
-  | { request: { type: 'todo' }; response: OKResponse }
-  | BackendAudioToFrontendReqRes
-  | BackendVideoToFrontendReqRes;
+  | BackendToFrontendMediaReqRes;
 
-export type BackendAudioToFrontendReqRes =
-  // | { request: { type: 'audio/load'; src: string; id: string }; response: OKResponse }
-  | { request: { type: 'audio/play'; id: string }; response: OKResponse }
-  | { request: { type: 'audio/pause'; id: string }; response: OKResponse }
-  | { request: { type: 'audio/dispose'; id: string }; response: OKResponse }
-  | { request: { type: 'audio/seek'; id: string; clock: number }; response: OKResponse }
-  | { request: { type: 'audio/setPlaybackRate'; id: string; rate: number }; response: OKResponse };
-
-export type BackendVideoToFrontendReqRes =
-  | { request: { type: 'video/loadTrack'; track: VideoTrack }; response: OKResponse }
-  | { request: { type: 'video/play' }; response: OKResponse }
-  | { request: { type: 'video/pause' }; response: OKResponse }
-  | { request: { type: 'video/stop' }; response: OKResponse }
-  | { request: { type: 'video/seek'; clock: number }; response: OKResponse }
-  | { request: { type: 'video/setPlaybackRate'; rate: number }; response: OKResponse };
+export type BackendToFrontendMediaReqRes =
+  | {
+      request: { type: 'media/load'; mediaType: MediaType; id: string; src: string; clock: number };
+      response: OKResponse;
+    }
+  | { request: { type: 'media/play'; mediaType: MediaType; id: string }; response: OKResponse }
+  | { request: { type: 'media/pause'; mediaType: MediaType; id: string }; response: OKResponse }
+  | { request: { type: 'media/pauseAll' }; response: OKResponse }
+  | { request: { type: 'media/stop'; mediaType: MediaType; id: string }; response: OKResponse }
+  | { request: { type: 'media/dispose'; mediaType: MediaType; id: string }; response: OKResponse }
+  | { request: { type: 'media/seek'; mediaType: MediaType; id: string; clock: number }; response: OKResponse }
+  | {
+      request: { type: 'media/setPlaybackRate'; mediaType: MediaType; id: string; rate: number };
+      response: OKResponse;
+    }
+  | { request: { type: 'media/statuses' }; response: { type: 'mediaStatuses'; mediaStatuses: MediaStatuses } };
 
 export type FrontendRequest = FrontendToBackendReqRes['request'];
 export type BackendResponse = FrontendToBackendReqRes['response'] | ErrorResponse;
 
 export type BackendRequest = BackendToFrontendReqRes['request'];
 export type FrontendResponse = BackendToFrontendReqRes['response'] | ErrorResponse;
+
+export type BackendMediaRequest = BackendToFrontendMediaReqRes['request'];
+export type FrontendMediaResponse = BackendToFrontendMediaReqRes['response'] | ErrorResponse;
 
 export type ReqRes = { request: { type: string }; response: { type: string } };
 export type ExtractResponse<RR extends ReqRes, Req extends { type: string }> = Extract<
@@ -136,23 +112,15 @@ export type ExtractResponse<RR extends ReqRes, Req extends { type: string }> = E
 //   { request: { type: Req['type'] } }
 // >['response'];
 
-export type PostMessageOptions = {
-  performDefaultActions: boolean;
-};
+// export type PostMessageOptions = {
+//   performDefaultActions: boolean;
+// };
 
 // export type PostMessageToFrontend = <Req extends BackendRequest>(req: Req) => Promise<FrontendResponseFor<Req>>;
 // export type PostMessageToBackend = <Req extends FrontendRequest>(
 //   req: Req,
 //   options?: PostMessageOptions,
 // ) => Promise<BackendResponseFor<Req>>;
-
-export type BackendAudioRequest = BackendAudioToFrontendReqRes['request'];
-export type FrontendAudioResponse = BackendAudioToFrontendReqRes['response'] | ErrorResponse;
-export type PostAudioMessageToFrontend = (req: BackendAudioRequest) => Promise<FrontendAudioResponse>;
-
-export type BackendVideoRequest = BackendVideoToFrontendReqRes['request'];
-export type FrontendVideoResponse = BackendVideoToFrontendReqRes['response'] | ErrorResponse;
-export type PostVideoMessageToFrontend = (req: BackendVideoRequest) => Promise<FrontendVideoResponse>;
 
 // export type B2SReqAccountJoin = { type: 'account/join'; credentials: Credentials };
 // export type B2SResAccountJoin = { type: 'user'; user: User };
@@ -209,6 +177,24 @@ export type ServerResponse = BackendToServerReqRes['response'] | ErrorResponse;
 
 // const y: ServerResponseFor<{type: 'account/join'; credentials: Credentials}>
 // const z: ServerResponseFor<{type: 'account/login'; credentials: Credentials}>
+
+export type MediaType = 'audio' | 'video' | 'image';
+export type MediaStatuses = Record<string, MediaStatus>;
+export type MediaStatus = {
+  readyState: number;
+  networkState: number;
+  currentTime: number;
+  volume: number;
+  muted: boolean;
+  duration: number;
+  playbackRate: number;
+  paused: boolean;
+  seeking: boolean;
+  ended: boolean;
+  error: string;
+  currentSrc: string;
+  src: string;
+};
 
 export enum Screen {
   Account,
@@ -304,7 +290,7 @@ export type RecorderUITabId = 'editor-view' | 'details-view';
 
 export type RecorderSelection = RecorderSelectionEditor | RecorderSelectionTrack | RecorderSelectionChapter;
 export type RecorderSelectionEditor = { type: 'editor'; focus: number; anchor: number };
-export type RecorderSelectionTrack = { type: 'track'; trackType: 'audio' | 'video' | 'image'; id: string };
+export type RecorderSelectionTrack = { type: 'track'; trackType: MediaType; id: string };
 export type RecorderSelectionChapter = { type: 'chapter'; index: number };
 
 export type PlayerUIState = {
@@ -442,7 +428,7 @@ export type FocusCompact = {
 
 export type RangedTrack = {
   id: string;
-  type: 'audio' | 'video' | 'image';
+  type: MediaType;
   clockRange: ClockRange;
   title: string;
 };

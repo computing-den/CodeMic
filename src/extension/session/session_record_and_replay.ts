@@ -10,7 +10,7 @@ import WorkspacePlayer from './workspace_player.js';
 import WorkspaceRecorder from './workspace_recorder.js';
 import VscWorkspace from './vsc_workspace.js';
 import QueueRunner from '../../lib/queue_runner.js';
-import _ from 'lodash';
+import _, { inRange } from 'lodash';
 import { UpdateLoopAsync } from '../../lib/update_loop_async.js';
 import { isDuration } from 'moment';
 
@@ -80,33 +80,23 @@ export default class SessionRecordAndReplay {
   }
 
   async enqueueLoadWorkspace(options?: { clock?: number }) {
-    await this.stopOnError(this.queue.enqueue(this.loadWorkspace.bind(this), options));
+    await this.pauseOnError(this.queue.enqueue(this.loadWorkspace.bind(this), options));
   }
 
-  // reloadMedia() {
-  //   this.audioTrackPlayers.forEach(p => this.disposeAudioPlayer(p));
-  //   this.disposeVideoPlayer();
-
-  //   this.audioTrackPlayers = this.session.body.audioTracks.map(
-  //     audioTrack => new AudioTrackPlayer(this.session, audioTrack),
-  //   );
-  //   this.videoTrackPlayer = new VideoTrackPlayer(this.session);
-  // }
-
   async enqueueScan() {
-    await this.stopOnError(this.queue.enqueue(this.scan.bind(this)));
+    await this.pauseOnError(this.queue.enqueue(this.scan.bind(this)));
   }
 
   async enqueuePlay() {
-    await this.stopOnError(this.queue.enqueue(this.play.bind(this)));
+    await this.pauseOnError(this.queue.enqueue(this.play.bind(this)));
   }
 
   async enqueueRecord() {
-    await this.stopOnError(this.queue.enqueue(this.record.bind(this)));
+    await this.pauseOnError(this.queue.enqueue(this.record.bind(this)));
   }
 
   async enqueueSeek(clock: number) {
-    await this.stopOnError(this.queue.enqueue(this.seek.bind(this), clock));
+    await this.pauseOnError(this.queue.enqueue(this.seek.bind(this), clock));
   }
 
   /**
@@ -117,233 +107,36 @@ export default class SessionRecordAndReplay {
     this.updateLoop.stop();
     this.queue.clear();
     this.mode.status = Status.Paused;
-    // this.pauseAudios();
-    // this.pauseVideo();
+
+    // Pause workspace.
     if (this.mode.recorder) {
       this.workspaceRecorder.pause();
     } else {
       this.workspacePlayer.pause();
     }
+
+    // Pause media.
+    // Must not await on the queue because pause() may be called from inside a
+    // queue task.
+    this.enqueuePauseAllMedia().catch(console.error);
   }
-
-  // async fastSync() {
-  //   await this.seek(this.clock);
-  // }
-
-  // setClock(clock: number) {
-  //   this.clock = clock;
-  //   this.workspaceRecorder.setClock(this.clock);
-  //   this.workspacePlayer.setClock(this.clock);
-  // }
-
-  // loadAudioTrack(audioTrack: t.AudioTrack) {
-  //   const audioTrackPlayer = new AudioTrackPlayer(this.session, audioTrack);
-  //   this.audioTrackPlayers.push(audioTrackPlayer);
-  //   this.initAudioPlayer(audioTrackPlayer);
-  //   // audioTrackPlayer.load();
-  // }
-
-  // unloadAudioTrack(id: string) {
-  //   const i = this.audioTrackPlayers.findIndex(c => c.audioTrack.id === id);
-  //   if (i === -1) {
-  //     console.error(`SessionRecordAndReplay deleteAudio did not find audio track with id ${id}`);
-  //     return;
-  //   }
-
-  //   this.audioTrackPlayers[i].pause();
-  //   this.disposeAudioPlayer(this.audioTrackPlayers[i]);
-  //   this.audioTrackPlayers.splice(i, 1);
-  // }
-
-  // loadVideoTrack(videoTrack: t.VideoTrack) {
-  //   // Maybe load if video is in range?
-  // }
-
-  // unloadVideoTrack(id: string) {
-  //   if (this.videoTrackPlayer.videoTrack?.id === id) {
-  //     this.videoTrackPlayer.stop();
-  //   }
-  //   this.disposeVideoPlayer();
-  // }
-
-  handleFrontendAudioEvent(e: t.FrontendMediaEvent) {
-    // TODO
-    //   const audioPlayer = this.audioTrackPlayers.find(a => a.audioTrack.id === e.id);
-    //   if (audioPlayer) {
-    //     audioPlayer.handleAudioEvent(e);
-    //   } else {
-    //     console.error(`handleFrontendAudioEvent audio track player with id ${e.id} not found`);
-    //   }
-  }
-
-  handleFrontendVideoEvent(e: t.FrontendMediaEvent) {
-    // TODO
-    //   this.videoTrackPlayer.handleVideoEvent(e);
-  }
-
-  // async applyInsertEvent(cmd: t.InsertEventCmd) {
-  //   if (this.internalWorkspace.eventIndex === cmd.index - 1) {
-  //     this.internalWorkspace.eventIndex++;
-  //     await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Forwards);
-  //   }
-  // }
-
-  // async unapplyInsertEvent(cmd: t.InsertEventCmd) {
-  //   if (this.internalWorkspace.eventIndex === cmd.index) {
-  //     this.internalWorkspace.eventIndex--;
-  //     await this.workspacePlayer.applyEditorEvent(cmd.event, cmd.uri, t.Direction.Backwards);
-  //   }
-  // }
-
-  // updateAudioTrack(audioTrack: t.AudioTrack) {
-  //   const audioTrackPlayer = this.audioTrackPlayers.find(p => p.audioTrack.id === audioTrack.id);
-  //   if (audioTrackPlayer) {
-  //     audioTrackPlayer.audioTrack = audioTrack;
-  //   }
-  // }
-
-  // updateVideoTrack(videoTrack: t.VideoTrack) {
-  //   if (this.videoTrackPlayer.videoTrack?.id === videoTrack.id) {
-  //     this.videoTrackPlayer.videoTrack = videoTrack;
-  //   }
-  // }
 
   async enqueueSyncAfterSessionChange(change: t.SessionChange) {
-    await this.stopOnError(this.queue.enqueue(this.syncAfterSessionChange.bind(this), change));
+    await this.pauseOnError(this.queue.enqueue(this.syncAfterSessionChange.bind(this), change));
   }
 
-  async enqueueSyncMedia() {
-    await this.stopOnError(this.queue.enqueue(this.syncMedia.bind(this)));
+  async enqueueSyncMedia(opts?: { hard?: boolean }) {
+    await this.pauseOnError(this.queue.enqueue(this.syncMedia.bind(this)));
   }
-
-  // private initAudioPlayer(c: AudioTrackPlayer) {
-  //   c.onError = this.gotError.bind(this);
-  // }
-
-  // private initVideoPlayer() {
-  //   this.videoTrackPlayer.onError = this.gotError.bind(this);
-  // }
-
-  // private disposeAudioPlayer(c: AudioTrackPlayer) {
-  //   c.onError = undefined;
-  // }
-
-  // private disposeVideoPlayer() {
-  //   this.videoTrackPlayer.onError = undefined;
-  // }
-
-  // private seekInRangeAudios() {
-  //   for (const c of this.audioTrackPlayers) {
-  //     if (this.isTrackInRange(c.audioTrack)) this.seekAudio(c);
-  //   }
-  // }
-
-  // private seekInRangeAudiosThatAreNotRunning() {
-  //   for (const c of this.audioTrackPlayers) {
-  //     if (!c.running && this.isTrackInRange(c.audioTrack)) this.seekAudio(c);
-  //   }
-  // }
-
-  // private seekAudio(c: AudioTrackPlayer) {
-  //   c.seek(this.globalClockToTrackLocal(c.audioTrack));
-  // }
-
-  // private playInRangeAudios() {
-  //   for (const c of this.audioTrackPlayers) {
-  //     if (!c.running && this.isTrackInRange(c.audioTrack)) c.play();
-  //   }
-  // }
-
-  // private setInRangeAudiosPlaybackRate() {
-  //   for (const c of this.audioTrackPlayers) {
-  //     if (this.isTrackInRange(c.audioTrack)) {
-  //       const rate = this.getAdjustedPlaybackRate(lib.clockToGlobal(c.lastReportedClock, c.audioTrack.clockRange));
-  //       c.setPlaybackRate(rate);
-  //     }
-  //   }
-  // }
-
-  // private pauseAudios() {
-  //   for (const c of this.audioTrackPlayers) {
-  //     if (c.running) c.pause();
-  //   }
-  // }
-
-  // private pauseOutOfRangeAudios() {
-  //   for (const c of this.audioTrackPlayers) {
-  //     if (c.running && !this.isTrackInRange(c.audioTrack)) c.pause();
-  //   }
-  // }
-
-  // private stopOutOfRangeVideo() {
-  //   const c = this.videoTrackPlayer;
-  //   if (c.videoTrack && !this.isTrackInRange(c.videoTrack)) c.stop();
-  // }
-
-  // private pauseVideo() {
-  //   this.videoTrackPlayer.pause();
-  // }
-
-  // private loadInRangeVideoAndSeek() {
-  //   const videoTrack = this.findInRangeVideoTrack();
-  //   if (videoTrack) {
-  //     this.videoTrackPlayer.loadTrack(videoTrack);
-  //     this.videoTrackPlayer.seek(this.globalClockToTrackLocal(videoTrack));
-  //   }
-  // }
-
-  // private loadInRangeVideoAndSeekIfDifferent() {
-  //   const videoTrack = this.findInRangeVideoTrack();
-  //   // console.log('loadInRangeVideoAndSeekIfDifferent videoTrack', videoTrack);
-  //   if (videoTrack && (this.videoTrackPlayer.videoTrack !== videoTrack || !this.videoTrackPlayer.running)) {
-  //     this.videoTrackPlayer.loadTrack(videoTrack);
-  //     this.videoTrackPlayer.seek(this.globalClockToTrackLocal(videoTrack));
-  //   }
-  // }
-
-  // private findInRangeVideoTrack(): t.VideoTrack | undefined {
-  //   return _.findLast(this.session.body.videoTracks, t => this.isTrackInRange(t));
-  // }
-
-  // private playInRangeVideo() {
-  //   if (
-  //     !this.videoTrackPlayer.running &&
-  //     this.videoTrackPlayer.videoTrack &&
-  //     this.isTrackInRange(this.videoTrackPlayer.videoTrack)
-  //   ) {
-  //     this.videoTrackPlayer.play();
-  //   }
-  // }
-
-  // private setInRangeVideoPlaybackRate() {
-  //   if (this.videoTrackPlayer.videoTrack && this.isTrackInRange(this.videoTrackPlayer.videoTrack)) {
-  //     const rate = this.getAdjustedPlaybackRate(
-  //       lib.clockToGlobal(this.videoTrackPlayer.lastReportedClock, this.videoTrackPlayer.videoTrack.clockRange),
-  //     );
-  //     this.videoTrackPlayer.setPlaybackRate(rate);
-  //   }
-  // }
-
-  // private getAdjustedPlaybackRate(clock: number): number {
-  //   const diff = this.clock - clock;
-  //   const threshold = 0.5;
-  //   if (diff > threshold) {
-  //     return 1.05;
-  //   } else if (diff < threshold) {
-  //     return 0.95;
-  //   } else {
-  //     return 1;
-  //   }
-  // }
 
   private async enqueueUpdate(diffMs: number) {
-    await this.stopOnError(this.queue.enqueue(this.update.bind(this, diffMs)));
+    await this.pauseOnError(this.queue.enqueue(this.update.bind(this, diffMs)));
   }
 
   private async seek(clock: number) {
     this.clock = Math.min(this.session.head.duration, clock);
     await this.workspacePlayer.seek(clock);
-    await this.syncMedia();
+    await this.syncMedia({ hard: true });
     this.updateLoop.resetDiff();
   }
 
@@ -402,7 +195,8 @@ export default class SessionRecordAndReplay {
   }
 
   private async play() {
-    assert(!this.running);
+    // If user double-clicks on the play button, it might call twice.
+    if (this.running) return;
 
     this.mode.recorder = false;
     this.mode.status = Status.Running;
@@ -419,7 +213,8 @@ export default class SessionRecordAndReplay {
   }
 
   private async record() {
-    assert(!this.running);
+    // If user double-clicks on the pause button, it might call twice.
+    if (!this.running) return;
 
     this.mode.recorder = true;
     this.mode.status = Status.Running;
@@ -435,19 +230,26 @@ export default class SessionRecordAndReplay {
 
   /**
    * Only meant to be called by the update loop. Don't call it directly or make
-   * it do anything special when diffMs is 0.
+   * it do anything special when diffMs is 0. Also, it shouldn't be called
+   * directly to update everything for seek(). Call sync workspace and media
+   * directly.
+   *
    * On error, it will call this.session.onError and also throw.
    */
   private async update(diffMs: number) {
     try {
-      // const isLoading = this.videoTrackPlayer.loading || this.audioTrackPlayers.some(p => p.loading);
-      // if (isLoading) {
-      //   this.videoTrackPlayer.pause();
-      //   for (const c of this.audioTrackPlayers) c.pause();
-      //   return;
-      // }
+      // Wait until all media have loaded enough data to play through.
+      const mediaStatuses = await this.getMediaStatuses();
+      const isLoading = _.some(mediaStatuses, s => s.readyState < 4);
+      if (isLoading) {
+        await this.pauseAllMedia();
+        return;
+      }
+
+      // Update clock.
       this.clock += diffMs / 1000;
 
+      // Update workspace.
       if (this.mode.recorder) {
         if (config.logSessionRRUpdateStep) {
           console.log(
@@ -464,12 +266,15 @@ export default class SessionRecordAndReplay {
         await this.workspacePlayer.seek(this.clock);
       }
 
-      await this.syncMedia();
+      // Sync media.
+      await this.syncMedia({ mediaStatuses });
 
+      // Pause if reached the end during playback.
       if (!this.mode.recorder && this.clock === this.session.head.duration) {
         this.pause();
       }
 
+      // Trigger callback to update frontend.
       this.session.onProgress?.();
     } catch (error) {
       this.session.onError?.(error as Error);
@@ -477,16 +282,123 @@ export default class SessionRecordAndReplay {
     }
   }
 
-  private async syncMedia() {
-    // TODO
-    // this.seekInRangeAudiosThatAreNotRunning();
-    // this.loadInRangeVideoAndSeekIfDifferent();
-    // if (this.running) {
-    //   this.playInRangeAudios();
-    //   this.playInRangeVideo();
-    // }
-    // this.pauseOutOfRangeAudios();
-    // this.stopOutOfRangeVideo();
+  /**
+   * If mediaStatuses is not passed, it'll fetch it automatically. Useful when
+   * caller already has mediaStatuses.
+   */
+  private async syncMedia(opts?: { mediaStatuses?: t.MediaStatuses; hard?: boolean }) {
+    if (!this.session.context.webviewProvider.isReady) return;
+
+    const mediaStatuses = opts?.mediaStatuses ?? (await this.getMediaStatuses());
+
+    const postMessage = this.session.context.webviewProvider.postMessage.bind(this.session.context.webviewProvider);
+
+    // const allTracks = [...this.session.body.audioTracks, ...this.session.body.videoTracks];
+    // const [inRangeTracks, outOfRangeTracks] = _.partition(allTracks, t => this.isTrackInRange(t));
+    // const isMediaPlaying = (status: t.MediaStatus) => !status.paused && !status.ended && status.readyState === 4;
+
+    const outOfRangeAudioTracks = this.session.body.audioTracks.filter(t => !this.isTrackInRange(t));
+    const inRangeAudioTracks = this.session.body.audioTracks.filter(t => this.isTrackInRange(t));
+
+    // Only one video at a time (the last one).
+    const activeVideoTrack = _.findLast(this.session.body.videoTracks, t => this.isTrackInRange(t));
+    const outOfRangeVideoTracks = this.session.body.videoTracks.filter(t => t !== activeVideoTrack);
+
+    // Combine in range tracks.
+    const inRangeTracks = _.compact([...inRangeAudioTracks, activeVideoTrack]);
+
+    // Dispose out-of-range video tracks. Do this before loading a new video
+    // because videos share a single HTMLVideoElement and must be stopped before
+    // loading a new one onto the same HTMLVideoElement.  This will delete the
+    // video track manager on the frontend. When calling load, it'll create a
+    // new video track manager and set .src on the HTMLVideoElement.
+    const videoTracksToDispose = outOfRangeVideoTracks.filter(t => mediaStatuses[t.id]);
+    await Promise.all(
+      videoTracksToDispose.map(t => postMessage({ type: 'media/dispose', mediaType: t.type, id: t.id })),
+    );
+
+    // Pause all out-of-range audio tracks. We dont' dispose of audio tracks
+    // because they're always loaded. See comments below.
+    const audioTracksToDispose = outOfRangeAudioTracks.filter(t => mediaStatuses[t.id]);
+    await Promise.all(audioTracksToDispose.map(t => postMessage({ type: 'media/pause', mediaType: t.type, id: t.id })));
+
+    // Load all audios and the active video.
+    //
+    // All audio files must be *always* loaded and only paused when out of
+    // range. This way, on the frontend, play() and seek() can prepare audio
+    // tracks immediately. Otherwise, if we load and play an audio during
+    // playback, we get the error "play() can only be initiated by a user
+    // gesture."
+    //
+    // We can get away with this for video because there is only one
+    // HTMLVideoElement on the page and on the frontend, play() and seek()
+    // prepare the HTMLVideoElement immediately.
+    const tracksToLoad = _.compact([...this.session.body.audioTracks, activeVideoTrack]).filter(
+      t => !mediaStatuses[t.id],
+    );
+    await Promise.all(
+      tracksToLoad.map(t => {
+        assert(t.file.type === 'local');
+        return postMessage({
+          type: 'media/load',
+          mediaType: t.type,
+          id: t.id,
+          src: this.session.context.webviewProvider
+            .asWebviewUri(this.session.core.dataPath, 'blobs', t.file.sha1)
+            .toString(),
+          clock: this.globalClockToTrackLocal(t),
+        });
+      }),
+    );
+
+    // Seek. When opts.hard, seek exactly to current clock, otherwise, seek only
+    // if clock is too far off.
+    const clockDiffThreshold = 3;
+    const shouldSeekTrack = (t: t.RangedTrack) => {
+      if (!mediaStatuses[t.id]) return false;
+      const trackGlobalClock = this.trackLocalClockToGlobal(mediaStatuses[t.id].currentTime, t);
+      const clockDiff = Math.abs(trackGlobalClock - this.clock);
+      return opts?.hard || clockDiff >= clockDiffThreshold;
+    };
+    const tracksToSeek = inRangeTracks.filter(shouldSeekTrack);
+    await Promise.all(
+      tracksToSeek.map(t =>
+        postMessage({ type: 'media/seek', mediaType: t.type, id: t.id, clock: this.globalClockToTrackLocal(t) }),
+      ),
+    );
+
+    // Play in-range tracks if session is running. We may call syncMedia() just
+    // to load the tracks and the video without wanting to play yet.
+    if (this.running) {
+      const tracksToPlay = inRangeTracks.filter(t => mediaStatuses[t.id]?.paused);
+      await Promise.all(tracksToPlay.map(t => postMessage({ type: 'media/play', mediaType: t.type, id: t.id })));
+    }
+
+    // Adjust playback rate to catch up with current clock if track was not already sought.
+    const tracksNotSought = _.difference(inRangeTracks, tracksToSeek).filter(t => mediaStatuses[t.id]);
+    await Promise.all(
+      tracksNotSought.map(t => {
+        const trackGlobalClock = this.trackLocalClockToGlobal(mediaStatuses[t.id].currentTime, t);
+        const rate = lib.adjustTrackPlaybackRate(this.clock, trackGlobalClock);
+        if (rate !== undefined && Math.abs(mediaStatuses[t.id].playbackRate - rate) > 0.001) {
+          return postMessage({ type: 'media/setPlaybackRate', mediaType: t.type, id: t.id, rate });
+        }
+      }),
+    );
+  }
+
+  private async getMediaStatuses(): Promise<t.MediaStatuses> {
+    const res = await this.session.context.webviewProvider.postMessage({ type: 'media/statuses' });
+    assert(res.type === 'mediaStatuses');
+    return res.mediaStatuses;
+  }
+
+  private async enqueuePauseAllMedia() {
+    await this.queue.enqueue(this.pauseAllMedia.bind(this));
+  }
+
+  private async pauseAllMedia() {
+    await this.session.context.webviewProvider.postMessage({ type: 'media/pauseAll' });
   }
 
   /**
@@ -668,7 +580,7 @@ export default class SessionRecordAndReplay {
     }
   }
 
-  private async stopOnError<T>(promise: Promise<T>): Promise<T> {
+  private async pauseOnError<T>(promise: Promise<T>): Promise<T> {
     try {
       return await promise;
     } catch (error) {
@@ -692,5 +604,9 @@ export default class SessionRecordAndReplay {
 
   private globalClockToTrackLocal(t: t.RangedTrack): number {
     return lib.clockToLocal(this.clock, t.clockRange);
+  }
+
+  private trackLocalClockToGlobal(trackLocalClock: number, t: t.RangedTrack): number {
+    return lib.clockToGlobal(trackLocalClock, t.clockRange);
   }
 }

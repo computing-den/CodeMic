@@ -2,11 +2,10 @@ import * as t from '../lib/types.js';
 import * as b from '../lib/bus.js';
 import * as lib from '../lib/lib.js';
 import { updateStore, getStore } from './store.js';
-import type MediaManager from './media_manager.js';
+import { mediaManager } from './media_manager.js';
 
 const vscode = acquireVsCodeApi();
 const bus = new b.Bus(postParcel, messageHandler);
-let mediaManager: MediaManager | undefined;
 window.addEventListener('message', event => bus.handleParcel(event.data));
 
 // type Listener = (req: t.BackendRequest) => Promise<t.FrontendResponse>;
@@ -20,9 +19,9 @@ window.addEventListener('message', event => bus.handleParcel(event.data));
 // mediaEventListener = l;
 // }
 
-export function setMediaManager(m: MediaManager) {
-  mediaManager = m;
-}
+// export function setMediaManager(m: MediaManager) {
+//   mediaManager = m;
+// }
 
 export default async function postMessage<Req extends t.FrontendRequest>(
   req: Req,
@@ -44,70 +43,18 @@ export default async function postMessage<Req extends t.FrontendRequest>(
 async function messageHandler(req: t.BackendRequest): Promise<t.FrontendResponse> {
   // console.log('webview received: ', req);
 
+  if (req.type.startsWith('media/')) {
+    return await mediaManager.handleRequest(req as t.BackendMediaRequest);
+  }
+
   switch (req.type) {
     case 'updateStore': {
       updateStore(() => req.store);
       return { type: 'ok' };
     }
-    case 'todo': {
-      return { type: 'ok' };
-    }
-    // case 'audio/load': {
-    //   await mediaManager.load(req.id, req.src);
-    //   return { type: 'ok' };
-    // }
-    case 'audio/play': {
-      await mediaManager?.audioManager.play(req.id);
-      return { type: 'ok' };
-    }
-    case 'audio/pause': {
-      mediaManager?.audioManager.pause(req.id);
-      return { type: 'ok' };
-    }
-    // case 'audio/stop': {
-    //   await mediaManager.getAudioManager(req.id).stop();
-    //   return { type: 'ok' };
-    // }
-    case 'audio/dispose': {
-      mediaManager?.audioManager.dispose(req.id);
-      return { type: 'ok' };
-    }
-    case 'audio/seek': {
-      mediaManager?.audioManager.seek(req.id, req.clock);
-      return { type: 'ok' };
-    }
-    case 'audio/setPlaybackRate': {
-      mediaManager?.audioManager.setPlaybackRate(req.id, req.rate);
-      return { type: 'ok' };
-    }
-    case 'video/loadTrack': {
-      mediaManager?.videoManager.loadTrack(req.track);
-      return { type: 'ok' };
-    }
-    case 'video/play': {
-      await mediaManager?.videoManager.play();
-      return { type: 'ok' };
-    }
-    case 'video/pause': {
-      mediaManager?.videoManager.pause();
-      return { type: 'ok' };
-    }
-    case 'video/stop': {
-      mediaManager?.videoManager.stop();
-      return { type: 'ok' };
-    }
-    case 'video/seek': {
-      mediaManager?.videoManager.seek(req.clock);
-      return { type: 'ok' };
-    }
-    case 'video/setPlaybackRate': {
-      mediaManager?.videoManager.setPlaybackRate(req.rate);
-      return { type: 'ok' };
-    }
-    default: {
-      lib.unreachable(req);
-    }
   }
+
+  throw new Error(`Unknown request from backend: ${req.type}`);
 }
 
 //==================================================

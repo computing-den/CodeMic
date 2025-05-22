@@ -12,6 +12,14 @@ class WebviewProvider implements vscode.WebviewViewProvider {
   onMessage?: b.MessageHandler;
   onViewOpen?: () => void;
 
+  asWebviewUri(base: string, ...paths: string[]): vscode.Uri {
+    return this.view!.webview.asWebviewUri(vscode.Uri.joinPath(vscode.Uri.file(base), ...paths));
+  }
+
+  get extensionWebviewUri(): vscode.Uri {
+    return this.view!.webview.asWebviewUri(this.extension.extensionUri);
+  }
+
   private view?: vscode.WebviewView;
   private bus?: b.Bus;
 
@@ -100,8 +108,8 @@ class WebviewProvider implements vscode.WebviewViewProvider {
       logWebviewAudioEvents: config.logWebviewAudioEvents,
       logWebviewVideoEvents: config.logWebviewVideoEvents,
       debug: config.debug,
-      webviewUriBase: webview.asWebviewUri(vscode.Uri.file('/')).toString(),
-      extensionWebviewUri: webview.asWebviewUri(this.extension.extensionUri).toString(),
+      webviewUriBase: this.asWebviewUri('/').toString(),
+      extensionWebviewUri: this.extensionWebviewUri.toString(),
       server: config.server,
     };
 

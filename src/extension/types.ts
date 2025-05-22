@@ -9,8 +9,6 @@ export type Context = {
   userDataPath: string;
   userSettingsPath: string;
   settings: t.Settings;
-  postAudioMessage?: (req: t.BackendAudioRequest) => Promise<t.FrontendAudioResponse>;
-  postVideoMessage?: (req: t.BackendVideoRequest) => Promise<t.FrontendVideoResponse>;
   updateFrontend?: () => any;
   user?: t.User;
   earlyAccessEmail?: string;
@@ -39,5 +37,3 @@ export type WorkspaceChangeGlobalState = {
   recorder?: RecorderRestoreState;
 };
 export type ReadDirOptions = { includeDirs?: boolean; includeFiles?: boolean };
-
-// export interface Thenable<T> extends PromiseLike<T> { }
