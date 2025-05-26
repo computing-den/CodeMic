@@ -2,51 +2,36 @@
   .main-section .section-body {
     padding: var(--container-padding-ver-small) var(--container-padding-hor) 0 var(--container-padding-hor);
 
-    &:has(video:not([src])),
-    &:has(video[src='']) {
-      .cover-container {
-        display: flex;
-      }
-    }
-
     .media-toolbar {
     }
 
-    /* .cover-container { */
-    /*   border-radius: 5px; */
-    /*   /\* display: flex; *\/ */
-    /*   justify-content: center; */
-    /*   align-items: center; */
-    /*   overflow: hidden; */
-    /*   position: relative; */
-    /*   /\* background: var(--background-secondary); *\/ */
-    /*   background: black; */
-    /*   display: none; */
-
-    /*   & img { */
-    /*     width: 100%; */
-    /*     /\* height: 200px; *\/ */
-    /*     /\* object-fit: contain; *\/ */
-    /*   } */
-    /* } */
-
-    .cover-container {
+    .media-container {
       border: var(--cover-container-border);
       overflow: hidden;
       border-radius: var(--card-border-radius);
       position: relative;
       background: #1f1f1f;
-      display: none;
       transition: height 0.3s ease-out;
       transition-delay: 0.4s;
+      display: flex;
 
-      &:has(video[src]:not([src=''])),
-      &:has(img) {
-        display: flex;
+      /* /\* Hide media-container if session is loaded, */
+      /*  * and there's no video and no cover image */
+      /*  * and clock is not at 0. */
+      /*  *\/ */
+      /* &.loaded:not(:has(video[src])):not(.cover):not(.at-zero) { */
+      /*   display: none; */
+      /* } */
+
+      /* Hide cover image if has non-blank video */
+      &:has(video[src]:not([data-blank])) {
+        & img {
+          display: none;
+        }
       }
 
-      &:has(video[src]:not([src=''])) img {
-        display: none;
+      video[data-blank] {
+        opacity: 0;
       }
 
       img,

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { cn } from './misc';
 
 type Props = { className?: string; src?: string; fallback: string };
 export default function ImgWithFallback(props: Props) {
@@ -19,5 +20,11 @@ export default function ImgWithFallback(props: Props) {
     };
   }, [props.src]);
 
-  return <img className={props.className} src={showFallback ? props.fallback : props.src} ref={ref} />;
+  return (
+    <img
+      className={cn(props.className, showFallback && 'fallback')}
+      src={showFallback ? props.fallback : props.src}
+      ref={ref}
+    />
+  );
 }

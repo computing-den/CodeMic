@@ -57,8 +57,8 @@ export default class Player extends React.Component<Props> {
     return document.getElementById('guide-video') as HTMLVideoElement | undefined;
   };
 
-  getCoverContainerElem = (): HTMLElement => {
-    return document.getElementById('cover-container')!;
+  getMediaContainerElem = (): HTMLElement => {
+    return document.getElementById('media-container')!;
   };
 
   tocItemClicked = async (item: t.TocItem) => {
@@ -88,7 +88,7 @@ export default class Player extends React.Component<Props> {
   // }
 
   updateCoverContainerHeight = () => {
-    const container = this.getCoverContainerElem();
+    const container = this.getMediaContainerElem();
     let height = 0;
     for (const child of container.children) {
       height = Math.max(height, child.getBoundingClientRect().height);
@@ -242,7 +242,15 @@ export default class Player extends React.Component<Props> {
               clock={session.clock}
               duration={head.duration}
             />
-            <div id="cover-container" className="cover-container subsection subsection_spaced">
+            <div
+              id="media-container"
+              className={cn(
+                'media-container subsection subsection_spaced',
+                // session.loaded && 'loaded',
+                // session.clock === 0 && 'at-zero',
+                // session.head.hasCover && 'cover',
+              )}
+            >
               <Cover local={local} head={head} />
               <video id="guide-video" />
             </div>

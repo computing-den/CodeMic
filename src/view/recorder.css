@@ -86,11 +86,11 @@
         height: 400px;
         max-height: 25vh;
 
-        &:has(video:not([src])),
-        &:has(video[src='']) {
+        /* Show .empty-content if there's no video with src or if the video is blank */
+        &:has(video[data-blank]),
+        &:not(:has(video[src])) {
           .empty-content {
             display: flex;
-
             justify-content: center;
             align-items: center;
             position: absolute;
@@ -98,15 +98,17 @@
             bottom: 0;
             left: 0;
             right: 0;
+            /* background: #1f1f1f; */
 
             .codicon {
               font-size: 6rem;
               color: #d7d7d7;
             }
           }
-        }
 
-        video {
+          video[data-blank] {
+            opacity: 0;
+          }
         }
 
         .empty-content {

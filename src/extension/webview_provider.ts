@@ -16,10 +16,6 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     return this.view!.webview.asWebviewUri(vscode.Uri.joinPath(vscode.Uri.file(base), ...paths));
   }
 
-  get extensionWebviewUri(): vscode.Uri {
-    return this.view!.webview.asWebviewUri(this.extension.extensionUri);
-  }
-
   private view?: vscode.WebviewView;
   private bus?: b.Bus;
 
@@ -109,7 +105,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
       logWebviewVideoEvents: config.logWebviewVideoEvents,
       debug: config.debug,
       webviewUriBase: this.asWebviewUri('/').toString(),
-      extensionWebviewUri: this.extensionWebviewUri.toString(),
+      extensionWebviewUri: this.view!.webview.asWebviewUri(this.extension.extensionUri).toString(),
       server: config.server,
     };
 

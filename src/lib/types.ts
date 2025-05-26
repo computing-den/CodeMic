@@ -70,7 +70,15 @@ export type BackendToFrontendReqRes =
 
 export type BackendToFrontendMediaReqRes =
   | {
-      request: { type: 'media/load'; mediaType: MediaType; id: string; src: string; clock: number };
+      request: {
+        type: 'media/load';
+        mediaType: MediaType;
+        id: string;
+        src: string;
+        clock: number;
+        loop?: boolean;
+        blank?: boolean;
+      };
       response: OKResponse;
     }
   | { request: { type: 'media/play'; mediaType: MediaType; id: string }; response: OKResponse }
@@ -181,6 +189,7 @@ export type ServerResponse = BackendToServerReqRes['response'] | ErrorResponse;
 export type MediaType = 'audio' | 'video' | 'image';
 export type MediaStatuses = Record<string, MediaStatus>;
 export type MediaStatus = {
+  type: MediaType;
   readyState: number;
   networkState: number;
   currentTime: number;

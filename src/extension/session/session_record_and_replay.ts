@@ -13,6 +13,8 @@ import QueueRunner from '../../lib/queue_runner.js';
 import _, { inRange } from 'lodash';
 import { UpdateLoopAsync } from '../../lib/update_loop_async.js';
 import { isDuration } from 'moment';
+import { v4 as uuid } from 'uuid';
+import { mediaManager } from '../../view/media_manager.js';
 
 enum Status {
   Init,
@@ -27,6 +29,8 @@ type Mode = {
 };
 
 const UPDATE_LOOP_INTERVAL_MS = 100;
+
+const BLANK_VIDEO_ID = '00000000-33fd-4f9d-95dc-37e211464000';
 
 export default class SessionRecordAndReplay {
   session: LoadedSession;
@@ -214,7 +218,7 @@ export default class SessionRecordAndReplay {
 
   private async record() {
     // If user double-clicks on the pause button, it might call twice.
-    if (!this.running) return;
+    if (this.running) return;
 
     this.mode.recorder = true;
     this.mode.status = Status.Running;
@@ -240,9 +244,11 @@ export default class SessionRecordAndReplay {
     try {
       // Wait until all media have loaded enough data to play through.
       const mediaStatuses = await this.getMediaStatuses();
-      const isLoading = _.some(mediaStatuses, s => s.readyState < 4);
+      const isLoading = _.some(mediaStatuses, s => Boolean(s.src) && s.readyState < 4);
       if (isLoading) {
-        await this.pauseAllMedia();
+        if (_.some(mediaStatuses, s => !s.paused)) {
+          await this.pauseAllMedia();
+        }
         return;
       }
 
@@ -290,39 +296,48 @@ export default class SessionRecordAndReplay {
     if (!this.session.context.webviewProvider.isReady) return;
 
     const mediaStatuses = opts?.mediaStatuses ?? (await this.getMediaStatuses());
-
     const postMessage = this.session.context.webviewProvider.postMessage.bind(this.session.context.webviewProvider);
 
-    // const allTracks = [...this.session.body.audioTracks, ...this.session.body.videoTracks];
-    // const [inRangeTracks, outOfRangeTracks] = _.partition(allTracks, t => this.isTrackInRange(t));
-    // const isMediaPlaying = (status: t.MediaStatus) => !status.paused && !status.ended && status.readyState === 4;
-
-    const outOfRangeAudioTracks = this.session.body.audioTracks.filter(t => !this.isTrackInRange(t));
-    const inRangeAudioTracks = this.session.body.audioTracks.filter(t => this.isTrackInRange(t));
-
     // Only one video at a time (the last one).
-    const activeVideoTrack = _.findLast(this.session.body.videoTracks, t => this.isTrackInRange(t));
-    const outOfRangeVideoTracks = this.session.body.videoTracks.filter(t => t !== activeVideoTrack);
+    const inRangeVideoTrack = _.findLast(this.session.body.videoTracks, t => this.isTrackInRange(t));
+    // const outOfRangeVideoTracks = this.session.body.videoTracks.filter(t => t !== inRangeVideoTrack);
 
-    // Combine in range tracks.
-    const inRangeTracks = _.compact([...inRangeAudioTracks, activeVideoTrack]);
+    // If there is at least one video track, but no in-range video, load the
+    // blank video on loop so that the frontend has a video it can use to
+    // prepare the HTMLVideoElement on user interaction.
+    // First check if the blank video is already running.
+    const showingBlankVideo = this.session.body.videoTracks.length > 0 && !inRangeVideoTrack;
+    if (showingBlankVideo) {
+      if (!mediaStatuses[BLANK_VIDEO_ID]) {
+        await postMessage({
+          type: 'media/load',
+          mediaType: 'video',
+          id: BLANK_VIDEO_ID,
+          src: this.session.context.webviewProvider
+            .asWebviewUri(this.session.context.extension.extensionUri.fsPath, 'resources', 'blank_360p.mp4')
+            .toString(),
+          clock: 0,
+          loop: true,
+          blank: true,
+        });
+      }
+    }
 
-    // Dispose out-of-range video tracks. Do this before loading a new video
-    // because videos share a single HTMLVideoElement and must be stopped before
-    // loading a new one onto the same HTMLVideoElement.  This will delete the
-    // video track manager on the frontend. When calling load, it'll create a
-    // new video track manager and set .src on the HTMLVideoElement.
-    const videoTracksToDispose = outOfRangeVideoTracks.filter(t => mediaStatuses[t.id]);
-    await Promise.all(
-      videoTracksToDispose.map(t => postMessage({ type: 'media/dispose', mediaType: t.type, id: t.id })),
-    );
+    // if (!inRangeVideoTrack) {
+    //   // Dispose of out of range video tracks.
+    //   const videoTracksToDispose = outOfRangeVideoTracks.filter(t => mediaStatuses[t.id]);
+    //   await Promise.all(
+    //     videoTracksToDispose.map(t => postMessage({ type: 'media/dispose', mediaType: t.type, id: t.id })),
+    //   );
+    // }
 
     // Pause all out-of-range audio tracks. We dont' dispose of audio tracks
     // because they're always loaded. See comments below.
-    const audioTracksToDispose = outOfRangeAudioTracks.filter(t => mediaStatuses[t.id]);
-    await Promise.all(audioTracksToDispose.map(t => postMessage({ type: 'media/pause', mediaType: t.type, id: t.id })));
+    const outOfRangeAudioTracks = this.session.body.audioTracks.filter(t => !this.isTrackInRange(t));
+    const audioTracksToPause = outOfRangeAudioTracks.filter(t => mediaStatuses[t.id]);
+    await Promise.all(audioTracksToPause.map(t => postMessage({ type: 'media/pause', mediaType: t.type, id: t.id })));
 
-    // Load all audios and the active video.
+    // Load all audios and the in-range video.
     //
     // All audio files must be *always* loaded and only paused when out of
     // range. This way, on the frontend, play() and seek() can prepare audio
@@ -333,7 +348,7 @@ export default class SessionRecordAndReplay {
     // We can get away with this for video because there is only one
     // HTMLVideoElement on the page and on the frontend, play() and seek()
     // prepare the HTMLVideoElement immediately.
-    const tracksToLoad = _.compact([...this.session.body.audioTracks, activeVideoTrack]).filter(
+    const tracksToLoad = _.compact([...this.session.body.audioTracks, inRangeVideoTrack]).filter(
       t => !mediaStatuses[t.id],
     );
     await Promise.all(
@@ -350,6 +365,10 @@ export default class SessionRecordAndReplay {
         });
       }),
     );
+
+    // Combine in range tracks.
+    const inRangeAudioTracks = this.session.body.audioTracks.filter(t => this.isTrackInRange(t));
+    const inRangeTracks = _.compact([...inRangeAudioTracks, inRangeVideoTrack]);
 
     // Seek. When opts.hard, seek exactly to current clock, otherwise, seek only
     // if clock is too far off.
@@ -382,6 +401,18 @@ export default class SessionRecordAndReplay {
         const rate = lib.adjustTrackPlaybackRate(this.clock, trackGlobalClock);
         if (rate !== undefined && Math.abs(mediaStatuses[t.id].playbackRate - rate) > 0.001) {
           return postMessage({ type: 'media/setPlaybackRate', mediaType: t.type, id: t.id, rate });
+        }
+      }),
+    );
+
+    // Dispose of any audio or video that no longer exists.
+    // This only happens in recorder when the user deletes a track.
+    const allTracks = [...this.session.body.audioTracks, ...this.session.body.videoTracks];
+    await Promise.all(
+      _.map(mediaStatuses, (mediaStatus, id) => {
+        const track = allTracks.find(t => t.id === id);
+        if (!track && !(id === BLANK_VIDEO_ID && showingBlankVideo)) {
+          return postMessage({ type: 'media/dispose', mediaType: mediaStatus.type, id });
         }
       }),
     );

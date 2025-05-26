@@ -21,7 +21,15 @@ export default class MediaManager {
         if (req.mediaType === 'audio') {
           this.trackManagers[req.id] = new AudioTrackManager(req.id, req.src, req.clock);
         } else if (req.mediaType === 'video') {
-          this.trackManagers[req.id] = new VideoTrackManager(req.id, req.src, req.clock);
+          // Replace existing video if there's one.
+          let videoTrackManager = _.find(this.trackManagers, m => m instanceof VideoTrackManager);
+          if (videoTrackManager) {
+            delete this.trackManagers[videoTrackManager.id];
+            videoTrackManager.replace(req.id, req.src, req.clock, req.loop, req.blank);
+          } else {
+            videoTrackManager = new VideoTrackManager(req.id, req.src, req.clock, req.loop, req.blank);
+          }
+          this.trackManagers[req.id] = videoTrackManager;
         } else {
           throw new Error(`media/load unknow media type ${req.mediaType}`);
         }
@@ -174,7 +182,7 @@ class AudioTrackManager implements TrackManager {
   }
 
   getStatus(): t.MediaStatus {
-    return getHTMLMediaElementStatus(this.audio);
+    return getHTMLMediaElementStatus(this.audio, 'audio');
   }
 
   private handleError = async (e: ErrorEvent) => {
@@ -191,20 +199,32 @@ class AudioTrackManager implements TrackManager {
 class VideoTrackManager implements TrackManager {
   video: HTMLVideoElement;
 
-  constructor(public id: string, public src: string, clock: number) {
-    if (config.logWebviewVideoEvents) console.log(`VideoTrackManager prepare`);
+  constructor(public id: string, public src: string, clock: number, loop?: boolean, blank?: boolean) {
+    if (config.logWebviewVideoEvents) console.log(`VideoTrackManager create video ${id}: ${src}`);
 
     const elem = document.querySelector('#guide-video');
     assert(elem && elem instanceof HTMLVideoElement, 'Did not find video element');
     this.video = elem;
 
     this.video.addEventListener('error', this.handleError);
+    this.replace(id, src, clock, loop, blank);
+  }
+
+  replace(id: string, src: string, clock: number, loop?: boolean, blank?: boolean) {
+    this.id = id;
+    this.src = src;
     this.video.muted = false;
     this.video.volume = 1;
     this.video.preload = 'auto';
     this.video.src = src;
     this.video.currentTime = clock;
     this.video.preservesPitch = true;
+    this.video.loop = Boolean(loop);
+    if (blank) {
+      this.video.dataset.blank = 'true';
+    } else {
+      delete this.video.dataset.blank;
+    }
     this.video.load();
   }
 
@@ -250,7 +270,7 @@ class VideoTrackManager implements TrackManager {
   }
 
   getStatus(): t.MediaStatus {
-    return getHTMLMediaElementStatus(this.video);
+    return getHTMLMediaElementStatus(this.video, 'video');
   }
 
   private handleError = async (e: ErrorEvent) => {
@@ -261,8 +281,9 @@ class VideoTrackManager implements TrackManager {
   };
 }
 
-function getHTMLMediaElementStatus(media: HTMLMediaElement): t.MediaStatus {
+function getHTMLMediaElementStatus(media: HTMLMediaElement, type: t.MediaType): t.MediaStatus {
   return {
+    type,
     readyState: media.readyState,
     networkState: media.networkState,
     currentTime: media.currentTime,
