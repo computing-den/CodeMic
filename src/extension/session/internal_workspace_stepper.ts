@@ -17,13 +17,13 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     await workspaceStepperDispatch(this, event, direction, uriSet);
   }
 
-  async applyInitEvent(e: t.InitEvent, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyStoreEvent(e: t.StoreEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(e.uri);
     if (direction === t.Direction.Forwards) {
       this.internalWorkspace.insertFile(e.uri, e.file);
     } else {
-      // If we want to reverse the init event, we must delete it from worktree as well as text documents and text editors.
-      throw new Error('Cannot reverse init event');
+      // If we want to reverse the store event, we must delete it from worktree as well as text documents and text editors.
+      throw new Error('Cannot reverse store event');
     }
   }
 

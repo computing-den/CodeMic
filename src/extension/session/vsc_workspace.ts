@@ -164,14 +164,14 @@ export default class VscWorkspace {
     //   }
     // }
 
-    // Scan the workspace directory (files and dirs) and create init events.
+    // Scan the workspace directory (files and dirs) and create store events.
     // TODO: ignore files in .codemicignore
     const pathsWithStats = await this.session.core.readDirRecursively({ includeFiles: true, includeDirs: true });
     for (const [p, stat] of pathsWithStats) {
       const uri = lib.workspaceUri(p);
       if (stat.isDirectory()) {
         events.push({
-          type: 'init',
+          type: 'store',
           id: lib.nextId(),
           uri,
           clock: 0,
@@ -182,7 +182,7 @@ export default class VscWorkspace {
         const sha1 = await misc.computeSHA1(data);
         await this.session.core.copyToBlob(path.join(this.session.workspace, p), sha1);
         events.push({
-          type: 'init',
+          type: 'store',
           id: lib.nextId(),
           uri,
           clock: 0,
@@ -191,7 +191,7 @@ export default class VscWorkspace {
       }
     }
 
-    // Walk through untitled text documents and create init events.
+    // Walk through untitled text documents and create store events.
     for (const vscTextDocument of vscode.workspace.textDocuments) {
       if (vscTextDocument.uri.scheme !== 'untitled') continue;
 
@@ -200,7 +200,7 @@ export default class VscWorkspace {
       const data = new TextEncoder().encode(vscTextDocument.getText());
       const sha1 = await misc.computeSHA1(data);
       await this.session.core.writeBlob(sha1, data);
-      events.push({ type: 'init', id: lib.nextId(), uri, clock: 0, file: { type: 'local', sha1 } });
+      events.push({ type: 'store', id: lib.nextId(), uri, clock: 0, file: { type: 'local', sha1 } });
     }
 
     // Walk through text documents and create openTextDocument events.

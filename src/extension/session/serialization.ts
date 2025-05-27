@@ -24,7 +24,7 @@ export function serializeSessionBody(body: t.SessionBody): t.SessionBodyCompact 
 
 function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCompact {
   switch (e.type) {
-    case 'init':
+    case 'store':
       return {
         t: 0,
         u: uriMap.get(e.uri)!,
@@ -188,7 +188,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
   switch (e.t) {
     case 0:
       return {
-        type: 'init',
+        type: 'store',
         id: nextId(),
         uri: uris[e.u],
         clock: deserializeClock(e.c),
@@ -289,7 +289,7 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
   switch (e.t) {
     case 0:
       return {
-        type: 'init',
+        type: 'store',
         id: nextId(),
         uri,
         clock: deserializeClock(e.c),

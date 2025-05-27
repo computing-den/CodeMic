@@ -22,14 +22,14 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     // this.eventIndex = step.newEventIndex;
   }
 
-  async applyInitEvent(e: t.InitEvent, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyStoreEvent(e: t.StoreEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (direction === t.Direction.Forwards) {
       if (e.file.type === 'dir') {
         const fsPath = URI.parse(this.session.core.resolveUri(e.uri)).fsPath;
         await fs.promises.mkdir(fsPath, { recursive: true });
       }
     } else {
-      throw new Error('Cannot reverse init event');
+      throw new Error('Cannot reverse store event');
     }
   }
 

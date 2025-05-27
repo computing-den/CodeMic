@@ -467,7 +467,7 @@ export type OpenDialogOptions = {
 
 export interface WorkspaceStepper {
   applyEditorEvent(e: EditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyInitEvent(e: InitEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyStoreEvent(e: StoreEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyTextChangeEvent(e: TextChangeEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyOpenTextDocumentEvent(e: OpenTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyCloseTextDocumentEvent(e: CloseTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
@@ -480,7 +480,7 @@ export interface WorkspaceStepper {
 }
 
 export type EditorEvent =
-  | InitEvent
+  | StoreEvent
   | TextChangeEvent
   | OpenTextDocumentEvent
   | CloseTextDocumentEvent
@@ -491,10 +491,8 @@ export type EditorEvent =
   | SaveEvent
   | TextInsertEvent;
 
-// export type EditorEventWithUri = { event: EditorEvent; uri: string };
-
-export type InitEvent = {
-  type: 'init';
+export type StoreEvent = {
+  type: 'store';
   id: number;
   uri: string;
   clock: number;
@@ -592,7 +590,7 @@ export type TextInsertEvent = {
 };
 
 export type EditorEventCompact =
-  | InitEventCompact
+  | StoreEventCompact
   | TextChangeEventCompact
   | OpenTextDocumentEventCompact
   | CloseTextDocumentEventCompact
@@ -603,7 +601,7 @@ export type EditorEventCompact =
   | SaveEventCompact
   | TextInsertEventCompact;
 
-export type InitEventCompact = {
+export type StoreEventCompact = {
   t: 0;
   u: number;
   c: number;
@@ -853,7 +851,7 @@ export namespace BodyFormatV1 {
   };
 
   export type EditorEventCompact =
-    | InitEventCompact
+    | StoreEventCompact
     | TextChangeEventCompact
     | OpenTextDocumentEventCompact
     | CloseTextDocumentEventCompact
@@ -864,7 +862,7 @@ export namespace BodyFormatV1 {
     | SaveEventCompact
     | TextInsertEventCompact;
 
-  export type InitEventCompact = {
+  export type StoreEventCompact = {
     t: 0;
     c: number;
     f: File;

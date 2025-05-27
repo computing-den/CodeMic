@@ -7,8 +7,8 @@ export default function workspaceStepperDispatch(
   uriSet?: t.UriSet,
 ): Promise<void> {
   switch (e.type) {
-    case 'init':
-      return stepper.applyInitEvent(e, direction, uriSet);
+    case 'store':
+      return stepper.applyStoreEvent(e, direction, uriSet);
     case 'textChange':
       return stepper.applyTextChangeEvent(e, direction, uriSet);
     case 'openTextDocument':

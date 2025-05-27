@@ -494,7 +494,7 @@ export default class SessionCore {
 
     // Find blobs in editor tracks.
     for (const e of body.editorEvents) {
-      if (e.type === 'init' && e.file.type === 'local') blobs.add(e.file.sha1);
+      if (e.type === 'store' && e.file.type === 'local') blobs.add(e.file.sha1);
     }
 
     // Find blobs in audio and video tracks.
