@@ -345,8 +345,8 @@ export default class SessionCore {
     if (options?.download) {
       await this.download({ skipIfExists: true, progress: options.progress, abortController: options.abortController });
     }
-    const compact = await storage.readJSON<t.SessionBodyCompact>(path.join(this.dataPath, 'body.json'));
-    return deserializeSessionBody(compact);
+    const compact = await storage.readJSON<any>(path.join(this.dataPath, 'body.json'));
+    return deserializeSessionBody(compact, this.session.head.formatVersion);
   }
 
   async bodyExists() {

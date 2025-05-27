@@ -151,7 +151,30 @@ function serializeFocus(focus: t.Focus, uriMap: UriMap): t.FocusCompact {
   };
 }
 
-export function deserializeSessionBody(compact: t.SessionBodyCompact): t.SessionBody {
+export function deserializeSessionBody(compact: any, formatVersion: number): t.SessionBody {
+  switch (formatVersion) {
+    case 1:
+      return deserializeSessionBodyV1(compact as t.BodyFormatV1.SessionBodyCompact);
+    case 2:
+      return deserializeSessionBodyV2(compact as t.SessionBodyCompact);
+    default:
+      throw new Error(`Unknown format version ${formatVersion}`);
+  }
+}
+
+export function deserializeSessionBodyV1(compact: t.BodyFormatV1.SessionBodyCompact): t.SessionBody {
+  let editorEvents = _.flatMap(compact.editorTracks, (t, uri) => _.map(t, e => deserializeEditorEventV1(e, uri)));
+  editorEvents = _.orderBy(editorEvents, 'clock');
+  return {
+    editorEvents,
+    audioTracks: compact.audioTracks,
+    videoTracks: compact.videoTracks,
+    defaultEol: compact.defaultEol,
+    focusTimeline: compact.focusTimeline.map(f => deserializeFocusV1(f)),
+  };
+}
+
+export function deserializeSessionBodyV2(compact: t.SessionBodyCompact): t.SessionBody {
   return {
     editorEvents: _.map(compact.editorEvents, t => deserializeEditorEvent(t, compact.uris)),
     audioTracks: compact.audioTracks,
@@ -262,6 +285,107 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
   }
 }
 
+function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: string): t.EditorEvent {
+  switch (e.t) {
+    case 0:
+      return {
+        type: 'init',
+        id: nextId(),
+        uri,
+        clock: deserializeClock(e.c),
+        file: e.f,
+      };
+    case 1:
+      return {
+        type: 'textChange',
+        id: nextId(),
+        uri,
+        clock: deserializeClock(e.c),
+        contentChanges: e.cc.map(deserializeContentChange),
+        revContentChanges: e.rcc.map(deserializeContentChange),
+        updateSelection: e.u ?? true,
+      };
+    case 2:
+      return {
+        type: 'openTextDocument',
+        id: nextId(),
+        uri,
+        clock: deserializeClock(e.c),
+        text: e.x,
+        eol: e.e,
+        isInWorktree: e.i,
+      };
+    case 3:
+      return {
+        type: 'closeTextDocument',
+        id: nextId(),
+        uri,
+        clock: deserializeClock(e.c),
+        revText: e.rt,
+        revEol: e.re,
+      };
+    case 4:
+      return {
+        type: 'showTextEditor',
+        id: nextId(),
+        uri,
+        clock: deserializeClock(e.c),
+        preserveFocus: e.p ?? false,
+        selections: e.s?.map(deserializeSelection),
+        visibleRange: e.v && deserializeLineRange(e.v),
+        revUri: e.ru,
+        revSelections: e.rs?.map(deserializeSelection),
+        revVisibleRange: e.rv && deserializeLineRange(e.rv),
+      };
+    case 5:
+      return {
+        type: 'closeTextEditor',
+        id: nextId(),
+        uri,
+        clock: deserializeClock(e.c),
+        revSelections: e.rs?.map(deserializeSelection),
+        revVisibleRange: e.rv && deserializeLineRange(e.rv),
+      };
+    case 6:
+      return {
+        type: 'select',
+        id: nextId(),
+        uri,
+        clock: deserializeClock(e.c),
+        selections: e.s.map(deserializeSelection),
+        // visibleRange: deserializeRange(e.v),
+        revSelections: e.rs.map(deserializeSelection),
+        // revVisibleRange: deserializeRange(e.rv),
+      };
+    case 7:
+      return {
+        type: 'scroll',
+        id: nextId(),
+        uri,
+        clock: deserializeClock(e.c),
+        visibleRange: deserializeLineRange(e.v),
+        revVisibleRange: deserializeLineRange(e.rv),
+      };
+    case 8:
+      return {
+        type: 'save',
+        id: nextId(),
+        uri,
+        clock: deserializeClock(e.c),
+      };
+    case 9:
+      return {
+        type: 'textInsert',
+        id: nextId(),
+        uri,
+        clock: deserializeClock(e.c),
+        text: e.x,
+        revRange: deserializeRange(e.r),
+        updateSelection: e.u ?? true,
+      };
+  }
+}
+
 function deserializeContentChange(cc: t.ContentChangeCompact): ContentChange {
   return new ContentChange(cc.t, deserializeRange(cc.r));
 }
@@ -290,6 +414,15 @@ function deserializeFocus(focus: t.FocusCompact, uris: string[]): t.Focus {
   return {
     clock: deserializeClock(focus.c),
     uri: uris[focus.u],
+    number: focus.n,
+    text: focus.t,
+  };
+}
+
+function deserializeFocusV1(focus: t.BodyFormatV1.FocusCompact): t.Focus {
+  return {
+    clock: deserializeClock(focus.c),
+    uri: focus.u,
     number: focus.n,
     text: focus.t,
   };

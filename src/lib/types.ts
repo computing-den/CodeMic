@@ -835,3 +835,109 @@ export type OSPaths = {
   log: string;
   temp: string;
 };
+
+export namespace BodyFormatV1 {
+  export type SessionBodyCompact = {
+    audioTracks: AudioTrack[];
+    videoTracks: VideoTrack[];
+    editorTracks: Record<string, EditorEventCompact[]>;
+    focusTimeline: FocusCompact[];
+    defaultEol: EndOfLine;
+  };
+
+  export type FocusCompact = {
+    u: string;
+    t: string;
+    n: number;
+    c: number;
+  };
+
+  export type EditorEventCompact =
+    | InitEventCompact
+    | TextChangeEventCompact
+    | OpenTextDocumentEventCompact
+    | CloseTextDocumentEventCompact
+    | ShowTextEditorEventCompact
+    | CloseTextEditorEventCompact
+    | SelectEventCompact
+    | ScrollEventCompact
+    | SaveEventCompact
+    | TextInsertEventCompact;
+
+  export type InitEventCompact = {
+    t: 0;
+    c: number;
+    f: File;
+  };
+
+  export type TextChangeEventCompact = {
+    t: 1;
+    c: number;
+    cc: ContentChangeCompact[];
+    rcc: ContentChangeCompact[];
+    u?: boolean; // undefined defaults to true
+  };
+
+  export type OpenTextDocumentEventCompact = {
+    t: 2;
+    c: number;
+    x?: string;
+    e: EndOfLine;
+    i: boolean;
+  };
+
+  export type CloseTextDocumentEventCompact = {
+    t: 3;
+    c: number;
+    rt: string;
+    re: EndOfLine;
+  };
+
+  export type ShowTextEditorEventCompact = {
+    t: 4;
+    c: number;
+    p?: boolean; // undefined defaults to false
+    s?: SelectionCompact[];
+    v?: LineRangeCompact;
+    ru?: string;
+    rs?: SelectionCompact[];
+    rv?: LineRangeCompact;
+    // revSelections: Selection[];
+  };
+
+  export type CloseTextEditorEventCompact = {
+    t: 5;
+    c: number;
+    rs?: SelectionCompact[];
+    rv?: LineRangeCompact;
+  };
+
+  export type SelectEventCompact = {
+    t: 6;
+    c: number;
+    s: SelectionCompact[];
+    // v: RangeCompact;
+    rs: SelectionCompact[];
+    // rv: RangeCompact;
+  };
+
+  export type ScrollEventCompact = {
+    t: 7;
+    c: number;
+    v: LineRangeCompact;
+    rv: LineRangeCompact;
+  };
+
+  export type SaveEventCompact = {
+    t: 8;
+    c: number;
+  };
+
+  export type TextInsertEventCompact = {
+    t: 9;
+    c: number;
+    x: string;
+    r: RangeCompact;
+    u?: boolean; // undefined defaults to true
+  };
+}
