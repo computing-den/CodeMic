@@ -8,15 +8,16 @@
   "repository": "github:computing-den/CodeMic",
   "icon": "resources/icon.png",
   "scripts": {
-    "compile": "tsc && node esbuild.mjs",
-    "compile:metafile": "tsc && node esbuild.mjs --metafile",
-    "watch": "npm-run-all -p watch:*",
+    "compile": "npm run clean && tsc && node esbuild.mjs",
+    "compile:metafile": "npm run clean && tsc && node esbuild.mjs --metafile",
+    "watch": "npm run clean && npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.mjs --watch",
     "watch:tsc": "tsc --watch",
     "vscode:prepublish": "npm run bundle",
-    "bundle": "tsc && node esbuild.mjs --production",
+    "bundle": "npm run clean && tsc && node esbuild.mjs --production",
     "package": "vsce package",
     "ls": "vsce ls",
+    "clean": "rm -rf dist",
     "test": "npm run compile && vscode-test"
   },
   "files": [
