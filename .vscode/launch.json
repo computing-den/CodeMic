@@ -10,6 +10,7 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
+        "--disable-extensions",
         "--extensionDevelopmentPath=${workspaceFolder}"
         //"--load-extension=/home/sean/.config/google-chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.28.0_0"
       ],
@@ -26,12 +27,14 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
+        "${workspaceFolder}/test/test_workspace",
+        "--disable-extensions",
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "--extensionTestsPath=${workspaceFolder}/dist/test"
+        "--extensionTestsPath=${workspaceFolder}/dist/test-runner.js"
       ],
       "preLaunchTask": "${defaultBuildTask}",
       "sourceMaps": true,
-      "outFiles": ["${workspaceFolder}/**/*"]
+      "outFiles": ["${workspaceFolder}/dist/**/*"]
     }
   ]
 }

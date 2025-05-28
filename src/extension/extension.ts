@@ -2,9 +2,9 @@ import CodeMic from './codemic.js';
 import _ from 'lodash';
 import * as vscode from 'vscode';
 
-let codemic: CodeMic;
+export let codemic: CodeMic;
 
-export async function activate(extensionContext: vscode.ExtensionContext) {
+export async function activate(extensionContext: vscode.ExtensionContext): Promise<CodeMic> {
   try {
     codemic = await CodeMic.fromExtensionContext(extensionContext);
     await codemic.start();
@@ -18,9 +18,12 @@ export async function activate(extensionContext: vscode.ExtensionContext) {
     globalThis.vscode = vscode;
     //@ts-ignore
     globalThis._ = _;
+
+    return codemic;
   } catch (error: any) {
     console.error(error);
     vscode.window.showErrorMessage(error.message);
+    throw error;
   }
 }
 

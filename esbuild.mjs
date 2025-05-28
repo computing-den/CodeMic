@@ -74,24 +74,43 @@ const extensionJs = await esbuild.context({
   external: ['vscode'],
 });
 
+const testsJs = await esbuild.context({
+  ...common,
+  entryPoints: [
+    'src/tests/test-runner.ts',
+    ...fs
+      .readdirSync('src/tests/', { recursive: true, encoding: 'utf8' })
+      .filter(x => x.endsWith('.test.ts'))
+      .map(x => `src/tests/${x}`),
+  ],
+  outdir: 'dist',
+  platform: 'node',
+  format: 'cjs',
+  external: ['vscode'],
+});
+
 if (watch) {
   await viewJs.watch();
   await viewCss.watch();
   await extensionJs.watch();
+  if (!production) await testsJs.watch();
 } else {
   const viewJsRes = await viewJs.rebuild();
   const viewCssRes = await viewCss.rebuild();
   const extensionJsRes = await extensionJs.rebuild();
+  const testsJsRes = !production && (await testsJs.rebuild());
 
   if (metafile) {
     fs.writeFileSync('dist/webview.js.json', JSON.stringify(viewJsRes.metafile));
     fs.writeFileSync('dist/webview.css.json', JSON.stringify(viewCssRes.metafile));
     fs.writeFileSync('dist/extension.js.json', JSON.stringify(extensionJsRes.metafile));
+    // if(testsJsRes) fs.writeFileSync('dist/tests.js.json', JSON.stringify(testsJsRes.metafile));
   }
 
   await viewJs.dispose();
   await viewCss.dispose();
   await extensionJs.dispose();
+  await testsJs.dispose();
 }
 
 // if (mustWatch) {

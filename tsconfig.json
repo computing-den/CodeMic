@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "out",
+    // "outDir": "out",
     "lib": ["es2020", "dom", "dom.iterable"],
     "module": "commonjs",
     "target": "es2020",

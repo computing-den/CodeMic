@@ -12,14 +12,18 @@ class WebviewProvider implements vscode.WebviewViewProvider {
   onMessage?: b.MessageHandler;
   onViewOpen?: () => void;
 
-  asWebviewUri(base: string, ...paths: string[]): vscode.Uri {
-    return this.view!.webview.asWebviewUri(vscode.Uri.joinPath(vscode.Uri.file(base), ...paths));
-  }
-
   private view?: vscode.WebviewView;
   private bus?: b.Bus;
 
   constructor(public extension: vscode.ExtensionContext) {}
+
+  asWebviewUri(base: string, ...paths: string[]): vscode.Uri {
+    return this.view!.webview.asWebviewUri(vscode.Uri.joinPath(vscode.Uri.file(base), ...paths));
+  }
+
+  get visible(): boolean {
+    return Boolean(this.view?.visible);
+  }
 
   resolveWebviewView(
     webviewView: vscode.WebviewView,
