@@ -467,7 +467,9 @@ export type OpenDialogOptions = {
 
 export interface WorkspaceStepper {
   applyEditorEvent(e: EditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
-  applyStoreEvent(e: StoreEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyFsCreateEvent(e: FsCreateEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyFsChangeEvent(e: FsChangeEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyFsDeleteEvent(e: FsDeleteEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyTextChangeEvent(e: TextChangeEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyOpenTextDocumentEvent(e: OpenTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyCloseTextDocumentEvent(e: CloseTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
@@ -480,7 +482,9 @@ export interface WorkspaceStepper {
 }
 
 export type EditorEvent =
-  | StoreEvent
+  | FsCreateEvent
+  | FsChangeEvent
+  | FsDeleteEvent
   | TextChangeEvent
   | OpenTextDocumentEvent
   | CloseTextDocumentEvent
@@ -491,12 +495,29 @@ export type EditorEvent =
   | SaveEvent
   | TextInsertEvent;
 
-export type StoreEvent = {
-  type: 'store';
+export type FsCreateEvent = {
+  type: 'fsCreate';
   id: number;
   uri: string;
   clock: number;
   file: File;
+};
+
+export type FsChangeEvent = {
+  type: 'fsChange';
+  id: number;
+  uri: string;
+  clock: number;
+  file: File;
+  revFile: File;
+};
+
+export type FsDeleteEvent = {
+  type: 'fsDelete';
+  id: number;
+  uri: string;
+  clock: number;
+  revFile: File;
 };
 
 export type TextChangeEvent = {
@@ -590,7 +611,7 @@ export type TextInsertEvent = {
 };
 
 export type EditorEventCompact =
-  | StoreEventCompact
+  | FsCreateEventCompact
   | TextChangeEventCompact
   | OpenTextDocumentEventCompact
   | CloseTextDocumentEventCompact
@@ -599,9 +620,11 @@ export type EditorEventCompact =
   | SelectEventCompact
   | ScrollEventCompact
   | SaveEventCompact
-  | TextInsertEventCompact;
+  | TextInsertEventCompact
+  | FsChangeEventCompact
+  | FsDeleteEventCompact;
 
-export type StoreEventCompact = {
+export type FsCreateEventCompact = {
   t: 0;
   u: number;
   c: number;
@@ -686,6 +709,20 @@ export type TextInsertEventCompact = {
   x: string;
   r: RangeCompact;
   us?: boolean; // undefined defaults to true
+};
+
+export type FsChangeEventCompact = {
+  t: 10;
+  u: number;
+  c: number;
+  f: File;
+  rf: File;
+};
+export type FsDeleteEventCompact = {
+  t: 11;
+  u: number;
+  c: number;
+  rf: File;
 };
 
 export type PositionCompact = [number, number];
@@ -784,15 +821,15 @@ export interface InternalDocument {
 
 // export type Worktree = { [key: Uri]: File };
 
-export type File = DirFile | EmptyFile | LocalFile | GitFile;
+export type File = DirFile | EmptyFile | BlobFile | GitFile;
 export type DirFile = {
   type: 'dir';
 };
 export type EmptyFile = {
   type: 'empty';
 };
-export type LocalFile = {
-  type: 'local';
+export type BlobFile = {
+  type: 'blob';
   sha1: string;
 };
 export type GitFile = {
@@ -850,8 +887,24 @@ export namespace BodyFormatV1 {
     c: number;
   };
 
+  export type File = DirFile | EmptyFile | LocalFile | GitFile;
+  export type DirFile = {
+    type: 'dir';
+  };
+  export type EmptyFile = {
+    type: 'empty';
+  };
+  export type LocalFile = {
+    type: 'local';
+    sha1: string;
+  };
+  export type GitFile = {
+    type: 'git';
+    sha1: string;
+  };
+
   export type EditorEventCompact =
-    | StoreEventCompact
+    | FsCreateEventCompact
     | TextChangeEventCompact
     | OpenTextDocumentEventCompact
     | CloseTextDocumentEventCompact
@@ -862,7 +915,7 @@ export namespace BodyFormatV1 {
     | SaveEventCompact
     | TextInsertEventCompact;
 
-  export type StoreEventCompact = {
+  export type FsCreateEventCompact = {
     t: 0;
     c: number;
     f: File;

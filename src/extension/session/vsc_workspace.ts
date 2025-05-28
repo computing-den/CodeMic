@@ -171,7 +171,7 @@ export default class VscWorkspace {
       const uri = lib.workspaceUri(p);
       if (stat.isDirectory()) {
         events.push({
-          type: 'store',
+          type: 'fsCreate',
           id: lib.nextId(),
           uri,
           clock: 0,
@@ -182,11 +182,11 @@ export default class VscWorkspace {
         const sha1 = await misc.computeSHA1(data);
         await this.session.core.copyToBlob(path.join(this.session.workspace, p), sha1);
         events.push({
-          type: 'store',
+          type: 'fsCreate',
           id: lib.nextId(),
           uri,
           clock: 0,
-          file: { type: 'local', sha1 },
+          file: { type: 'blob', sha1 },
         });
       }
     }
@@ -200,7 +200,7 @@ export default class VscWorkspace {
       const data = new TextEncoder().encode(vscTextDocument.getText());
       const sha1 = await misc.computeSHA1(data);
       await this.session.core.writeBlob(sha1, data);
-      events.push({ type: 'store', id: lib.nextId(), uri, clock: 0, file: { type: 'local', sha1 } });
+      events.push({ type: 'fsCreate', id: lib.nextId(), uri, clock: 0, file: { type: 'blob', sha1 } });
     }
 
     // Walk through text documents and create openTextDocument events.
@@ -341,12 +341,8 @@ export default class VscWorkspace {
         }
 
         if (vscTextDocument) {
-          const text = new TextDecoder().decode(await internalWorkspace.getContentByUri(targetUri));
-          edit.replace(
-            vscTextDocument.uri,
-            VscWorkspace.toVscRange(this.getVscTextDocumentRange(vscTextDocument)),
-            text,
-          );
+          const text = new TextDecoder().decode(await internalWorkspace.getLiveContentByUri(targetUri));
+          edit.replace(vscTextDocument.uri, this.getVscTextDocumentVscRange(vscTextDocument), text);
         } else {
           targetUrisOutsideVsc.push(targetUri);
         }
@@ -355,12 +351,12 @@ export default class VscWorkspace {
 
       // untitled uris have been opened above and not included in targetUrisOutsideVsc.
       for (const targetUri of targetUrisOutsideVsc) {
-        assert(URI.parse(targetUri).scheme == 'workspace');
+        assert(URI.parse(targetUri).scheme === 'workspace');
         const fsPath = URI.parse(this.session.core.resolveUri(targetUri)).fsPath;
         if (internalWorkspace.isDirUri(targetUri)) {
           await fs.promises.mkdir(fsPath, { recursive: true });
         } else {
-          const data = await internalWorkspace.getContentByUri(targetUri);
+          const data = await internalWorkspace.getLiveContentByUri(targetUri);
           await storage.writeBinary(fsPath, data);
         }
       }
@@ -389,6 +385,7 @@ export default class VscWorkspace {
   }
 
   async closeVscTextEditorByVscUri(uri: vscode.Uri, options?: { skipConfirmation?: boolean }) {
+    // Remember the current ative text editor to restore later.
     const activeUri = vscode.window.activeTextEditor?.document.uri;
     await vscode.commands.executeCommand('vscode.open', uri);
 
@@ -401,6 +398,8 @@ export default class VscWorkspace {
     } else {
       await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
     }
+
+    // Restore the previous active text editor.
     if (activeUri && activeUri.toString() !== uri.toString()) {
       await vscode.commands.executeCommand('vscode.open', activeUri);
     }
@@ -416,6 +415,10 @@ export default class VscWorkspace {
    */
   async saveVscTextDocument(vscTextDocument: vscode.TextDocument) {
     await fs.promises.writeFile(vscTextDocument.uri.fsPath, vscTextDocument.getText());
+    await this.revertVscTextDocument(vscTextDocument);
+  }
+
+  async revertVscTextDocument(vscTextDocument: vscode.TextDocument) {
     await vscode.commands.executeCommand('vscode.open', vscTextDocument.uri);
     await vscode.commands.executeCommand('workbench.action.files.revert');
   }
@@ -543,6 +546,10 @@ export default class VscWorkspace {
 
   getVscTextDocumentRange(document: vscode.TextDocument): Range {
     return VscWorkspace.fromVscRange(document.validateRange(new vscode.Range(0, 0, document.lineCount, 0)));
+  }
+
+  getVscTextDocumentVscRange(document: vscode.TextDocument): vscode.Range {
+    return document.validateRange(new vscode.Range(0, 0, document.lineCount, 0));
   }
 
   uriFromVsc(vscUri: vscode.Uri): string {

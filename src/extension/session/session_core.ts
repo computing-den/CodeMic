@@ -391,7 +391,7 @@ export default class SessionCore {
     await fs.promises.mkdir(this.session.workspace, { recursive: true });
   }
 
-  async writeFileIfNotExists(uri: string, text: string) {
+  async writeTextFileIfNotExists(uri: string, text: string) {
     const fsPath = URI.parse(this.resolveUri(uri)).fsPath;
 
     if (!(await storage.pathExists(fsPath))) {
@@ -410,10 +410,26 @@ export default class SessionCore {
   }
 
   async readFile(file: t.File): Promise<Uint8Array> {
-    if (file.type === 'local') {
+    if (file.type === 'blob') {
       return this.readBlob(file.sha1);
     } else {
       throw new Error(`TODO readFile ${file.type}`);
+    }
+  }
+
+  async writeFile(uri: string, file: t.File) {
+    const fsPath = URI.parse(this.resolveUri(uri)).fsPath;
+    switch (file.type) {
+      case 'dir':
+        await fs.promises.mkdir(fsPath, { recursive: true });
+        break;
+      case 'blob':
+        await fs.promises.cp(path.join(this.dataPath, 'blobs', file.sha1), fsPath, { force: true, recursive: true });
+        break;
+      case 'empty':
+        break;
+      default:
+        throw new Error(`writeFile unknown type ${file.type}`);
     }
   }
 
@@ -494,15 +510,15 @@ export default class SessionCore {
 
     // Find blobs in editor tracks.
     for (const e of body.editorEvents) {
-      if (e.type === 'store' && e.file.type === 'local') blobs.add(e.file.sha1);
+      if (e.type === 'fsCreate' && e.file.type === 'blob') blobs.add(e.file.sha1);
     }
 
     // Find blobs in audio and video tracks.
     for (const track of body.audioTracks) {
-      if (track.file.type === 'local') blobs.add(track.file.sha1);
+      if (track.file.type === 'blob') blobs.add(track.file.sha1);
     }
     for (const track of body.videoTracks) {
-      if (track.file.type === 'local') blobs.add(track.file.sha1);
+      if (track.file.type === 'blob') blobs.add(track.file.sha1);
     }
 
     return blobs;

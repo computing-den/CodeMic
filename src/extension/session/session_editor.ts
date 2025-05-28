@@ -163,7 +163,7 @@ export default class SessionEditor {
       id,
       type: 'audio',
       clockRange: { start: clock, end: clock + duration },
-      file: { type: 'local', sha1: sha1 },
+      file: { type: 'blob', sha1: sha1 },
       title: path.basename(fsPath),
     };
 
@@ -232,7 +232,7 @@ export default class SessionEditor {
       id,
       type: 'video',
       clockRange: { start: clock, end: clock + duration },
-      file: { type: 'local', sha1: sha1 },
+      file: { type: 'blob', sha1: sha1 },
       title: path.basename(fsPath),
     };
 

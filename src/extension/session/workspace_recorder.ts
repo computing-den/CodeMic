@@ -10,6 +10,8 @@ import vscode from 'vscode';
 import _ from 'lodash';
 import { LoadedSession } from './session.js';
 import VscWorkspace from './vsc_workspace.js';
+import * as misc from '../misc.js';
+import * as fs from 'fs';
 
 // const SCROLL_LINES_TRIGGER = 2;
 
@@ -104,12 +106,12 @@ class WorkspaceRecorder {
     }
 
     // listen for save events
-    {
-      const disposable = vscode.workspace.onDidSaveTextDocument(vscTextDocument => {
-        this.saveTextDocument(vscTextDocument);
-      });
-      this.disposables.push(disposable);
-    }
+    // {
+    //   const disposable = vscode.workspace.onDidSaveTextDocument(vscTextDocument => {
+    //     this.saveTextDocument(vscTextDocument);
+    //   });
+    //   this.disposables.push(disposable);
+    // }
 
     // listen for scroll events
     {
@@ -117,6 +119,16 @@ class WorkspaceRecorder {
         this.scroll(e.textEditor, e.visibleRanges);
       });
       this.disposables.push(disposable);
+    }
+
+    // listen for filesystem events
+    {
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(this.session.workspace, '**/*'),
+      );
+      watcher.onDidCreate(uri => this.fsCreate(uri));
+      watcher.onDidChange(uri => this.fsChange(uri));
+      watcher.onDidDelete(uri => this.fsDelete(uri));
     }
 
     // register disposables
@@ -559,24 +571,6 @@ class WorkspaceRecorder {
     this.setFocus();
   }
 
-  private saveTextDocument(vscTextDocument: vscode.TextDocument) {
-    logRawEvent(`event: saveTextDocument ${vscTextDocument.uri}`);
-    if (!this.vscWorkspace.shouldRecordVscUri(vscTextDocument.uri)) return;
-
-    const uri = this.vscWorkspace.uriFromVsc(vscTextDocument.uri);
-    logAcceptedEvent(`accepted save for ${uri}`);
-
-    this.insertEvent(
-      {
-        type: 'save',
-        id: lib.nextId(),
-        uri,
-        clock: this.clock,
-      },
-      { coalescing: false },
-    );
-  }
-
   private scroll(vscTextEditor: vscode.TextEditor, vscVisibleRanges: readonly vscode.Range[]) {
     const visibleRanges = vscVisibleRanges.map(VscWorkspace.fromVscLineRange);
     logRawEvent(`event: scroll ${vscTextEditor.document.uri} ${JSON.stringify(visibleRanges)}`);
@@ -632,6 +626,95 @@ class WorkspaceRecorder {
     );
   }
 
+  private async fsCreate(vscUri: vscode.Uri) {
+    logRawEvent(`event: fsCreate ${vscUri}`);
+    if (!this.vscWorkspace.shouldRecordVscUri(vscUri)) return;
+
+    const uri = this.vscWorkspace.uriFromVsc(vscUri);
+    logAcceptedEvent(`accepted save for ${uri}`);
+
+    const stat = await fs.promises.stat(vscUri.fsPath);
+    assert(stat.isFile() || stat.isDirectory(), `Expected ${vscUri.fsPath} to be a regular file or directory.`);
+
+    const data = await fs.promises.readFile(vscUri.fsPath);
+    const sha1 = await misc.computeSHA1(data);
+    const file: t.File = { type: 'blob', sha1 };
+
+    this.insertEvent(
+      {
+        type: 'fsCreate',
+        id: lib.nextId(),
+        uri,
+        clock: this.clock,
+        file,
+      },
+      { coalescing: false },
+    );
+  }
+
+  private async fsChange(vscUri: vscode.Uri) {
+    logRawEvent(`event: fsChange ${vscUri}`);
+    if (!this.vscWorkspace.shouldRecordVscUri(vscUri)) return;
+
+    const uri = this.vscWorkspace.uriFromVsc(vscUri);
+    logAcceptedEvent(`accepted save for ${uri}`);
+
+    const stat = await fs.promises.stat(vscUri.fsPath);
+    assert(stat.isFile(), `Expected ${vscUri.fsPath} to be a regular file.`);
+
+    const data = await fs.promises.readFile(vscUri.fsPath);
+    const sha1 = await misc.computeSHA1(data);
+    const file: t.File = { type: 'blob', sha1 };
+
+    const internalWorktreeItem = this.internalWorkspace.getWorktreeItemByUri(uri);
+    assert(internalWorktreeItem, `Received change event for ${vscUri.fsPath} but it's not in the internal worktree`);
+    const revFile = internalWorktreeItem.file;
+    internalWorktreeItem.file = file;
+
+    this.insertEvent(
+      {
+        type: 'fsChange',
+        id: lib.nextId(),
+        uri,
+        clock: this.clock,
+        file,
+        revFile,
+      },
+      { coalescing: false },
+    );
+  }
+
+  private async fsDelete(vscUri: vscode.Uri) {
+    logRawEvent(`event: fsDelete ${vscUri}`);
+    if (!this.vscWorkspace.shouldRecordVscUri(vscUri)) return;
+
+    const uri = this.vscWorkspace.uriFromVsc(vscUri);
+    logAcceptedEvent(`accepted save for ${uri}`);
+
+    const stat = await fs.promises.stat(vscUri.fsPath);
+    assert(stat.isFile() || stat.isDirectory(), `Expected ${vscUri.fsPath} to be a regular file or directory.`);
+
+    // const data = await fs.promises.readFile(vscUri.fsPath);
+    // const sha1 = await misc.computeSHA1(data);
+    // const file: t.File = { type: 'blob', sha1 };
+
+    const internalWorktreeItem = this.internalWorkspace.getWorktreeItemByUri(uri);
+    assert(internalWorktreeItem, `Received delete event for ${vscUri.fsPath} but it's not in the internal worktree`);
+    const revFile = internalWorktreeItem.file;
+    this.internalWorkspace.deleteFileByUri(uri);
+
+    this.insertEvent(
+      {
+        type: 'fsDelete',
+        id: lib.nextId(),
+        uri,
+        clock: this.clock,
+        revFile,
+      },
+      { coalescing: false },
+    );
+  }
+
   private insertEvent(e: t.EditorEvent, opts: { coalescing: boolean }) {
     const i = this.session.editor.insertEvent(e, opts);
     this.internalWorkspace.eventIndex = i;
@@ -661,7 +744,7 @@ class WorkspaceRecorder {
     const vscText = vscTextDocument.getText();
 
     if (isInWorktree) {
-      irText = new TextDecoder().decode(await this.internalWorkspace.getContentByUri(uri));
+      irText = new TextDecoder().decode(await this.internalWorkspace.getLiveContentByUri(uri));
     }
 
     if (irTextDocument && irText !== vscText) {

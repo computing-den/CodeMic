@@ -13,12 +13,16 @@ import InternalTextDocument from './internal_text_document.js';
  * LiveWorktree is supposed to hold the entire workspace directory at a particular clock: every
  * file and directory and where to find their contents: dir, file with open TextDocument, or a
  * blob to be read from disk.
- * If a document has been loaded into memory, then the latest content is in the document field and
- * it should always be retrieved from there.
- * Otherwise, its uri refers to the base file stored on disk.
+ * The file field represents the content on disk. Whereas the document field represents the loaded
+ * document which is used in the text editor and it may be unsaved.
+ * The recorder ignores any document whose file does not exist on disk except for untitled documents
+ * whose file is of type empty.
  */
 type LiveWorktree = Map<string, LiveWorktreeItem>;
-type LiveWorktreeItem = { file: t.File; document?: t.InternalDocument; editor?: t.InternalEditor };
+type LiveWorktreeItem = LiveWorktreeItemExistingWithDocument | LiveWorktreeItemExistingWithoutDocument;
+
+type LiveWorktreeItemExistingWithDocument = { file: t.File; document: t.InternalDocument; editor?: t.InternalEditor };
+type LiveWorktreeItemExistingWithoutDocument = { file: t.File; document: undefined; editor: undefined };
 
 export type SeekStep = { event: t.EditorEvent; index: number };
 export type SeekData = { steps: SeekStep[]; direction: t.Direction };
@@ -73,7 +77,11 @@ export default class InternalWorkspace {
     return Boolean(this.worktree.get(uri)?.file.type === 'dir');
   }
 
-  async getContentByUri(uri: string): Promise<Uint8Array> {
+  getWorktreeItemByUri(uri: string): LiveWorktreeItem | undefined {
+    return this.worktree.get(uri);
+  }
+
+  async getLiveContentByUri(uri: string): Promise<Uint8Array> {
     const item = this.worktree.get(uri);
     assert(item);
 
@@ -81,15 +89,14 @@ export default class InternalWorkspace {
       return item.document.getContent();
     }
 
-    if (item.file.type === 'local') {
-      return this.session.core.readFile(item.file);
+    switch (item.file.type) {
+      case 'blob':
+        return this.session.core.readFile(item.file);
+      case 'empty':
+        return new Uint8Array();
+      default:
+        throw new Error(`getLiveContentByUri ${uri} type "${item.file.type}" not supported`);
     }
-
-    if (item.file.type === 'empty') {
-      return new Uint8Array();
-    }
-
-    throw new Error(`getContentByUri ${uri} type "${item.file}" not supported`);
   }
 
   findTextDocumentByUri(uri: string): InternalTextDocument | undefined {
@@ -147,12 +154,12 @@ export default class InternalWorkspace {
           const parentUri = workspaceUri(p);
           if (!this.worktree.has(parentUri)) {
             console.log('XXX insertFile parent: ', parentUri);
-            this.worktree.set(parentUri, { file: { type: 'dir' } });
+            this.worktree.set(parentUri, { file: { type: 'dir' }, document: undefined, editor: undefined });
           }
         }
       }
 
-      item = { file };
+      item = { file, document: undefined, editor: undefined };
       this.worktree.set(uri, item);
     }
     return item;
@@ -204,15 +211,37 @@ export default class InternalWorkspace {
   //   return path.workspaceUriFromAbsPath(this.session.workspace, p);
   // }
 
-  closeAndRemoveTextDocumentByUri(uri: string) {
-    this.closeTextEditorByUri(uri);
+  deleteFileByUri(uri: string) {
+    const item = this.worktree.get(uri);
+    assert(item);
     this.textDocuments = this.textDocuments.filter(x => x.uri !== uri);
+    this.textEditors = this.textEditors.filter(x => x.document.uri !== uri);
+    if (this.activeTextEditor?.document.uri === uri) {
+      this.activeTextEditor = undefined;
+    }
     this.worktree.delete(uri);
   }
 
+  closeTextDocumentByUri(uri: string) {
+    this.textDocuments = this.textDocuments.filter(x => x.uri !== uri);
+    this.textEditors = this.textEditors.filter(x => x.document.uri !== uri);
+    if (this.activeTextEditor?.document.uri === uri) {
+      this.activeTextEditor = undefined;
+    }
+  }
+
+  // closeAndRemoveTextDocumentByUri(uri: string) {
+  //   this.textDocuments = this.textDocuments.filter(x => x.uri !== uri);
+  //   this.textEditors = this.textEditors.filter(x => x.document.uri !== uri);
+  //   if (this.activeTextEditor?.document.uri === uri) {
+  //     this.activeTextEditor = undefined;
+  //   }
+  // }
+
   closeTextEditorByUri(uri: string) {
-    if (this.worktree.get(uri)?.editor) {
-      this.worktree.get(uri)!.editor = undefined;
+    const item = this.worktree.get(uri);
+    if (item?.editor) {
+      item.editor = undefined;
       this.textEditors = this.textEditors.filter(x => x.document.uri !== uri);
     }
     if (this.activeTextEditor?.document.uri === uri) {

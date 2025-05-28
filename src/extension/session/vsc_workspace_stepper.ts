@@ -13,23 +13,59 @@ import { URI } from 'vscode-uri';
 class VscWorkspaceStepper implements t.WorkspaceStepper {
   constructor(private session: LoadedSession, private vscWorkspace: VscWorkspace) {}
 
-  async applyEditorEvent(e: t.EditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    await workspaceStepperDispatch(this, e, direction, uriSet);
+  async applyEditorEvent(e: t.EditorEvent, direction: t.Direction) {
+    await workspaceStepperDispatch(this, e, direction);
   }
 
-  async applySeekStep(step: SeekStep, direction: t.Direction, uriSet?: t.UriSet) {
-    await this.applyEditorEvent(step.event, direction, uriSet);
+  async applySeekStep(step: SeekStep, direction: t.Direction) {
+    await this.applyEditorEvent(step.event, direction);
     // this.eventIndex = step.newEventIndex;
   }
 
-  async applyStoreEvent(e: t.StoreEvent, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyFsCreateEvent(e: t.FsCreateEvent, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
-      if (e.file.type === 'dir') {
-        const fsPath = URI.parse(this.session.core.resolveUri(e.uri)).fsPath;
-        await fs.promises.mkdir(fsPath, { recursive: true });
-      }
+      await this.session.core.writeFile(e.uri, e.file);
     } else {
-      throw new Error('Cannot reverse store event');
+      await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
+      await fs.promises.rm(URI.parse(this.session.core.resolveUri(e.uri)).fsPath);
+    }
+  }
+
+  async applyFsChangeEvent(e: t.FsChangeEvent, direction: t.Direction) {
+    const vscTextDocument = this.vscWorkspace.findVscTextDocumentByUri(e.uri);
+    const text = vscTextDocument?.getText();
+    let file: t.File;
+
+    if (direction === t.Direction.Forwards) {
+      file = e.file;
+    } else {
+      file = e.revFile;
+    }
+
+    await this.session.core.writeFile(e.uri, file);
+
+    // We must revert the document so that vscode won't later warn about the file having
+    // been changed when we try to save the file.
+    //
+    // Then, if the text in the document was different from what's now in the
+    // file, we restore that text.
+    if (vscTextDocument) {
+      await this.vscWorkspace.revertVscTextDocument(vscTextDocument);
+      const textInFile = new TextDecoder().decode(await this.session.core.readFile(file));
+      if (text !== textInFile) {
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(vscTextDocument.uri, this.vscWorkspace.getVscTextDocumentVscRange(vscTextDocument), textInFile);
+        await vscode.workspace.applyEdit(edit);
+      }
+    }
+  }
+
+  async applyFsDeleteEvent(e: t.FsDeleteEvent, direction: t.Direction) {
+    if (direction === t.Direction.Forwards) {
+      await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
+      await fs.promises.rm(URI.parse(this.session.core.resolveUri(e.uri)).fsPath);
+    } else {
+      await this.session.core.writeFile(e.uri, e.revFile);
     }
   }
 
@@ -70,7 +106,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
       // If file doesn't exist, create it and open it and we're done.
       // vscode.workspace.openTextDocument() will throw if file doesn't exist.
       if (!vscTextDocument && vscUri.scheme === 'file') {
-        await this.session.core.writeFileIfNotExists(e.uri, e.text || '');
+        await this.session.core.writeTextFileIfNotExists(e.uri, e.text || '');
         await this.vscWorkspace.openTextDocumentByUri(e.uri);
         return;
       }

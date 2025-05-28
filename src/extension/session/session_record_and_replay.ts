@@ -175,7 +175,7 @@ export default class SessionRecordAndReplay {
 
     // Sync and save.
     await this.vscWorkspace.sync(targetUris);
-    await this.vscWorkspace.saveAllRelevantVscTabs();
+    // await this.vscWorkspace.saveAllRelevantVscTabs();
 
     // Close irrelevant tabs.
     await this.vscWorkspace.closeIrrelevantVscTabs();
@@ -353,7 +353,7 @@ export default class SessionRecordAndReplay {
     );
     await Promise.all(
       tracksToLoad.map(t => {
-        assert(t.file.type === 'local');
+        assert(t.file.type === 'blob');
         return postMessage({
           type: 'media/load',
           mediaType: t.type,

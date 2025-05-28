@@ -17,13 +17,32 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     await workspaceStepperDispatch(this, event, direction, uriSet);
   }
 
-  async applyStoreEvent(e: t.StoreEvent, direction: t.Direction, uriSet?: t.UriSet) {
+  async applyFsCreateEvent(e: t.FsCreateEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(e.uri);
     if (direction === t.Direction.Forwards) {
       this.internalWorkspace.insertFile(e.uri, e.file);
     } else {
-      // If we want to reverse the store event, we must delete it from worktree as well as text documents and text editors.
-      throw new Error('Cannot reverse store event');
+      this.internalWorkspace.deleteFileByUri(e.uri);
+    }
+  }
+
+  async applyFsChangeEvent(e: t.FsChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {
+    if (uriSet) uriSet.add(e.uri);
+    const item = this.internalWorkspace.getWorktreeItemByUri(e.uri);
+    assert(item, `File ${e.uri} not found in internal representation`);
+    if (direction === t.Direction.Forwards) {
+      item.file = e.file;
+    } else {
+      item.file = e.revFile;
+    }
+  }
+
+  async applyFsDeleteEvent(e: t.FsDeleteEvent, direction: t.Direction, uriSet?: t.UriSet) {
+    if (uriSet) uriSet.add(e.uri);
+    if (direction === t.Direction.Forwards) {
+      this.internalWorkspace.deleteFileByUri(e.uri);
+    } else {
+      this.internalWorkspace.insertFile(e.uri, e.revFile);
     }
   }
 
@@ -60,16 +79,17 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
         if (e.text !== undefined) {
           text = e.text;
         } else if (this.internalWorkspace.doesUriExist(e.uri)) {
-          text = new TextDecoder().decode(await this.internalWorkspace.getContentByUri(e.uri));
+          text = new TextDecoder().decode(await this.internalWorkspace.getLiveContentByUri(e.uri));
         }
         textDocument = InternalTextDocument.fromText(e.uri, text, e.eol);
         this.internalWorkspace.insertTextDocument(textDocument); // Will insert into worktree if necessary.
       }
     } else {
       if (e.isInWorktree) {
-        this.internalWorkspace.closeTextEditorByUri(e.uri);
+        this.internalWorkspace.closeTextDocumentByUri(e.uri);
       } else {
-        this.internalWorkspace.closeAndRemoveTextDocumentByUri(e.uri);
+        throw new Error('TODO this should not happen now that we listen to file change events');
+        // this.internalWorkspace.closeAndRemoveTextDocumentByUri(e.uri);
       }
     }
   }

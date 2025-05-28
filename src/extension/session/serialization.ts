@@ -24,7 +24,7 @@ export function serializeSessionBody(body: t.SessionBody): t.SessionBodyCompact 
 
 function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCompact {
   switch (e.type) {
-    case 'store':
+    case 'fsCreate':
       return {
         t: 0,
         u: uriMap.get(e.uri)!,
@@ -115,6 +115,21 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         r: serializeRange(e.revRange),
         us: e.updateSelection ? undefined : false,
       };
+    case 'fsChange':
+      return {
+        t: 10,
+        u: uriMap.get(e.uri)!,
+        c: serializeClock(e.clock),
+        f: e.file,
+        rf: e.revFile,
+      };
+    case 'fsDelete':
+      return {
+        t: 11,
+        u: uriMap.get(e.uri)!,
+        c: serializeClock(e.clock),
+        rf: e.revFile,
+      };
   }
 }
 
@@ -188,7 +203,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
   switch (e.t) {
     case 0:
       return {
-        type: 'store',
+        type: 'fsCreate',
         id: nextId(),
         uri: uris[e.u],
         clock: deserializeClock(e.c),
@@ -281,6 +296,23 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         text: e.x,
         revRange: deserializeRange(e.r),
         updateSelection: e.us ?? true,
+      };
+    case 10:
+      return {
+        type: 'fsChange',
+        id: nextId(),
+        uri: uris[e.u],
+        clock: deserializeClock(e.c),
+        file: e.f,
+        revFile: e.rf,
+      };
+    case 11:
+      return {
+        type: 'fsDelete',
+        id: nextId(),
+        uri: uris[e.u],
+        clock: deserializeClock(e.c),
+        revFile: e.rf,
       };
   }
 }
@@ -289,11 +321,11 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
   switch (e.t) {
     case 0:
       return {
-        type: 'store',
+        type: 'fsCreate',
         id: nextId(),
         uri,
         clock: deserializeClock(e.c),
-        file: e.f,
+        file: deserializeFileV1(e.f),
       };
     case 1:
       return {
@@ -383,6 +415,17 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         revRange: deserializeRange(e.r),
         updateSelection: e.u ?? true,
       };
+  }
+}
+
+function deserializeFileV1(f: t.BodyFormatV1.File): t.File {
+  switch (f.type) {
+    case 'empty':
+    case 'dir':
+    case 'git':
+      return f;
+    case 'local':
+      return { type: 'blob', sha1: f.sha1 };
   }
 }
 
