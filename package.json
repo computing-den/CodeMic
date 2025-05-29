@@ -10,8 +10,8 @@
   "scripts": {
     "compile": "npm run clean && tsc && node esbuild.mjs",
     "compile:metafile": "npm run clean && tsc && node esbuild.mjs --metafile",
-    "watch": "npm run clean && npm-run-all -p watch:*",
-    "watch:esbuild": "node esbuild.mjs --watch",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "npm run clean && node esbuild.mjs --watch",
     "watch:tsc": "tsc --watch",
     "vscode:prepublish": "npm run bundle",
     "bundle": "npm run clean && tsc && node esbuild.mjs --production",

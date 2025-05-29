@@ -1,0 +1,13 @@
+{
+  "id": "2295a645-0eff-49a8-94db-b4097b8f826e",
+  "handle": "session1",
+  "title": "Title",
+  "description": "Desc",
+  "author": "sean_shirazi",
+  "duration": 0,
+  "modificationTimestamp": "2025-05-29T14:40:55.086Z",
+  "toc": [],
+  "formatVersion": 2,
+  "ignorePatterns": "# Ignore the .git directory\n.git\n\n# Node.js dependencies\nnode_modules\n\n# Python byte-compiled / optimized / DLL files\n__pycache__\n*.py[cod]\n*$py.class\n\n",
+  "hasCover": false
+}

@@ -273,7 +273,6 @@ export default class SessionCore {
     this.session.editor.saved();
 
     // if (config.debug) {
-    //   console.log('XXX DEBUG Reading head again to make sure');
     //   try {
     //     await SessionCore.readLocal(this.session.context, this.session.workspace);
     //     console.log('XXX DEBUG head was written correctly');

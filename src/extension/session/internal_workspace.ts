@@ -143,8 +143,6 @@ export default class InternalWorkspace {
     if (item) {
       item.file = file;
     } else {
-      console.log('XXX insertFile: ', uri);
-
       // insert parent directories
       const uriParsed = URI.parse(uri);
       if (uriParsed.scheme === 'workspace') {
@@ -153,7 +151,6 @@ export default class InternalWorkspace {
           const p = path.join(...components.slice(0, i + 1));
           const parentUri = workspaceUri(p);
           if (!this.worktree.has(parentUri)) {
-            console.log('XXX insertFile parent: ', parentUri);
             this.worktree.set(parentUri, { file: { type: 'dir' }, document: undefined, editor: undefined });
           }
         }

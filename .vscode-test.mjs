@@ -4,11 +4,11 @@ export default defineConfig([
   {
     label: 'tests',
     files: 'dist/*.test.js',
-    // version: 'insiders',
-    workspaceFolder: './sampleWorkspace',
+    version: 'stable',
+    workspaceFolder: './test_data/test_workspace',
     mocha: {
       ui: 'tdd',
-      timeout: 3_000,
+      timeout: 30_000,
     },
   },
   // you can specify additional test configurations, too

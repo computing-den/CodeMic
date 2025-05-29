@@ -929,7 +929,6 @@ class CodeMic {
   }
 
   openView() {
-    console.log('XXXX openView');
     this.context.webviewProvider.show();
   }
 
