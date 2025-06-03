@@ -85,12 +85,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
         this.internalWorkspace.insertTextDocument(textDocument); // Will insert into worktree if necessary.
       }
     } else {
-      if (e.isInWorktree) {
-        this.internalWorkspace.closeTextDocumentByUri(e.uri);
-      } else {
-        throw new Error('TODO this should not happen now that we listen to file change events');
-        // this.internalWorkspace.closeAndRemoveTextDocumentByUri(e.uri);
-      }
+      this.internalWorkspace.closeTextDocumentByUri(e.uri);
     }
   }
 

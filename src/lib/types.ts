@@ -412,6 +412,8 @@ export type SessionBody = {
   defaultEol: EndOfLine;
 };
 
+export type SessionBodyExport = ({ full: true } & SessionBody) | ({ full?: false } & SessionBodyCompact);
+
 export type SessionBodyCompact = {
   uris: string[];
   editorEvents: EditorEventCompact[];
@@ -537,7 +539,7 @@ export type OpenTextDocumentEvent = {
   clock: number;
   text?: string;
   eol: EndOfLine;
-  isInWorktree: boolean;
+  isInWorktree?: boolean;
 };
 
 export type CloseTextDocumentEvent = {
@@ -646,7 +648,7 @@ export type OpenTextDocumentEventCompact = {
   c: number;
   x?: string;
   e: EndOfLine;
-  i: boolean;
+  i?: boolean;
 };
 
 export type CloseTextDocumentEventCompact = {

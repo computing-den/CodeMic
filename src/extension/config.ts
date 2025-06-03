@@ -12,6 +12,7 @@ export type Config = {
   logSessionRRUpdateStep: boolean;
   logTrackPlayerUpdateStep: boolean;
   logMasterAndTracksTimeUpdates: boolean;
+  exportFullBody?: boolean;
   debug: boolean;
 };
 

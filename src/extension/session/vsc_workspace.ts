@@ -221,7 +221,7 @@ export default class VscWorkspace {
         uri: this.uriFromVsc(vscTextDocument.uri),
         clock: 0,
         eol: VscWorkspace.eolFromVsc(vscTextDocument.eol),
-        isInWorktree: false,
+        // isInWorktree: false,
       });
     }
 
@@ -261,6 +261,7 @@ export default class VscWorkspace {
     // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
 
     const { internalWorkspace } = this;
+    const urisChangedOnDisk = new Set();
 
     // all text editor tabs that are not in internalWorkspace's textEditors should be closed
     for (const tab of this.getTabsWithInputText()) {
@@ -283,6 +284,7 @@ export default class VscWorkspace {
               force: true,
               recursive: true,
             });
+            urisChangedOnDisk.add(targetUri);
           }
         }
       }
@@ -296,90 +298,118 @@ export default class VscWorkspace {
         const uri = lib.workspaceUri(p);
         if (!internalWorkspace.doesUriExist(uri)) {
           await fs.promises.rm(path.join(this.session.workspace, p), { force: true, recursive: true });
+          urisChangedOnDisk.add(uri);
         }
       }
-
-      // set targetUris to all known uris in internalWorkspace
-      targetUris = internalWorkspace.getWorktreeUris();
     }
 
-    // // for now, just delete empty directories
-    // {
-    //   const dirs = await this.readDirRecursively({ includeDirs: true });
-    //   const workspaceUriPaths = internalWorkspace.getWorktreeUris().filter(path.isWorkspaceUri).map(path.getWorkspaceUriPath);
-    //   for (const dir of dirs) {
-    //     const dirIsEmpty = !workspaceUriPaths.some(p => path.isBaseOf(dir, p));
-    //     if (dirIsEmpty) await fs.promises.rm(path.join(this.workspace, dir), { force: true, recursive: true });
-    //   }
-    // }
+    // If targetUris are not given, all uris in worktree are targets.
+    targetUris = internalWorkspace.getWorktreeUris();
 
-    // for each targetUri
-    //   if it doesn't exist in internalWorkspace.worktree, it's already been deleted above, so ignore it
-    //   if it's an untitled document, open it and replace its content
-    //   if it has an associated text editor open in vscode, replace its content
-    //   if it's a directory, mkdir
-    //   else, mkdir and write to file
-    // NOTE: changing documents with WorkspaceEdit without immediately saving them causes them to be
-    //       opened even if they did not have an associated editor.
+    // Sync files on disk.
+    // If uri scheme is not workspace, ignore it. We're looking for workspace files/dirs.
+    // If uri is not in worktree, ignore it. It's already been deleted above.
+    // If its type (dir vs file) is different than in worktree delete it first.
+    // If it doesn't exist or its sha1 is different than in worktree, copy blob to workspace.
+    for (const targetUri of targetUris) {
+      if (URI.parse(targetUri).scheme !== 'workspace') continue;
+
+      const worktreeItem = internalWorkspace.getWorktreeItemByUri(targetUri);
+      if (!worktreeItem) continue;
+
+      const fsPath = URI.parse(this.session.core.resolveUri(targetUri)).fsPath;
+
+      const [statError, stat] = await lib.tryCatch(fs.promises.stat(fsPath));
+      const errorNoEntry = (statError as NodeJS.ErrnoException | null)?.code === 'ENOENT';
+      if (statError && !errorNoEntry) throw statError;
+
+      switch (worktreeItem.file.type) {
+        case 'dir': {
+          if (!stat?.isDirectory()) {
+            await fs.promises.rm(fsPath, { force: true, recursive: true });
+            await fs.promises.mkdir(fsPath, { recursive: true });
+            urisChangedOnDisk.add(targetUri);
+          } else if (errorNoEntry) {
+            await fs.promises.mkdir(fsPath, { recursive: true });
+            urisChangedOnDisk.add(targetUri);
+          }
+          break;
+        }
+        case 'blob': {
+          if (stat && !stat.isFile()) {
+            await fs.promises.rm(fsPath, { force: true, recursive: true });
+            urisChangedOnDisk.add(targetUri);
+          }
+          const existingSha1 = stat?.isFile() && (await misc.computeSHA1(await fs.promises.readFile(fsPath)));
+          if (existingSha1 !== worktreeItem.file.sha1) {
+            await this.session.core.copyBlobTo(worktreeItem.file.sha1, fsPath);
+            urisChangedOnDisk.add(targetUri);
+          }
+          break;
+        }
+        default:
+          throw new Error(`Cannot sync file of type ${worktreeItem.file.type}`);
+      }
+    }
+
+    // Sync vscode text documents and text editors.
+    // If uri is not in worktree, ignore it. It's already been deleted above.
+    // If uri scheme is workspace and there is a vscode document open:
+    //   If uri was changed above on disk or document is not in worktree, then revert vsc document to avoid warnings later.
+    // If internal document is open:
+    //   If there's no vscode document, open it (may be file or untitled).
+    //   If vscode document content is different from internal, edit vscode.
     {
-      const targetUrisOutsideVsc: string[] = [];
       const edit = new vscode.WorkspaceEdit();
       for (const targetUri of targetUris) {
-        if (!internalWorkspace.doesUriExist(targetUri)) continue;
+        const worktreeItem = internalWorkspace.getWorktreeItemByUri(targetUri);
+        if (!worktreeItem) continue;
 
-        if (internalWorkspace.isDirUri(targetUri)) {
-          targetUrisOutsideVsc.push(targetUri);
-          continue;
+        let vscTextDocument = this.findVscTextDocumentByUri(targetUri);
+        const uriScheme = URI.parse(targetUri).scheme;
+
+        if (
+          uriScheme === 'workspace' &&
+          vscTextDocument &&
+          (urisChangedOnDisk.has(targetUri) || !worktreeItem.document)
+        ) {
+          await this.revertVscTextDocument(vscTextDocument);
         }
 
-        // Handle text documents that are untitled or have an associated text editor.
-        let vscTextDocument: vscode.TextDocument | undefined;
-        if (URI.parse(targetUri).scheme === 'untitled') {
-          vscTextDocument = await this.openUntitledVscTextDocumentByUri(targetUri);
-        } else if (this.findTabInputTextByUri(targetUri)) {
-          vscTextDocument = this.findVscTextDocumentByUri(targetUri);
-        }
-
-        if (vscTextDocument) {
-          const text = new TextDecoder().decode(await internalWorkspace.getLiveContentByUri(targetUri));
-          edit.replace(vscTextDocument.uri, this.getVscTextDocumentVscRange(vscTextDocument), text);
-        } else {
-          targetUrisOutsideVsc.push(targetUri);
+        if (worktreeItem.document) {
+          vscTextDocument ??= await this.openTextDocumentByUri(targetUri);
+          const vscContent = vscTextDocument.getText();
+          const internalContent = new TextDecoder().decode(worktreeItem.document.getContent());
+          if (vscContent !== internalContent) {
+            edit.replace(vscTextDocument.uri, this.getVscTextDocumentVscRange(vscTextDocument), internalContent);
+          }
         }
       }
       await vscode.workspace.applyEdit(edit);
-
-      // untitled uris have been opened above and not included in targetUrisOutsideVsc.
-      for (const targetUri of targetUrisOutsideVsc) {
-        assert(URI.parse(targetUri).scheme === 'workspace');
-        const fsPath = URI.parse(this.session.core.resolveUri(targetUri)).fsPath;
-        if (internalWorkspace.isDirUri(targetUri)) {
-          await fs.promises.mkdir(fsPath, { recursive: true });
-        } else {
-          const data = await internalWorkspace.getLiveContentByUri(targetUri);
-          await storage.writeBinary(fsPath, data);
-        }
-      }
     }
 
     // open all internalWorkspace's textEditors in vscdoe
     {
-      const tabUris = this.getRelevantTabUris();
+      // const tabUris = this.getRelevantTabUris();
       for (const textEditor of internalWorkspace.textEditors) {
-        if (!tabUris.includes(textEditor.document.uri)) {
-          await this.showTextDocumentByUri(textEditor.document.uri, {
-            preserveFocus: true,
-            selection: VscWorkspace.toVscSelection(textEditor.selections[0]),
-          });
-        }
+        // if (!tabUris.includes(textEditor.document.uri)) {
+        await this.showTextDocumentByUri(textEditor.document.uri, {
+          preserveFocus: true,
+          selection: VscWorkspace.toVscSelection(textEditor.selections[0]),
+        });
+        // }
       }
     }
 
-    // show this.activeTextEditor
+    // show active text editor.
     if (internalWorkspace.activeTextEditor) {
       await this.showTextDocumentByUri(internalWorkspace.activeTextEditor.document.uri, {
         preserveFocus: false,
         selection: VscWorkspace.toVscSelection(internalWorkspace.activeTextEditor.selections[0]),
+      });
+      await vscode.commands.executeCommand('revealLine', {
+        lineNumber: internalWorkspace.activeTextEditor.visibleRange.start,
+        at: 'top',
       });
     }
   }

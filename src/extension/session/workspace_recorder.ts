@@ -105,6 +105,7 @@ class WorkspaceRecorder {
       this.disposables.push(disposable);
     }
 
+    // NOTE: We now listen to file changes. So no need for listening to save event.
     // listen for save events
     // {
     //   const disposable = vscode.workspace.onDidSaveTextDocument(vscTextDocument => {
@@ -129,6 +130,7 @@ class WorkspaceRecorder {
       watcher.onDidCreate(uri => this.fsCreate(uri));
       watcher.onDidChange(uri => this.fsChange(uri));
       watcher.onDidDelete(uri => this.fsDelete(uri));
+      this.disposables.push(watcher);
     }
 
     // register disposables
@@ -639,6 +641,9 @@ class WorkspaceRecorder {
     const data = await fs.promises.readFile(vscUri.fsPath);
     const sha1 = await misc.computeSHA1(data);
     const file: t.File = { type: 'blob', sha1 };
+    await this.session.core.writeBlob(sha1, data);
+
+    this.internalWorkspace.insertFile(uri, file);
 
     this.insertEvent(
       {
@@ -669,6 +674,15 @@ class WorkspaceRecorder {
     const internalWorktreeItem = this.internalWorkspace.getWorktreeItemByUri(uri);
     assert(internalWorktreeItem, `Received change event for ${vscUri.fsPath} but it's not in the internal worktree`);
     const revFile = internalWorktreeItem.file;
+
+    if (_.isEqual(file, revFile)) {
+      // Nothing has changed.
+      debugger;
+      return;
+    }
+
+    // Write new blob and commit file to internal work tree.
+    await this.session.core.writeBlob(sha1, data);
     internalWorktreeItem.file = file;
 
     this.insertEvent(
@@ -721,7 +735,9 @@ class WorkspaceRecorder {
   }
 
   /**
-   * Inserts an 'openTextDocument' event only if:
+   * Only untitled documents can be opened without an existing internal worktree item.
+   *
+   * Inserts an 'openTextDocument' event if:
    * - item does NOT exist in internal worktree, or
    * - item exists in internal worktree but has no document.
    *
@@ -737,17 +753,31 @@ class WorkspaceRecorder {
     vscTextDocument: vscode.TextDocument,
     uri: string,
   ): Promise<InternalTextDocument> {
-    const isInWorktree = this.internalWorkspace.doesUriExist(uri);
+    const vscText = vscTextDocument.getText();
+    const irExists = this.internalWorkspace.doesUriExist(uri);
+    const irText = irExists && new TextDecoder().decode(await this.internalWorkspace.getLiveContentByUri(uri));
     let irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
 
-    let irText: string | undefined;
-    const vscText = vscTextDocument.getText();
-
-    if (isInWorktree) {
-      irText = new TextDecoder().decode(await this.internalWorkspace.getLiveContentByUri(uri));
+    if (vscTextDocument.uri.scheme !== 'untitled') {
+      assert(irExists, `${uri} was opened in VSCode but not found internally`);
     }
 
-    if (irTextDocument && irText !== vscText) {
+    if (!irTextDocument) {
+      irTextDocument = this.vscWorkspace.textDocumentFromVsc(vscTextDocument, uri);
+      this.internalWorkspace.insertTextDocument(irTextDocument); // will insert into worktree as well
+      this.insertEvent(
+        {
+          type: 'openTextDocument',
+          id: lib.nextId(),
+          uri,
+          clock: this.clock,
+          text: irText === vscText ? undefined : vscText,
+          eol: irTextDocument.eol,
+          // isInWorktree,
+        },
+        { coalescing: false },
+      );
+    } else if (irText !== vscText) {
       const irRange = irTextDocument.getRange();
       const irContentChanges: ContentChange[] = [{ range: irRange, text: vscText }];
       const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
@@ -760,21 +790,6 @@ class WorkspaceRecorder {
           contentChanges: irContentChanges,
           revContentChanges: irRevContentChanges,
           updateSelection: false,
-        },
-        { coalescing: false },
-      );
-    } else if (!irTextDocument) {
-      irTextDocument = this.vscWorkspace.textDocumentFromVsc(vscTextDocument, uri);
-      this.internalWorkspace.insertTextDocument(irTextDocument); // will insert into worktree as well
-      this.insertEvent(
-        {
-          type: 'openTextDocument',
-          id: lib.nextId(),
-          uri,
-          clock: this.clock,
-          text: irText === vscText ? undefined : vscText,
-          eol: irTextDocument.eol,
-          isInWorktree,
         },
         { coalescing: false },
       );

@@ -526,3 +526,27 @@ export function binarySearch<T, U, V>(
   }
   return -1;
 }
+
+/**
+ * Useful when results or errors need to be used outside of try-catch blocks. For example:
+ *
+ * let res, error;
+ * try {
+ *   res = f(1, 2, 3);
+ * } catch(err) {
+ *   error = err;
+ * }
+ *
+ * becomes:
+ * const [error, res] = tryCatch(arg)
+ *
+ * Awaits the given promise and return Promise<[error, res]>.
+ * If arg is a function, it's the same as tryCatch(arg(...functionArgs)).
+ */
+export async function tryCatch<T>(promise: Promise<T>): Promise<[null, T] | [Error, null]> {
+  try {
+    return [null, await promise];
+  } catch (error) {
+    return [error as Error, null];
+  }
+}

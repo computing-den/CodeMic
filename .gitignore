@@ -9,5 +9,5 @@
 .emacs.desktop
 #*
 *.vsix
-/test/workspace
+/test_data/test_workspace
 .vscode-test

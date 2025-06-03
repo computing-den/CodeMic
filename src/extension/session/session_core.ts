@@ -423,7 +423,7 @@ export default class SessionCore {
         await fs.promises.mkdir(fsPath, { recursive: true });
         break;
       case 'blob':
-        await fs.promises.cp(path.join(this.dataPath, 'blobs', file.sha1), fsPath, { force: true, recursive: true });
+        await this.copyBlobTo(file.sha1, fsPath);
         break;
       case 'empty':
         break;
@@ -434,6 +434,10 @@ export default class SessionCore {
 
   async copyToBlob(src: string, sha1: string) {
     await fs.promises.cp(src, path.join(this.dataPath, 'blobs', sha1), { recursive: true });
+  }
+
+  async copyBlobTo(sha1: string, dst: string) {
+    await fs.promises.cp(path.join(this.dataPath, 'blobs', sha1), dst, { force: true, recursive: true });
   }
 
   async delete() {
@@ -507,18 +511,44 @@ export default class SessionCore {
     const body = this.session.body ?? (await this.readBody());
     const blobs = new Set<string>();
 
-    // Find blobs in editor tracks.
+    function maybeAddFile(file: t.File) {
+      if (file.type === 'blob') {
+        blobs.add(file.sha1);
+      }
+    }
+
+    // Find blobs in editor events.
     for (const e of body.editorEvents) {
-      if (e.type === 'fsCreate' && e.file.type === 'blob') blobs.add(e.file.sha1);
+      switch (e.type) {
+        case 'fsCreate':
+          maybeAddFile(e.file);
+          break;
+        case 'fsChange':
+          maybeAddFile(e.file);
+          maybeAddFile(e.revFile);
+          break;
+        case 'fsDelete':
+          maybeAddFile(e.revFile);
+          break;
+
+        case 'textChange':
+        case 'openTextDocument':
+        case 'closeTextDocument':
+        case 'showTextEditor':
+        case 'closeTextEditor':
+        case 'select':
+        case 'scroll':
+        case 'save':
+        case 'textInsert':
+          break;
+        default:
+          lib.unreachable(e);
+      }
     }
 
     // Find blobs in audio and video tracks.
-    for (const track of body.audioTracks) {
-      if (track.file.type === 'blob') blobs.add(track.file.sha1);
-    }
-    for (const track of body.videoTracks) {
-      if (track.file.type === 'blob') blobs.add(track.file.sha1);
-    }
+    for (const track of body.audioTracks) maybeAddFile(track.file);
+    for (const track of body.videoTracks) maybeAddFile(track.file);
 
     return blobs;
   }

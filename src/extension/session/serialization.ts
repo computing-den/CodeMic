@@ -1,10 +1,13 @@
 import * as t from '../../lib/types.js';
 import { Range, LineRange, Selection, ContentChange, Position, nextId } from '../../lib/lib.js';
 import _ from 'lodash';
+import config from '../config.js';
 
 type UriMap = Map<string, number>;
 
-export function serializeSessionBody(body: t.SessionBody): t.SessionBodyCompact {
+export function serializeSessionBody(body: t.SessionBody): t.SessionBodyExport {
+  if (config.exportFullBody) return { full: true, ...body };
+
   const uris = _.uniq(
     _.concat(
       body.editorEvents.map(e => e.uri),
@@ -166,36 +169,38 @@ function serializeFocus(focus: t.Focus, uriMap: UriMap): t.FocusCompact {
   };
 }
 
-export function deserializeSessionBody(compact: any, formatVersion: number): t.SessionBody {
+export function deserializeSessionBody(body: any, formatVersion: number): t.SessionBody {
   switch (formatVersion) {
     case 1:
-      return deserializeSessionBodyV1(compact as t.BodyFormatV1.SessionBodyCompact);
+      return deserializeSessionBodyV1(body as t.BodyFormatV1.SessionBodyCompact);
     case 2:
-      return deserializeSessionBodyV2(compact as t.SessionBodyCompact);
+      return deserializeSessionBodyV2(body as t.SessionBodyExport);
     default:
       throw new Error(`Unknown format version ${formatVersion}`);
   }
 }
 
-export function deserializeSessionBodyV1(compact: t.BodyFormatV1.SessionBodyCompact): t.SessionBody {
-  let editorEvents = _.flatMap(compact.editorTracks, (t, uri) => _.map(t, e => deserializeEditorEventV1(e, uri)));
+export function deserializeSessionBodyV1(body: t.BodyFormatV1.SessionBodyCompact): t.SessionBody {
+  let editorEvents = _.flatMap(body.editorTracks, (t, uri) => _.map(t, e => deserializeEditorEventV1(e, uri)));
   editorEvents = _.orderBy(editorEvents, 'clock');
   return {
     editorEvents,
-    audioTracks: compact.audioTracks,
-    videoTracks: compact.videoTracks,
-    defaultEol: compact.defaultEol,
-    focusTimeline: compact.focusTimeline.map(f => deserializeFocusV1(f)),
+    audioTracks: body.audioTracks,
+    videoTracks: body.videoTracks,
+    defaultEol: body.defaultEol,
+    focusTimeline: body.focusTimeline.map(f => deserializeFocusV1(f)),
   };
 }
 
-export function deserializeSessionBodyV2(compact: t.SessionBodyCompact): t.SessionBody {
+export function deserializeSessionBodyV2(body: t.SessionBodyExport): t.SessionBody {
+  if (body.full) return _.omit(body, 'full');
+
   return {
-    editorEvents: _.map(compact.editorEvents, t => deserializeEditorEvent(t, compact.uris)),
-    audioTracks: compact.audioTracks,
-    videoTracks: compact.videoTracks,
-    defaultEol: compact.defaultEol,
-    focusTimeline: compact.focusTimeline.map(f => deserializeFocus(f, compact.uris)),
+    editorEvents: _.map(body.editorEvents, t => deserializeEditorEvent(t, body.uris)),
+    audioTracks: body.audioTracks,
+    videoTracks: body.videoTracks,
+    defaultEol: body.defaultEol,
+    focusTimeline: body.focusTimeline.map(f => deserializeFocus(f, body.uris)),
   };
 }
 
