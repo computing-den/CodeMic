@@ -492,6 +492,12 @@ class CodeMic {
         await this.updateFrontend();
         return ok;
       }
+      case 'recorder/syncWorkspace': {
+        assert(this.session?.isLoaded());
+        await this.session.rr.enqueueSync(req.clock);
+        await this.updateFrontend();
+        return ok;
+      }
       case 'recorder/save': {
         assert(this.session?.isLoaded());
         await this.session.editor.write({ pause: true });
@@ -665,6 +671,12 @@ class CodeMic {
         const change = this.session.editor.crop(req.clock);
         await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
+        return ok;
+      }
+      case 'recorder/makeTest': {
+        assert(this.session?.isLoaded());
+        await this.session.rr.makeTest();
+        vscode.window.showInformationMessage('Made test.');
         return ok;
       }
       // case 'confirmForkFromPlayer': {

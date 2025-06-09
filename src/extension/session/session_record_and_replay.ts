@@ -15,6 +15,8 @@ import { UpdateLoopAsync } from '../../lib/update_loop_async.js';
 import { isDuration } from 'moment';
 import { v4 as uuid } from 'uuid';
 import { mediaManager } from '../../view/media_manager.js';
+import path from 'path';
+import fs from 'fs';
 
 enum Status {
   Init,
@@ -83,6 +85,14 @@ export default class SessionRecordAndReplay {
     return Boolean(this.running && !this.mode.recorder);
   }
 
+  get _test_internalWorkspace(): InternalWorkspace {
+    return this.internalWorkspace;
+  }
+
+  get _test_vscWorkspace(): VscWorkspace {
+    return this.vscWorkspace;
+  }
+
   async enqueueLoadWorkspace(options?: { clock?: number }) {
     await this.pauseOnError(this.queue.enqueue(this.loadWorkspace.bind(this), options));
   }
@@ -101,6 +111,10 @@ export default class SessionRecordAndReplay {
 
   async enqueueSeek(clock: number) {
     await this.pauseOnError(this.queue.enqueue(this.seek.bind(this), clock));
+  }
+
+  async enqueueSync(clock?: number) {
+    await this.pauseOnError(this.queue.enqueue(this.sync.bind(this), clock));
   }
 
   /**
@@ -133,6 +147,10 @@ export default class SessionRecordAndReplay {
     await this.pauseOnError(this.queue.enqueue(this.syncMedia.bind(this)));
   }
 
+  async makeTest() {
+    return this.vscWorkspace.makeTest();
+  }
+
   private async enqueueUpdate(diffMs: number) {
     await this.pauseOnError(this.queue.enqueue(this.update.bind(this, diffMs)));
   }
@@ -142,6 +160,17 @@ export default class SessionRecordAndReplay {
     await this.workspacePlayer.seek(clock);
     await this.syncMedia({ hard: true });
     this.updateLoop.resetDiff();
+  }
+
+  private async sync(clock?: number) {
+    assert(!this.running, 'Cannot sync while playing/recording');
+
+    if (clock !== undefined) {
+      this.clock = clock;
+      await this.internalWorkspace.seek(clock);
+    }
+    await this.vscWorkspace.sync();
+    await this.syncMedia();
   }
 
   private async loadWorkspace(options?: { clock?: number }) {

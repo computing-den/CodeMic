@@ -14,10 +14,14 @@ import vscode from 'vscode';
 import path from 'path';
 import { URI } from 'vscode-uri';
 import InternalWorkspace from './internal_workspace.js';
+import VscWorkspaceStepper from './vsc_workspace_stepper.js';
+import { serializeTestMeta } from './serialization.js';
 
 type TabWithInputText = Omit<vscode.Tab, 'input'> & {
   readonly input: vscode.TabInputText;
 };
+
+const PROJECT_PATH = path.resolve(__dirname, '..'); // relative to dist
 
 export default class VscWorkspace {
   constructor(public session: LoadedSession, private internalWorkspace: InternalWorkspace) {}
@@ -417,7 +421,16 @@ export default class VscWorkspace {
   async closeVscTextEditorByVscUri(uri: vscode.Uri, options?: { skipConfirmation?: boolean }) {
     // Remember the current ative text editor to restore later.
     const activeUri = vscode.window.activeTextEditor?.document.uri;
-    await vscode.commands.executeCommand('vscode.open', uri);
+
+    try {
+      await this.showTextDocumentByVscUri(uri);
+    } catch (error) {
+      // if the text document was deleted vscode shows the tab but cannot open
+      // it and activeTextEditor is undefined.
+      const tab = this.findTabInputTextByVscUri(uri);
+      if (tab) await vscode.window.tabGroups.close(tab);
+      return;
+    }
 
     assert(
       vscode.window.activeTextEditor?.document.uri.toString() === uri.toString(),
@@ -431,7 +444,7 @@ export default class VscWorkspace {
 
     // Restore the previous active text editor.
     if (activeUri && activeUri.toString() !== uri.toString()) {
-      await vscode.commands.executeCommand('vscode.open', activeUri);
+      await this.showTextDocumentByVscUri(activeUri);
     }
   }
 
@@ -449,7 +462,8 @@ export default class VscWorkspace {
   }
 
   async revertVscTextDocument(vscTextDocument: vscode.TextDocument) {
-    await vscode.commands.executeCommand('vscode.open', vscTextDocument.uri);
+    vscode.window.showTextDocument(vscTextDocument, { preview: false, viewColumn: vscode.ViewColumn.One });
+    // await vscode.commands.executeCommand('vscode.open', vscTextDocument.uri);
     await vscode.commands.executeCommand('workbench.action.files.revert');
   }
 
@@ -765,6 +779,105 @@ export default class VscWorkspace {
     for (const d of disposables) d.dispose();
 
     return success;
+  }
+
+  async makeTest() {
+    const testPath = path.resolve(PROJECT_PATH, 'test_data/sessions', this.session.head.handle);
+    const testClockPath = path.resolve(testPath, `clock_${this.session.rr.clock}`);
+    const testDataPath = path.resolve(testPath, 'CodeMic');
+
+    // Remove existing data path and clock path.
+    await fs.promises.rm(testClockPath, { recursive: true, force: true });
+    await fs.promises.rm(testDataPath, { recursive: true, force: true });
+
+    // Flush and write head/body to test data path.
+    this.session.editor.finishEditing();
+    this.session.core.write();
+    await fs.promises.cp(this.session.core.dataPath, testDataPath, { recursive: true });
+
+    // Write files.
+    const filePathsStats = await this.session.core.readDirRecursively({ includeDirs: true, includeFiles: true });
+    await fs.promises.mkdir(path.resolve(testClockPath, 'files'), { recursive: true });
+    for (const [filePath, stat] of filePathsStats) {
+      const srcFilePath = path.resolve(this.session.workspace, filePath);
+      const testFilePath = path.resolve(testClockPath, 'files', filePath);
+      if (stat.isDirectory()) {
+        await fs.promises.mkdir(testFilePath, { recursive: true });
+      } else if (stat.isFile()) {
+        await fs.promises.cp(srcFilePath, testFilePath, { force: true });
+      } else {
+        throw new Error(`Unknown file type at ${srcFilePath}`);
+      }
+    }
+
+    // Write text_documents.
+    await fs.promises.mkdir(path.resolve(testClockPath, 'text_documents'), { recursive: true });
+    for (const internalTextDocument of this.internalWorkspace.textDocuments) {
+      const parsedUri = URI.parse(internalTextDocument.uri);
+      const relPath = parsedUri.fsPath;
+      if (parsedUri.scheme === 'untitled') {
+        assert(/^Untitled-\d+$/.test(relPath));
+      } else if (parsedUri.scheme === 'workspace') {
+        // nothing
+      } else {
+        throw new Error(`Unknown URI scheme ${parsedUri.toString()}`);
+      }
+
+      const testFilePath = path.resolve(testClockPath, 'text_documents', relPath);
+      await storage.writeString(testFilePath, internalTextDocument.getText());
+    }
+    // for (const vscTextDocument of vscode.workspace.textDocuments) {
+    //   const parsedUri = URI.parse(this.uriFromVsc(vscTextDocument.uri));
+    //   const relPath = parsedUri.fsPath;
+    //   if (parsedUri.scheme === 'untitled') {
+    //     assert(/^Untitled-\d+$/.test(relPath));
+    //   } else if (parsedUri.scheme === 'workspace') {
+    //     // nothing
+    //   } else {
+    //     throw new Error(`Unknown URI scheme ${parsedUri.toString()}`);
+    //   }
+
+    //   const testFilePath = path.resolve(testClockPath, 'text_documents', relPath);
+    //   await storage.writeString(testFilePath, vscTextDocument.getText());
+    // }
+
+    // Write meta.json.
+    // TODO check internal text documents to see if they're the same.
+
+    const dirtyTextDocuments = vscode.workspace.textDocuments.filter(d => d.isDirty).map(d => this.uriFromVsc(d.uri));
+    const tabVscUris = this.getRelevantTabVscUris();
+    let vscOpenTextEditors: t.TestMetaTextEditor[] = [];
+    const originalActiveTextEditor = vscode.window.activeTextEditor;
+    for (const tabVscUri of tabVscUris) {
+      const vscTextEditor = await this.showTextDocumentByVscUri(tabVscUri);
+      const selections = VscWorkspace.fromVscSelections(vscTextEditor.selections);
+      const visibleRange = VscWorkspace.fromVscLineRange(vscTextEditor.visibleRanges[0]);
+      vscOpenTextEditors.push({ uri: this.uriFromVsc(tabVscUri), selections, visibleRange });
+    }
+    vscOpenTextEditors = _.orderBy(vscOpenTextEditors, 'uri');
+
+    let internalOpenTextEditors: t.TestMetaTextEditor[] = this.internalWorkspace.textEditors.map(textEditor => ({
+      uri: textEditor.document.uri,
+      selections: textEditor.selections,
+      visibleRange: textEditor.visibleRange,
+    }));
+    internalOpenTextEditors = _.orderBy(internalOpenTextEditors, 'uri');
+
+    if (!_.isEqual(vscOpenTextEditors, internalOpenTextEditors)) {
+      throw new Error(
+        `Internal and VSCode text editors are different:\n` +
+          `internal text editors: ${JSON.stringify(internalOpenTextEditors, null, 2)}\n` +
+          `vscode text editors: ${JSON.stringify(vscOpenTextEditors, null, 2)}\n`,
+      );
+    }
+
+    const meta: t.TestMeta = { dirtyTextDocuments, openTextEditors: vscOpenTextEditors };
+    await storage.writeJSON(path.resolve(testClockPath, 'meta.json'), serializeTestMeta(meta));
+
+    // Restore active text editor.
+    if (originalActiveTextEditor) {
+      await vscode.window.showTextDocument(originalActiveTextEditor.document);
+    }
   }
 
   // async makeWorkspace() {

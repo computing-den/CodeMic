@@ -37,6 +37,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/record' }; response: OKResponse }
   | { request: { type: 'recorder/pause' }; response: OKResponse }
   | { request: { type: 'recorder/seek'; clock: number }; response: OKResponse }
+  | { request: { type: 'recorder/syncWorkspace'; clock?: number }; response: OKResponse }
   | { request: { type: 'recorder/save' }; response: OKResponse }
   | { request: { type: 'recorder/publish' }; response: OKResponse }
   | { request: { type: 'recorder/undo' }; response: OKResponse }
@@ -59,6 +60,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/updateChapter'; index: number; update: Partial<TocItem> }; response: OKResponse }
   | { request: { type: 'recorder/deleteChapter'; index: number }; response: OKResponse }
   | { request: { type: 'recorder/crop'; clock: number }; response: OKResponse }
+  | { request: { type: 'recorder/makeTest' }; response: OKResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
   | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }
   | { request: { type: 'readyToLoadMedia' }; response: OKResponse }
@@ -839,13 +841,28 @@ export type GitFile = {
   sha1: string;
 };
 
-export type TextEditor = {
-  uri: string;
-  selections: Selection[];
-  visibleRange: LineRange;
-  // = [{ anchor: { line: 0, character: 0 }, active: { line: 0, character: 0 } }],
-  // = { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },
-};
+// export type TextEditorJSON = {
+//   uri: string;
+//   selections: SelectionJSON[];
+//   visibleRange: LineRangeJSON;
+//   // = [{ anchor: { line: 0, character: 0 }, active: { line: 0, character: 0 } }],
+//   // = { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },
+// };
+
+// export type PositionJSON = {
+//   line: number;
+//   character: number;
+// };
+
+// export type SelectionJSON = {
+//   anchor: PositionJSON;
+//   active: PositionJSON;
+// };
+
+// export type LineRangeJSON = {
+//   start: number;
+//   end: number;
+// };
 
 export type EndOfLine = '\n' | '\r\n';
 
@@ -871,6 +888,28 @@ export type OSPaths = {
   cache: string;
   log: string;
   temp: string;
+};
+
+export type TestMeta = {
+  dirtyTextDocuments: string[];
+  openTextEditors: TestMetaTextEditor[];
+};
+
+export type TestMetaTextEditor = {
+  uri: string;
+  selections: Selection[];
+  visibleRange: LineRange;
+};
+
+export type TestMetaCompact = {
+  dirtyTextDocuments: string[];
+  openTextEditors: TestMetaTextEditorCompact[];
+};
+
+export type TestMetaTextEditorCompact = {
+  uri: string;
+  selections: SelectionCompact[];
+  visibleRange: LineRangeCompact;
 };
 
 export namespace BodyFormatV1 {
@@ -904,6 +943,25 @@ export namespace BodyFormatV1 {
     type: 'git';
     sha1: string;
   };
+
+  export type RangedTrack = {
+    id: string;
+    type: MediaType;
+    clockRange: ClockRange;
+    title: string;
+  };
+
+  export type RangedTrackFile = RangedTrack & { file: File };
+
+  /**
+   * Multiple audio tracks may refer to the same file.
+   */
+  export type AudioTrack = RangedTrackFile;
+
+  /**
+   * Multiple video tracks may refer to the same file.
+   */
+  export type VideoTrack = RangedTrackFile;
 
   export type EditorEventCompact =
     | FsCreateEventCompact

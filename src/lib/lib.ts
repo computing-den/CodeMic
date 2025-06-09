@@ -321,6 +321,10 @@ export class LineRange {
   }
 }
 
+export function areSelectionsEqual(a: Selection[], b: Selection[]): boolean {
+  return a.length === b.length && _.zip(a, b).every(([m, n]) => m!.isEqual(n!));
+}
+
 export function getSelectionsAfterTextChangeEvent(e: t.TextChangeEvent): Selection[] {
   // e.contentChanges: [
   //   {"text": "!", "range": [0, 2, 0, 2]},

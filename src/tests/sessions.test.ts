@@ -5,45 +5,58 @@ import _ from 'lodash';
 import * as vscode from 'vscode';
 import CodeMic from '../extension/codemic.js';
 import * as lib from '../lib/lib.js';
+import type * as t from '../lib/types.js';
 import { inspect } from 'util';
 import { URI } from 'vscode-uri';
+import VscWorkspace from '../extension/session/vsc_workspace.js';
+import { deserializeTestMeta } from '../extension/session/serialization.js';
+import { describe } from 'mocha';
 
-const projectPath = path.resolve(__dirname, '..');
+const projectPath = path.resolve(__dirname, '..'); // relative to dist
 const workspacePath = path.resolve(projectPath, 'test_data/test_workspace');
+const testSessionsPath = path.resolve(projectPath, 'test_data/sessions');
 
+// Dynamic tests using fs messes up the vscode test extension. It still works but vscode
+// cannot show the list of tests.
+// const testSessions = fs.readdirSync(testSessionsPath, { encoding: 'utf8' });
 suite('Sessions Test Suite', () => {
-  test('Session1', async () => {
-    const sessionHandle = 'session1';
-    const head = JSON.parse(
-      fs.readFileSync(path.resolve(projectPath, 'test_data/sessions', sessionHandle, 'CodeMic', 'head.json'), 'utf8'),
-    );
-
-    await prepareForSession(sessionHandle);
-
-    await getCodeMic().handleMessage({ type: 'welcome/openSessionInRecorder', sessionId: head.id });
-    assert.strictEqual(getCodeMic().session?.head.id, head.id);
-    assert.strictEqual(getCodeMic().recorder?.tabId, 'editor-view');
-
-    const clocks = readAvailableClocks(sessionHandle);
-    for (const clock of clocks) {
-      // Seek if necessary.
-      if (clock !== getCodeMic().session!.rr!.clock) {
-        await getCodeMic().handleMessage({ type: 'recorder/seek', clock });
-      }
-
-      // Check files and open text documents.
-      checkFilesAtClock(sessionHandle, clock);
-      checkOpenTextDocumentsAtClock(sessionHandle, clock);
-    }
-
-    // test('wait', async () => {
-    //   await timeout(30_000);
-    // });
-  });
+  test('Session my_test_session', () => testSession('my_test_session'));
 });
 
-function checkFilesAtClock(sessionHandle: string, clock: number) {
-  const expectedFilesPath = path.resolve(projectPath, 'test_data/sessions', sessionHandle, `clock_${clock}`, 'files');
+async function testSession(sessionHandle: string) {
+  const head = JSON.parse(
+    fs.readFileSync(path.resolve(projectPath, 'test_data/sessions', sessionHandle, 'CodeMic', 'head.json'), 'utf8'),
+  );
+
+  await prepareForSession(sessionHandle);
+
+  await getCodeMic().handleMessage({ type: 'welcome/openSessionInRecorder', sessionId: head.id });
+  assert.strictEqual(getCodeMic().session?.head.id, head.id);
+  assert.strictEqual(getCodeMic().recorder?.tabId, 'editor-view');
+
+  const clockStrs = readAvailableClockStrs(sessionHandle);
+  const clockStrsSeq = getClockStrsSeq(clockStrs);
+  console.log('clock sequence: ', clockStrsSeq.join(' -> '));
+  for (const [i, clockStr] of clockStrsSeq.entries()) {
+    const label = clockStrsSeq.slice(0, i + 1).join(' -> ');
+
+    // Seek if necessary.
+    if (Number(clockStr) !== getCodeMic().session!.rr!.clock) {
+      await getCodeMic().handleMessage({ type: 'recorder/seek', clock: Number(clockStr) });
+    }
+
+    const testClockPath = path.resolve(projectPath, 'test_data/sessions', sessionHandle, `clock_${clockStr}`);
+    const meta = deserializeTestMeta(JSON.parse(fs.readFileSync(path.resolve(testClockPath, 'meta.json'), 'utf8')));
+
+    // Check files and open text documents.
+    checkFilesAtClock(testClockPath, sessionHandle, label);
+    checkTextDocumentsAtClock(testClockPath, sessionHandle, label, meta);
+    await checkTextEditorsAtClock(testClockPath, sessionHandle, label, meta);
+  }
+}
+
+function checkFilesAtClock(testClockPath: string, sessionHandle: string, label: string) {
+  const expectedFilesPath = path.resolve(testClockPath, 'files');
   const expectedFiles = fs.readdirSync(expectedFilesPath, { recursive: true, encoding: 'utf8' });
   const actualFiles = fs
     .readdirSync(workspacePath, { recursive: true, encoding: 'utf8' })
@@ -55,11 +68,11 @@ function checkFilesAtClock(sessionHandle: string, clock: number) {
   // Compare file names.
   assert.ok(
     missingActualFiles.length === 0,
-    `At ${clock}, the following files are missing: ${missingActualFiles.join(', ')}`,
+    `At ${label}: the following files are missing: ${missingActualFiles.join(', ')}`,
   );
   assert.ok(
     extraActualFiles.length === 0,
-    `At ${clock}, the following files are extra: ${extraActualFiles.join(', ')}`,
+    `At ${label}: the following files are extra: ${extraActualFiles.join(', ')}`,
   );
 
   // Compare content.
@@ -68,87 +81,223 @@ function checkFilesAtClock(sessionHandle: string, clock: number) {
     if (expectedStat.isFile()) {
       const expectedContent = fs.readFileSync(path.resolve(expectedFilesPath, file), 'utf8');
       const actualContent = fs.readFileSync(path.resolve(workspacePath, file), 'utf8');
-      assert.strictEqual(actualContent, expectedContent, `At ${clock}, found unexpected content in file ${file}`);
+      assert.strictEqual(actualContent, expectedContent, `At ${label}: found unexpected content in file ${file}`);
     } else if (expectedStat.isDirectory()) {
       assert.ok(
         fs.statSync(path.resolve(workspacePath, file)).isDirectory(),
-        `At ${clock}, expected directory at ${file}`,
+        `At ${label}: expected directory at ${file}`,
       );
     } else {
-      assert.fail(`At ${clock}, found expected file of unknown type at ${file}`);
+      assert.fail(`At ${label}: found expected file of unknown type at ${file}`);
     }
   }
 }
 
-function checkOpenTextDocumentsAtClock(sessionHandle: string, clock: number) {
-  const expectedOpenTextDocumentsPath = path.resolve(
-    projectPath,
-    'test_data/sessions',
-    sessionHandle,
-    `clock_${clock}`,
-    'open_text_documents',
-  );
-  const expectedOpenTextDocumentsPaths = fs.readdirSync(expectedOpenTextDocumentsPath, {
+function checkTextDocumentsAtClock(testClockPath: string, sessionHandle: string, label: string, meta: t.TestMeta) {
+  // Compare text documents' content against internal
+  // Compare text documents' content against vscode
+  // Must not have extra internal text documents
+  // Must not have extra *dirty* vscode documents
+
+  type TextDocument = { content: string; uri: string; dirty?: boolean };
+
+  const expectedTextDocumentsPath = path.resolve(testClockPath, 'text_documents');
+  const expectedTextDocumentsPaths = fs.readdirSync(expectedTextDocumentsPath, {
     recursive: true,
     encoding: 'utf8',
   });
 
-  const expectedOpenTextDocuments: { content: string; uri: string }[] = expectedOpenTextDocumentsPaths.map(p => {
-    const content = fs.readFileSync(path.resolve(expectedOpenTextDocumentsPath, p), 'utf8');
-    console.log('XXX: ', p, ':', JSON.stringify(content));
-    if (p.startsWith('Untitled-')) {
-      return { uri: URI.from({ scheme: 'untitled', path: p }).toString(), content };
-    } else {
-      return { uri: lib.workspaceUri(p), content };
+  const expectedTextDocuments: TextDocument[] = _.compact(
+    expectedTextDocumentsPaths.map(p => {
+      const file = path.resolve(expectedTextDocumentsPath, p);
+      if (!fs.statSync(path.resolve(workspacePath, file)).isFile()) return;
+
+      const content = fs.readFileSync(file, 'utf8');
+      if (p.startsWith('Untitled-')) {
+        const uri = URI.from({ scheme: 'untitled', path: p }).toString();
+        return { uri, content, dirty: meta.dirtyTextDocuments.includes(uri) };
+      } else {
+        const uri = lib.workspaceUri(p);
+        return { uri, content, dirty: meta.dirtyTextDocuments.includes(uri) };
+      }
+    }),
+  );
+
+  const actualVscTextDocuments: TextDocument[] = vscode.workspace.textDocuments.map(textDocument => {
+    const content = textDocument.getText();
+
+    switch (textDocument.uri.scheme) {
+      case 'file': {
+        const uri = lib.workspaceUriFrom(workspacePath, textDocument.uri.fsPath);
+        return { uri, content, dirty: meta.dirtyTextDocuments.includes(uri) };
+      }
+      case 'untitled': {
+        const uri = URI.from({ scheme: 'untitled', path: textDocument.uri.path }).toString();
+        return { uri, content, dirty: meta.dirtyTextDocuments.includes(uri) };
+      }
+      default:
+        throw new Error(`unknown scheme: ${textDocument.uri.scheme}`);
     }
   });
 
-  const actualOpenTextDocuments: { content: string; uri: string }[] = vscode.workspace.textDocuments.map(
-    textDocument => {
-      const content = textDocument.getText();
+  const actualInternalTextDocuments: TextDocument[] =
+    getCodeMic().session!.rr!._test_internalWorkspace.textDocuments.map(textDocument => {
+      return { uri: textDocument.uri, content: textDocument.getText() };
+    });
 
-      switch (textDocument.uri.scheme) {
-        case 'file':
-          return { uri: lib.workspaceUriFrom(workspacePath, textDocument.uri.fsPath), content };
-        case 'untitled':
-          return { uri: URI.from({ scheme: 'untitled', path: textDocument.uri.path }).toString(), content };
-        default:
-          throw new Error(`unknown scheme: ${textDocument.uri.scheme}`);
-      }
-    },
-  );
-
-  const missingActual = _.differenceBy(expectedOpenTextDocuments, actualOpenTextDocuments, 'uri');
-  const extraActual = _.differenceBy(actualOpenTextDocuments, expectedOpenTextDocuments, 'uri');
-
-  // Compare text document uris.
-  assert.ok(
-    missingActual.length === 0,
-    `At ${clock}, the following text documents are expected to be open: ${missingActual.map(x => x.uri).join(', ')}`,
-  );
-  assert.ok(
-    extraActual.length === 0,
-    `At ${clock}, the following text documents are not expected to be open: ${extraActual.map(x => x.uri).join(', ')}`,
-  );
-
-  // Compare text document contents.
-  for (const expected of expectedOpenTextDocuments) {
-    const actual = _.find(actualOpenTextDocuments, ['uri', expected.uri]);
-    assert.ok(actual);
-    assert.strictEqual(
-      actual.content,
-      expected.content,
-      `At ${clock}, found unexpected content in open text document ${actual.uri}`,
-    );
+  function getDiff(expected: TextDocument, actual: TextDocument | undefined) {
+    if (expected && actual && expected.content !== actual.content) {
+      return { uri: expected.uri, expected: expected.content, actual: actual.content };
+    }
   }
+
+  function getDiffDirty(expected: TextDocument, actual: TextDocument | undefined) {
+    if (expected?.dirty !== undefined && actual?.dirty !== undefined && expected.dirty !== actual.dirty) {
+      return { uri: expected.uri, expected: expected.dirty, actual: actual.dirty };
+    }
+  }
+
+  const missingActualVsc = _.differenceBy(expectedTextDocuments, actualVscTextDocuments, 'uri');
+  const extraActualVsc = _.differenceBy(actualVscTextDocuments, expectedTextDocuments, 'uri');
+  const dirtyExtraActualVsc = _.filter(extraActualVsc, 'dirty');
+  const diffContentVsc = _.compact(
+    _.map(expectedTextDocuments, expected => getDiff(expected, _.find(actualVscTextDocuments, ['uri', expected.uri]))),
+  );
+  const diffDirtyVsc = _.compact(
+    _.map(expectedTextDocuments, expected =>
+      getDiffDirty(expected, _.find(actualVscTextDocuments, ['uri', expected.uri])),
+    ),
+  );
+
+  const extraActualInternal = _.differenceBy(actualInternalTextDocuments, expectedTextDocuments, 'uri');
+  const missingActualInternal = _.differenceBy(expectedTextDocuments, actualInternalTextDocuments, 'uri');
+  const diffContentInternal = _.compact(
+    _.map(expectedTextDocuments, expected =>
+      getDiff(expected, _.find(actualInternalTextDocuments, ['uri', expected.uri])),
+    ),
+  );
+  const diffDirtyInternal = _.compact(
+    _.map(expectedTextDocuments, expected =>
+      getDiffDirty(expected, _.find(actualInternalTextDocuments, ['uri', expected.uri])),
+    ),
+  );
+
+  const errors = [];
+
+  if (missingActualVsc.length > 0) {
+    errors.push(`missing text documents in vscode: ${missingActualVsc.map(x => x.uri).join(', ')}`);
+  }
+  if (dirtyExtraActualVsc.length > 0) {
+    errors.push(`extra text documents in vscode: ${dirtyExtraActualVsc.map(x => x.uri).join(', ')}`);
+  }
+  if (diffContentVsc.length > 0) {
+    errors.push(`unexpected text document content in vscode: ${JSON.stringify(diffContentVsc, null, 2)}`);
+  }
+  if (diffDirtyVsc.length > 0) {
+    errors.push(`different text document dirty state in vscode: ${JSON.stringify(diffDirtyVsc, null, 2)}`);
+  }
+
+  if (missingActualInternal.length > 0) {
+    errors.push(`missing text documents in internal: ${missingActualInternal.map(x => x.uri).join(', ')}`);
+  }
+  if (extraActualInternal.length > 0) {
+    errors.push(`extra text documents in internal: ${extraActualInternal.map(x => x.uri).join(', ')}`);
+  }
+  if (diffContentInternal.length > 0) {
+    errors.push(`unexpected text document content in internal: ${JSON.stringify(diffContentInternal, null, 2)}`);
+  }
+  if (diffDirtyInternal.length > 0) {
+    errors.push(`different text document dirty state in internal: ${JSON.stringify(diffDirtyInternal, null, 2)}`);
+  }
+
+  assert.ok(errors.length === 0, `At ${label}: found ${errors.length} errors: ${errors.join('\n\n')}`);
 }
 
-function readAvailableClocks(sessionHandle: string): number[] {
-  return fs
-    .readdirSync(path.resolve(projectPath, 'test_data/sessions', sessionHandle), 'utf8')
-    .map(x => x.match(/^clock_(\d+)$/)?.[1])
-    .filter(Boolean)
-    .map(Number);
+async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: string, label: string, meta: t.TestMeta) {
+  // Compare text editors' selections and visibleRange against internal
+  // Compare text editors' selections and visibleRange against vscode
+
+  const originalActiveTextEditor = vscode.window.activeTextEditor;
+
+  const vscWorkspace = getCodeMic().session!.rr!._test_vscWorkspace;
+  const actualVscTextEditors: t.TestMetaTextEditor[] = await Promise.all(
+    vscWorkspace.getRelevantTabVscUris().map(async vscUri => {
+      const vscTextEditor = await vscWorkspace.showTextDocumentByVscUri(vscUri);
+      return {
+        uri: vscWorkspace.uriFromVsc(vscUri),
+        selections: VscWorkspace.fromVscSelections(vscTextEditor.selections),
+        visibleRange: VscWorkspace.fromVscLineRange(vscTextEditor.visibleRanges[0]),
+      };
+    }),
+  );
+  const actualInternalTextEditors: t.TestMetaTextEditor[] =
+    getCodeMic().session!.rr!._test_internalWorkspace.textEditors.map(textEditor => ({
+      uri: textEditor.document.uri,
+      selections: textEditor.selections,
+      visibleRange: textEditor.visibleRange,
+    }));
+
+  function getDiff(expected: t.TestMetaTextEditor, actual: t.TestMetaTextEditor | undefined) {
+    if (
+      expected &&
+      actual &&
+      (!lib.areSelectionsEqual(expected.selections, actual.selections) ||
+        !expected.visibleRange.isEqual(actual.visibleRange))
+    ) {
+      return { uri: expected.uri, expected: _.omit(expected, 'uri'), actual: _.omit(actual, 'uri') };
+    }
+  }
+
+  const extraActualVsc = _.differenceBy(actualVscTextEditors, meta.openTextEditors, 'uri');
+  const missingActualVsc = _.differenceBy(meta.openTextEditors, actualVscTextEditors, 'uri');
+  const diffVsc = _.compact(
+    _.map(meta.openTextEditors, expected => getDiff(expected, _.find(actualVscTextEditors, ['uri', expected.uri]))),
+  );
+
+  const extraActualInternal = _.differenceBy(actualInternalTextEditors, meta.openTextEditors, 'uri');
+  const missingActualInternal = _.differenceBy(meta.openTextEditors, actualInternalTextEditors, 'uri');
+  const diffInternal = _.compact(
+    _.map(meta.openTextEditors, expected =>
+      getDiff(expected, _.find(actualInternalTextEditors, ['uri', expected.uri])),
+    ),
+  );
+
+  const errors = [];
+
+  if (missingActualVsc.length > 0) {
+    errors.push(`missing text editor in vscode: ${missingActualVsc.map(x => x.uri).join(', ')}`);
+  }
+  if (extraActualVsc.length > 0) {
+    errors.push(`extra & dirty text editor in vscode: ${extraActualVsc.map(x => x.uri).join(', ')}`);
+  }
+  if (diffVsc.length > 0) {
+    errors.push(`unexpected text editor state in vscode: ${JSON.stringify(diffVsc, null, 2)}`);
+  }
+
+  if (missingActualInternal.length > 0) {
+    errors.push(`missing text editor in internal: ${missingActualInternal.map(x => x.uri).join(', ')}`);
+  }
+  if (extraActualInternal.length > 0) {
+    errors.push(`extra text editor in internal: ${extraActualInternal.map(x => x.uri).join(', ')}`);
+  }
+  if (diffInternal.length > 0) {
+    errors.push(`unexpected text editor state in internal: ${JSON.stringify(diffInternal, null, 2)}`);
+  }
+
+  // Restore active text editor.
+  if (originalActiveTextEditor) {
+    await vscode.window.showTextDocument(originalActiveTextEditor.document);
+  }
+
+  assert.ok(errors.length === 0, `At ${label}: found ${errors.length} errors: ${errors.join('\n\n')}`);
+}
+
+function readAvailableClockStrs(sessionHandle: string): string[] {
+  return _.compact(
+    fs
+      .readdirSync(path.resolve(projectPath, 'test_data/sessions', sessionHandle), 'utf8')
+      .map(x => x.match(/^clock_([\d\.]+)$/)?.[1]),
+  );
 }
 
 // function checkFilesAgainstExpectations(exp: TestExpectation) {
@@ -159,16 +308,16 @@ function readAvailableClocks(sessionHandle: string): number[] {
 //     const stat = fs.statSync(filepath);
 //     if (stat.isFile()) {
 //       const expPart = exp.parts.find(part => part.type === 'file' && part.path === f) as TestFileExpectation;
-//       assert.ok(expPart, `At ${exp.clock}: file ${f} is not expected to be in the workspace`);
+//       assert.ok(expPart, `At ${exp.label}: file ${f} is not expected to be in the workspace`);
 //       const content = fs.readFileSync(filepath, { encoding: 'utf8' });
-//       assert.strictEqual(content, expPart.content, `At ${exp.clock}: file ${f}'s content does not match expectation`);
+//       assert.strictEqual(content, expPart.content, `At ${exp.label}: file ${f}'s content does not match expectation`);
 //     }
 //   }
 
 //   for (const part of exp.parts) {
 //     if (part.type === 'file') {
 //       const found = workspaceFiles.find(f => part.path === f);
-//       assert.ok(found, `At ${exp.clock}: file ${part.path} was expected but not found in the workspace`);
+//       assert.ok(found, `At ${exp.label}: file ${part.path} was expected but not found in the workspace`);
 //     }
 //   }
 // }
@@ -186,6 +335,9 @@ function getCodeMicExtension(): vscode.Extension<CodeMic> {
 async function prepareForSession(sessionHandle: string) {
   await openCodeMicView();
 
+  // Go to welcome page / refresh welcome page.
+  await vscode.commands.executeCommand('codemic.openHome');
+
   // Delete workspace content
   for (const file of fs.readdirSync(workspacePath)) {
     fs.rmSync(path.resolve(workspacePath, file), { recursive: true });
@@ -197,9 +349,6 @@ async function prepareForSession(sessionHandle: string) {
     path.resolve(workspacePath, '.CodeMic'),
     { recursive: true },
   );
-
-  // Go to welcome page / refresh welcome page.
-  await vscode.commands.executeCommand('codemic.openHome');
 }
 
 // function getWorkspacePath(): string {
@@ -216,4 +365,13 @@ async function openCodeMicView() {
   await vscode.commands.executeCommand('workbench.view.extension.codemic-view-container');
   await vscode.commands.executeCommand('codemic-view.focus');
   assert.ok(getCodeMic().context.webviewProvider.visible);
+}
+
+function getClockStrsSeq(clockStrs: string[]): string[] {
+  let res = clockStrs.slice();
+  for (let i = 0; i < clockStrs.length * 3; i++) {
+    const candidate = _.sample(clockStrs);
+    if (candidate && candidate !== res.at(-1)) res.push(candidate);
+  }
+  return res;
 }

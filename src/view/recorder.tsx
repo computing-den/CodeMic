@@ -1,4 +1,3 @@
-import { produce, type Draft } from 'immer';
 import MediaToolbar, * as MT from './media_toolbar.jsx';
 import React, { forwardRef, Ref, RefObject, useEffect, useRef, useState } from 'react';
 import * as t from '../lib/types.js';
@@ -20,6 +19,7 @@ import path from 'path';
 import { URI } from 'vscode-uri';
 import { PictureInPicture } from './svgs.jsx';
 import Cover from './cover.jsx';
+import config from './config.js';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -432,9 +432,7 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       ? {
           title: 'Pause',
           icon: 'codicon-debug-pause',
-          onClick: async () => {
-            await postMessage({ type: 'recorder/pause' });
-          },
+          onClick: () => postMessage({ type: 'recorder/pause' }),
         }
       : {
           title: 'Play',
@@ -450,6 +448,14 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       // NOTE: change of video src does not trigger an update
       //       but it's ok for now, since state/props change during playback.
       disabled: !guideVideoRef.current?.src,
+    },
+    {
+      title: 'Sync workspace',
+      icon: 'codicon-sync',
+      onClick: () => postMessage({ type: 'recorder/syncWorkspace', clock: selectionClockRange?.start }),
+      // NOTE: change of video src does not trigger an update
+      //       but it's ok for now, since state/props change during playback.
+      disabled: session.playing || session.recording,
     },
   ];
 
@@ -538,7 +544,11 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     await postMessage({ type: 'recorder/redo' });
   }
 
-  const toolbarActions = [
+  async function makeTest() {
+    await postMessage({ type: 'recorder/makeTest' });
+  }
+
+  const toolbarActions = _.compact([
     <Toolbar.Button
       title="Undo"
       icon="fa-solid fa-rotate-left"
@@ -623,7 +633,16 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       }
       onClick={deleteSelection}
     />,
-  ];
+    config.debug && <Toolbar.Separator />,
+    config.debug && (
+      <Toolbar.Button
+        title="Make test"
+        icon="codicon codicon-beaker"
+        disabled={session.playing || session.recording}
+        onClick={makeTest}
+      />
+    ),
+  ]);
 
   return (
     <div id={id} className={className}>

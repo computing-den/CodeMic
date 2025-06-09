@@ -169,6 +169,17 @@ function serializeFocus(focus: t.Focus, uriMap: UriMap): t.FocusCompact {
   };
 }
 
+export function serializeTestMeta(meta: t.TestMeta): t.TestMetaCompact {
+  return {
+    dirtyTextDocuments: meta.dirtyTextDocuments,
+    openTextEditors: meta.openTextEditors.map(e => ({
+      uri: e.uri,
+      selections: e.selections.map(serializeSelection),
+      visibleRange: serializeLineRange(e.visibleRange),
+    })),
+  };
+}
+
 export function deserializeSessionBody(body: any, formatVersion: number): t.SessionBody {
   switch (formatVersion) {
     case 1:
@@ -185,10 +196,10 @@ export function deserializeSessionBodyV1(body: t.BodyFormatV1.SessionBodyCompact
   editorEvents = _.orderBy(editorEvents, 'clock');
   return {
     editorEvents,
-    audioTracks: body.audioTracks,
-    videoTracks: body.videoTracks,
+    audioTracks: body.audioTracks.map(deserializeAudioTrackV1),
+    videoTracks: body.videoTracks.map(deserializeVideoTrackV1),
     defaultEol: body.defaultEol,
-    focusTimeline: body.focusTimeline.map(f => deserializeFocusV1(f)),
+    focusTimeline: body.focusTimeline.map(deserializeFocusV1),
   };
 }
 
@@ -473,5 +484,23 @@ function deserializeFocusV1(focus: t.BodyFormatV1.FocusCompact): t.Focus {
     uri: focus.u,
     number: focus.n,
     text: focus.t,
+  };
+}
+
+function deserializeAudioTrackV1(track: t.BodyFormatV1.AudioTrack): t.AudioTrack {
+  return { ...track, file: deserializeFileV1(track.file) };
+}
+function deserializeVideoTrackV1(track: t.BodyFormatV1.VideoTrack): t.VideoTrack {
+  return { ...track, file: deserializeFileV1(track.file) };
+}
+
+export function deserializeTestMeta(compact: t.TestMetaCompact): t.TestMeta {
+  return {
+    dirtyTextDocuments: compact.dirtyTextDocuments,
+    openTextEditors: compact.openTextEditors.map(e => ({
+      uri: e.uri,
+      selections: e.selections.map(deserializeSelection),
+      visibleRange: deserializeLineRange(e.visibleRange),
+    })),
   };
 }
