@@ -27,7 +27,7 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "${workspaceFolder}/test/test_workspace",
+        "${workspaceFolder}/test_data/test_workspace",
         "--disable-extensions",
         "--extensionDevelopmentPath=${workspaceFolder}",
         "--extensionTestsPath=${workspaceFolder}/dist/test-runner.js"

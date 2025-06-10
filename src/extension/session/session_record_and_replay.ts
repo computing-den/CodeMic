@@ -109,8 +109,8 @@ export default class SessionRecordAndReplay {
     await this.pauseOnError(this.queue.enqueue(this.record.bind(this)));
   }
 
-  async enqueueSeek(clock: number) {
-    await this.pauseOnError(this.queue.enqueue(this.seek.bind(this), clock));
+  async enqueueSeek(clock: number, useStepper?: boolean) {
+    await this.pauseOnError(this.queue.enqueue(this.seek.bind(this), clock, useStepper));
   }
 
   async enqueueSync(clock?: number) {
@@ -155,9 +155,9 @@ export default class SessionRecordAndReplay {
     await this.pauseOnError(this.queue.enqueue(this.update.bind(this, diffMs)));
   }
 
-  private async seek(clock: number) {
+  private async seek(clock: number, useStepper?: boolean) {
     this.clock = Math.min(this.session.head.duration, clock);
-    await this.workspacePlayer.seek(clock);
+    await this.workspacePlayer.seek(clock, useStepper);
     await this.syncMedia({ hard: true });
     this.updateLoop.resetDiff();
   }

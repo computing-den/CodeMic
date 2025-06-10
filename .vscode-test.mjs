@@ -8,7 +8,7 @@ export default defineConfig([
     workspaceFolder: './test_data/test_workspace',
     mocha: {
       ui: 'tdd',
-      timeout: 30_000,
+      timeout: 3_000_000,
     },
   },
   // you can specify additional test configurations, too

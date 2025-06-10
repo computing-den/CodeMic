@@ -488,7 +488,7 @@ class CodeMic {
       }
       case 'recorder/seek': {
         assert(this.session?.isLoaded());
-        await this.session.rr.enqueueSeek(req.clock);
+        await this.session.rr.enqueueSeek(req.clock, req.useStepper);
         await this.updateFrontend();
         return ok;
       }

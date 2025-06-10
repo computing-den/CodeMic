@@ -11,10 +11,18 @@ import { URI } from 'vscode-uri';
 import VscWorkspace from '../extension/session/vsc_workspace.js';
 import { deserializeTestMeta } from '../extension/session/serialization.js';
 import { describe } from 'mocha';
+import config from '../extension/config.js';
+import { pathExists, readJSON, writeJSON } from '../extension/storage.js';
 
 const projectPath = path.resolve(__dirname, '..'); // relative to dist
 const workspacePath = path.resolve(projectPath, 'test_data/test_workspace');
 const testSessionsPath = path.resolve(projectPath, 'test_data/sessions');
+
+type SessionTestStep = {
+  clock: number;
+  clockStr: string;
+  useStepper: boolean;
+};
 
 // Dynamic tests using fs messes up the vscode test extension. It still works but vscode
 // cannot show the list of tests.
@@ -24,9 +32,9 @@ suite('Sessions Test Suite', () => {
 });
 
 async function testSession(sessionHandle: string) {
-  const head = JSON.parse(
-    fs.readFileSync(path.resolve(projectPath, 'test_data/sessions', sessionHandle, 'CodeMic', 'head.json'), 'utf8'),
-  );
+  const sessionTestDataPath = path.resolve(testSessionsPath, sessionHandle);
+  const lastPlanPath = path.resolve(sessionTestDataPath, 'session_test_last_plan.json');
+  const head = JSON.parse(fs.readFileSync(path.resolve(sessionTestDataPath, 'CodeMic', 'head.json'), 'utf8'));
 
   await prepareForSession(sessionHandle);
 
@@ -35,17 +43,26 @@ async function testSession(sessionHandle: string) {
   assert.strictEqual(getCodeMic().recorder?.tabId, 'editor-view');
 
   const clockStrs = readAvailableClockStrs(sessionHandle);
-  const clockStrsSeq = getClockStrsSeq(clockStrs);
-  console.log('clock sequence: ', clockStrsSeq.join(' -> '));
-  for (const [i, clockStr] of clockStrsSeq.entries()) {
-    const label = clockStrsSeq.slice(0, i + 1).join(' -> ');
+  let steps: SessionTestStep[];
+  if (config.testWithLastParams && (await pathExists(lastPlanPath))) {
+    steps = await readJSON(lastPlanPath);
+    console.log('Reusing test plan: ', steps.map(sessionTestStepToString).join(' -> '));
+  } else {
+    steps = getSessionTestSteps(clockStrs);
+    await writeJSON(lastPlanPath, steps);
+    console.log('New test plan: ', steps.map(sessionTestStepToString).join(' -> '));
+  }
+
+  for (const [i, step] of steps.entries()) {
+    const label = steps
+      .slice(0, i + 1)
+      .map(sessionTestStepToString)
+      .join(' -> ');
 
     // Seek if necessary.
-    if (Number(clockStr) !== getCodeMic().session!.rr!.clock) {
-      await getCodeMic().handleMessage({ type: 'recorder/seek', clock: Number(clockStr) });
-    }
+    await getCodeMic().handleMessage({ type: 'recorder/seek', clock: step.clock, useStepper: step.useStepper });
 
-    const testClockPath = path.resolve(projectPath, 'test_data/sessions', sessionHandle, `clock_${clockStr}`);
+    const testClockPath = path.resolve(sessionTestDataPath, `clock_${step.clockStr}`);
     const meta = deserializeTestMeta(JSON.parse(fs.readFileSync(path.resolve(testClockPath, 'meta.json'), 'utf8')));
 
     // Check files and open text documents.
@@ -81,7 +98,7 @@ function checkFilesAtClock(testClockPath: string, sessionHandle: string, label: 
     if (expectedStat.isFile()) {
       const expectedContent = fs.readFileSync(path.resolve(expectedFilesPath, file), 'utf8');
       const actualContent = fs.readFileSync(path.resolve(workspacePath, file), 'utf8');
-      assert.strictEqual(actualContent, expectedContent, `At ${label}: found unexpected content in file ${file}`);
+      assert.strictEqual(actualContent, expectedContent, `At ${label}: foundf unexpected content in file ${file}`);
     } else if (expectedStat.isDirectory()) {
       assert.ok(
         fs.statSync(path.resolve(workspacePath, file)).isDirectory(),
@@ -185,32 +202,32 @@ function checkTextDocumentsAtClock(testClockPath: string, sessionHandle: string,
   const errors = [];
 
   if (missingActualVsc.length > 0) {
-    errors.push(`missing text documents in vscode: ${missingActualVsc.map(x => x.uri).join(', ')}`);
+    errors.push(`missing text document(s) in vscode: ${missingActualVsc.map(x => x.uri).join(', ')}`);
   }
   if (dirtyExtraActualVsc.length > 0) {
-    errors.push(`extra text documents in vscode: ${dirtyExtraActualVsc.map(x => x.uri).join(', ')}`);
+    errors.push(`extra text document(s) in vscode: ${dirtyExtraActualVsc.map(x => x.uri).join(', ')}`);
   }
   if (diffContentVsc.length > 0) {
-    errors.push(`unexpected text document content in vscode: ${JSON.stringify(diffContentVsc, null, 2)}`);
+    errors.push(`unexpected text document content(s) in vscode: ${JSON.stringify(diffContentVsc, null, 2)}`);
   }
   if (diffDirtyVsc.length > 0) {
-    errors.push(`different text document dirty state in vscode: ${JSON.stringify(diffDirtyVsc, null, 2)}`);
+    errors.push(`different text document dirty state(s) in vscode: ${JSON.stringify(diffDirtyVsc, null, 2)}`);
   }
 
   if (missingActualInternal.length > 0) {
-    errors.push(`missing text documents in internal: ${missingActualInternal.map(x => x.uri).join(', ')}`);
+    errors.push(`missing text document(s) in internal: ${missingActualInternal.map(x => x.uri).join(', ')}`);
   }
   if (extraActualInternal.length > 0) {
-    errors.push(`extra text documents in internal: ${extraActualInternal.map(x => x.uri).join(', ')}`);
+    errors.push(`extra text document(s) in internal: ${extraActualInternal.map(x => x.uri).join(', ')}`);
   }
   if (diffContentInternal.length > 0) {
-    errors.push(`unexpected text document content in internal: ${JSON.stringify(diffContentInternal, null, 2)}`);
+    errors.push(`unexpected text document content(s) in internal: ${JSON.stringify(diffContentInternal, null, 2)}`);
   }
   if (diffDirtyInternal.length > 0) {
-    errors.push(`different text document dirty state in internal: ${JSON.stringify(diffDirtyInternal, null, 2)}`);
+    errors.push(`different text document dirty state(s) in internal: ${JSON.stringify(diffDirtyInternal, null, 2)}`);
   }
 
-  assert.ok(errors.length === 0, `At ${label}: found ${errors.length} errors: ${errors.join('\n\n')}`);
+  assert.ok(errors.length === 0, `At ${label}: found ${errors.length} error(s): ${errors.join('\n\n')}`);
 }
 
 async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: string, label: string, meta: t.TestMeta) {
@@ -265,23 +282,23 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
   const errors = [];
 
   if (missingActualVsc.length > 0) {
-    errors.push(`missing text editor in vscode: ${missingActualVsc.map(x => x.uri).join(', ')}`);
+    errors.push(`missing text editor(s) in vscode: ${missingActualVsc.map(x => x.uri).join(', ')}`);
   }
   if (extraActualVsc.length > 0) {
-    errors.push(`extra & dirty text editor in vscode: ${extraActualVsc.map(x => x.uri).join(', ')}`);
+    errors.push(`extra text editor(s) in vscode: ${extraActualVsc.map(x => x.uri).join(', ')}`);
   }
   if (diffVsc.length > 0) {
-    errors.push(`unexpected text editor state in vscode: ${JSON.stringify(diffVsc, null, 2)}`);
+    errors.push(`unexpected text editor state(s) in vscode: ${JSON.stringify(diffVsc, null, 2)}`);
   }
 
   if (missingActualInternal.length > 0) {
-    errors.push(`missing text editor in internal: ${missingActualInternal.map(x => x.uri).join(', ')}`);
+    errors.push(`missing text editor(s) in internal: ${missingActualInternal.map(x => x.uri).join(', ')}`);
   }
   if (extraActualInternal.length > 0) {
-    errors.push(`extra text editor in internal: ${extraActualInternal.map(x => x.uri).join(', ')}`);
+    errors.push(`extra text editor(s) in internal: ${extraActualInternal.map(x => x.uri).join(', ')}`);
   }
   if (diffInternal.length > 0) {
-    errors.push(`unexpected text editor state in internal: ${JSON.stringify(diffInternal, null, 2)}`);
+    errors.push(`unexpected text editor state(s) in internal: ${JSON.stringify(diffInternal, null, 2)}`);
   }
 
   // Restore active text editor.
@@ -289,7 +306,7 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
     await vscode.window.showTextDocument(originalActiveTextEditor.document);
   }
 
-  assert.ok(errors.length === 0, `At ${label}: found ${errors.length} errors: ${errors.join('\n\n')}`);
+  assert.ok(errors.length === 0, `At ${label}: found ${errors.length} error(s): ${errors.join('\n\n')}`);
 }
 
 function readAvailableClockStrs(sessionHandle: string): string[] {
@@ -367,11 +384,16 @@ async function openCodeMicView() {
   assert.ok(getCodeMic().context.webviewProvider.visible);
 }
 
-function getClockStrsSeq(clockStrs: string[]): string[] {
-  let res = clockStrs.slice();
-  for (let i = 0; i < clockStrs.length * 3; i++) {
+function getSessionTestSteps(clockStrs: string[]): SessionTestStep[] {
+  let resClockStrs = _.orderBy(clockStrs, Number);
+  for (let i = 0; i < clockStrs.length * 5; i++) {
     const candidate = _.sample(clockStrs);
-    if (candidate && candidate !== res.at(-1)) res.push(candidate);
+    if (candidate && candidate !== resClockStrs.at(-1)) resClockStrs.push(candidate);
   }
-  return res;
+
+  return resClockStrs.map(clockStr => ({ clockStr, clock: Number(clockStr), useStepper: _.sample([true, false]) }));
+}
+
+function sessionTestStepToString(step: SessionTestStep): string {
+  return (step.useStepper ? 'step:' : 'sync:') + step.clockStr;
 }

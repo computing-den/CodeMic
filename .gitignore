@@ -10,4 +10,6 @@
 #*
 *.vsix
 /test_data/test_workspace
+/test_data/test_workspace
 .vscode-test
+session_test_last_plan.json

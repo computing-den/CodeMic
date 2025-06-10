@@ -57,12 +57,12 @@ class WorkspacePlayer {
     this.dispose();
   }
 
-  async seek(clock: number) {
-    await this.seekWithData(this.internalWorkspace.getSeekData(clock));
+  async seek(clock: number, useStepper?: boolean) {
+    await this.seekWithData(this.internalWorkspace.getSeekData(clock), useStepper);
   }
 
-  async seekWithData(seekData: SeekData) {
-    if (seekData.steps.length > STEP_COUNT_THRESHOLD) {
+  async seekWithData(seekData: SeekData, useStepper?: boolean) {
+    if (seekData.steps.length > STEP_COUNT_THRESHOLD && useStepper !== true) {
       if (config.logTrackPlayerUpdateStep) {
         console.log('updateImmediately: applying wholesale', seekData);
       }

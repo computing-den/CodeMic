@@ -19,10 +19,7 @@ import InternalTextDocument from './internal_text_document.js';
  * whose file is of type empty.
  */
 type LiveWorktree = Map<string, LiveWorktreeItem>;
-type LiveWorktreeItem = LiveWorktreeItemExistingWithDocument | LiveWorktreeItemExistingWithoutDocument;
-
-type LiveWorktreeItemExistingWithDocument = { file: t.File; document: t.InternalDocument; editor?: t.InternalEditor };
-type LiveWorktreeItemExistingWithoutDocument = { file: t.File; document: undefined; editor: undefined };
+type LiveWorktreeItem = { file: t.File; document?: t.InternalDocument; editor?: t.InternalEditor };
 
 export type SeekStep = { event: t.EditorEvent; index: number };
 export type SeekData = { steps: SeekStep[]; direction: t.Direction };
@@ -209,21 +206,18 @@ export default class InternalWorkspace {
   // }
 
   deleteFileByUri(uri: string) {
-    const item = this.worktree.get(uri);
-    assert(item);
-    this.textDocuments = this.textDocuments.filter(x => x.uri !== uri);
-    this.textEditors = this.textEditors.filter(x => x.document.uri !== uri);
-    if (this.activeTextEditor?.document.uri === uri) {
-      this.activeTextEditor = undefined;
-    }
+    this.closeTextDocumentByUri(uri);
     this.worktree.delete(uri);
   }
 
   closeTextDocumentByUri(uri: string) {
-    this.textDocuments = this.textDocuments.filter(x => x.uri !== uri);
-    this.textEditors = this.textEditors.filter(x => x.document.uri !== uri);
-    if (this.activeTextEditor?.document.uri === uri) {
-      this.activeTextEditor = undefined;
+    const item = this.worktree.get(uri);
+    assert(item, `Cannot close text document ${uri}. It does not exist in worktree.`);
+
+    this.closeTextEditorByUri(uri);
+    if (item.document) {
+      this.textDocuments = this.textDocuments.filter(x => x !== item.document);
+      item.document = undefined;
     }
   }
 
@@ -237,12 +231,14 @@ export default class InternalWorkspace {
 
   closeTextEditorByUri(uri: string) {
     const item = this.worktree.get(uri);
-    if (item?.editor) {
+    assert(item, `Cannot close text editor ${uri}. It does not exist in worktree.`);
+
+    if (item.editor) {
+      this.textEditors = this.textEditors.filter(x => x !== item.editor);
+      if (this.activeTextEditor === item.editor) {
+        this.activeTextEditor = undefined;
+      }
       item.editor = undefined;
-      this.textEditors = this.textEditors.filter(x => x.document.uri !== uri);
-    }
-    if (this.activeTextEditor?.document.uri === uri) {
-      this.activeTextEditor = undefined;
     }
   }
 

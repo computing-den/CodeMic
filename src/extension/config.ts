@@ -13,6 +13,7 @@ export type Config = {
   logTrackPlayerUpdateStep: boolean;
   logMasterAndTracksTimeUpdates: boolean;
   exportFullBody?: boolean;
+  testWithLastParams?: boolean;
   debug: boolean;
 };
 
