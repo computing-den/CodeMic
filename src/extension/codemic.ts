@@ -337,16 +337,25 @@ class CodeMic {
         const session = Session.Core.fromListing(this.context, listing);
 
         const cancel = 'Cancel';
-        const del = 'Delete';
+        const deleteHistory = 'Delete history';
+        const deleteAll = 'Delete history & data';
         const answer = await vscode.window.showWarningMessage(
           `Are you sure you want to delete session ${session.head.handle}?`,
           { modal: true, detail: `${session.workspace} will be deleted.` },
           { title: cancel, isCloseAffordance: true },
-          { title: del },
+          { title: deleteHistory },
+          { title: deleteAll },
         );
 
-        if (answer?.title === del) {
-          await session.core.delete();
+        if (answer?.title === deleteHistory) {
+          await session.core.deleteHistory();
+        }
+        if (answer?.title === deleteAll) {
+          await session.core.deleteWorkspace();
+          await session.core.deleteHistory();
+        }
+
+        if (answer?.title === deleteHistory || answer?.title === deleteAll) {
           this.welcome.sessions = this.welcome.sessions.filter(s => s.head.id !== req.sessionId);
         }
         await this.updateFrontend();

@@ -253,10 +253,13 @@ export default class SessionCore {
       // Delete the old session.
       try {
         const old = await Session.Core.readLocal(this.session.context, this.session.workspace);
-        if (old) await old.core.delete();
+        if (old) {
+          await old.core.deleteDataPath();
+          await old.core.deleteHistory();
+        }
       } catch (error) {
         // If opening the session failed for any reason, force delete it.
-        // This won't delete its history though.
+        // This won't delete its history though because we don't know its id.
         await fs.promises.rm(this.finalDataPath, { force: true, recursive: true });
         console.error(error);
       }
@@ -440,10 +443,14 @@ export default class SessionCore {
     await fs.promises.cp(path.join(this.dataPath, 'blobs', sha1), dst, { force: true, recursive: true });
   }
 
-  async delete() {
-    assert(!this.session.temp, 'Tried to delete a temp session.');
+  async deleteWorkspace() {
     await fs.promises.rm(this.session.workspace, { force: true, recursive: true });
     await this.deleteHistory();
+  }
+
+  async deleteDataPath() {
+    assert(!this.session.temp, 'Tried to delete a temp session.');
+    await fs.promises.rm(this.dataPath, { force: true, recursive: true });
   }
 
   async packageBody() {

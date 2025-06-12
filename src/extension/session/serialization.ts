@@ -177,6 +177,7 @@ export function serializeTestMeta(meta: t.TestMeta): t.TestMetaCompact {
       selections: e.selections.map(serializeSelection),
       visibleRange: serializeLineRange(e.visibleRange),
     })),
+    activeTextEditor: meta.activeTextEditor,
   };
 }
 
@@ -379,8 +380,8 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         uri,
         clock: deserializeClock(e.c),
         preserveFocus: e.p ?? false,
-        selections: e.s?.map(deserializeSelection),
-        visibleRange: e.v && deserializeLineRange(e.v),
+        selections: e.s?.map(deserializeSelection) ?? [new Selection(new Position(0, 0), new Position(0, 0))],
+        visibleRange: (e.v && deserializeLineRange(e.v)) ?? new LineRange(0, 1),
         revUri: e.ru,
         revSelections: e.rs?.map(deserializeSelection),
         revVisibleRange: e.rv && deserializeLineRange(e.rv),
@@ -502,5 +503,6 @@ export function deserializeTestMeta(compact: t.TestMetaCompact): t.TestMeta {
       selections: e.selections.map(deserializeSelection),
       visibleRange: deserializeLineRange(e.visibleRange),
     })),
+    activeTextEditor: compact.activeTextEditor,
   };
 }

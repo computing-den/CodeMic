@@ -9,6 +9,8 @@ import _ from 'lodash';
 import { LoadedSession } from './session.js';
 import VscWorkspace from './vsc_workspace.js';
 import { URI } from 'vscode-uri';
+import { pathExists } from '../storage.js';
+import config from '../config.js';
 
 class VscWorkspaceStepper implements t.WorkspaceStepper {
   constructor(private session: LoadedSession, private vscWorkspace: VscWorkspace) {}
@@ -105,7 +107,14 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
 
       // If file doesn't exist, create it and open it and we're done.
       // vscode.workspace.openTextDocument() will throw if file doesn't exist.
+      // Technically, file must always exist because there should always be
+      // a fsCreate before openTextDocument. But, v1 did not have that.
       if (!vscTextDocument && vscUri.scheme === 'file') {
+        const fsPath = URI.parse(this.session.core.resolveUri(e.uri)).fsPath;
+        if (config.debug && !(await pathExists(fsPath))) {
+          throw new Error(`Trying to open document but file does not exist at ${fsPath}`);
+        }
+
         await this.session.core.writeTextFileIfNotExists(e.uri, e.text || '');
         await this.vscWorkspace.openTextDocumentByUri(e.uri);
         return;

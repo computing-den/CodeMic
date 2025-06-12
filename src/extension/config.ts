@@ -14,6 +14,8 @@ export type Config = {
   logMasterAndTracksTimeUpdates: boolean;
   exportFullBody?: boolean;
   testWithLastParams?: boolean;
+  testRepeatCount?: number;
+  testComplexityMultiplier?: number;
   debug: boolean;
 };
 

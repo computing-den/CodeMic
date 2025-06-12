@@ -759,7 +759,7 @@ class WorkspaceRecorder {
     let irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
 
     if (vscTextDocument.uri.scheme !== 'untitled') {
-      assert(irExists, `${uri} was opened in VSCode but not found internally`);
+      assert(irExists, `Document ${uri} was opened in VSCode but its file was not found internally`);
     }
 
     if (!irTextDocument) {

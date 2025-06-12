@@ -35,23 +35,29 @@ async function testSession(sessionHandle: string) {
   const sessionTestDataPath = path.resolve(testSessionsPath, sessionHandle);
   const lastPlanPath = path.resolve(sessionTestDataPath, 'session_test_last_plan.json');
   const head = JSON.parse(fs.readFileSync(path.resolve(sessionTestDataPath, 'CodeMic', 'head.json'), 'utf8'));
-
-  await prepareForSession(sessionHandle);
-
-  await getCodeMic().handleMessage({ type: 'welcome/openSessionInRecorder', sessionId: head.id });
-  assert.strictEqual(getCodeMic().session?.head.id, head.id);
-  assert.strictEqual(getCodeMic().recorder?.tabId, 'editor-view');
-
   const clockStrs = readAvailableClockStrs(sessionHandle);
-  let steps: SessionTestStep[];
   if (config.testWithLastParams && (await pathExists(lastPlanPath))) {
-    steps = await readJSON(lastPlanPath);
+    const steps: SessionTestStep[] = await readJSON(lastPlanPath);
     console.log('Reusing test plan: ', steps.map(sessionTestStepToString).join(' -> '));
+
+    await prepareForSession(sessionHandle);
+    await openSessionInRecorder(head.id);
+    await testSessionSteps(sessionHandle, steps);
   } else {
-    steps = getSessionTestSteps(clockStrs);
-    await writeJSON(lastPlanPath, steps);
-    console.log('New test plan: ', steps.map(sessionTestStepToString).join(' -> '));
+    for (let i = 0; i < (config.testRepeatCount ?? 1); i++) {
+      const steps = createRandomSessionTestSteps(clockStrs);
+      await writeJSON(lastPlanPath, steps);
+      console.log(`#${i + 1} New test plan: ${steps.map(sessionTestStepToString).join(' -> ')}`);
+
+      await prepareForSession(sessionHandle);
+      await openSessionInRecorder(head.id);
+      await testSessionSteps(sessionHandle, steps);
+    }
   }
+}
+
+async function testSessionSteps(sessionHandle: string, steps: SessionTestStep[]) {
+  const sessionTestDataPath = path.resolve(testSessionsPath, sessionHandle);
 
   for (const [i, step] of steps.entries()) {
     const label = steps
@@ -227,7 +233,7 @@ function checkTextDocumentsAtClock(testClockPath: string, sessionHandle: string,
     errors.push(`different text document dirty state(s) in internal: ${JSON.stringify(diffDirtyInternal, null, 2)}`);
   }
 
-  assert.ok(errors.length === 0, `At ${label}: found ${errors.length} error(s): ${errors.join('\n\n')}`);
+  assert.ok(errors.length === 0, `At ${label}: found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
 }
 
 async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: string, label: string, meta: t.TestMeta) {
@@ -236,6 +242,7 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
 
   const originalActiveTextEditor = vscode.window.activeTextEditor;
 
+  const internalWorkspace = getCodeMic().session!.rr!._test_internalWorkspace;
   const vscWorkspace = getCodeMic().session!.rr!._test_vscWorkspace;
   const actualVscTextEditors: t.TestMetaTextEditor[] = await Promise.all(
     vscWorkspace.getRelevantTabVscUris().map(async vscUri => {
@@ -247,12 +254,11 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
       };
     }),
   );
-  const actualInternalTextEditors: t.TestMetaTextEditor[] =
-    getCodeMic().session!.rr!._test_internalWorkspace.textEditors.map(textEditor => ({
-      uri: textEditor.document.uri,
-      selections: textEditor.selections,
-      visibleRange: textEditor.visibleRange,
-    }));
+  const actualInternalTextEditors: t.TestMetaTextEditor[] = internalWorkspace.textEditors.map(textEditor => ({
+    uri: textEditor.document.uri,
+    selections: textEditor.selections,
+    visibleRange: textEditor.visibleRange,
+  }));
 
   function getDiff(expected: t.TestMetaTextEditor, actual: t.TestMetaTextEditor | undefined) {
     if (
@@ -301,12 +307,26 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
     errors.push(`unexpected text editor state(s) in internal: ${JSON.stringify(diffInternal, null, 2)}`);
   }
 
+  if (meta.activeTextEditor !== internalWorkspace.activeTextEditor?.document.uri) {
+    errors.push(
+      `unexpected internal active text editor: expected ${meta.activeTextEditor}, actual: ${internalWorkspace.activeTextEditor?.document.uri}`,
+    );
+  }
+
+  const vscActiveTextEditorUri =
+    originalActiveTextEditor && vscWorkspace.uriFromVsc(originalActiveTextEditor.document.uri);
+  if (meta.activeTextEditor !== vscActiveTextEditorUri) {
+    errors.push(
+      `unexpected vscode active text editor: expected ${meta.activeTextEditor}, actual: ${vscActiveTextEditorUri}`,
+    );
+  }
+
   // Restore active text editor.
   if (originalActiveTextEditor) {
     await vscode.window.showTextDocument(originalActiveTextEditor.document);
   }
 
-  assert.ok(errors.length === 0, `At ${label}: found ${errors.length} error(s): ${errors.join('\n\n')}`);
+  assert.ok(errors.length === 0, `At ${label}: found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
 }
 
 function readAvailableClockStrs(sessionHandle: string): string[] {
@@ -368,6 +388,12 @@ async function prepareForSession(sessionHandle: string) {
   );
 }
 
+async function openSessionInRecorder(id: string) {
+  await getCodeMic().handleMessage({ type: 'welcome/openSessionInRecorder', sessionId: id });
+  assert.strictEqual(getCodeMic().session?.head.id, id);
+  assert.strictEqual(getCodeMic().recorder?.tabId, 'editor-view');
+}
+
 // function getWorkspacePath(): string {
 //   const workspacePath = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
 //   assert.ok(workspacePath, 'workspace not set');
@@ -384,9 +410,9 @@ async function openCodeMicView() {
   assert.ok(getCodeMic().context.webviewProvider.visible);
 }
 
-function getSessionTestSteps(clockStrs: string[]): SessionTestStep[] {
+function createRandomSessionTestSteps(clockStrs: string[]): SessionTestStep[] {
   let resClockStrs = _.orderBy(clockStrs, Number);
-  for (let i = 0; i < clockStrs.length * 5; i++) {
+  for (let i = 0; i < clockStrs.length * (config.testComplexityMultiplier ?? 1); i++) {
     const candidate = _.sample(clockStrs);
     if (candidate && candidate !== resClockStrs.at(-1)) resClockStrs.push(candidate);
   }

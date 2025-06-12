@@ -559,8 +559,8 @@ export type ShowTextEditorEvent = {
   uri: string;
   clock: number;
   preserveFocus: boolean;
-  selections?: Selection[];
-  visibleRange?: LineRange;
+  selections: Selection[];
+  visibleRange: LineRange;
   revUri?: string;
   revSelections?: Selection[];
   revVisibleRange?: LineRange;
@@ -666,8 +666,8 @@ export type ShowTextEditorEventCompact = {
   u: number;
   c: number;
   p?: boolean; // undefined defaults to false
-  s?: SelectionCompact[];
-  v?: LineRangeCompact;
+  s: SelectionCompact[];
+  v: LineRangeCompact;
   ru?: string;
   rs?: SelectionCompact[];
   rv?: LineRangeCompact;
@@ -893,6 +893,7 @@ export type OSPaths = {
 export type TestMeta = {
   dirtyTextDocuments: string[];
   openTextEditors: TestMetaTextEditor[];
+  activeTextEditor?: string;
 };
 
 export type TestMetaTextEditor = {
@@ -904,6 +905,7 @@ export type TestMetaTextEditor = {
 export type TestMetaCompact = {
   dirtyTextDocuments: string[];
   openTextEditors: TestMetaTextEditorCompact[];
+  activeTextEditor?: string;
 };
 
 export type TestMetaTextEditorCompact = {

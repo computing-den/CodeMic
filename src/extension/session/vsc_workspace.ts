@@ -161,15 +161,9 @@ export default class VscWorkspace {
     assert(this.session.mustScan, 'Session is not meant for scan.');
     assert(this.session.body.editorEvents.length === 0, 'Scanning a non-empty session.');
     const events: t.EditorEvent[] = [];
-
-    // for (const vscTextDocument of vscode.workspace.textDocuments) {
-    //   if (vscTextDocument.dirty) {
-    //     throw new Error('Checkpoint.fromWorkspace: there are unsaved files in the current workspace.');
-    //   }
-    // }
+    await this.rehydrateRelevantTextDocuments();
 
     // Scan the workspace directory (files and dirs) and create store events.
-    // TODO: ignore files in .codemicignore
     const pathsWithStats = await this.session.core.readDirRecursively({ includeFiles: true, includeDirs: true });
     for (const [p, stat] of pathsWithStats) {
       const uri = lib.workspaceUri(p);
@@ -208,6 +202,7 @@ export default class VscWorkspace {
     }
 
     // Walk through text documents and create openTextDocument events.
+    // If document is dirty, insert text as well.
     // Ignore files outside workspace or with schemes other than untitled or file.
     // Ignore deleted files.
     for (const vscTextDocument of vscode.workspace.textDocuments) {
@@ -224,6 +219,7 @@ export default class VscWorkspace {
         id: lib.nextId(),
         uri: this.uriFromVsc(vscTextDocument.uri),
         clock: 0,
+        text: vscTextDocument.isDirty ? vscTextDocument.getText() : undefined,
         eol: VscWorkspace.eolFromVsc(vscTextDocument.eol),
         // isInWorktree: false,
       });
@@ -231,22 +227,21 @@ export default class VscWorkspace {
 
     // Walk through open tabs and create showTextEditor events.
     // Ignore anything for which we don't have an openTextDocument event.
-    for (const tab of this.getTabsWithInputText()) {
-      // Ignore files outside workspace or with schemes other than untitled or file.
-      if (!this.shouldRecordVscUri(tab.input.uri)) continue;
+    const originalActiveTextEditor = vscode.window.activeTextEditor;
+    for (const vscUri of this.getRelevantTabVscUris()) {
+      const uri = this.uriFromVsc(vscUri);
 
       // Ignore if we don't have an openTextDocument event.
-      const uri = this.uriFromVsc(tab.input.uri);
+      // This should't really happen.
       if (!events.some(e => e.uri === uri && e.type === 'openTextDocument')) continue;
 
       // Create showTextEditor event.
-      // vscode.window.visibleTextEditors does not include tabs that exist but are not currently open.
-      // Basically, it only includes the visible panes.
-      const vscTextEditor = this.findVscTextEditorByVscUri(vscode.window.visibleTextEditors, tab.input.uri);
-      const selections = vscTextEditor && VscWorkspace.fromVscSelections(vscTextEditor.selections);
-      const visibleRange = vscTextEditor && VscWorkspace.fromVscLineRange(vscTextEditor.visibleRanges[0]);
-      const activeVscUri = vscode.window.activeTextEditor?.document.uri;
-      const isActiveEditor = activeVscUri?.toString() === tab.input.uri.toString();
+      // vscode.window.visibleTextEditors only includes the visible panes. So, we have to open the text editor
+      // first and then we can read its selections and visible ranges.
+      const vscTextEditor = await this.showTextDocumentByVscUri(vscUri);
+      const selections = VscWorkspace.fromVscSelections(vscTextEditor.selections);
+      const visibleRange = VscWorkspace.fromVscLineRange(vscTextEditor.visibleRanges[0]);
+      const isActiveEditor = originalActiveTextEditor?.document.uri.toString() === vscUri.toString();
       events.push({
         type: 'showTextEditor',
         id: lib.nextId(),
@@ -256,6 +251,11 @@ export default class VscWorkspace {
         selections,
         visibleRange,
       });
+    }
+
+    // Restore active text editor.
+    if (originalActiveTextEditor) {
+      await vscode.window.showTextDocument(originalActiveTextEditor.document);
     }
 
     return events;
@@ -465,7 +465,7 @@ export default class VscWorkspace {
   }
 
   async revertVscTextDocument(vscTextDocument: vscode.TextDocument) {
-    vscode.window.showTextDocument(vscTextDocument, { preview: false, viewColumn: vscode.ViewColumn.One });
+    await vscode.window.showTextDocument(vscTextDocument, { preview: false, viewColumn: vscode.ViewColumn.One });
     // await vscode.commands.executeCommand('vscode.open', vscTextDocument.uri);
     await vscode.commands.executeCommand('workbench.action.files.revert');
   }
@@ -522,32 +522,41 @@ export default class VscWorkspace {
    * The problem is that when we do something like =vscode.workspace.openTextDocument('untitled:Untitled-1')= it
    * creates a document with associated resource, a document with a path that will be saved to file =./Untitled-1=
    * even if its content is empty.
-   * If instead we use =await vscode.commands.executeCommand('workbench.action.files.newUntitledFile')= we get an
-   * untitled file without an associated resource which will not prompt to save when the content is empty.
+   *
+   * If instead we use =vscode.commands.executeCommand('workbench.action.files.newUntitledFile')= or
+   * vscode.workspace.openTextDocument() we get an untitled file without an associated resource which will
+   * not prompt to save when the content is empty.
+   *
    * However, the URI of the new document will be picked by vscode. For example, if Untitled-1 and Untitled-3 are
    * already open, when we open a new untitled file, vscode will name it Untitled-2.
    * So, we must make sure that when opening Untitled-X, every untitled number less than X is already open
    * and then try to open a new file.
+   *
    * Another thing is that just because there is no tab currently with that name, doesn't necessarily mean that
    * there is no document open with that name.
+   *
+   * The opposite is true as well! If vscode was just started (e.g. with F5 during dev) and tabs from the
+   * previous session are opened, the tabs may exist but their documents do not exist yet.
    */
   private async openUntitledVscTextDocumentByVscUri(uri: vscode.Uri): Promise<vscode.TextDocument> {
     if (!/^Untitled-\d+$/.test(uri.path)) {
-      console.error(
-        `openUntitledVscTextDocumentByVscUri: untitled URI with invalid path: ${uri.path}. Opening as file...`,
-      );
-      return await vscode.workspace.openTextDocument(uri);
+      throw new Error(`openUntitledVscTextDocumentByVscUri: untitled URI with invalid path: ${uri.path}.`);
     }
 
-    // Gather all the untitled names.
-    const untitledNames: string[] = vscode.workspace.textDocuments.map(d => d.uri.path);
+    // Check if the tab exists we can reuse its URI to open the text document.
+    const tab = this.getTabsWithInputText().find(tab => tab.input.uri.toString() === uri.toString());
+    if (tab) return vscode.workspace.openTextDocument(tab.input.uri);
 
-    // console.log('XXX untitled names: ', untitledNames.join(', '));
+    // Gather all the untitled names.
+    const openTextDocumentsPaths: string[] = vscode.workspace.textDocuments.map(d => d.uri.path);
+
+    // console.log('XXX untitled names: ', openTextDocumentsPaths.join(', '));
     // Open every untitled name up to target name.
     for (let i = 1; i < 100; i++) {
       let name = `Untitled-${i}`;
-      if (!untitledNames.includes(name)) {
-        await vscode.commands.executeCommand('workbench.action.files.newUntitledFile');
+      if (!openTextDocumentsPaths.includes(name)) {
+        await vscode.workspace.openTextDocument();
+        // await vscode.commands.executeCommand('workbench.action.files.newUntitledFile');
       }
       if (uri.path === name) break;
     }
@@ -788,6 +797,8 @@ export default class VscWorkspace {
     const testPath = path.resolve(PROJECT_PATH, 'test_data/sessions', this.session.head.handle);
     const testClockPath = path.resolve(testPath, `clock_${this.session.rr.clock}`);
     const testDataPath = path.resolve(testPath, 'CodeMic');
+    await this.rehydrateRelevantTextDocuments();
+    const relevantVscTextDocuments = vscode.workspace.textDocuments.filter(d => this.shouldRecordVscUri(d.uri));
 
     // Remove existing data path and clock path.
     await fs.promises.rm(testClockPath, { recursive: true, force: true });
@@ -814,40 +825,49 @@ export default class VscWorkspace {
     }
 
     // Write text_documents.
-    await fs.promises.mkdir(path.resolve(testClockPath, 'text_documents'), { recursive: true });
-    for (const internalTextDocument of this.internalWorkspace.textDocuments) {
-      const parsedUri = URI.parse(internalTextDocument.uri);
-      const relPath = parsedUri.fsPath;
-      if (parsedUri.scheme === 'untitled') {
-        assert(/^Untitled-\d+$/.test(relPath));
-      } else if (parsedUri.scheme === 'workspace') {
-        // nothing
-      } else {
-        throw new Error(`Unknown URI scheme ${parsedUri.toString()}`);
+    {
+      const vscTextDocuments = relevantVscTextDocuments.map(d => ({
+        content: d.getText(),
+        uri: this.uriFromVsc(d.uri),
+      }));
+      const internalTextDocuments = this.internalWorkspace.textDocuments.map(d => ({
+        content: d.getText(),
+        uri: d.uri,
+      }));
+
+      // Assert that internal and vscode text documents are the same.
+      // It's ok for vscode to have extra text documents because we cannot explicitly close vscode text documents.
+      const diffInternalTextDocuments = _.differenceWith(internalTextDocuments, vscTextDocuments, _.isEqual);
+      if (!_.isEmpty(diffInternalTextDocuments)) {
+        const diffVscTextDocuments = _.compact(
+          diffInternalTextDocuments.map(d => _.find(vscTextDocuments, ['uri', d.uri])),
+        );
+        throw new Error(
+          `Internal and VSCode text documents are different:\n` +
+            `internal documents diff: ${JSON.stringify(diffInternalTextDocuments, null, 2)}\n` +
+            `vscode documents diff: ${JSON.stringify(diffVscTextDocuments, null, 2)}\n`,
+        );
       }
 
-      const testFilePath = path.resolve(testClockPath, 'text_documents', relPath);
-      await storage.writeString(testFilePath, internalTextDocument.getText());
+      await fs.promises.mkdir(path.resolve(testClockPath, 'text_documents'), { recursive: true });
+      for (const internalTextDocument of this.internalWorkspace.textDocuments) {
+        const parsedUri = URI.parse(internalTextDocument.uri);
+        const relPath = parsedUri.fsPath;
+        if (parsedUri.scheme === 'untitled') {
+          assert(/^Untitled-\d+$/.test(relPath));
+        } else if (parsedUri.scheme === 'workspace') {
+          // nothing
+        } else {
+          throw new Error(`Unknown URI scheme ${parsedUri.toString()}`);
+        }
+
+        const testFilePath = path.resolve(testClockPath, 'text_documents', relPath);
+        await storage.writeString(testFilePath, internalTextDocument.getText());
+      }
     }
-    // for (const vscTextDocument of vscode.workspace.textDocuments) {
-    //   const parsedUri = URI.parse(this.uriFromVsc(vscTextDocument.uri));
-    //   const relPath = parsedUri.fsPath;
-    //   if (parsedUri.scheme === 'untitled') {
-    //     assert(/^Untitled-\d+$/.test(relPath));
-    //   } else if (parsedUri.scheme === 'workspace') {
-    //     // nothing
-    //   } else {
-    //     throw new Error(`Unknown URI scheme ${parsedUri.toString()}`);
-    //   }
 
-    //   const testFilePath = path.resolve(testClockPath, 'text_documents', relPath);
-    //   await storage.writeString(testFilePath, vscTextDocument.getText());
-    // }
-
-    // Write meta.json.
-    // TODO check internal text documents to see if they're the same.
-
-    const dirtyTextDocuments = vscode.workspace.textDocuments.filter(d => d.isDirty).map(d => this.uriFromVsc(d.uri));
+    // Text editors
+    const dirtyTextDocuments = relevantVscTextDocuments.filter(d => d.isDirty).map(d => this.uriFromVsc(d.uri));
     const tabVscUris = this.getRelevantTabVscUris();
     let vscOpenTextEditors: t.TestMetaTextEditor[] = [];
     const originalActiveTextEditor = vscode.window.activeTextEditor;
@@ -859,26 +879,58 @@ export default class VscWorkspace {
     }
     vscOpenTextEditors = _.orderBy(vscOpenTextEditors, 'uri');
 
+    // Assert that internal and vscode text editors are the same.
     let internalOpenTextEditors: t.TestMetaTextEditor[] = this.internalWorkspace.textEditors.map(textEditor => ({
       uri: textEditor.document.uri,
       selections: textEditor.selections,
       visibleRange: textEditor.visibleRange,
     }));
     internalOpenTextEditors = _.orderBy(internalOpenTextEditors, 'uri');
-
     if (!_.isEqual(vscOpenTextEditors, internalOpenTextEditors)) {
+      const diffVsc = _.differenceWith(vscOpenTextEditors, internalOpenTextEditors, _.isEqual);
+      const diffInternal = _.differenceWith(internalOpenTextEditors, vscOpenTextEditors, _.isEqual);
       throw new Error(
         `Internal and VSCode text editors are different:\n` +
-          `internal text editors: ${JSON.stringify(internalOpenTextEditors, null, 2)}\n` +
-          `vscode text editors: ${JSON.stringify(vscOpenTextEditors, null, 2)}\n`,
+          `internal editors diff: ${JSON.stringify(diffInternal, null, 2)}\n` +
+          `vscode editors diff: ${JSON.stringify(diffVsc, null, 2)}\n`,
       );
     }
 
-    const meta: t.TestMeta = { dirtyTextDocuments, openTextEditors: vscOpenTextEditors };
-    await storage.writeJSON(path.resolve(testClockPath, 'meta.json'), serializeTestMeta(meta));
-
     // Restore active text editor.
     if (originalActiveTextEditor) {
+      await vscode.window.showTextDocument(originalActiveTextEditor.document);
+    }
+
+    const meta: t.TestMeta = {
+      dirtyTextDocuments,
+      openTextEditors: vscOpenTextEditors,
+      activeTextEditor: originalActiveTextEditor && this.uriFromVsc(originalActiveTextEditor.document.uri),
+    };
+    await storage.writeJSON(path.resolve(testClockPath, 'meta.json'), serializeTestMeta(meta));
+  }
+
+  /**
+   * If vscode was just started (e.g. with F5 during dev) and tabs from the
+   * previous session are opened, the tabs may exist but their documents do not exist yet.
+   * We can rehydrate them by visiting such tabs so that we can then use
+   * vscode.workspace.textDocuments
+   */
+  private async rehydrateRelevantTextDocuments() {
+    const tabUris = this.getRelevantTabVscUris();
+    const textDocumentUris = vscode.workspace.textDocuments.map(d => d.uri);
+    const missingTextDocumentUris = _.differenceWith(
+      tabUris,
+      textDocumentUris,
+      (a, b) => a.toString() === b.toString(),
+    );
+    const originalActiveTextEditor = vscode.window.activeTextEditor;
+
+    for (const uri of missingTextDocumentUris) {
+      await vscode.window.showTextDocument(uri);
+    }
+
+    // Restore active text editor.
+    if (!_.isEmpty(missingTextDocumentUris) && originalActiveTextEditor) {
       await vscode.window.showTextDocument(originalActiveTextEditor.document);
     }
   }
