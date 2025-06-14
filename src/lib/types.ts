@@ -558,13 +558,18 @@ export type ShowTextEditorEvent = {
   id: number;
   uri: string;
   clock: number;
-  preserveFocus: boolean;
+  // preserveFocus: boolean;
   selections: Selection[];
   visibleRange: LineRange;
   revUri?: string;
+
+  // The following are the reverse selection and visible range of the uri, not the revUri
   revSelections?: Selection[];
   revVisibleRange?: LineRange;
-  // revSelections: Selection[];
+
+  // Recorder behavior changed between v1 and v2.
+  // undefined means latest version.
+  recorderVersion?: number;
 };
 
 export type CloseTextEditorEvent = {
@@ -665,12 +670,12 @@ export type ShowTextEditorEventCompact = {
   t: 4;
   u: number;
   c: number;
-  p?: boolean; // undefined defaults to false
   s: SelectionCompact[];
   v: LineRangeCompact;
   ru?: string;
   rs?: SelectionCompact[];
   rv?: LineRangeCompact;
+  rver?: number;
   // revSelections: Selection[];
 };
 

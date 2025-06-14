@@ -11,9 +11,14 @@ import VscWorkspace from './vsc_workspace.js';
 import { URI } from 'vscode-uri';
 import { pathExists } from '../storage.js';
 import config from '../config.js';
+import InternalWorkspace from './internal_workspace.js';
 
 class VscWorkspaceStepper implements t.WorkspaceStepper {
-  constructor(private session: LoadedSession, private vscWorkspace: VscWorkspace) {}
+  constructor(
+    private session: LoadedSession,
+    private internalWorkspace: InternalWorkspace,
+    private vscWorkspace: VscWorkspace,
+  ) {}
 
   async applyEditorEvent(e: t.EditorEvent, direction: t.Direction) {
     await workspaceStepperDispatch(this, e, direction);
@@ -162,21 +167,63 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
   }
 
   async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction) {
-    if (direction === t.Direction.Forwards) {
-      const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(e.uri, { preserveFocus: false });
-      if (e.selections) {
-        vscTextEditor.selections = VscWorkspace.toVscSelections(e.selections);
+    // In v1, revSelection and revVisibleRange referred to the revUri editor.
+    // In v2, revSelection and revVisibleRange refer to the uri editor while the selection
+    // and the visible range of the revUri remain untouched.
+    // recorderVersion: undefined means latest version.
+
+    if (e.recorderVersion === 1) {
+      if (direction === t.Direction.Forwards) {
+        const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(e.uri, { preserveFocus: false });
+        if (e.selections) {
+          vscTextEditor.selections = VscWorkspace.toVscSelections(e.selections);
+        }
+        if (e.visibleRange) {
+          await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start, at: 'top' });
+        }
+      } else if (e.revUri) {
+        const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(e.revUri, { preserveFocus: false });
+        if (e.revSelections) {
+          vscTextEditor.selections = VscWorkspace.toVscSelections(e.revSelections);
+        }
+        if (e.revVisibleRange) {
+          await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start, at: 'top' });
+        }
       }
-      if (e.visibleRange) {
-        await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start, at: 'top' });
-      }
-    } else if (e.revUri) {
-      const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(e.revUri, { preserveFocus: false });
-      if (e.revSelections) {
-        vscTextEditor.selections = VscWorkspace.toVscSelections(e.revSelections);
-      }
-      if (e.revVisibleRange) {
-        await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start, at: 'top' });
+    } else {
+      if (direction === t.Direction.Forwards) {
+        const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(e.uri, { preserveFocus: false });
+        if (e.selections) {
+          vscTextEditor.selections = VscWorkspace.toVscSelections(e.selections);
+        }
+        if (e.visibleRange) {
+          await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start, at: 'top' });
+        }
+      } else {
+        // Reverse text e.uri's text editor's selection and visible range.
+        assert(vscode.window.activeTextEditor, `Expected active text editor to be ${e.uri}, but none is open`);
+        const vscActiveUri = this.vscWorkspace.uriFromVsc(vscode.window.activeTextEditor.document.uri);
+        assert(vscActiveUri === e.uri, `Expected active text editor to be ${e.uri}, but it is ${vscActiveUri}`);
+        if (e.revSelections) {
+          vscode.window.activeTextEditor.selections = VscWorkspace.toVscSelections(e.revSelections);
+        }
+        if (e.revVisibleRange) {
+          await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start, at: 'top' });
+        }
+
+        // Go back to e.revUri if any and set its selections and visible range,
+        // or clear active text editor.
+        if (e.revUri) {
+          const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(e.revUri);
+          const internalTextEditor = this.internalWorkspace.getTextEditorByUri(e.revUri);
+          vscTextEditor.selections = VscWorkspace.toVscSelections(internalTextEditor.selections);
+          await vscode.commands.executeCommand('revealLine', {
+            lineNumber: internalTextEditor.visibleRange.start,
+            at: 'top',
+          });
+        } else {
+          await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
+        }
       }
     }
   }

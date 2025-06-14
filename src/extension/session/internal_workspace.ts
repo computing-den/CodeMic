@@ -15,8 +15,8 @@ import InternalTextDocument from './internal_text_document.js';
  * blob to be read from disk.
  * The file field represents the content on disk. Whereas the document field represents the loaded
  * document which is used in the text editor and it may be unsaved.
- * The recorder ignores any document whose file does not exist on disk except for untitled documents
- * whose file is of type empty.
+ * When saving an untitled document to disk, VSCode first opens the document, changes its content,
+ * then writes the document to disk. So, between those steps, that item will have an empty file.
  */
 type LiveWorktree = Map<string, LiveWorktreeItem>;
 type LiveWorktreeItem = { file: t.File; document?: t.InternalDocument; editor?: t.InternalEditor };
@@ -185,11 +185,11 @@ export default class InternalWorkspace {
         worktreeItem.editor.scroll(visibleRange);
       }
       return worktreeItem.editor;
+    } else {
+      const textEditor = new InternalTextEditor(await this.openTextDocumentByUri(uri), selections, visibleRange);
+      this.insertTextEditor(textEditor);
+      return textEditor;
     }
-
-    const textEditor = new InternalTextEditor(await this.openTextDocumentByUri(uri), selections, visibleRange);
-    this.insertTextEditor(textEditor);
-    return textEditor;
   }
 
   insertTextEditor(textEditor: InternalTextEditor): LiveWorktreeItem {

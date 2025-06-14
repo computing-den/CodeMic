@@ -67,12 +67,12 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         t: 4,
         u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
-        p: e.preserveFocus ? true : undefined,
         s: e.selections?.map(serializeSelection),
         v: e.visibleRange && serializeLineRange(e.visibleRange),
         ru: e.revUri,
         rs: e.revSelections?.map(serializeSelection),
         rv: e.revVisibleRange && serializeLineRange(e.revVisibleRange),
+        rver: e.recorderVersion,
       };
 
     case 'closeTextEditor':
@@ -261,12 +261,12 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         id: nextId(),
         uri: uris[e.u],
         clock: deserializeClock(e.c),
-        preserveFocus: e.p ?? false,
         selections: e.s?.map(deserializeSelection),
         visibleRange: e.v && deserializeLineRange(e.v),
         revUri: e.ru,
         revSelections: e.rs?.map(deserializeSelection),
         revVisibleRange: e.rv && deserializeLineRange(e.rv),
+        recorderVersion: e.rver,
       };
     case 5:
       return {
@@ -379,12 +379,12 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         id: nextId(),
         uri,
         clock: deserializeClock(e.c),
-        preserveFocus: e.p ?? false,
         selections: e.s?.map(deserializeSelection) ?? [new Selection(new Position(0, 0), new Position(0, 0))],
         visibleRange: (e.v && deserializeLineRange(e.v)) ?? new LineRange(0, 1),
         revUri: e.ru,
         revSelections: e.rs?.map(deserializeSelection),
         revVisibleRange: e.rv && deserializeLineRange(e.rv),
+        recorderVersion: 1,
       };
     case 5:
       return {

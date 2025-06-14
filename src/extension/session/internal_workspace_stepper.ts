@@ -103,17 +103,45 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
   }
 
   async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    if (direction === t.Direction.Forwards) {
-      if (uriSet) uriSet.add(e.uri);
-      const textEditor = await this.internalWorkspace.openTextEditorByUri(e.uri, e.selections, e.visibleRange);
-      if (!e.preserveFocus) {
+    // In v1, revSelection and revVisibleRange referred to the revUri editor.
+    // In v2, revSelection and revVisibleRange refer to the uri editor while the selection
+    // and the visible range of the revUri remain untouched.
+    // recorderVersion: undefined means latest version.
+
+    if (e.recorderVersion === 1) {
+      if (direction === t.Direction.Forwards) {
+        if (uriSet) uriSet.add(e.uri);
+        const textEditor = await this.internalWorkspace.openTextEditorByUri(e.uri, e.selections, e.visibleRange);
+        this.internalWorkspace.activeTextEditor = textEditor;
+      } else if (e.revUri) {
+        if (uriSet) uriSet.add(e.revUri);
+        const textEditor = await this.internalWorkspace.openTextEditorByUri(
+          e.revUri,
+          e.revSelections,
+          e.revVisibleRange,
+        );
         this.internalWorkspace.activeTextEditor = textEditor;
       }
-    } else if (e.revUri) {
-      if (uriSet) uriSet.add(e.revUri);
-      const textEditor = await this.internalWorkspace.openTextEditorByUri(e.revUri, e.revSelections, e.revVisibleRange);
-      if (!e.preserveFocus) {
+    } else {
+      if (direction === t.Direction.Forwards) {
+        if (uriSet) uriSet.add(e.uri);
+        const textEditor = await this.internalWorkspace.openTextEditorByUri(e.uri, e.selections, e.visibleRange);
         this.internalWorkspace.activeTextEditor = textEditor;
+      } else {
+        // Reverse e.uri's text editor's selection and visible range.
+        if (uriSet) uriSet.add(e.uri);
+        const textEditor = this.internalWorkspace.getTextEditorByUri(e.uri);
+        if (e.revSelections) textEditor.select(e.revSelections);
+        if (e.revVisibleRange) textEditor.scroll(e.revVisibleRange);
+
+        // Go back to e.revUri if any or clear active text editor.
+        if (e.revUri) {
+          if (uriSet) uriSet.add(e.revUri);
+          const revTextEditor = this.internalWorkspace.getTextEditorByUri(e.revUri);
+          this.internalWorkspace.activeTextEditor = revTextEditor;
+        } else {
+          this.internalWorkspace.activeTextEditor = undefined;
+        }
       }
     }
   }

@@ -28,7 +28,7 @@ class WorkspacePlayer {
     this.session = session;
     this.internalWorkspace = internalWorkspace;
     this.vscWorkspace = vscWorkspace;
-    this.vscWorkspaceStepper = new VscWorkspaceStepper(session, vscWorkspace);
+    this.vscWorkspaceStepper = new VscWorkspaceStepper(session, internalWorkspace, vscWorkspace);
   }
 
   async play() {

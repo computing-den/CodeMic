@@ -241,13 +241,11 @@ export default class VscWorkspace {
       const vscTextEditor = await this.showTextDocumentByVscUri(vscUri);
       const selections = VscWorkspace.fromVscSelections(vscTextEditor.selections);
       const visibleRange = VscWorkspace.fromVscLineRange(vscTextEditor.visibleRanges[0]);
-      const isActiveEditor = originalActiveTextEditor?.document.uri.toString() === vscUri.toString();
       events.push({
         type: 'showTextEditor',
         id: lib.nextId(),
         uri,
         clock: 0,
-        preserveFocus: !isActiveEditor,
         selections,
         visibleRange,
       });

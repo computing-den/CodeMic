@@ -1,3 +1,26 @@
+/**
+ * When saving an untitled document to disk, VSCode first opens the document, changes its content,
+ * then writes the document to disk. So, between those steps, that item will have an empty file.
+ * Here's the order of events when saving Untitled-1 to "New stuff.perl":
+ *
+ * openTextDocument "New stuff.perl"
+ * textChange "New stuff.perl" with WHOLE CONTENT from untitled on range [0, 0, 0, 0]
+ * fsCreate "New stuff.perl"
+ *
+ * textChange "Untitled-1" WHOLE RANGE to ""
+ * select "Untitled-1" [0, 0, 0, 0]
+ * scroll "Untitled-1" [0, 0]
+ * closeTextEditor "Untitled-1"
+ *
+ * showTextEditor "New stuff.perl"
+ * select "New stuff.perl" to what it was in untitled
+ *
+ * fsChange "New stuff.perl"  -   *I DONT'T KNOW WHY*
+ *
+ *
+ *
+ */
+
 import * as t from '../../lib/types.js';
 import { Selection, ContentChange } from '../../lib/lib.js';
 import * as lib from '../../lib/lib.js';
@@ -79,7 +102,7 @@ class WorkspaceRecorder {
       this.disposables.push(disposable);
     }
 
-    // listen for show document events
+    // listen for show text editor events
     {
       const disposable = vscode.window.onDidChangeActiveTextEditor(async vscTextEditor => {
         if (vscTextEditor) await this.showTextEditor(vscTextEditor);
@@ -256,106 +279,106 @@ class WorkspaceRecorder {
 
     logAcceptedEvent(`accepted textChange for ${uri}`);
 
-    // Here, we assume that it is possible to get a textChange without a text editor
-    // because vscode's event itself does not provide a text editor.
+    // Here, we assume that document must exist internally by the time we get a text change event.
+    const irTextDocument = this.internalWorkspace.getTextDocumentByUri(uri);
 
-    const irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
-    if (irTextDocument) {
-      let debugInitIrText: string | undefined;
-      if (config.debug) {
-        debugInitIrText = irTextDocument.getText();
-      }
+    // // It will insert the latest text in 'openTextDocument' if necessary.
+    // if (!irTextDocument) {
+    //   await this.openTextDocumentByUri(vscTextDocument, uri);
+    //   return;
+    // }
 
-      // Read https://github.com/microsoft/vscode/issues/11487 about contentChanges array.
-      let irContentChanges = vscContentChanges.map(c => new ContentChange(c.text, VscWorkspace.fromVscRange(c.range)));
+    let debugInitIrText: string | undefined;
+    if (config.debug) {
+      debugInitIrText = irTextDocument.getText();
+    }
 
-      // Order content changes.
-      irContentChanges.sort((a, b) => a.range.start.compareTo(b.range.start));
+    // Read https://github.com/microsoft/vscode/issues/11487 about contentChanges array.
+    let irContentChanges = vscContentChanges.map(c => new ContentChange(c.text, VscWorkspace.fromVscRange(c.range)));
 
-      // Validate ranges and make sure there are no overlaps.
-      for (const [i, cc] of irContentChanges.entries()) {
-        assert(irTextDocument.isRangeValid(cc.range), 'textChange: invalid range');
-        if (i > 0) {
-          assert(
-            cc.range.start.isAfterOrEqual(irContentChanges[i - 1].range.end),
-            // ih.isRangeNonOverlapping(irContentChanges[i - 1].range, cc.range),
-            'textChange: got content changes with overlapping ranges',
-          );
-        }
-      }
+    // Order content changes.
+    irContentChanges.sort((a, b) => a.range.start.compareTo(b.range.start));
 
-      const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
-
-      let coalescing = false;
-
-      // Try to simplify it to textInsert event when:
-      // - There is only one cursor: only one content change.
-      // - No text is replaced: the range's start and end are the same.
-      let irEvent: t.EditorEvent;
-      if (irContentChanges.length === 1 && irContentChanges[0].range.start.isEqual(irContentChanges[0].range.end)) {
-        // example:
-        // contentChanges:    [{"text":"a\nb","range":{"start":{"line":0,"character":5},"end":{"line":0,"character":5}}}]
-        // revContentChanges: [{"range":{"start":{"line":0,"character":5},"end":{"line":1,"character":1}},"text":""}]
-        irEvent = {
-          type: 'textInsert',
-          id: lib.nextId(),
-          uri,
-          clock: this.clock,
-          revRange: irRevContentChanges[0].range, // range.start is the position before text insert, while range.end is the position after text insert
-          text: irContentChanges[0].text,
-          updateSelection: false,
-        };
-
-        coalescing = true;
-
-        // console.log('XXX textInsert:', irEvent);
-        // console.log('XXX equivalent textChange:', lib.getTextChangeEventFromTextInsertEvent(irEvent));
-        // console.log('XXX expected textChange:', {
-        //   type: 'textChange',
-        //   clock: this.clock,
-        //   contentChanges: irContentChanges,
-        //   revContentChanges: irRevContentChanges,
-        //   updateSelection: false,
-        // });
-      } else {
-        irEvent = {
-          type: 'textChange',
-          id: lib.nextId(),
-          uri,
-          clock: this.clock,
-          contentChanges: irContentChanges,
-          revContentChanges: irRevContentChanges,
-          updateSelection: false,
-        };
-      }
-
-      this.insertEvent(irEvent, { coalescing });
-      this.setFocus();
-
-      // DEBUG
-      if (config.debug) {
+    // Validate ranges and make sure there are no overlaps.
+    for (const [i, cc] of irContentChanges.entries()) {
+      assert(irTextDocument.isRangeValid(cc.range), 'textChange: invalid range');
+      if (i > 0) {
         assert(
-          irTextDocument.getText() === vscTextDocument.getText(),
-          "textChange: internal text doesn't match vscode text after applying changes",
-        );
-
-        const debugNextIrText = irTextDocument.getText();
-        await this.internalWorkspace.stepper.applyEditorEvent(irEvent, t.Direction.Backwards);
-        const debugReInitIrText = irTextDocument.getText();
-        assert(
-          debugInitIrText === debugReInitIrText,
-          "textChange: text doesn't match what it was after applying changes in reverse",
-        );
-
-        await this.internalWorkspace.stepper.applyEditorEvent(irEvent, t.Direction.Forwards);
-        assert(
-          debugNextIrText === irTextDocument.getText(),
-          "textChange: text doesn't match what it was after applying changes again",
+          cc.range.start.isAfterOrEqual(irContentChanges[i - 1].range.end),
+          // ih.isRangeNonOverlapping(irContentChanges[i - 1].range, cc.range),
+          'textChange: got content changes with overlapping ranges',
         );
       }
+    }
+
+    const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
+
+    let coalescing = false;
+
+    // Try to simplify it to textInsert event when:
+    // - There is only one cursor: only one content change.
+    // - No text is replaced: the range's start and end are the same.
+    let irEvent: t.EditorEvent;
+    if (irContentChanges.length === 1 && irContentChanges[0].range.start.isEqual(irContentChanges[0].range.end)) {
+      // example:
+      // contentChanges:    [{"text":"a\nb","range":{"start":{"line":0,"character":5},"end":{"line":0,"character":5}}}]
+      // revContentChanges: [{"range":{"start":{"line":0,"character":5},"end":{"line":1,"character":1}},"text":""}]
+      irEvent = {
+        type: 'textInsert',
+        id: lib.nextId(),
+        uri,
+        clock: this.clock,
+        revRange: irRevContentChanges[0].range, // range.start is the position before text insert, while range.end is the position after text insert
+        text: irContentChanges[0].text,
+        updateSelection: false,
+      };
+
+      coalescing = true;
+
+      // console.log('XXX textInsert:', irEvent);
+      // console.log('XXX equivalent textChange:', lib.getTextChangeEventFromTextInsertEvent(irEvent));
+      // console.log('XXX expected textChange:', {
+      //   type: 'textChange',
+      //   clock: this.clock,
+      //   contentChanges: irContentChanges,
+      //   revContentChanges: irRevContentChanges,
+      //   updateSelection: false,
+      // });
     } else {
-      // It will insert the latest text in 'openTextDocument' if necessary.
-      await this.openTextDocumentByUri(vscTextDocument, uri);
+      irEvent = {
+        type: 'textChange',
+        id: lib.nextId(),
+        uri,
+        clock: this.clock,
+        contentChanges: irContentChanges,
+        revContentChanges: irRevContentChanges,
+        updateSelection: false,
+      };
+    }
+
+    this.insertEvent(irEvent, { coalescing });
+    this.setFocus();
+
+    // DEBUG
+    if (config.debug) {
+      assert(
+        irTextDocument.getText() === vscTextDocument.getText(),
+        "textChange: internal text doesn't match vscode text after applying changes",
+      );
+
+      const debugNextIrText = irTextDocument.getText();
+      await this.internalWorkspace.stepper.applyEditorEvent(irEvent, t.Direction.Backwards);
+      const debugReInitIrText = irTextDocument.getText();
+      assert(
+        debugInitIrText === debugReInitIrText,
+        "textChange: text doesn't match what it was after applying changes in reverse",
+      );
+
+      await this.internalWorkspace.stepper.applyEditorEvent(irEvent, t.Direction.Forwards);
+      assert(
+        debugNextIrText === irTextDocument.getText(),
+        "textChange: text doesn't match what it was after applying changes again",
+      );
     }
   }
 
@@ -407,10 +430,54 @@ class WorkspaceRecorder {
     const uri = this.vscWorkspace.uriFromVsc(vscTextDocument.uri);
     logAcceptedEvent(`accepted openTextDocument for ${uri}`);
 
-    await this.openTextDocumentByUri(vscTextDocument, uri);
+    const vscText = vscTextDocument.getText();
+    const irExists = this.internalWorkspace.doesUriExist(uri);
+    const irText = irExists && new TextDecoder().decode(await this.internalWorkspace.getLiveContentByUri(uri));
+    let irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
+
+    // if (vscTextDocument.uri.scheme !== 'untitled') {
+    //   assert(irExists, `Document ${uri} was opened in VSCode but its file was not found internally`);
+    // }
+
+    if (!irTextDocument) {
+      irTextDocument = this.vscWorkspace.textDocumentFromVsc(vscTextDocument, uri);
+      this.internalWorkspace.insertTextDocument(irTextDocument); // will insert into worktree as well
+      this.insertEvent(
+        {
+          type: 'openTextDocument',
+          id: lib.nextId(),
+          uri,
+          clock: this.clock,
+          text: irText === vscText ? undefined : vscText,
+          eol: irTextDocument.eol,
+          // isInWorktree,
+        },
+        { coalescing: false },
+      );
+    } else if (irText !== vscText) {
+      const irRange = irTextDocument.getRange();
+      const irContentChanges: ContentChange[] = [{ range: irRange, text: vscText }];
+      const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
+      this.insertEvent(
+        {
+          type: 'textChange',
+          id: lib.nextId(),
+          uri,
+          clock: this.clock,
+          contentChanges: irContentChanges,
+          revContentChanges: irRevContentChanges,
+          updateSelection: false,
+        },
+        { coalescing: false },
+      );
+    }
   }
 
   private async closeTextDocument(vscTextDocument: vscode.TextDocument) {
+    // NOTE: We're using onDidChangeTabs to record closeTextEditor and not
+    // recording closeTextDocument. Text documents only get closed if their
+    // files get deleted. This is mostly because of how languageId change behaves.
+    //
     // When user closes a tab without saving it, vscode issues a textChange event
     // to restore the original content before issuing a closeTextDocument
     // This also happens for untitled documents when closed without saving.
@@ -473,23 +540,25 @@ class WorkspaceRecorder {
     logAcceptedEvent(`accepted showTextEditor for ${uri}`);
 
     const revUri = this.internalWorkspace.activeTextEditor?.document.uri;
-    const revSelections = this.internalWorkspace.activeTextEditor?.selections;
-    const revVisibleRange = this.internalWorkspace.activeTextEditor?.visibleRange;
 
-    // Possibly inserts an openTextDocument or textChange event if the document wasn't found in internal editorTrack or
-    // its contents were different.
-    const irTextEditor = await this.openTextEditorHelper(vscTextEditor, uri);
-    this.internalWorkspace.activeTextEditor = irTextEditor;
+    // revSelections and revVisibleRange refer to the uri text editor, not revUri.
+    const revTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
+    const revSelections = revTextEditor?.selections;
+    const revVisibleRange = revTextEditor?.visibleRange;
+
+    const selections = VscWorkspace.fromVscSelections(vscTextEditor.selections);
+    const visibleRange = VscWorkspace.fromVscLineRange(vscTextEditor.visibleRanges[0]);
+    const textEditor = await this.internalWorkspace.openTextEditorByUri(uri, selections, visibleRange);
+    this.internalWorkspace.activeTextEditor = textEditor;
 
     this.insertEvent(
       {
         type: 'showTextEditor',
         id: lib.nextId(),
         uri,
-        preserveFocus: false,
         clock: this.clock,
-        selections: irTextEditor.selections,
-        visibleRange: irTextEditor.visibleRange,
+        selections,
+        visibleRange,
         revUri,
         revSelections,
         revVisibleRange,
@@ -506,13 +575,7 @@ class WorkspaceRecorder {
 
     // const visibleRange = VscWorkspace.fromVscRange(vscTextEditor.visibleRanges[0]);
     const uri = this.vscWorkspace.uriFromVsc(vscTextEditor.document.uri);
-
-    const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
-
-    if (!irTextEditor) {
-      this.showTextEditor(vscTextEditor); // Will insert selection too.
-      return;
-    }
+    const irTextEditor = this.internalWorkspace.getTextEditorByUri(uri);
 
     const lastEventIndex = this.session.body.editorEvents.length - 1;
     const lastEvent = this.session.body.editorEvents[lastEventIndex];
@@ -580,11 +643,7 @@ class WorkspaceRecorder {
 
     const visibleRange = visibleRanges[0];
     const uri = this.vscWorkspace.uriFromVsc(vscTextEditor.document.uri);
-    const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
-    if (!irTextEditor) {
-      this.showTextEditor(vscTextEditor); // Will insert selection.
-      return;
-    }
+    const irTextEditor = this.internalWorkspace.getTextEditorByUri(uri);
 
     // if (!this.scrolling) {
     //   this.scrollStartRange ??= visibleRange;
@@ -749,73 +808,21 @@ class WorkspaceRecorder {
    *
    * Assumes a valid uri which has already been approved by this.vscWorkspace.shouldRecordVscUri().
    */
-  private async openTextDocumentByUri(
-    vscTextDocument: vscode.TextDocument,
-    uri: string,
-  ): Promise<InternalTextDocument> {
-    const vscText = vscTextDocument.getText();
-    const irExists = this.internalWorkspace.doesUriExist(uri);
-    const irText = irExists && new TextDecoder().decode(await this.internalWorkspace.getLiveContentByUri(uri));
-    let irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
+  // private async openTextDocumentByUri(
+  //   vscTextDocument: vscode.TextDocument,
+  //   uri: string,
+  // ): Promise<InternalTextDocument> {
 
-    if (vscTextDocument.uri.scheme !== 'untitled') {
-      assert(irExists, `Document ${uri} was opened in VSCode but its file was not found internally`);
-    }
+  //   return irTextDocument;
+  // }
 
-    if (!irTextDocument) {
-      irTextDocument = this.vscWorkspace.textDocumentFromVsc(vscTextDocument, uri);
-      this.internalWorkspace.insertTextDocument(irTextDocument); // will insert into worktree as well
-      this.insertEvent(
-        {
-          type: 'openTextDocument',
-          id: lib.nextId(),
-          uri,
-          clock: this.clock,
-          text: irText === vscText ? undefined : vscText,
-          eol: irTextDocument.eol,
-          // isInWorktree,
-        },
-        { coalescing: false },
-      );
-    } else if (irText !== vscText) {
-      const irRange = irTextDocument.getRange();
-      const irContentChanges: ContentChange[] = [{ range: irRange, text: vscText }];
-      const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
-      this.insertEvent(
-        {
-          type: 'textChange',
-          id: lib.nextId(),
-          uri,
-          clock: this.clock,
-          contentChanges: irContentChanges,
-          revContentChanges: irRevContentChanges,
-          updateSelection: false,
-        },
-        { coalescing: false },
-      );
-    }
-
-    return irTextDocument;
-  }
-
-  /**
-   * It does not push a showTextEditor event but it might open the text document.
-   * Then, it will create or update the internal text editor.
-   */
-  private async openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: string): Promise<InternalTextEditor> {
-    const selections = VscWorkspace.fromVscSelections(vscTextEditor.selections);
-    const visibleRange = VscWorkspace.fromVscLineRange(vscTextEditor.visibleRanges[0]);
-    const textDocument = await this.openTextDocumentByUri(vscTextEditor.document, uri);
-    let textEditor = this.internalWorkspace.findTextEditorByUri(textDocument.uri);
-    if (!textEditor) {
-      textEditor = new InternalTextEditor(textDocument, selections, visibleRange);
-      this.internalWorkspace.insertTextEditor(textEditor);
-    } else {
-      textEditor.select(selections);
-      textEditor.scroll(visibleRange);
-    }
-    return textEditor;
-  }
+  // /**
+  //  * It does not push a showTextEditor event.
+  //  * It will create or update the internal text editor.
+  //  */
+  // private async openTextEditorHelper(vscTextEditor: vscode.TextEditor, uri: string): Promise<InternalTextEditor> {
+  //   return textEditor;
+  // }
 
   // private simplifyEvents() {
   // TODO
