@@ -20,7 +20,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
   async applyFsCreateEvent(e: t.FsCreateEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(e.uri);
     if (direction === t.Direction.Forwards) {
-      this.internalWorkspace.insertFile(e.uri, e.file);
+      this.internalWorkspace.insertOrUpdateFile(e.uri, e.file);
     } else {
       this.internalWorkspace.deleteFileByUri(e.uri);
     }
@@ -29,7 +29,6 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
   async applyFsChangeEvent(e: t.FsChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(e.uri);
     const item = this.internalWorkspace.getWorktreeItemByUri(e.uri);
-    assert(item, `File ${e.uri} not found in internal representation`);
     if (direction === t.Direction.Forwards) {
       item.file = e.file;
     } else {
@@ -42,7 +41,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     if (direction === t.Direction.Forwards) {
       this.internalWorkspace.deleteFileByUri(e.uri);
     } else {
-      this.internalWorkspace.insertFile(e.uri, e.revFile);
+      this.internalWorkspace.insertOrUpdateFile(e.uri, e.revFile);
     }
   }
 
@@ -65,25 +64,11 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
   }
 
   async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    // The document may or may not exist in the worktree.
-    // The content must be matched if e.text is given.
-
     if (uriSet) uriSet.add(e.uri);
 
     if (direction === t.Direction.Forwards) {
-      let textDocument = this.internalWorkspace.findTextDocumentByUri(e.uri);
-      if (textDocument && e.text !== undefined && e.text !== textDocument.getText()) {
-        textDocument.applyContentChanges([{ range: textDocument.getRange(), text: e.text }], false);
-      } else if (!textDocument) {
-        let text = '';
-        if (e.text !== undefined) {
-          text = e.text;
-        } else if (this.internalWorkspace.doesUriExist(e.uri)) {
-          text = new TextDecoder().decode(await this.internalWorkspace.getLiveContentByUri(e.uri));
-        }
-        textDocument = InternalTextDocument.fromText(e.uri, text, e.eol);
-        this.internalWorkspace.insertTextDocument(textDocument); // Will insert into worktree if necessary.
-      }
+      // Even untitled uris have fsCreate before openTextDocument.
+      await this.internalWorkspace.openTextDocumentByUri(e.uri, e.eol);
     } else {
       this.internalWorkspace.closeTextDocumentByUri(e.uri);
     }

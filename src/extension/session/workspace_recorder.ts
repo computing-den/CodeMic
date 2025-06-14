@@ -1,6 +1,6 @@
 /**
  * When saving an untitled document to disk, VSCode first opens the document, changes its content,
- * then writes the document to disk. So, between those steps, that item will have an empty file.
+ * possibly issue a showTextEditor, then maybe (!) writes the document to disk.
  * Here's the order of events when saving Untitled-1 to "New stuff.perl":
  *
  * openTextDocument "New stuff.perl"
@@ -15,18 +15,18 @@
  * showTextEditor "New stuff.perl"
  * select "New stuff.perl" to what it was in untitled
  *
- * fsChange "New stuff.perl"  -   *I DONT'T KNOW WHY*
+ * This order is not stable. Another time I ran it and fsCreate was issued last.
  *
- *
- *
+ * But we cannot actually replay this sequence of events in vscode because it's not
+ * possible to open a text document with file uri if the file doesn't exist on disk.
+ * So, during recording, we have to issue an fsCreate event ourselves possibly with
+ * empty content. Essentially reversing the order of events.
  */
 
 import * as t from '../../lib/types.js';
 import { Selection, ContentChange } from '../../lib/lib.js';
 import * as lib from '../../lib/lib.js';
 import InternalWorkspace from './internal_workspace.js';
-import InternalTextEditor from './internal_text_editor.js';
-import InternalTextDocument from './internal_text_document.js';
 import assert from '../../lib/assert.js';
 import config from '../config.js';
 import vscode from 'vscode';
@@ -53,6 +53,8 @@ class WorkspaceRecorder {
   // private lastUri?: t.Uri;
   // private lastPosition?: Position;
   // private lastLine: number | undefined;
+
+  // private textDocumentsUrisBeingCreated = new Set<string>();
 
   private get clock(): number {
     return this.session.rr.clock;
@@ -268,6 +270,8 @@ class WorkspaceRecorder {
     vscTextDocument: vscode.TextDocument,
     vscContentChanges: readonly vscode.TextDocumentContentChangeEvent[],
   ) {
+    // See the top of the file for explanation.
+
     logRawEvent(`event: textChange ${vscTextDocument.uri} ${JSON.stringify(vscContentChanges)}`);
     if (!this.vscWorkspace.shouldRecordVscUri(vscTextDocument.uri)) return;
 
@@ -424,53 +428,80 @@ class WorkspaceRecorder {
   }
 
   private async openTextDocument(vscTextDocument: vscode.TextDocument) {
+    // See the top of the file for explanation.
+
     logRawEvent(`event: openTextDocument ${vscTextDocument.uri}`);
     if (!this.vscWorkspace.shouldRecordVscUri(vscTextDocument.uri)) return;
 
     const uri = this.vscWorkspace.uriFromVsc(vscTextDocument.uri);
+    let irItem = this.internalWorkspace.findWorktreeItemByUri(uri);
+
+    if (!irItem) {
+      // When saving untitled, vscode issues an openTextDocument before fsCreate.
+      // So, here, we issue our own fsCreate and insert an empty file.
+      this.insertEvent(
+        {
+          type: 'fsCreate',
+          id: lib.nextId(),
+          uri,
+          clock: this.clock,
+          file: { type: 'empty' },
+        },
+        { coalescing: false },
+      );
+
+      // Insert internal file.
+      irItem = this.internalWorkspace.insertOrUpdateFile(uri, { type: 'empty' });
+    }
+
     logAcceptedEvent(`accepted openTextDocument for ${uri}`);
 
-    const vscText = vscTextDocument.getText();
-    const irExists = this.internalWorkspace.doesUriExist(uri);
-    const irText = irExists && new TextDecoder().decode(await this.internalWorkspace.getLiveContentByUri(uri));
-    let irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
-
-    // if (vscTextDocument.uri.scheme !== 'untitled') {
-    //   assert(irExists, `Document ${uri} was opened in VSCode but its file was not found internally`);
-    // }
-
-    if (!irTextDocument) {
-      irTextDocument = this.vscWorkspace.textDocumentFromVsc(vscTextDocument, uri);
-      this.internalWorkspace.insertTextDocument(irTextDocument); // will insert into worktree as well
+    // Insert internal document.
+    const irItemAlreadyHadDocument = Boolean(irItem.document);
+    if (!irItemAlreadyHadDocument) {
+      const irTextDocument = this.vscWorkspace.textDocumentFromVsc(vscTextDocument, uri);
+      this.internalWorkspace.insertTextDocument(irTextDocument);
       this.insertEvent(
         {
           type: 'openTextDocument',
           id: lib.nextId(),
           uri,
           clock: this.clock,
-          text: irText === vscText ? undefined : vscText,
           eol: irTextDocument.eol,
-          // isInWorktree,
-        },
-        { coalescing: false },
-      );
-    } else if (irText !== vscText) {
-      const irRange = irTextDocument.getRange();
-      const irContentChanges: ContentChange[] = [{ range: irRange, text: vscText }];
-      const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
-      this.insertEvent(
-        {
-          type: 'textChange',
-          id: lib.nextId(),
-          uri,
-          clock: this.clock,
-          contentChanges: irContentChanges,
-          revContentChanges: irRevContentChanges,
-          updateSelection: false,
         },
         { coalescing: false },
       );
     }
+
+    // irItem must have a document by now.
+    assert(irItem.document);
+
+    // If irText is not the same as vscText, insert textChange.
+    // I don't really know when this is supposed to happen. So, for now, let's assert
+    // it until we find a use case for it.
+    const irText = new TextDecoder().decode(irItem.document.getContent());
+    const vscText = vscTextDocument.getText();
+    assert(
+      irText === vscText,
+      `openTextDocument ${uri} has different content.\nInternally:\n\n${irText}\n\nIn Vscode:\n\n${vscText}\n\n`,
+    );
+    // if (irText !== vscText) {
+    //   const irRange = irTextDocument.getRange();
+    //   const irContentChanges: ContentChange[] = [{ range: irRange, text: vscText }];
+    //   const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
+    //   this.insertEvent(
+    //     {
+    //       type: 'textChange',
+    //       id: lib.nextId(),
+    //       uri,
+    //       clock: this.clock,
+    //       contentChanges: irContentChanges,
+    //       revContentChanges: irRevContentChanges,
+    //       updateSelection: false,
+    //     },
+    //     { coalescing: !irItemAlreadyHadDocument },
+    //   );
+    // }
   }
 
   private async closeTextDocument(vscTextDocument: vscode.TextDocument) {
@@ -690,8 +721,16 @@ class WorkspaceRecorder {
   private async fsCreate(vscUri: vscode.Uri) {
     logRawEvent(`event: fsCreate ${vscUri}`);
     if (!this.vscWorkspace.shouldRecordVscUri(vscUri)) return;
-
     const uri = this.vscWorkspace.uriFromVsc(vscUri);
+
+    // When saving an untitled document, fsCreate may come last.
+    // By then, we've already issued an fsCreate ourselves.
+    // So, let's change this to an fsChange.
+    if (this.internalWorkspace.doesUriExist(uri)) {
+      logRawEvent(`changing fsCreate to fsChange because item already existed internally ${vscUri}`);
+      return this.fsChange(vscUri);
+    }
+
     logAcceptedEvent(`accepted save for ${uri}`);
 
     const stat = await fs.promises.stat(vscUri.fsPath);
@@ -702,7 +741,8 @@ class WorkspaceRecorder {
     const file: t.File = { type: 'blob', sha1 };
     await this.session.core.writeBlob(sha1, data);
 
-    this.internalWorkspace.insertFile(uri, file);
+    assert(!this.internalWorkspace.doesUriExist(uri));
+    this.internalWorkspace.insertOrUpdateFile(uri, file);
 
     this.insertEvent(
       {
@@ -730,7 +770,7 @@ class WorkspaceRecorder {
     const sha1 = await misc.computeSHA1(data);
     const file: t.File = { type: 'blob', sha1 };
 
-    const internalWorktreeItem = this.internalWorkspace.getWorktreeItemByUri(uri);
+    const internalWorktreeItem = this.internalWorkspace.findWorktreeItemByUri(uri);
     assert(internalWorktreeItem, `Received change event for ${vscUri.fsPath} but it's not in the internal worktree`);
     const revFile = internalWorktreeItem.file;
 
@@ -771,7 +811,7 @@ class WorkspaceRecorder {
     // const sha1 = await misc.computeSHA1(data);
     // const file: t.File = { type: 'blob', sha1 };
 
-    const internalWorktreeItem = this.internalWorkspace.getWorktreeItemByUri(uri);
+    const internalWorktreeItem = this.internalWorkspace.findWorktreeItemByUri(uri);
     assert(internalWorktreeItem, `Received delete event for ${vscUri.fsPath} but it's not in the internal worktree`);
     const revFile = internalWorktreeItem.file;
     this.internalWorkspace.deleteFileByUri(uri);

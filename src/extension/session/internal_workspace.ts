@@ -74,25 +74,23 @@ export default class InternalWorkspace {
     return Boolean(this.worktree.get(uri)?.file.type === 'dir');
   }
 
-  getWorktreeItemByUri(uri: string): LiveWorktreeItem | undefined {
+  findWorktreeItemByUri(uri: string): LiveWorktreeItem | undefined {
     return this.worktree.get(uri);
   }
 
-  async getLiveContentByUri(uri: string): Promise<Uint8Array> {
+  getWorktreeItemByUri(uri: string): LiveWorktreeItem {
     const item = this.worktree.get(uri);
-    assert(item);
+    if (!item) throw new Error(`${uri} not found in internal workspace`);
+    return item;
+  }
+
+  async getLiveContentByUri(uri: string): Promise<Uint8Array> {
+    const item = this.getWorktreeItemByUri(uri);
 
     if (item.document) {
       return item.document.getContent();
-    }
-
-    switch (item.file.type) {
-      case 'blob':
-        return this.session.core.readFile(item.file);
-      case 'empty':
-        return new Uint8Array();
-      default:
-        throw new Error(`getLiveContentByUri ${uri} type "${item.file.type}" not supported`);
+    } else {
+      return this.session.core.readFile(item.file);
     }
   }
 
@@ -118,24 +116,23 @@ export default class InternalWorkspace {
     return textEditor;
   }
 
-  async openTextDocumentByUri(uri: string): Promise<InternalTextDocument> {
-    const worktreeItem = this.worktree.get(uri);
-    if (!worktreeItem) throw new Error(`file not found ${uri}`);
+  async openTextDocumentByUri(uri: string, eol?: t.EndOfLine): Promise<InternalTextDocument> {
+    const item = this.getWorktreeItemByUri(uri);
 
-    if (worktreeItem.document) {
-      if (!(worktreeItem.document instanceof InternalTextDocument)) {
+    if (item.document) {
+      if (!(item.document instanceof InternalTextDocument)) {
         throw new Error(`file is not a text document ${uri}`);
       }
-      return worktreeItem.document;
+      return item.document;
     }
 
-    const text = new TextDecoder().decode(await this.session.core.readFile(worktreeItem.file));
-    const textDocument = InternalTextDocument.fromText(uri, text, this.session.body.defaultEol);
+    const text = new TextDecoder().decode(await this.session.core.readFile(item.file));
+    const textDocument = InternalTextDocument.fromText(uri, text, eol ?? this.session.body.defaultEol);
     this.insertTextDocument(textDocument);
     return textDocument;
   }
 
-  insertFile(uri: string, file: t.File): LiveWorktreeItem {
+  insertOrUpdateFile(uri: string, file: t.File): LiveWorktreeItem {
     let item = this.worktree.get(uri);
     if (item) {
       item.file = file;
@@ -159,13 +156,12 @@ export default class InternalWorkspace {
     return item;
   }
 
-  insertTextDocument(textDocument: InternalTextDocument): LiveWorktreeItem {
-    const item = this.worktree.get(textDocument.uri) ?? this.insertFile(textDocument.uri, { type: 'empty' });
+  insertTextDocument(textDocument: InternalTextDocument) {
+    assert(!this.textDocuments.includes(textDocument));
+    const item = this.getWorktreeItemByUri(textDocument.uri);
+
     item.document = textDocument;
-    if (!this.textDocuments.includes(textDocument)) {
-      this.textDocuments.push(textDocument);
-    }
-    return item;
+    this.textDocuments.push(textDocument);
   }
 
   async openTextEditorByUri(
@@ -173,18 +169,17 @@ export default class InternalWorkspace {
     selections?: Selection[],
     visibleRange?: LineRange,
   ): Promise<InternalTextEditor> {
-    const worktreeItem = this.worktree.get(uri);
-    if (!worktreeItem) throw new Error(`file not found ${uri}`);
+    const item = this.getWorktreeItemByUri(uri);
 
-    if (worktreeItem.editor) {
-      if (!(worktreeItem.editor instanceof InternalTextEditor)) {
+    if (item.editor) {
+      if (!(item.editor instanceof InternalTextEditor)) {
         throw new Error(`file is not a text document ${uri}`);
       }
       if (selections && visibleRange) {
-        worktreeItem.editor.select(selections);
-        worktreeItem.editor.scroll(visibleRange);
+        item.editor.select(selections);
+        item.editor.scroll(visibleRange);
       }
-      return worktreeItem.editor;
+      return item.editor;
     } else {
       const textEditor = new InternalTextEditor(await this.openTextDocumentByUri(uri), selections, visibleRange);
       this.insertTextEditor(textEditor);
@@ -193,7 +188,8 @@ export default class InternalWorkspace {
   }
 
   insertTextEditor(textEditor: InternalTextEditor): LiveWorktreeItem {
-    let item = this.worktree.get(textEditor.document.uri) ?? this.insertTextDocument(textEditor.document);
+    let item = this.getWorktreeItemByUri(textEditor.document.uri);
+
     item.editor = textEditor;
     if (!this.textEditors.includes(textEditor)) {
       this.textEditors.push(textEditor);
@@ -211,8 +207,7 @@ export default class InternalWorkspace {
   }
 
   closeTextDocumentByUri(uri: string) {
-    const item = this.worktree.get(uri);
-    assert(item, `Cannot close text document ${uri}. It does not exist in worktree.`);
+    const item = this.getWorktreeItemByUri(uri);
 
     this.closeTextEditorByUri(uri);
     if (item.document) {
@@ -230,8 +225,7 @@ export default class InternalWorkspace {
   // }
 
   closeTextEditorByUri(uri: string) {
-    const item = this.worktree.get(uri);
-    assert(item, `Cannot close text editor ${uri}. It does not exist in worktree.`);
+    const item = this.getWorktreeItemByUri(uri);
 
     if (item.editor) {
       this.textEditors = this.textEditors.filter(x => x !== item.editor);

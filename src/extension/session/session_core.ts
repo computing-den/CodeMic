@@ -412,15 +412,18 @@ export default class SessionCore {
   }
 
   async readFile(file: t.File): Promise<Uint8Array> {
-    if (file.type === 'blob') {
-      return this.readBlob(file.sha1);
-    } else {
-      throw new Error(`TODO readFile ${file.type}`);
+    switch (file.type) {
+      case 'blob':
+        return this.readBlob(file.sha1);
+      case 'empty':
+        return new Uint8Array();
+      default:
+        throw new Error(`file type "${file.type}" not supported`);
     }
   }
 
   async writeFile(uri: string, file: t.File) {
-    const fsPath = URI.parse(this.resolveUri(uri)).fsPath;
+    const { scheme, fsPath } = URI.parse(this.resolveUri(uri));
     switch (file.type) {
       case 'dir':
         await fs.promises.mkdir(fsPath, { recursive: true });
@@ -429,6 +432,9 @@ export default class SessionCore {
         await this.copyBlobTo(file.sha1, fsPath);
         break;
       case 'empty':
+        if (scheme === 'file') {
+          await storage.writeString(fsPath, '');
+        }
         break;
       default:
         throw new Error(`writeFile unknown type ${file.type}`);

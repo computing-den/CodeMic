@@ -48,9 +48,7 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         t: 2,
         u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
-        x: e.text,
         e: e.eol,
-        i: e.isInWorktree,
       };
 
     case 'closeTextDocument':
@@ -242,9 +240,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         id: nextId(),
         uri: uris[e.u],
         clock: deserializeClock(e.c),
-        text: e.x,
         eol: e.e,
-        isInWorktree: e.i,
       };
     case 3:
       return {
@@ -360,9 +356,7 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         id: nextId(),
         uri,
         clock: deserializeClock(e.c),
-        text: e.x,
         eol: e.e,
-        isInWorktree: e.i,
       };
     case 3:
       return {

@@ -539,9 +539,9 @@ export type OpenTextDocumentEvent = {
   id: number;
   uri: string;
   clock: number;
-  text?: string;
+  // text?: string;
   eol: EndOfLine;
-  isInWorktree?: boolean;
+  // isInWorktree?: boolean;
 };
 
 export type CloseTextDocumentEvent = {
@@ -653,9 +653,9 @@ export type OpenTextDocumentEventCompact = {
   t: 2;
   u: number;
   c: number;
-  x?: string;
+  // x?: string;
   e: EndOfLine;
-  i?: boolean;
+  // i?: boolean;
 };
 
 export type CloseTextDocumentEventCompact = {
@@ -999,9 +999,9 @@ export namespace BodyFormatV1 {
   export type OpenTextDocumentEventCompact = {
     t: 2;
     c: number;
-    x?: string;
+    // x?: string;
     e: EndOfLine;
-    i: boolean;
+    // i: boolean;
   };
 
   export type CloseTextDocumentEventCompact = {

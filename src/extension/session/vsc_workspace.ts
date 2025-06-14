@@ -202,11 +202,11 @@ export default class VscWorkspace {
     }
 
     // Walk through text documents and create openTextDocument events.
-    // If document is dirty, insert text as well.
+    // If document is dirty, insert text change event as well (except for untitled document
+    //   because we've already inserted the content using fsCreate above)
     // Ignore files outside workspace or with schemes other than untitled or file.
     // Ignore deleted files.
     for (const vscTextDocument of vscode.workspace.textDocuments) {
-      // Ignore files outside workspace or with schemes other than untitled or file.
       if (!this.shouldRecordVscUri(vscTextDocument.uri)) continue;
 
       // If file is deleted but the text editor is still there, ignore it.
@@ -214,15 +214,37 @@ export default class VscWorkspace {
         continue;
       }
 
+      const uri = this.uriFromVsc(vscTextDocument.uri);
+
       events.push({
         type: 'openTextDocument',
         id: lib.nextId(),
-        uri: this.uriFromVsc(vscTextDocument.uri),
+        uri,
         clock: 0,
-        text: vscTextDocument.isDirty ? vscTextDocument.getText() : undefined,
         eol: VscWorkspace.eolFromVsc(vscTextDocument.eol),
         // isInWorktree: false,
       });
+
+      if (vscTextDocument.isDirty && vscTextDocument.uri.scheme === 'file') {
+        // Calculate revContentChanges for the textChange event based on the existing content in file.n
+        let revText = await fs.promises.readFile(vscTextDocument.uri.fsPath, 'utf8');
+        const eol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
+        const internalTextDocument = InternalTextDocument.fromText(uri, revText, eol);
+        const irContentChanges: lib.ContentChange[] = [
+          { range: internalTextDocument.getRange(), text: vscTextDocument.getText() },
+        ];
+        const irRevContentChanges = internalTextDocument.applyContentChanges(irContentChanges, true);
+
+        events.push({
+          type: 'textChange',
+          id: lib.nextId(),
+          uri,
+          clock: 0,
+          contentChanges: irContentChanges,
+          revContentChanges: irRevContentChanges,
+          updateSelection: false,
+        });
+      }
     }
 
     // Walk through open tabs and create showTextEditor events.
@@ -280,7 +302,7 @@ export default class VscWorkspace {
     for (const targetUri of targetUris) {
       if (URI.parse(targetUri).scheme !== 'workspace') continue;
 
-      const worktreeItem = internalWorkspace.getWorktreeItemByUri(targetUri);
+      const worktreeItem = internalWorkspace.findWorktreeItemByUri(targetUri);
       if (!worktreeItem) continue;
 
       const fsPath = URI.parse(this.session.core.resolveUri(targetUri)).fsPath;
@@ -330,7 +352,7 @@ export default class VscWorkspace {
     {
       const edit = new vscode.WorkspaceEdit();
       for (const targetUri of targetUris) {
-        const worktreeItem = internalWorkspace.getWorktreeItemByUri(targetUri);
+        const worktreeItem = internalWorkspace.findWorktreeItemByUri(targetUri);
         if (!worktreeItem) continue;
 
         let vscTextDocument = this.findVscTextDocumentByUri(targetUri);
