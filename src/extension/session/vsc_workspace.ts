@@ -163,7 +163,7 @@ export default class VscWorkspace {
     const events: t.EditorEvent[] = [];
     await this.rehydrateRelevantTextDocuments();
 
-    // Scan the workspace directory (files and dirs) and create store events.
+    // Scan the workspace directory (files and dirs) and create fsCreate events.
     const pathsWithStats = await this.session.core.readDirRecursively({ includeFiles: true, includeDirs: true });
     for (const [p, stat] of pathsWithStats) {
       const uri = lib.workspaceUri(p);
@@ -189,16 +189,16 @@ export default class VscWorkspace {
       }
     }
 
-    // Walk through untitled text documents and create store events.
+    // Walk through untitled text documents and create fsCreate events.
     for (const vscTextDocument of vscode.workspace.textDocuments) {
       if (vscTextDocument.uri.scheme !== 'untitled') continue;
 
       const uri = this.uriFromVsc(vscTextDocument.uri);
 
-      const data = new TextEncoder().encode(vscTextDocument.getText());
-      const sha1 = await misc.computeSHA1(data);
-      await this.session.core.writeBlob(sha1, data);
-      events.push({ type: 'fsCreate', id: lib.nextId(), uri, clock: 0, file: { type: 'blob', sha1 } });
+      // const data = new TextEncoder().encode(vscTextDocument.getText());
+      // const sha1 = await misc.computeSHA1(data);
+      // await this.session.core.writeBlob(sha1, data);
+      events.push({ type: 'fsCreate', id: lib.nextId(), uri, clock: 0, file: { type: 'empty' } });
     }
 
     // Walk through text documents and create openTextDocument events.
@@ -225,9 +225,19 @@ export default class VscWorkspace {
         // isInWorktree: false,
       });
 
-      if (vscTextDocument.isDirty && vscTextDocument.uri.scheme === 'file') {
-        // Calculate revContentChanges for the textChange event based on the existing content in file.n
-        let revText = await fs.promises.readFile(vscTextDocument.uri.fsPath, 'utf8');
+      if (vscTextDocument.isDirty) {
+        // Calculate revContentChanges for the textChange event.
+        let revText: string;
+        switch (vscTextDocument.uri.scheme) {
+          case 'untitled':
+            revText = '';
+            break;
+          case 'file':
+            revText = await fs.promises.readFile(vscTextDocument.uri.fsPath, 'utf8');
+            break;
+          default:
+            throw new Error(`uriFromVsc: unknown scheme: ${vscTextDocument.uri}`);
+        }
         const eol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
         const internalTextDocument = InternalTextDocument.fromText(uri, revText, eol);
         const irContentChanges: lib.ContentChange[] = [
@@ -850,18 +860,29 @@ export default class VscWorkspace {
         content: d.getText(),
         uri: this.uriFromVsc(d.uri),
       }));
-      const internalTextDocuments = this.internalWorkspace.textDocuments.map(d => ({
-        content: d.getText(),
-        uri: d.uri,
-      }));
+      const internalTextDocuments = await Promise.all(
+        this.internalWorkspace.textDocuments.map(async d => ({
+          content: d.getText(),
+          uri: d.uri,
+          isDirty: await this.internalWorkspace.isDocumentContentDirtyByUri(d.uri),
+        })),
+      );
 
       // Assert that internal and vscode text documents are the same.
       // It's ok for vscode to have extra text documents because we cannot explicitly close vscode text documents.
-      const diffInternalTextDocuments = _.differenceWith(internalTextDocuments, vscTextDocuments, _.isEqual);
-      if (!_.isEmpty(diffInternalTextDocuments)) {
-        const diffVscTextDocuments = _.compact(
-          diffInternalTextDocuments.map(d => _.find(vscTextDocuments, ['uri', d.uri])),
+      // It's ok for internal to have extra text documents if they are not dirty because we don't always close them.
+      const diffTextDocumentUris: string[] = [];
+      for (const internal of internalTextDocuments) {
+        const vsc = _.find(vscTextDocuments, ['uri', internal.uri]);
+        if ((vsc && vsc.content !== internal.content) || (!vsc && internal.isDirty)) {
+          diffTextDocumentUris.push(internal.uri);
+        }
+      }
+      if (!_.isEmpty(diffTextDocumentUris)) {
+        const diffInternalTextDocuments = _.filter(internalTextDocuments, ({ uri }) =>
+          _.includes(diffTextDocumentUris, uri),
         );
+        const diffVscTextDocuments = _.filter(vscTextDocuments, ({ uri }) => _.includes(diffTextDocumentUris, uri));
         throw new Error(
           `Internal and VSCode text documents are different:\n` +
             `internal documents diff: ${JSON.stringify(diffInternalTextDocuments, null, 2)}\n` +

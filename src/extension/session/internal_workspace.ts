@@ -94,6 +94,17 @@ export default class InternalWorkspace {
     }
   }
 
+  async isDocumentContentDirtyByUri(uri: string): Promise<boolean> {
+    const item = this.getWorktreeItemByUri(uri);
+    if (!item.document) return false;
+
+    const dContent = item.document.getContent();
+    const fContent = await this.session.core.readFile(item.file);
+    const dBuffer = Buffer.from(dContent.buffer, dContent.byteOffset, dContent.byteLength);
+    const fBuffer = Buffer.from(fContent.buffer, fContent.byteOffset, fContent.byteLength);
+    return !dBuffer.equals(fBuffer);
+  }
+
   findTextDocumentByUri(uri: string): InternalTextDocument | undefined {
     const textDocument = this.worktree.get(uri)?.document;
     return textDocument instanceof InternalTextDocument ? textDocument : undefined;

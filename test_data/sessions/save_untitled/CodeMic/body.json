@@ -1,0 +1,113 @@
+{
+  "full": true,
+  "editorEvents": [
+    {
+      "type": "fsCreate",
+      "id": 2,
+      "uri": "workspace:abc.txt",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "ba8d7655d12d8ebabf0ec47eb01f57cba267fa92" }
+    },
+    { "type": "fsCreate", "id": 3, "uri": "untitled:Untitled-1", "clock": 0, "file": { "type": "empty" } },
+    { "type": "openTextDocument", "id": 4, "uri": "untitled:Untitled-1", "clock": 0, "eol": "\n" },
+    {
+      "type": "textChange",
+      "id": 5,
+      "uri": "untitled:Untitled-1",
+      "clock": 0,
+      "contentChanges": [
+        { "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 0 } }, "text": "Dirty" }
+      ],
+      "revContentChanges": [
+        { "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 5 } }, "text": "" }
+      ],
+      "updateSelection": false
+    },
+    {
+      "type": "showTextEditor",
+      "id": 6,
+      "uri": "untitled:Untitled-1",
+      "clock": 0,
+      "selections": [{ "anchor": { "line": 0, "character": 5 }, "active": { "line": 0, "character": 5 } }],
+      "visibleRange": { "start": 0, "end": 0 }
+    },
+    {
+      "type": "fsCreate",
+      "id": 7,
+      "uri": "workspace:New%20stuff.perl",
+      "clock": 5.067503739,
+      "file": { "type": "empty" }
+    },
+    { "type": "openTextDocument", "id": 8, "uri": "workspace:New%20stuff.perl", "clock": 5.067503739, "eol": "\n" },
+    {
+      "type": "textInsert",
+      "id": 9,
+      "uri": "workspace:New%20stuff.perl",
+      "clock": 5.067503739,
+      "revRange": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 5 } },
+      "text": "Dirty",
+      "updateSelection": false
+    },
+    {
+      "type": "textChange",
+      "id": 12,
+      "uri": "untitled:Untitled-1",
+      "clock": 5.067503739,
+      "contentChanges": [
+        { "text": "", "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 5 } } }
+      ],
+      "revContentChanges": [
+        { "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 0 } }, "text": "Dirty" }
+      ],
+      "updateSelection": false
+    },
+    {
+      "type": "select",
+      "id": 13,
+      "uri": "untitled:Untitled-1",
+      "clock": 5.067503739,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "revSelections": [{ "anchor": { "line": 0, "character": 5 }, "active": { "line": 0, "character": 5 } }]
+    },
+    {
+      "type": "closeTextEditor",
+      "id": 14,
+      "uri": "untitled:Untitled-1",
+      "active": true,
+      "clock": 5.067503739,
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "revVisibleRange": { "start": 0, "end": 0 }
+    },
+    {
+      "type": "showTextEditor",
+      "id": 15,
+      "uri": "workspace:New%20stuff.perl",
+      "clock": 5.067503739,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 0 }
+    },
+    {
+      "type": "select",
+      "id": 16,
+      "uri": "workspace:New%20stuff.perl",
+      "clock": 5.067503739,
+      "selections": [{ "anchor": { "line": 0, "character": 5 }, "active": { "line": 0, "character": 5 } }],
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }]
+    },
+    {
+      "type": "fsChange",
+      "id": 17,
+      "uri": "workspace:New%20stuff.perl",
+      "clock": 5.170411519999995,
+      "file": { "type": "blob", "sha1": "6b5a06ae49acf38c1119aa226c68fad7228b22aa" },
+      "revFile": { "type": "empty" }
+    }
+  ],
+  "audioTracks": [],
+  "videoTracks": [],
+  "focusTimeline": [
+    { "clock": 0, "uri": "untitled:Untitled-1", "number": 0, "text": "Dirty" },
+    { "clock": 5.067503739, "uri": "workspace:New%20stuff.perl", "number": 0, "text": "Dirty" }
+  ],
+  "defaultEol": "\n"
+}

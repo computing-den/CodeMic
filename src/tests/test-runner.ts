@@ -8,6 +8,8 @@ export async function run(): Promise<void> {
     ui: 'tdd',
     color: true,
     timeout: 3_000_000,
+    parallel: false,
+    asyncOnly: true,
   });
 
   const testsRoot = path.resolve(__dirname);

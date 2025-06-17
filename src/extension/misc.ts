@@ -2,7 +2,6 @@ import nodePath from 'path';
 import os from 'os';
 import * as t from '../lib/types.js';
 import _ from 'lodash';
-import assert from 'assert';
 import crypto from 'crypto';
 import type { Progress } from './types.js';
 import path from 'path';

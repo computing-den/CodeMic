@@ -137,7 +137,10 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     if (direction === t.Direction.Forwards) {
       this.internalWorkspace.closeTextEditorByUri(e.uri);
     } else {
-      await this.internalWorkspace.openTextEditorByUri(e.uri, e.revSelections, e.revVisibleRange);
+      const textEditor = await this.internalWorkspace.openTextEditorByUri(e.uri, e.revSelections, e.revVisibleRange);
+      if (e.active) {
+        this.internalWorkspace.activeTextEditor = textEditor;
+      }
     }
   }
 

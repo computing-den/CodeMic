@@ -5,7 +5,6 @@ import VscWorkspaceStepper from './vsc_workspace_stepper.js';
 import config from '../config.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
-import assert from 'assert';
 import { LoadedSession } from './session.js';
 import VscWorkspace from './vsc_workspace.js';
 

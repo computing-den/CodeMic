@@ -1,0 +1,13 @@
+{
+  "id": "a565bd77-b455-4485-8812-2c08dd5cb709",
+  "handle": "save_untitled",
+  "title": "Save untitled",
+  "description": "",
+  "author": "sean_shirazi",
+  "duration": 8.736786036999993,
+  "modificationTimestamp": "2025-06-17T12:35:18.020Z",
+  "toc": [],
+  "formatVersion": 2,
+  "ignorePatterns": "# Ignore the .git directory\n.git\n\n# Node.js dependencies\nnode_modules\n\n# Python byte-compiled / optimized / DLL files\n__pycache__\n*.py[cod]\n*$py.class\n\n",
+  "hasCover": false
+}

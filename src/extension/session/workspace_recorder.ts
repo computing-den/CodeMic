@@ -412,6 +412,7 @@ class WorkspaceRecorder {
       const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
       const revSelections = irTextEditor?.selections;
       const revVisibleRange = irTextEditor?.visibleRange;
+      const active = Boolean(irTextEditor && this.internalWorkspace.activeTextEditor === irTextEditor);
       this.internalWorkspace.closeTextEditorByUri(uri);
       this.insertEvent(
         {
@@ -419,6 +420,7 @@ class WorkspaceRecorder {
           id: lib.nextId(),
           uri,
           clock: this.clock,
+          active,
           revSelections,
           revVisibleRange,
         },

@@ -9,6 +9,8 @@ export default defineConfig([
     mocha: {
       ui: 'tdd',
       timeout: 3_000_000,
+      parallel: false,
+      asyncOnly: true,
     },
   },
   // you can specify additional test configurations, too

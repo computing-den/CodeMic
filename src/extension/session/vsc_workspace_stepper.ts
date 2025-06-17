@@ -214,7 +214,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     if (direction === t.Direction.Forwards) {
       await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
     } else {
-      const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(e.uri, { preserveFocus: false });
+      const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(e.uri);
       if (e.revSelections) {
         vscTextEditor.selections = VscWorkspace.toVscSelections(e.revSelections);
       }

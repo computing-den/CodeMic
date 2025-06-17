@@ -1,10 +1,10 @@
 import config from './config.js';
 import * as vscode from 'vscode';
-import assert from 'assert';
 import _ from 'lodash';
 import * as t from '../lib/types.js';
 import * as b from '../lib/bus.js';
 import osPaths from './os_paths.js';
+import assert from '../lib/assert.js';
 
 class WebviewProvider implements vscode.WebviewViewProvider {
   static readonly viewType = 'codemic-view';

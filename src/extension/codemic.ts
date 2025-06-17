@@ -7,7 +7,6 @@ import type { Context } from './types.js';
 import osPaths from './os_paths.js';
 import * as vscode from 'vscode';
 import _ from 'lodash';
-import assert from 'assert';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import * as paths from '../lib/paths.js';
@@ -15,6 +14,7 @@ import VscWorkspace from './session/vsc_workspace.js';
 import path from 'path';
 import cache from './cache.js';
 import SessionCore from './session/session_core.js';
+import assert from '../lib/assert.js';
 
 type OpenScreenParams =
   | { screen: t.Screen.Loading }
@@ -1050,7 +1050,6 @@ class CodeMic {
   }
 
   async refreshWelcomeScreen() {
-    this.welcome = undefined;
     await this.openScreen({ screen: t.Screen.Welcome });
   }
 

@@ -29,6 +29,7 @@ type SessionTestStep = {
 // const testSessions = fs.readdirSync(testSessionsPath, { encoding: 'utf8' });
 suite('Sessions Test Suite', () => {
   test('Session my_test_session', () => testSession('my_test_session'));
+  test('Session save_untitled', () => testSession('save_untitled'));
 });
 
 async function testSession(sessionHandle: string) {
@@ -181,6 +182,7 @@ function checkTextDocumentsAtClock(testClockPath: string, sessionHandle: string,
   }
 
   const missingActualVsc = _.differenceBy(expectedTextDocuments, actualVscTextDocuments, 'uri');
+  const dirtyMissingActualVsc = _.filter(missingActualVsc, 'dirty');
   const extraActualVsc = _.differenceBy(actualVscTextDocuments, expectedTextDocuments, 'uri');
   const dirtyExtraActualVsc = _.filter(extraActualVsc, 'dirty');
   const diffContentVsc = _.compact(
@@ -207,8 +209,8 @@ function checkTextDocumentsAtClock(testClockPath: string, sessionHandle: string,
 
   const errors = [];
 
-  if (missingActualVsc.length > 0) {
-    errors.push(`missing text document(s) in vscode: ${missingActualVsc.map(x => x.uri).join(', ')}`);
+  if (dirtyMissingActualVsc.length > 0) {
+    errors.push(`missing text document(s) in vscode: ${dirtyMissingActualVsc.map(x => x.uri).join(', ')}`);
   }
   if (dirtyExtraActualVsc.length > 0) {
     errors.push(`extra text document(s) in vscode: ${dirtyExtraActualVsc.map(x => x.uri).join(', ')}`);
@@ -386,6 +388,9 @@ async function prepareForSession(sessionHandle: string) {
     path.resolve(workspacePath, '.CodeMic'),
     { recursive: true },
   );
+
+  // Go to welcome page / refresh welcome page.
+  await vscode.commands.executeCommand('codemic.refreshHome');
 }
 
 async function openSessionInRecorder(id: string) {

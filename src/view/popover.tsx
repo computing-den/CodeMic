@@ -10,9 +10,9 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useClickOutsideHandler } from './hooks';
+import { useClickOutsideHandler } from './hooks.js';
 import _ from 'lodash';
-import assert from '../lib/assert';
+import assert from '../lib/assert.js';
 import ReactDOM from 'react-dom';
 
 export type HorizontalPlacement = 'left' | 'right' | 'center';

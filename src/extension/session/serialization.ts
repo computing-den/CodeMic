@@ -67,7 +67,7 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         c: serializeClock(e.clock),
         s: e.selections?.map(serializeSelection),
         v: e.visibleRange && serializeLineRange(e.visibleRange),
-        ru: e.revUri,
+        ru: e.revUri ? uriMap.get(e.revUri) : undefined,
         rs: e.revSelections?.map(serializeSelection),
         rv: e.revVisibleRange && serializeLineRange(e.revVisibleRange),
         rver: e.recorderVersion,
@@ -78,6 +78,7 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         t: 5,
         u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
+        a: e.active ? undefined : false,
         rs: e.revSelections?.map(serializeSelection),
         rv: e.revVisibleRange && serializeLineRange(e.revVisibleRange),
       };
@@ -259,7 +260,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         clock: deserializeClock(e.c),
         selections: e.s?.map(deserializeSelection),
         visibleRange: e.v && deserializeLineRange(e.v),
-        revUri: e.ru,
+        revUri: e.ru === undefined ? undefined : uris[e.ru],
         revSelections: e.rs?.map(deserializeSelection),
         revVisibleRange: e.rv && deserializeLineRange(e.rv),
         recorderVersion: e.rver,
@@ -270,6 +271,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         id: nextId(),
         uri: uris[e.u],
         clock: deserializeClock(e.c),
+        active: e.a === undefined ? true : false,
         revSelections: e.rs?.map(deserializeSelection),
         revVisibleRange: e.rv && deserializeLineRange(e.rv),
       };
@@ -386,6 +388,7 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         id: nextId(),
         uri,
         clock: deserializeClock(e.c),
+        active: true,
         revSelections: e.rs?.map(deserializeSelection),
         revVisibleRange: e.rv && deserializeLineRange(e.rv),
       };

@@ -577,6 +577,7 @@ export type CloseTextEditorEvent = {
   id: number;
   uri: string;
   clock: number;
+  active: boolean;
   revSelections?: Selection[];
   revVisibleRange?: LineRange;
   // revSelections: Selection[];
@@ -672,7 +673,7 @@ export type ShowTextEditorEventCompact = {
   c: number;
   s: SelectionCompact[];
   v: LineRangeCompact;
-  ru?: string;
+  ru?: number;
   rs?: SelectionCompact[];
   rv?: LineRangeCompact;
   rver?: number;
@@ -683,6 +684,7 @@ export type CloseTextEditorEventCompact = {
   t: 5;
   u: number;
   c: number;
+  a?: boolean; // undefined means true
   rs?: SelectionCompact[];
   rv?: LineRangeCompact;
 };
