@@ -30,6 +30,7 @@ type SessionTestStep = {
 suite('Sessions Test Suite', () => {
   test('Session my_test_session', () => testSession('my_test_session'));
   test('Session save_untitled', () => testSession('save_untitled'));
+  test('Session delete_file_externally', () => testSession('delete_file_externally'));
 });
 
 async function testSession(sessionHandle: string) {

@@ -804,10 +804,10 @@ class WorkspaceRecorder {
     if (!this.vscWorkspace.shouldRecordVscUri(vscUri)) return;
 
     const uri = this.vscWorkspace.uriFromVsc(vscUri);
-    logAcceptedEvent(`accepted save for ${uri}`);
+    logAcceptedEvent(`accepted delete for ${uri}`);
 
-    const stat = await fs.promises.stat(vscUri.fsPath);
-    assert(stat.isFile() || stat.isDirectory(), `Expected ${vscUri.fsPath} to be a regular file or directory.`);
+    // const stat = await fs.promises.stat(vscUri.fsPath);
+    // assert(stat.isFile() || stat.isDirectory(), `Expected ${vscUri.fsPath} to be a regular file or directory.`);
 
     // const data = await fs.promises.readFile(vscUri.fsPath);
     // const sha1 = await misc.computeSHA1(data);

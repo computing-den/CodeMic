@@ -1,0 +1,13 @@
+{
+  "id": "97b5da3a-2c5d-4b5d-a512-f6aa00ba9148",
+  "handle": "delete_file_externally",
+  "title": "Delete file externally",
+  "description": "",
+  "author": "sean_shirazi",
+  "duration": 14.130641357999997,
+  "modificationTimestamp": "2025-06-17T14:33:44.149Z",
+  "toc": [],
+  "formatVersion": 2,
+  "ignorePatterns": "# Ignore the .git directory\n.git\n\n# Node.js dependencies\nnode_modules\n\n# Python byte-compiled / optimized / DLL files\n__pycache__\n*.py[cod]\n*$py.class\n\n",
+  "hasCover": false
+}
