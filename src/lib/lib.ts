@@ -428,6 +428,21 @@ export function workspaceUriFrom(workspace: string, absPath: string): string {
 //   return p.startsWith(base) && (base.length === p.length || p[base.length] === path.sep);
 // }
 
+export function getUnixPathHierarchy(p: string): string[] {
+  const res: string[] = [];
+  const components = p.split('/');
+  for (let i = 0; i < components.length; i++) {
+    res.push(path.join(...components.slice(0, i + 1)));
+  }
+  return res;
+}
+
+export function getWorkspaceUriHierarchy(uri: string): string[] {
+  const uriParsed = URI.parse(uri);
+  assert(uriParsed.scheme === 'workspace');
+  return getUnixPathHierarchy(uriParsed.fsPath).map(workspaceUri);
+}
+
 export function logRejectedPromises(results: PromiseSettledResult<any>[]) {
   for (const result of results) {
     if (result.status === 'rejected') console.error(result.reason);

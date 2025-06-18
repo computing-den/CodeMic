@@ -728,7 +728,7 @@ class WorkspaceRecorder {
     // When saving an untitled document, fsCreate may come last.
     // By then, we've already issued an fsCreate ourselves.
     // So, let's change this to an fsChange.
-    if (this.internalWorkspace.doesUriExist(uri)) {
+    if (this.internalWorkspace.isUriInWorktree(uri)) {
       logRawEvent(`changing fsCreate to fsChange because item already existed internally ${vscUri}`);
       return this.fsChange(vscUri);
     }
@@ -743,7 +743,7 @@ class WorkspaceRecorder {
     const file: t.File = { type: 'blob', sha1 };
     await this.session.core.writeBlob(sha1, data);
 
-    assert(!this.internalWorkspace.doesUriExist(uri));
+    assert(!this.internalWorkspace.isUriInWorktree(uri));
     this.internalWorkspace.insertOrUpdateFile(uri, file);
 
     this.insertEvent(

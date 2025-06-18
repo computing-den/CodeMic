@@ -8,7 +8,8 @@ import TextDocument from './internal_text_document.js';
  */
 export default class InternalTextEditor implements t.InternalEditor {
   constructor(
-    public document: TextDocument,
+    public uri: string,
+    public document?: TextDocument,
     public selections: Selection[] = [new Selection(new Position(0, 0), new Position(0, 0))],
     public visibleRange: LineRange = new LineRange(0, 1),
   ) {}
@@ -18,7 +19,7 @@ export default class InternalTextEditor implements t.InternalEditor {
   }
 
   get currentLineText(): string {
-    return this.document.lines[this.currentLine] ?? '';
+    return this.document?.lines[this.currentLine] ?? '';
   }
 
   select(selections: Selection[]) {

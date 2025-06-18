@@ -6,6 +6,10 @@ import assert from '../../lib/assert.js';
 export default class InternalTextDocument implements t.InternalDocument {
   constructor(public uri: string, public lines: string[], public eol: t.EndOfLine) {}
 
+  static fromBuffer(uri: string, arrayBuffer: Uint8Array, defaultEol: t.EndOfLine): InternalTextDocument {
+    return InternalTextDocument.fromText(uri, new TextDecoder().decode(arrayBuffer), defaultEol);
+  }
+
   static fromText(uri: string, text: string, defaultEol: t.EndOfLine): InternalTextDocument {
     const eol = (text.match(/\r?\n/)?.[0] as t.EndOfLine) || defaultEol;
     const lines = text.split(/\r?\n/);

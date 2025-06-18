@@ -549,7 +549,7 @@ export type CloseTextDocumentEvent = {
   id: number;
   uri: string;
   clock: number;
-  revText: string;
+  // revText: string;
   revEol: EndOfLine;
 };
 
@@ -823,7 +823,8 @@ export type SessionEffect =
     };
 
 export interface InternalEditor {
-  document: InternalDocument;
+  uri: string;
+  document?: InternalDocument;
 }
 
 export interface InternalDocument {
@@ -832,13 +833,13 @@ export interface InternalDocument {
 
 // export type Worktree = { [key: Uri]: File };
 
-export type File = DirFile | EmptyFile | BlobFile | GitFile;
+export type File = DirFile | /*EmptyFile | */ BlobFile | GitFile;
 export type DirFile = {
   type: 'dir';
 };
-export type EmptyFile = {
-  type: 'empty';
-};
+// export type EmptyFile = {
+//   type: 'empty';
+// };
 export type BlobFile = {
   type: 'blob';
   sha1: string;

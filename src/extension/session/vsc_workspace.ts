@@ -402,7 +402,7 @@ export default class VscWorkspace {
     if (wasGivenTargetUris) {
       // Only check paths in targetUris.
       for (const targetUri of targetUris) {
-        if (!internalWorkspace.doesUriExist(targetUri)) {
+        if (!internalWorkspace.isUriInWorktree(targetUri)) {
           if (URI.parse(targetUri).scheme === 'workspace') {
             await fs.promises.rm(URI.parse(this.session.core.resolveUri(targetUri)).fsPath, {
               force: true,
@@ -419,7 +419,7 @@ export default class VscWorkspace {
       });
       for (const [p] of workspacePathsWithStats) {
         const uri = lib.workspaceUri(p);
-        if (!internalWorkspace.doesUriExist(uri)) {
+        if (!internalWorkspace.isUriInWorktree(uri)) {
           await fs.promises.rm(path.join(this.session.workspace, p), { force: true, recursive: true });
         }
       }

@@ -4,7 +4,7 @@ import * as t from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import workspaceStepperDispatch from './workspace_stepper_dispatch.js';
-import InternalWorkspace from './internal_workspace.js';
+import InternalWorkspace, { LiveWorktree } from './internal_workspace.js';
 import InternalTextDocument from './internal_text_document.js';
 import { LoadedSession } from './session.js';
 
@@ -13,6 +13,10 @@ import { LoadedSession } from './session.js';
 class InternalWorkspaceStepper implements t.WorkspaceStepper {
   constructor(private session: LoadedSession, private internalWorkspace: InternalWorkspace) {}
 
+  get worktree(): LiveWorktree {
+    return this.internalWorkspace.worktree;
+  }
+
   async applyEditorEvent(event: t.EditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
     await workspaceStepperDispatch(this, event, direction, uriSet);
   }
@@ -20,45 +24,45 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
   async applyFsCreateEvent(e: t.FsCreateEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(e.uri);
     if (direction === t.Direction.Forwards) {
-      this.internalWorkspace.insertOrUpdateFile(e.uri, e.file);
+      this.worktree.addOrUpdateFile(e.uri, e.file, { createHierarchy: true });
     } else {
-      this.internalWorkspace.deleteFileByUri(e.uri);
+      this.worktree.get(e.uri).closeFile();
     }
   }
 
   async applyFsChangeEvent(e: t.FsChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(e.uri);
-    const item = this.internalWorkspace.getWorktreeItemByUri(e.uri);
     if (direction === t.Direction.Forwards) {
-      item.file = e.file;
+      this.worktree.get(e.uri).setFile(e.file);
     } else {
-      item.file = e.revFile;
+      this.worktree.get(e.uri).setFile(e.revFile);
     }
   }
 
   async applyFsDeleteEvent(e: t.FsDeleteEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(e.uri);
     if (direction === t.Direction.Forwards) {
-      this.internalWorkspace.deleteFileByUri(e.uri);
+      this.worktree.get(e.uri).closeFile();
     } else {
-      this.internalWorkspace.insertOrUpdateFile(e.uri, e.revFile);
+      this.worktree.addOrUpdateFile(e.uri, e.revFile, { createHierarchy: true });
     }
   }
 
   async applyTextChangeEvent(e: t.TextChangeEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(e.uri);
-    const textDocument = await this.internalWorkspace.openTextDocumentByUri(e.uri);
+    const item = this.worktree.get(e.uri);
+    const textDocument = item.textDocument;
+    assert(textDocument);
+
     if (direction === t.Direction.Forwards) {
       textDocument.applyContentChanges(e.contentChanges, false);
       if (e.updateSelection) {
-        const textEditor = await this.internalWorkspace.openTextEditorByUri(e.uri);
-        textEditor.select(lib.getSelectionsAfterTextChangeEvent(e));
+        await item.openTextEditor({ selections: lib.getSelectionsAfterTextChangeEvent(e), eol: textDocument.eol });
       }
     } else {
       textDocument.applyContentChanges(e.revContentChanges, false);
       if (e.updateSelection) {
-        const textEditor = await this.internalWorkspace.openTextEditorByUri(e.uri);
-        textEditor.select(lib.getSelectionsBeforeTextChangeEvent(e));
+        await item.openTextEditor({ selections: lib.getSelectionsBeforeTextChangeEvent(e), eol: textDocument.eol });
       }
     }
   }
@@ -67,24 +71,22 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     if (uriSet) uriSet.add(e.uri);
 
     if (direction === t.Direction.Forwards) {
-      // Even untitled uris have fsCreate before openTextDocument.
-      await this.internalWorkspace.openTextDocumentByUri(e.uri, e.eol);
+      const item = this.worktree.getOpt(e.uri) ?? this.worktree.add(e.uri);
+      await item.openTextDocument({ eol: e.eol });
     } else {
-      this.internalWorkspace.closeTextDocumentByUri(e.uri);
+      await this.worktree.get(e.uri).closeTextDocument();
     }
   }
 
   async applyCloseTextDocumentEvent(e: t.CloseTextDocumentEvent, direction: t.Direction, uriSet?: t.UriSet) {
-    throw new Error('TODO');
-    // if (uriSet) uriSet.add(uri);
+    if (uriSet) uriSet.add(e.uri);
 
-    // assert(URI.parse(uri).scheme === 'untitled', 'Must only record closeTextDocument for untitled URIs');
-
-    // if (direction === t.Direction.Forwards) {
-    //   this.internalWorkspace.closeAndRemoveTextDocumentByUri(uri);
-    // } else {
-    //   this.internalWorkspace.insertTextDocument(InternalTextDocument.fromText(uri, e.revText, e.revEol));
-    // }
+    if (direction === t.Direction.Forwards) {
+      await this.worktree.get(e.uri).closeTextDocument();
+    } else {
+      const item = this.worktree.getOpt(e.uri) ?? this.worktree.add(e.uri);
+      await item.openTextDocument({ eol: e.revEol });
+    }
   }
 
   async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction, uriSet?: t.UriSet) {
@@ -96,37 +98,33 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     if (e.recorderVersion === 1) {
       if (direction === t.Direction.Forwards) {
         if (uriSet) uriSet.add(e.uri);
-        const textEditor = await this.internalWorkspace.openTextEditorByUri(e.uri, e.selections, e.visibleRange);
-        this.internalWorkspace.activeTextEditor = textEditor;
+
+        const item = this.worktree.get(e.uri);
+        await item.openTextEditor({ selections: e.selections, visibleRange: e.visibleRange });
+        this.worktree.activeTextEditorUri = e.uri;
       } else if (e.revUri) {
         if (uriSet) uriSet.add(e.revUri);
-        const textEditor = await this.internalWorkspace.openTextEditorByUri(
-          e.revUri,
-          e.revSelections,
-          e.revVisibleRange,
-        );
-        this.internalWorkspace.activeTextEditor = textEditor;
+        const item = this.worktree.get(e.revUri);
+        await item.openTextEditor({ selections: e.revSelections, visibleRange: e.revVisibleRange });
+        this.worktree.activeTextEditorUri = e.revUri;
       }
     } else {
       if (direction === t.Direction.Forwards) {
         if (uriSet) uriSet.add(e.uri);
-        const textEditor = await this.internalWorkspace.openTextEditorByUri(e.uri, e.selections, e.visibleRange);
-        this.internalWorkspace.activeTextEditor = textEditor;
+        const item = this.worktree.get(e.uri);
+        await item.openTextEditor({ selections: e.selections, visibleRange: e.visibleRange });
+        this.worktree.activeTextEditorUri = e.uri;
       } else {
         // Reverse e.uri's text editor's selection and visible range.
         if (uriSet) uriSet.add(e.uri);
-        const textEditor = this.internalWorkspace.getTextEditorByUri(e.uri);
+        const textEditor = this.worktree.get(e.uri).textEditor;
+        assert(textEditor);
         if (e.revSelections) textEditor.select(e.revSelections);
         if (e.revVisibleRange) textEditor.scroll(e.revVisibleRange);
 
         // Go back to e.revUri if any or clear active text editor.
-        if (e.revUri) {
-          if (uriSet) uriSet.add(e.revUri);
-          const revTextEditor = this.internalWorkspace.getTextEditorByUri(e.revUri);
-          this.internalWorkspace.activeTextEditor = revTextEditor;
-        } else {
-          this.internalWorkspace.activeTextEditor = undefined;
-        }
+        if (e.revUri && uriSet) uriSet.add(e.revUri);
+        this.worktree.activeTextEditorUri = e.revUri;
       }
     }
   }
@@ -135,30 +133,34 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     if (uriSet) uriSet.add(e.uri);
 
     if (direction === t.Direction.Forwards) {
-      this.internalWorkspace.closeTextEditorByUri(e.uri);
-    } else {
-      const textEditor = await this.internalWorkspace.openTextEditorByUri(e.uri, e.revSelections, e.revVisibleRange);
-      if (e.active) {
-        this.internalWorkspace.activeTextEditor = textEditor;
+      this.worktree.get(e.uri).closeTextEditor();
+      if (this.worktree.activeTextEditorUri === e.uri) {
+        this.worktree.activeTextEditorUri = undefined;
       }
+    } else {
+      const item = this.worktree.get(e.uri);
+      await item.openTextEditor({ selections: e.revSelections, visibleRange: e.revVisibleRange });
+      if (e.active) this.worktree.activeTextEditorUri = e.uri;
     }
   }
 
   async applySelectEvent(e: t.SelectEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(e.uri);
-    const textEditor = await this.internalWorkspace.openTextEditorByUri(e.uri);
+    const textEditor = this.worktree.get(e.uri).textEditor;
+    assert(textEditor);
+
     if (direction === t.Direction.Forwards) {
       textEditor.select(e.selections);
-      // textEditor.scroll(e.visibleRange);
     } else {
       textEditor.select(e.revSelections);
-      // textEditor.scroll(e.revVisibleRange);
     }
   }
 
   async applyScrollEvent(e: t.ScrollEvent, direction: t.Direction, uriSet?: t.UriSet) {
     if (uriSet) uriSet.add(e.uri);
-    const textEditor = await this.internalWorkspace.openTextEditorByUri(e.uri);
+    const textEditor = this.worktree.get(e.uri).textEditor;
+    assert(textEditor);
+
     if (direction === t.Direction.Forwards) {
       textEditor.scroll(e.visibleRange);
     } else {
