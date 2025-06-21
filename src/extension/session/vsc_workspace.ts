@@ -13,8 +13,7 @@ import _ from 'lodash';
 import vscode from 'vscode';
 import path from 'path';
 import { URI } from 'vscode-uri';
-import InternalWorkspace from './internal_workspace.js';
-import VscWorkspaceStepper from './vsc_workspace_stepper.js';
+import InternalWorkspace, { LiveWorktree } from './internal_workspace.js';
 import { serializeTestMeta } from './serialization.js';
 
 type TabWithInputText = Omit<vscode.Tab, 'input'> & {
@@ -156,6 +155,10 @@ export default class VscWorkspace {
     return eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
   }
 
+  private get worktree(): LiveWorktree {
+    return this.internalWorkspace.worktree;
+  }
+
   async scanDirAndVsc(): Promise<t.EditorEvent[]> {
     assert(this.session.isLoaded(), 'Session must be loaded before it can be scanned.'); // make sure session has body
     assert(this.session.mustScan, 'Session is not meant for scan.');
@@ -189,21 +192,20 @@ export default class VscWorkspace {
       }
     }
 
-    // Walk through untitled text documents and create fsCreate events.
-    for (const vscTextDocument of vscode.workspace.textDocuments) {
-      if (vscTextDocument.uri.scheme !== 'untitled') continue;
+    // // Walk through untitled text documents and create fsCreate events.
+    // for (const vscTextDocument of vscode.workspace.textDocuments) {
+    //   if (vscTextDocument.uri.scheme !== 'untitled') continue;
 
-      const uri = this.uriFromVsc(vscTextDocument.uri);
+    //   const uri = this.uriFromVsc(vscTextDocument.uri);
 
-      // const data = new TextEncoder().encode(vscTextDocument.getText());
-      // const sha1 = await misc.computeSHA1(data);
-      // await this.session.core.writeBlob(sha1, data);
-      events.push({ type: 'fsCreate', id: lib.nextId(), uri, clock: 0, file: { type: 'empty' } });
-    }
+    //   // const data = new TextEncoder().encode(vscTextDocument.getText());
+    //   // const sha1 = await misc.computeSHA1(data);
+    //   // await this.session.core.writeBlob(sha1, data);
+    //   events.push({ type: 'fsCreate', id: lib.nextId(), uri, clock: 0, file: { type: 'empty' } });
+    // }
 
     // Walk through text documents and create openTextDocument events.
-    // If document is dirty, insert text change event as well (except for untitled document
-    //   because we've already inserted the content using fsCreate above)
+    // If document is dirty, insert text change event as well.
     // Ignore files outside workspace or with schemes other than untitled or file.
     // Ignore deleted files.
     for (const vscTextDocument of vscode.workspace.textDocuments) {
@@ -222,10 +224,9 @@ export default class VscWorkspace {
         uri,
         clock: 0,
         eol: VscWorkspace.eolFromVsc(vscTextDocument.eol),
-        // isInWorktree: false,
       });
 
-      if (vscTextDocument.isDirty) {
+      if (this.isVscTextDocumentDirty(vscTextDocument)) {
         // Calculate revContentChanges for the textChange event.
         let revText: string;
         switch (vscTextDocument.uri.scheme) {
@@ -280,11 +281,14 @@ export default class VscWorkspace {
         clock: 0,
         selections,
         visibleRange,
+        justOpened: true,
       });
     }
 
     // Restore active text editor.
     if (originalActiveTextEditor) {
+      // Don't use this.openTextDocumentByVscUri because it refuses to
+      // open untitled documents with associated files.
       await vscode.window.showTextDocument(originalActiveTextEditor.document);
     }
 
@@ -294,7 +298,7 @@ export default class VscWorkspace {
   async sync(targetUris?: string[]) {
     // Vscode does not let us close a TextDocument. We can only close tabs and tab groups.
 
-    const { internalWorkspace } = this;
+    const worktree = this.worktree;
     const urisChangedOnDisk = new Set();
 
     // Make sure workspace path exists.
@@ -302,18 +306,18 @@ export default class VscWorkspace {
 
     // If targetUris are not given, all uris in worktree are targets.
     const wasGivenTargetUris = Boolean(targetUris);
-    targetUris ??= internalWorkspace.getWorktreeUris();
+    targetUris ??= worktree.getUris();
 
     // Sync files on disk.
     // If uri scheme is not workspace, ignore it. We're looking for workspace files/dirs.
-    // If uri is not in worktree, ignore it. Will delete later.
+    // If uri is not in worktree or has no file, ignore it. Will delete later.
     // If its type (dir vs file) is different than in worktree delete it first.
     // If it doesn't exist or its sha1 is different than in worktree, copy blob to workspace.
     for (const targetUri of targetUris) {
       if (URI.parse(targetUri).scheme !== 'workspace') continue;
 
-      const worktreeItem = internalWorkspace.findWorktreeItemByUri(targetUri);
-      if (!worktreeItem) continue;
+      const item = worktree.getOpt(targetUri);
+      if (!item?.file) continue;
 
       const fsPath = URI.parse(this.session.core.resolveUri(targetUri)).fsPath;
 
@@ -321,7 +325,7 @@ export default class VscWorkspace {
       const errorNoEntry = (statError as NodeJS.ErrnoException | null)?.code === 'ENOENT';
       if (statError && !errorNoEntry) throw statError;
 
-      switch (worktreeItem.file.type) {
+      switch (item.file.type) {
         case 'dir': {
           if (!stat?.isDirectory()) {
             await fs.promises.rm(fsPath, { force: true, recursive: true });
@@ -339,21 +343,22 @@ export default class VscWorkspace {
             urisChangedOnDisk.add(targetUri);
           }
           const existingSha1 = stat?.isFile() && (await misc.computeSHA1(await fs.promises.readFile(fsPath)));
-          if (existingSha1 !== worktreeItem.file.sha1) {
-            await this.session.core.copyBlobTo(worktreeItem.file.sha1, fsPath);
+          if (existingSha1 !== item.file.sha1) {
+            await this.session.core.copyBlobTo(item.file.sha1, fsPath);
             urisChangedOnDisk.add(targetUri);
           }
           break;
         }
         default:
-          throw new Error(`Cannot sync file of type ${worktreeItem.file.type}`);
+          throw new Error(`Cannot sync file of type ${item.file.type}`);
       }
     }
 
     // Sync vscode text documents and text editors.
-    // If uri is not in worktree, ignore it. It's already been deleted above.
+    // If uri is not in worktree, ignore it. Will close later.
     // If uri scheme is workspace and there is a vscode document open:
-    //   If uri was changed above on disk or document is not in worktree, then revert vsc document to avoid warnings later.
+    //   If uri was changed above on disk or has no internal document, then revert vsc document to avoid warnings later.
+    //   NOTE: if there's no internal document, it means all the changes in vsc, if any, must be thrown out.
     //   NOTE: reverting a document may open its text editor even if it was closed. So we must make sure
     //         to revert documents before attempting to close anything.
     // If internal document is open:
@@ -362,25 +367,24 @@ export default class VscWorkspace {
     {
       const edit = new vscode.WorkspaceEdit();
       for (const targetUri of targetUris) {
-        const worktreeItem = internalWorkspace.findWorktreeItemByUri(targetUri);
-        if (!worktreeItem) continue;
+        const item = worktree.getOpt(targetUri);
+        if (!item) continue;
 
         let vscTextDocument = this.findVscTextDocumentByUri(targetUri);
-        const uriScheme = URI.parse(targetUri).scheme;
 
         if (
-          uriScheme === 'workspace' &&
+          URI.parse(targetUri).scheme === 'workspace' &&
           vscTextDocument &&
-          // !vscTextDocument.isClosed &&
-          (urisChangedOnDisk.has(targetUri) || !worktreeItem.document)
+          !vscTextDocument.isClosed &&
+          (urisChangedOnDisk.has(targetUri) || (!item.textDocument && this.isVscTextDocumentDirty(vscTextDocument)))
         ) {
           await this.revertVscTextDocument(vscTextDocument);
         }
 
-        if (worktreeItem.document) {
-          vscTextDocument ??= await this.openTextDocumentByUri(targetUri);
+        if (item.textDocument) {
+          vscTextDocument ??= await this.openTextDocumentByUri(targetUri, { createFileIfNecessary: true });
           const vscContent = vscTextDocument.getText();
-          const internalContent = new TextDecoder().decode(worktreeItem.document.getContent());
+          const internalContent = item.textDocument.getText();
           if (vscContent !== internalContent) {
             edit.replace(vscTextDocument.uri, this.getVscTextDocumentVscRange(vscTextDocument), internalContent);
           }
@@ -392,17 +396,17 @@ export default class VscWorkspace {
     // all text editor tabs that are not in internalWorkspace's textEditors should be closed
     for (const tab of this.getTabsWithInputText()) {
       if (this.shouldRecordVscUri(tab.input.uri)) {
-        if (!internalWorkspace.findTextEditorByUri(this.uriFromVsc(tab.input.uri))) {
+        if (!worktree.getOpt(this.uriFromVsc(tab.input.uri))?.textEditor) {
           await this.closeVscTextEditorByVscUri(tab.input.uri, { skipConfirmation: true });
         }
       }
     }
 
-    // Delete files that no longer exist in internal worktree.
+    // Delete files that no longer exist in internal worktree or have an associated file.
     if (wasGivenTargetUris) {
       // Only check paths in targetUris.
       for (const targetUri of targetUris) {
-        if (!internalWorkspace.isUriInWorktree(targetUri)) {
+        if (!worktree.getOpt(targetUri)?.file) {
           if (URI.parse(targetUri).scheme === 'workspace') {
             await fs.promises.rm(URI.parse(this.session.core.resolveUri(targetUri)).fsPath, {
               force: true,
@@ -419,66 +423,90 @@ export default class VscWorkspace {
       });
       for (const [p] of workspacePathsWithStats) {
         const uri = lib.workspaceUri(p);
-        if (!internalWorkspace.isUriInWorktree(uri)) {
+        if (!worktree.getOpt(uri)?.file) {
           await fs.promises.rm(path.join(this.session.workspace, p), { force: true, recursive: true });
         }
       }
     }
 
-    // open all internalWorkspace's textEditors in vscdoe
+    // open all internalWorkspace's textEditors in vscode
     {
-      // const tabUris = this.getRelevantTabUris();
-      for (const textEditor of internalWorkspace.textEditors) {
-        // if (!tabUris.includes(textEditor.document.uri)) {
-        await this.showTextDocumentByUri(textEditor.document.uri, {
-          preserveFocus: true,
-          selection: VscWorkspace.toVscSelection(textEditor.selections[0]),
-        });
-        // }
+      for (const item of worktree.getItems()) {
+        if (item.textEditor) {
+          const selection = VscWorkspace.toVscSelection(item.textEditor.selections[0]);
+          await this.showTextDocumentByUri(item.uri, { preserveFocus: true, selection });
+        }
       }
     }
 
     // show active text editor.
-    if (internalWorkspace.activeTextEditor) {
-      await this.showTextDocumentByUri(internalWorkspace.activeTextEditor.document.uri, {
-        preserveFocus: false,
-        selection: VscWorkspace.toVscSelection(internalWorkspace.activeTextEditor.selections[0]),
-      });
-      await vscode.commands.executeCommand('revealLine', {
-        lineNumber: internalWorkspace.activeTextEditor.visibleRange.start,
-        at: 'top',
-      });
+    if (worktree.activeTextEditorUri) {
+      const textEditor = worktree.get(worktree.activeTextEditorUri).textEditor;
+      assert(textEditor);
+      const selection = VscWorkspace.toVscSelection(textEditor.selections[0]);
+      await this.showTextDocumentByUri(worktree.activeTextEditorUri, { preserveFocus: false, selection });
+      await vscode.commands.executeCommand('revealLine', { lineNumber: textEditor.visibleRange.start, at: 'top' });
     }
   }
 
   async closeVscTextEditorByVscUri(uri: vscode.Uri, options?: { skipConfirmation?: boolean }) {
-    // Remember the current ative text editor to restore later.
-    const activeUri = vscode.window.activeTextEditor?.document.uri;
+    // Check if there's any tab open for uri.
+    if (!this.getRelevantTabVscUris().some(curUri => curUri.toString() === uri.toString())) return;
 
-    try {
-      await this.showTextDocumentByVscUri(uri);
-    } catch (error) {
-      // if the text document was deleted vscode shows the tab but cannot open
-      // it and activeTextEditor is undefined.
-      const tab = this.findTabInputTextByVscUri(uri);
-      if (tab) await vscode.window.tabGroups.close(tab);
-      return;
+    // Remember the current ative text editor to restore later.
+    const activeVscDocument = vscode.window.activeTextEditor?.document;
+
+    // If uri is not the active text editor, open it.
+    if (activeVscDocument?.uri.toString() !== uri.toString()) {
+      try {
+        await this.showTextDocumentByVscUri(uri);
+      } catch (error) {
+        console.error(error);
+        // if the text document was deleted vscode shows the tab but cannot open
+        // it and activeTextEditor is undefined.
+        const tab = this.findTabInputTextByVscUri(uri);
+        if (tab) await vscode.window.tabGroups.close(tab);
+        return;
+      }
     }
 
+    // Now, we can revert and close it.
     assert(
       vscode.window.activeTextEditor?.document.uri.toString() === uri.toString(),
       `Failed to open editor for ${uri.toString()}`,
     );
     if (options?.skipConfirmation) {
-      await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+      const value = await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
     } else {
       await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
     }
 
+    assert(vscode.window.activeTextEditor?.document.uri.toString() !== uri.toString(), `${uri} was not closed`);
+
     // Restore the previous active text editor.
-    if (activeUri && activeUri.toString() !== uri.toString()) {
-      await this.showTextDocumentByVscUri(activeUri);
+    if (activeVscDocument && activeVscDocument.uri.toString() !== uri.toString()) {
+      // Don't use this.openTextDocumentByVscUri because it refuses to
+      // open untitled documents with associated files.
+      await vscode.window.showTextDocument(activeVscDocument);
     }
+  }
+
+  /**
+   * Restore active text editor after awaiting cb() unless the active text
+   * editor has the same uri as exception.
+   */
+  async deferRestoreTextEditorByVscUri<T>(cb: () => T, opts?: { exception?: vscode.Uri }): Promise<T> {
+    // Remember the current ative text editor to restore later.
+    const document = vscode.window.activeTextEditor?.document;
+    let res;
+    try {
+      res = await cb();
+    } finally {
+      if (document && opts?.exception?.toString() !== document.uri.toString()) {
+        await vscode.window.showTextDocument(document);
+      }
+    }
+    return res;
   }
 
   async closeVscTextEditorByUri(uri: string, options?: { skipConfirmation?: boolean }) {
@@ -530,7 +558,7 @@ export default class VscWorkspace {
     uri: vscode.Uri,
     options?: { preserveFocus?: boolean; selection?: vscode.Range },
   ): Promise<vscode.TextEditor> {
-    const vscTextDocument = await this.openTextDocumentByVscUri(uri);
+    const vscTextDocument = await this.openTextDocumentByVscUri(uri, { createFileIfNecessary: true });
     return vscode.window.showTextDocument(vscTextDocument, {
       ...options,
       preview: false,
@@ -546,6 +574,20 @@ export default class VscWorkspace {
     options?: { preserveFocus?: boolean; selection?: vscode.Range },
   ): Promise<vscode.TextEditor> {
     return this.showTextDocumentByVscUri(this.uriToVsc(uri), options);
+  }
+
+  private isUntitledVscUriValid(uri: vscode.Uri): boolean {
+    return /^Untitled-\d+$/.test(uri.path);
+  }
+
+  /**
+   * Use this instead of TextDocument.isDirty because that doesn't report the dirty
+   * state for untitled documents properly every time. Apparently there's a bug:
+   * https://github.com/microsoft/vscode/issues/230754
+   * https://github.com/microsoft/vscode/issues/723
+   */
+  isVscTextDocumentDirty(vscTextDocument: vscode.TextDocument): boolean {
+    return Boolean(vscTextDocument.isDirty || (vscTextDocument.uri.scheme === 'untitled' && vscTextDocument.getText()));
   }
 
   /**
@@ -569,7 +611,7 @@ export default class VscWorkspace {
    * previous session are opened, the tabs may exist but their documents do not exist yet.
    */
   private async openUntitledVscTextDocumentByVscUri(uri: vscode.Uri): Promise<vscode.TextDocument> {
-    if (!/^Untitled-\d+$/.test(uri.path)) {
+    if (!this.isUntitledVscUriValid(uri)) {
       throw new Error(`openUntitledVscTextDocumentByVscUri: untitled URI with invalid path: ${uri.path}.`);
     }
 
@@ -602,21 +644,31 @@ export default class VscWorkspace {
   }
 
   /**
-   * Use this instead of vscode.workspace.openTextDocument() because it handled
-   * untitled documents properly.
+   * Use this instead of vscode.workspace.openTextDocument() because:
+   * + it handles untitled documents properly
+   * + it can optionally create the file before opening it, otherwise vscode throws error
    */
-  async openTextDocumentByVscUri(uri: vscode.Uri): Promise<vscode.TextDocument> {
+  async openTextDocumentByVscUri(
+    uri: vscode.Uri,
+    opts?: { createFileIfNecessary?: boolean },
+  ): Promise<vscode.TextDocument> {
     if (uri.scheme === 'untitled') {
       return this.openUntitledVscTextDocumentByVscUri(uri);
     } else if (uri.scheme === 'file') {
+      const textDocument = this.findVscTextDocumentByVscUri(uri);
+      if (textDocument) return textDocument;
+
+      if (opts?.createFileIfNecessary && !(await storage.pathExists(uri.fsPath))) {
+        await storage.writeString(uri.fsPath, '');
+      }
       return vscode.workspace.openTextDocument(uri);
     } else {
       throw new Error(`Cannot open text document with scheme ${uri.scheme}`);
     }
   }
 
-  async openTextDocumentByUri(uri: string): Promise<vscode.TextDocument> {
-    return this.openTextDocumentByVscUri(this.uriToVsc(uri));
+  async openTextDocumentByUri(uri: string, opts?: { createFileIfNecessary?: boolean }): Promise<vscode.TextDocument> {
+    return this.openTextDocumentByVscUri(this.uriToVsc(uri), opts);
   }
 
   shouldRecordVscUri(vscUri: vscode.Uri): boolean {
@@ -624,7 +676,11 @@ export default class VscWorkspace {
       case 'file':
         return this.session.core.shouldRecordAbsPath(vscUri.fsPath);
       case 'untitled':
-        return true;
+        // If URI is untitled, make sure it doesn't have an associated file.
+        // I don't know what their use case is and don't know how to close
+        // them while skipping the confirmation dialog. Perhaps, reverting
+        // it before closing works, I don't know.
+        return this.isUntitledVscUriValid(vscUri);
       default:
         return false;
     }
@@ -690,49 +746,6 @@ export default class VscWorkspace {
       VscWorkspace.eolFromVsc(vscTextDocument.eol),
     );
   }
-
-  // async closeVscTabInputText(tab: vscode.Tab, skipConfirmation: boolean = false) {
-  //   assert(tab.input instanceof vscode.TabInputText);
-
-  //   if (skipConfirmation) {
-  //     const vscTextDocument = await this.openTextDocumentByVscUri(tab.input.uri);
-  //     // console.log('XXX ', vscTextDocument.uri.toString(), 'isDirty: ', vscTextDocument.isDirty);
-  //     if (tab.input.uri.scheme === 'untitled') {
-  //       // Sometimes isDirty is false for untitled document even though it should be true.
-  //       // So, don't check isDirty for untitled.
-  //       // For untitled scheme, empty it first, then can close without confirmation.
-  //       const edit = new vscode.WorkspaceEdit();
-  //       edit.replace(vscTextDocument.uri, VscWorkspace.toVscRange(this.getVscTextDocumentRange(vscTextDocument)), '');
-  //       await vscode.workspace.applyEdit(edit);
-  //     } else if (tab.input.uri.scheme === 'file' && vscTextDocument.isDirty) {
-  //       // .save() returns false if document was not dirty
-  //       // Sometimes .save() fails and returns false. No idea why.
-  //       for (let i = 0; i < 5; i++) {
-  //         if (await vscTextDocument.save()) break;
-  //         console.error('closeVscTabInputText Failed to save:', tab.input.uri.toString());
-  //         await lib.timeout(100 * i + 100);
-  //       }
-  //     }
-  //   }
-
-  //   // Sometimes when save() fails the first time, closing the tab throws this error:
-  //   // Error: Tab close: Invalid tab not found!
-  //   // Maybe it automatically closes it? I don't know.
-  //   const newTab = this.findTabInputTextByVscUri(tab.input.uri);
-  //   if (newTab) {
-  //     // console.log('XXX trying to close', tab.input.uri.toString());
-  //     await vscode.window.tabGroups.close(newTab);
-  //     // console.log('XXX closed', tab.input.uri.toString());
-  //   }
-  // }
-
-  // makeTextEditorSnapshotFromVsc(vscTextEditor: vscode.TextEditor): t.TextEditor {
-  //   return ih.makeTextEditorSnapshot(
-  //     this.uriFromVsc(vscTextEditor.document.uri),
-  //     this.selectionsFromVsc(vscTextEditor.selections),
-  //     this.rangeFromVsc(vscTextEditor.visibleRanges[0]),
-  //   );
-  // }
 
   getRelevantTabUris(): string[] {
     return this.getRelevantTabVscUris().map(this.uriFromVsc.bind(this));
@@ -861,10 +874,10 @@ export default class VscWorkspace {
         uri: this.uriFromVsc(d.uri),
       }));
       const internalTextDocuments = await Promise.all(
-        this.internalWorkspace.textDocuments.map(async d => ({
+        this.worktree.getTextDocuments().map(async d => ({
           content: d.getText(),
           uri: d.uri,
-          isDirty: await this.internalWorkspace.isDocumentContentDirtyByUri(d.uri),
+          isDirty: await this.worktree.get(d.uri).isDirty(),
         })),
       );
 
@@ -891,7 +904,7 @@ export default class VscWorkspace {
       }
 
       await fs.promises.mkdir(path.resolve(testClockPath, 'text_documents'), { recursive: true });
-      for (const internalTextDocument of this.internalWorkspace.textDocuments) {
+      for (const internalTextDocument of this.worktree.getTextDocuments()) {
         const parsedUri = URI.parse(internalTextDocument.uri);
         const relPath = parsedUri.fsPath;
         if (parsedUri.scheme === 'untitled') {
@@ -908,7 +921,9 @@ export default class VscWorkspace {
     }
 
     // Text editors
-    const dirtyTextDocuments = relevantVscTextDocuments.filter(d => d.isDirty).map(d => this.uriFromVsc(d.uri));
+    const dirtyTextDocuments = relevantVscTextDocuments
+      .filter(d => this.isVscTextDocumentDirty(d))
+      .map(d => this.uriFromVsc(d.uri));
     const tabVscUris = this.getRelevantTabVscUris();
     let vscOpenTextEditors: t.TestMetaTextEditor[] = [];
     const originalActiveTextEditor = vscode.window.activeTextEditor;
@@ -921,8 +936,8 @@ export default class VscWorkspace {
     vscOpenTextEditors = _.orderBy(vscOpenTextEditors, 'uri');
 
     // Assert that internal and vscode text editors are the same.
-    let internalOpenTextEditors: t.TestMetaTextEditor[] = this.internalWorkspace.textEditors.map(textEditor => ({
-      uri: textEditor.document.uri,
+    let internalOpenTextEditors: t.TestMetaTextEditor[] = this.worktree.getTextEditors().map(textEditor => ({
+      uri: textEditor.uri,
       selections: textEditor.selections,
       visibleRange: textEditor.visibleRange,
     }));
@@ -939,13 +954,18 @@ export default class VscWorkspace {
 
     // Restore active text editor.
     if (originalActiveTextEditor) {
+      // Don't use this.openTextDocumentByVscUri because it refuses to
+      // open untitled documents with associated files.
       await vscode.window.showTextDocument(originalActiveTextEditor.document);
     }
 
     const meta: t.TestMeta = {
       dirtyTextDocuments,
       openTextEditors: vscOpenTextEditors,
-      activeTextEditor: originalActiveTextEditor && this.uriFromVsc(originalActiveTextEditor.document.uri),
+      activeTextEditor:
+        originalActiveTextEditor && this.shouldRecordVscUri(originalActiveTextEditor.document.uri)
+          ? this.uriFromVsc(originalActiveTextEditor.document.uri)
+          : undefined,
     };
     await storage.writeJSON(path.resolve(testClockPath, 'meta.json'), serializeTestMeta(meta));
   }
@@ -972,6 +992,8 @@ export default class VscWorkspace {
 
     // Restore active text editor.
     if (!_.isEmpty(missingTextDocumentUris) && originalActiveTextEditor) {
+      // Don't use this.openTextDocumentByVscUri because it refuses to
+      // open untitled documents with associated files.
       await vscode.window.showTextDocument(originalActiveTextEditor.document);
     }
   }

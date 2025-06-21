@@ -26,7 +26,7 @@
 import * as t from '../../lib/types.js';
 import { Selection, ContentChange } from '../../lib/lib.js';
 import * as lib from '../../lib/lib.js';
-import InternalWorkspace from './internal_workspace.js';
+import InternalWorkspace, { LiveWorktree } from './internal_workspace.js';
 import assert from '../../lib/assert.js';
 import config from '../config.js';
 import vscode from 'vscode';
@@ -35,6 +35,7 @@ import { LoadedSession } from './session.js';
 import VscWorkspace from './vsc_workspace.js';
 import * as misc from '../misc.js';
 import * as fs from 'fs';
+import QueueRunner from '../../lib/queue_runner.js';
 
 // const SCROLL_LINES_TRIGGER = 2;
 
@@ -48,6 +49,7 @@ class WorkspaceRecorder {
   private vscWorkspace: VscWorkspace;
 
   private disposables: vscode.Disposable[] = [];
+  private queue = new QueueRunner();
   // private scrolling: boolean = false;
   // private scrollStartRange?: Range;
   // private lastUri?: t.Uri;
@@ -58,6 +60,10 @@ class WorkspaceRecorder {
 
   private get clock(): number {
     return this.session.rr.clock;
+  }
+
+  private get worktree(): LiveWorktree {
+    return this.internalWorkspace.worktree;
   }
 
   constructor(session: LoadedSession, internalWorkspace: InternalWorkspace, vscWorkspace: VscWorkspace) {
@@ -84,7 +90,7 @@ class WorkspaceRecorder {
     // Listen to tabs opening/closing/changing.
     {
       const disposable = vscode.window.tabGroups.onDidChangeTabs(async tabChangeEvent => {
-        await this.changeTabs(tabChangeEvent);
+        await this.queue.enqueue(this.changeTabs.bind(this), tabChangeEvent);
       });
       this.disposables.push(disposable);
     }
@@ -92,14 +98,14 @@ class WorkspaceRecorder {
     // listen for open document events
     {
       const disposable = vscode.workspace.onDidOpenTextDocument(async vscTextDocument => {
-        await this.openTextDocument(vscTextDocument);
+        await this.queue.enqueue(this.openTextDocument.bind(this), vscTextDocument);
       });
       this.disposables.push(disposable);
     }
     // listen for close document events
     {
       const disposable = vscode.workspace.onDidCloseTextDocument(async vscTextDocument => {
-        await this.closeTextDocument(vscTextDocument);
+        await this.queue.enqueue(this.closeTextDocument.bind(this), vscTextDocument);
       });
       this.disposables.push(disposable);
     }
@@ -107,7 +113,7 @@ class WorkspaceRecorder {
     // listen for show text editor events
     {
       const disposable = vscode.window.onDidChangeActiveTextEditor(async vscTextEditor => {
-        if (vscTextEditor) await this.showTextEditor(vscTextEditor);
+        if (vscTextEditor) await this.queue.enqueue(this.showTextEditor.bind(this), vscTextEditor);
       });
       this.disposables.push(disposable);
     }
@@ -115,17 +121,17 @@ class WorkspaceRecorder {
     // listen for text change events
     {
       const disposable = vscode.workspace.onDidChangeTextDocument(async e => {
-        await this.textChange(e.document, e.contentChanges);
+        await this.queue.enqueue(this.textChange.bind(this), e.document, e.contentChanges);
       });
       this.disposables.push(disposable);
     }
 
     // listen for selection change events
     {
-      const disposable = vscode.window.onDidChangeTextEditorSelection(e => {
+      const disposable = vscode.window.onDidChangeTextEditorSelection(async e => {
         // checking for e.kind !== TextEditorSelectionChangeKind.Keyboard isn't helpful
         // because shift+arrow keys would trigger this event kind
-        this.select(e.textEditor, e.selections);
+        await this.queue.enqueue(this.select.bind(this), e.textEditor, e.selections);
       });
       this.disposables.push(disposable);
     }
@@ -141,8 +147,8 @@ class WorkspaceRecorder {
 
     // listen for scroll events
     {
-      const disposable = vscode.window.onDidChangeTextEditorVisibleRanges(e => {
-        this.scroll(e.textEditor, e.visibleRanges);
+      const disposable = vscode.window.onDidChangeTextEditorVisibleRanges(async e => {
+        await this.queue.enqueue(this.scroll.bind(this), e.textEditor, e.visibleRanges);
       });
       this.disposables.push(disposable);
     }
@@ -152,9 +158,9 @@ class WorkspaceRecorder {
       const watcher = vscode.workspace.createFileSystemWatcher(
         new vscode.RelativePattern(this.session.workspace, '**/*'),
       );
-      watcher.onDidCreate(uri => this.fsCreate(uri));
-      watcher.onDidChange(uri => this.fsChange(uri));
-      watcher.onDidDelete(uri => this.fsDelete(uri));
+      watcher.onDidCreate(uri => this.queue.enqueue(this.fsCreate.bind(this), uri));
+      watcher.onDidChange(uri => this.queue.enqueue(this.fsChange.bind(this), uri));
+      watcher.onDidDelete(uri => this.queue.enqueue(this.fsDelete.bind(this), uri));
       this.disposables.push(watcher);
     }
 
@@ -162,7 +168,7 @@ class WorkspaceRecorder {
     this.session.context.extension.subscriptions.push(...this.disposables);
 
     // update or create focus
-    this.setFocus();
+    await this.queue.enqueue(this.setFocus.bind(this));
   }
 
   pause() {
@@ -188,83 +194,20 @@ class WorkspaceRecorder {
   }
 
   private setFocus() {
-    const irTextEditor = this.internalWorkspace.activeTextEditor;
-    if (!irTextEditor) return;
+    if (!this.worktree.activeTextEditorUri) return;
+    const item = this.worktree.get(this.worktree.activeTextEditorUri);
+    assert(item.textEditor);
 
     this.session.editor.setFocus(
       {
         clock: this.clock,
-        uri: irTextEditor.document.uri,
-        number: irTextEditor.currentLine,
-        text: irTextEditor.currentLineText,
+        uri: item.textEditor.uri,
+        number: item.textEditor.currentLine,
+        text: item.textEditor.currentLineText,
       },
-      irTextEditor.document.isEmpty,
+      item.textDocument?.isEmpty ?? true,
     );
   }
-  // private updateFocus() {
-  //   const { documents, lines } = this.session.body.focusTimeline;
-  //   const { activeTextEditor } = this.internalWorkspace;
-  //   const activeUri = activeTextEditor?.document.uri;
-
-  //   if (activeUri!) return;
-
-  //   const currentLine = this.getCurrentLine();
-  //   const sameUri = activeUri === documents.at(-1)?.uri;
-  //   const lastLineFocus = lines.at(-1);
-  //   const lastDocumentFocus = documents.at(-1);
-  //   const sameLine = currentLine !== undefined && currentLine === lastLineFocus?.number;
-
-  //   // Update or insert line focus.
-  //   if (currentLine !== undefined) {
-  //     if (sameLine) {
-  //     }
-  //   }
-
-  //   // If we're on the same uri and the same line, update focus line, otherwise push a new one.
-  //   if (lines.length && sameUri && sameLine) {
-  //     this.session.editor.updateLineFocusAt(lines.length - 1, {
-  //       text: this.getCurrentLineText() ?? '',
-  //       clockRange: { start: lastLineFocus.clockRange.start, end: this.clock },
-  //     });
-  //   } else if (currentLine !== undefined) {
-  //     // If last line focus is trivial, remove it before pusing a new one.
-  //     if (lines.at(-1) && lib.getClockRangeDur(lines.at(-1)!.clockRange) < 2) {
-  //       this.session.editor.deleteLineFocusAt(lines.length - 1);
-  //     }
-  //     this.session.editor.insertLineFocus({
-  //       number: currentLine,
-  //       text: this.getCurrentLineText() ?? '',
-  //       clockRange: { start: this.clock, end: this.clock },
-  //     });
-  //   }
-
-  //   // Update last document focus clockRange.
-  //   if (lastDocumentFocus) {
-  //     this.session.editor.updateDocumentFocusAt(documents.length - 1, {
-  //       clockRange: { start: lastDocumentFocus.clockRange.start, end: this.clock },
-  //     });
-  //   }
-
-  //   // If uri has changed, push a new document focus.
-  //   if (!sameUri) {
-  //     this.session.editor.insertDocumentFocus({
-  //       uri: activeUri,
-  //       clockRange: { start: this.clock, end: this.clock },
-  //     });
-  //   }
-  // }
-
-  // private getCurrentLineText(): string | undefined {
-  //   const line = this.getCurrentLine();
-  //   if (line !== undefined) {
-  //     return this.internalWorkspace.activeTextEditor?.document.lines[line];
-  //   }
-  // }
-
-  // private getCurrentLine(): number | undefined {
-  //   const { activeTextEditor } = this.internalWorkspace;
-  //   return activeTextEditor?.selections[0]?.active.line;
-  // }
 
   private async textChange(
     vscTextDocument: vscode.TextDocument,
@@ -284,13 +227,8 @@ class WorkspaceRecorder {
     logAcceptedEvent(`accepted textChange for ${uri}`);
 
     // Here, we assume that document must exist internally by the time we get a text change event.
-    const irTextDocument = this.internalWorkspace.getTextDocumentByUri(uri);
-
-    // // It will insert the latest text in 'openTextDocument' if necessary.
-    // if (!irTextDocument) {
-    //   await this.openTextDocumentByUri(vscTextDocument, uri);
-    //   return;
-    // }
+    const irTextDocument = this.worktree.get(uri).textDocument;
+    assert(irTextDocument);
 
     let debugInitIrText: string | undefined;
     if (config.debug) {
@@ -298,10 +236,9 @@ class WorkspaceRecorder {
     }
 
     // Read https://github.com/microsoft/vscode/issues/11487 about contentChanges array.
-    let irContentChanges = vscContentChanges.map(c => new ContentChange(c.text, VscWorkspace.fromVscRange(c.range)));
-
-    // Order content changes.
-    irContentChanges.sort((a, b) => a.range.start.compareTo(b.range.start));
+    const irContentChanges = vscContentChanges
+      .map(c => new ContentChange(c.text, VscWorkspace.fromVscRange(c.range)))
+      .sort((a, b) => a.range.start.compareTo(b.range.start));
 
     // Validate ranges and make sure there are no overlaps.
     for (const [i, cc] of irContentChanges.entries()) {
@@ -315,6 +252,7 @@ class WorkspaceRecorder {
       }
     }
 
+    // Apply content changes and get the reverse.
     const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
 
     let coalescing = false;
@@ -388,6 +326,7 @@ class WorkspaceRecorder {
 
   private async changeTabs(tabChangeEvent: vscode.TabChangeEvent) {
     logRawEvent(`event: changeTabs`);
+
     // Collect the URIs that have been closed and no other instance of them
     // exist in the currently opened tabs.
     const existingUris = this.vscWorkspace.getRelevantTabVscUris();
@@ -404,16 +343,33 @@ class WorkspaceRecorder {
       }
     }
 
+    // // Collect the URIs that have been opened and no other instance of them
+    // // exist internally.
+    // const openedUris: vscode.Uri[] = [];
+    // for (let tab of tabChangeEvent.opened) {
+    //   if (tab.input instanceof vscode.TabInputText) {
+    //     const uri = tab.input.uri;
+    //     if (
+    //       this.vscWorkspace.shouldRecordVscUri(uri) &&
+    //         !this.worktree.getOpt( this.vscWorkspace.uriFromVsc(uri)
+    //     ) {
+    //       closedUris.push(tab.input.uri);
+    //     }
+    //   }
+    // }
+
     if (closedUris.length === 0) return;
 
     const uris = closedUris.map(uri => this.vscWorkspace.uriFromVsc(uri));
     for (const uri of uris) {
       logAcceptedEvent(`accepted closeTextEditor for ${uri}`);
-      const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
+      const item = this.worktree.get(uri);
+      const irTextEditor = item.textEditor;
       const revSelections = irTextEditor?.selections;
       const revVisibleRange = irTextEditor?.visibleRange;
-      const active = Boolean(irTextEditor && this.internalWorkspace.activeTextEditor === irTextEditor);
-      this.internalWorkspace.closeTextEditorByUri(uri);
+      const active = this.worktree.activeTextEditorUri === uri;
+      item.closeTextEditor();
+      if (active) this.worktree.activeTextEditorUri = undefined;
       this.insertEvent(
         {
           type: 'closeTextEditor',
@@ -436,52 +392,35 @@ class WorkspaceRecorder {
     if (!this.vscWorkspace.shouldRecordVscUri(vscTextDocument.uri)) return;
 
     const uri = this.vscWorkspace.uriFromVsc(vscTextDocument.uri);
-    let irItem = this.internalWorkspace.findWorktreeItemByUri(uri);
 
-    if (!irItem) {
-      // When saving untitled, vscode issues an openTextDocument before fsCreate.
-      // So, here, we issue our own fsCreate and insert an empty file.
-      this.insertEvent(
-        {
-          type: 'fsCreate',
-          id: lib.nextId(),
-          uri,
-          clock: this.clock,
-          file: { type: 'empty' },
-        },
-        { coalescing: false },
-      );
-
-      // Insert internal file.
-      irItem = this.internalWorkspace.insertOrUpdateFile(uri, { type: 'empty' });
-    }
-
-    logAcceptedEvent(`accepted openTextDocument for ${uri}`);
+    const irItem = this.worktree.getOpt(uri) ?? this.worktree.add(uri);
 
     // Insert internal document.
-    const irItemAlreadyHadDocument = Boolean(irItem.document);
+    const irItemAlreadyHadDocument = irItem.textDocument;
     if (!irItemAlreadyHadDocument) {
-      const irTextDocument = this.vscWorkspace.textDocumentFromVsc(vscTextDocument, uri);
-      this.internalWorkspace.insertTextDocument(irTextDocument);
+      logAcceptedEvent(`accepted openTextDocument for ${uri}`);
+      const eol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
+      await irItem.openTextDocument({ eol });
+
       this.insertEvent(
         {
           type: 'openTextDocument',
           id: lib.nextId(),
           uri,
           clock: this.clock,
-          eol: irTextDocument.eol,
+          eol,
         },
         { coalescing: false },
       );
     }
 
     // irItem must have a document by now.
-    assert(irItem.document);
+    assert(irItem.textDocument);
 
     // If irText is not the same as vscText, insert textChange.
     // I don't really know when this is supposed to happen. So, for now, let's assert
     // it until we find a use case for it.
-    const irText = new TextDecoder().decode(irItem.document.getContent());
+    const irText = irItem.textDocument.getText();
     const vscText = vscTextDocument.getText();
     assert(
       irText === vscText,
@@ -507,9 +446,26 @@ class WorkspaceRecorder {
   }
 
   private async closeTextDocument(vscTextDocument: vscode.TextDocument) {
-    // NOTE: We're using onDidChangeTabs to record closeTextEditor and not
-    // recording closeTextDocument. Text documents only get closed if their
-    // files get deleted. This is mostly because of how languageId change behaves.
+    logRawEvent(`event: closeTextDocument ${vscTextDocument.uri}`);
+    if (!this.vscWorkspace.shouldRecordVscUri(vscTextDocument.uri)) return;
+
+    const uri = this.vscWorkspace.uriFromVsc(vscTextDocument.uri);
+    logAcceptedEvent(`accepted closeTextDocument for ${uri}`);
+
+    const revEol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
+    await this.worktree.get(uri).closeTextDocument();
+
+    this.insertEvent(
+      {
+        type: 'closeTextDocument',
+        id: lib.nextId(),
+        uri,
+        clock: this.clock,
+        revEol,
+      },
+      { coalescing: false },
+    );
+
     //
     // When user closes a tab without saving it, vscode issues a textChange event
     // to restore the original content before issuing a closeTextDocument
@@ -523,46 +479,6 @@ class WorkspaceRecorder {
     // When user closes the document without saving, vscode
     // first issues a text change event to empty the content.
     //
-    //
-    //
-    // logRawEvent(`event: closeTextDocument ${vscTextDocument.uri}`);
-    // if (!this.vscWorkspace.shouldRecordVscUri(vscTextDocument.uri)) return;
-    // const uri = this.vscWorkspace.uriFromVsc(vscTextDocument.uri);
-    // let irTextDocument = this.internalWorkspace.findTextDocumentByUri(uri);
-    // const irTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
-    // if (!irTextDocument) return;
-    // logAcceptedEvent(`accepted closeTextDocument for ${uri}`);
-    // const revSelections = irTextEditor?.selections;
-    // const revVisibleRange = irTextEditor?.visibleRange;
-    // this.internalWorkspace.closeTextEditorByUri(uri);
-    // this.insertEvent(
-    //   {
-    //     type: 'closeTextEditor',
-    //     clock: this.clock,
-    //     revSelections,
-    //     revVisibleRange,
-    //   },
-    //   uri,
-    //   { coalescing: false },
-    // );
-    //
-    //
-    //
-    //
-    // if (vscTextDocument.uri.scheme === 'untitled') {
-    //   const revText = irTextDocument.getText();
-    //   this.internalWorkspace.closeAndRemoveTextDocumentByUri(uri);
-    //   this.insertEvent(
-    //     {
-    //       type: 'closeTextDocument',
-    //       clock: this.clock,
-    //       revText,
-    //       revEol: irTextDocument.eol,
-    //     },
-    //     uri,
-    //     { coalescing: true },
-    //   );
-    // }
   }
 
   private async showTextEditor(vscTextEditor: vscode.TextEditor) {
@@ -572,17 +488,22 @@ class WorkspaceRecorder {
     const uri = this.vscWorkspace.uriFromVsc(vscTextEditor.document.uri);
     logAcceptedEvent(`accepted showTextEditor for ${uri}`);
 
-    const revUri = this.internalWorkspace.activeTextEditor?.document.uri;
+    // We assume uri exists.
+    const item = this.worktree.get(uri);
+    // revUri is the editor currently open.
+    const revUri = this.worktree.activeTextEditorUri;
 
     // revSelections and revVisibleRange refer to the uri text editor, not revUri.
-    const revTextEditor = this.internalWorkspace.findTextEditorByUri(uri);
+    const revTextEditor = item.textEditor;
     const revSelections = revTextEditor?.selections;
     const revVisibleRange = revTextEditor?.visibleRange;
 
     const selections = VscWorkspace.fromVscSelections(vscTextEditor.selections);
     const visibleRange = VscWorkspace.fromVscLineRange(vscTextEditor.visibleRanges[0]);
-    const textEditor = await this.internalWorkspace.openTextEditorByUri(uri, selections, visibleRange);
-    this.internalWorkspace.activeTextEditor = textEditor;
+    const eol = VscWorkspace.eolFromVsc(vscTextEditor.document.eol);
+    const justOpened = !item.textEditor;
+    await item.openTextEditor({ selections, visibleRange, eol });
+    this.worktree.activeTextEditorUri = uri;
 
     this.insertEvent(
       {
@@ -592,6 +513,7 @@ class WorkspaceRecorder {
         clock: this.clock,
         selections,
         visibleRange,
+        justOpened,
         revUri,
         revSelections,
         revVisibleRange,
@@ -608,7 +530,8 @@ class WorkspaceRecorder {
 
     // const visibleRange = VscWorkspace.fromVscRange(vscTextEditor.visibleRanges[0]);
     const uri = this.vscWorkspace.uriFromVsc(vscTextEditor.document.uri);
-    const irTextEditor = this.internalWorkspace.getTextEditorByUri(uri);
+    const irTextEditor = this.worktree.get(uri).textEditor;
+    assert(irTextEditor);
 
     const lastEventIndex = this.session.body.editorEvents.length - 1;
     const lastEvent = this.session.body.editorEvents[lastEventIndex];
@@ -676,17 +599,8 @@ class WorkspaceRecorder {
 
     const visibleRange = visibleRanges[0];
     const uri = this.vscWorkspace.uriFromVsc(vscTextEditor.document.uri);
-    const irTextEditor = this.internalWorkspace.getTextEditorByUri(uri);
-
-    // if (!this.scrolling) {
-    //   this.scrollStartRange ??= visibleRange;
-    //   const delta = Math.abs(visibleRange.start.line - this.scrollStartRange.start.line);
-    //   if (delta > SCROLL_LINES_TRIGGER) {
-    //     this.scrolling = true;
-    //   }
-    // }
-
-    // if (!this.scrolling) return;
+    const irTextEditor = this.worktree.get(uri).textEditor;
+    assert(irTextEditor);
 
     // Avoid redundant scrolls.
     if (irTextEditor.visibleRange.isEqual(visibleRange)) return;
@@ -725,14 +639,6 @@ class WorkspaceRecorder {
     if (!this.vscWorkspace.shouldRecordVscUri(vscUri)) return;
     const uri = this.vscWorkspace.uriFromVsc(vscUri);
 
-    // When saving an untitled document, fsCreate may come last.
-    // By then, we've already issued an fsCreate ourselves.
-    // So, let's change this to an fsChange.
-    if (this.internalWorkspace.isUriInWorktree(uri)) {
-      logRawEvent(`changing fsCreate to fsChange because item already existed internally ${vscUri}`);
-      return this.fsChange(vscUri);
-    }
-
     logAcceptedEvent(`accepted save for ${uri}`);
 
     const stat = await fs.promises.stat(vscUri.fsPath);
@@ -743,8 +649,7 @@ class WorkspaceRecorder {
     const file: t.File = { type: 'blob', sha1 };
     await this.session.core.writeBlob(sha1, data);
 
-    assert(!this.internalWorkspace.isUriInWorktree(uri));
-    this.internalWorkspace.insertOrUpdateFile(uri, file);
+    this.worktree.addOrUpdateFile(uri, file);
 
     this.insertEvent(
       {
@@ -772,19 +677,16 @@ class WorkspaceRecorder {
     const sha1 = await misc.computeSHA1(data);
     const file: t.File = { type: 'blob', sha1 };
 
-    const internalWorktreeItem = this.internalWorkspace.findWorktreeItemByUri(uri);
-    assert(internalWorktreeItem, `Received change event for ${vscUri.fsPath} but it's not in the internal worktree`);
-    const revFile = internalWorktreeItem.file;
+    const item = this.worktree.getOpt(uri);
+    assert(item, `Received file change event for ${vscUri.fsPath} but it's not in the internal worktree`);
+    assert(item.file, `Received file change event for ${vscUri.fsPath} but internal worktree item does not have file`);
+    const revFile = item.file;
 
-    if (_.isEqual(file, revFile)) {
-      // Nothing has changed.
-      debugger;
-      return;
-    }
+    if (_.isEqual(file, revFile)) return;
 
     // Write new blob and commit file to internal work tree.
     await this.session.core.writeBlob(sha1, data);
-    internalWorktreeItem.file = file;
+    item.setFile(file);
 
     this.insertEvent(
       {
@@ -813,10 +715,11 @@ class WorkspaceRecorder {
     // const sha1 = await misc.computeSHA1(data);
     // const file: t.File = { type: 'blob', sha1 };
 
-    const internalWorktreeItem = this.internalWorkspace.findWorktreeItemByUri(uri);
-    assert(internalWorktreeItem, `Received delete event for ${vscUri.fsPath} but it's not in the internal worktree`);
-    const revFile = internalWorktreeItem.file;
-    this.internalWorkspace.deleteFileByUri(uri);
+    const item = this.worktree.getOpt(uri);
+    assert(item, `Received file delete event for ${vscUri.fsPath} but it's not in the internal worktree`);
+    assert(item.file, `Received file delete event for ${vscUri.fsPath} but internal worktree item does not have file`);
+    const revFile = item.file;
+    item.closeFile();
 
     this.insertEvent(
       {

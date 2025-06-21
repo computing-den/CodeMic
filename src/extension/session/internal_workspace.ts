@@ -33,17 +33,11 @@ export class LiveWorktreeItem {
   }
 
   get textDocument(): InternalTextDocument | undefined {
-    if (this._document) {
-      assert(this._document instanceof InternalTextDocument, `internal item is not a text document ${this.uri}`);
-      return this._document;
-    }
+    if (this._document instanceof InternalTextDocument) return this._document;
   }
 
   get textEditor(): InternalTextEditor | undefined {
-    if (this._editor) {
-      assert(this._editor instanceof InternalTextEditor, `internal item is not a text editor ${this.uri}`);
-      return this._editor;
-    }
+    if (this._editor instanceof InternalTextEditor) return this._editor;
   }
 
   setFile(file: t.File) {
@@ -187,6 +181,18 @@ export class LiveWorktree {
 
   getUris(): string[] {
     return Array.from(this.items.keys());
+  }
+
+  getItems(): LiveWorktreeItem[] {
+    return Array.from(this.items.values());
+  }
+
+  getTextDocuments(): InternalTextDocument[] {
+    return _.compact(Array.from(this.items.values()).map(item => item.textDocument));
+  }
+
+  getTextEditors(): InternalTextEditor[] {
+    return _.compact(Array.from(this.items.values()).map(item => item.textEditor));
   }
 
   add(

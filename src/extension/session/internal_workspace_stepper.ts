@@ -117,14 +117,20 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
       } else {
         // Reverse e.uri's text editor's selection and visible range.
         if (uriSet) uriSet.add(e.uri);
-        const textEditor = this.worktree.get(e.uri).textEditor;
-        assert(textEditor);
-        if (e.revSelections) textEditor.select(e.revSelections);
-        if (e.revVisibleRange) textEditor.scroll(e.revVisibleRange);
+        const item = this.worktree.get(e.uri);
+        assert(item.textEditor);
+        if (e.revSelections) item.textEditor.select(e.revSelections);
+        if (e.revVisibleRange) item.textEditor.scroll(e.revVisibleRange);
 
         // Go back to e.revUri if any or clear active text editor.
         if (e.revUri && uriSet) uriSet.add(e.revUri);
         this.worktree.activeTextEditorUri = e.revUri;
+
+        // If this showTextEditor event was to open e.uri for the first time,
+        // close it.
+        if (e.justOpened) {
+          item.closeTextEditor();
+        }
       }
     }
   }
@@ -138,7 +144,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
         this.worktree.activeTextEditorUri = undefined;
       }
     } else {
-      const item = this.worktree.get(e.uri);
+      const item = this.worktree.getOpt(e.uri) ?? this.worktree.add(e.uri);
       await item.openTextEditor({ selections: e.revSelections, visibleRange: e.revVisibleRange });
       if (e.active) this.worktree.activeTextEditorUri = e.uri;
     }

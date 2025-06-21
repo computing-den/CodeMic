@@ -377,7 +377,7 @@ export function getSelectionsBeforeTextInsertEvent(e: t.TextInsertEvent): Select
 export function getTextChangeEventFromTextInsertEvent(e: t.TextInsertEvent): t.TextChangeEvent {
   return {
     type: 'textChange',
-    id: nextId(),
+    id: e.id,
     uri: e.uri,
     clock: e.clock,
     contentChanges: [new ContentChange(e.text, new Range(e.revRange.start, e.revRange.start))],

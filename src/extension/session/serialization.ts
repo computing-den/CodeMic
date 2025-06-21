@@ -56,7 +56,7 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         t: 3,
         u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
-        rt: e.revText,
+        // rt: e.revText,
         re: e.revEol,
       };
 
@@ -67,6 +67,7 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         c: serializeClock(e.clock),
         s: e.selections?.map(serializeSelection),
         v: e.visibleRange && serializeLineRange(e.visibleRange),
+        jo: e.justOpened ? true : undefined,
         ru: e.revUri ? uriMap.get(e.revUri) : undefined,
         rs: e.revSelections?.map(serializeSelection),
         rv: e.revVisibleRange && serializeLineRange(e.revVisibleRange),
@@ -249,7 +250,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         id: nextId(),
         uri: uris[e.u],
         clock: deserializeClock(e.c),
-        revText: e.rt,
+        // revText: e.rt,
         revEol: e.re,
       };
     case 4:
@@ -260,6 +261,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         clock: deserializeClock(e.c),
         selections: e.s?.map(deserializeSelection),
         visibleRange: e.v && deserializeLineRange(e.v),
+        justOpened: e.jo ?? false,
         revUri: e.ru === undefined ? undefined : uris[e.ru],
         revSelections: e.rs?.map(deserializeSelection),
         revVisibleRange: e.rv && deserializeLineRange(e.rv),
@@ -366,7 +368,7 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         id: nextId(),
         uri,
         clock: deserializeClock(e.c),
-        revText: e.rt,
+        // revText: e.rt,
         revEol: e.re,
       };
     case 4:
@@ -377,6 +379,7 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         clock: deserializeClock(e.c),
         selections: e.s?.map(deserializeSelection) ?? [new Selection(new Position(0, 0), new Position(0, 0))],
         visibleRange: (e.v && deserializeLineRange(e.v)) ?? new LineRange(0, 1),
+        justOpened: false,
         revUri: e.ru,
         revSelections: e.rs?.map(deserializeSelection),
         revVisibleRange: e.rv && deserializeLineRange(e.rv),
@@ -435,6 +438,7 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
 function deserializeFileV1(f: t.BodyFormatV1.File): t.File {
   switch (f.type) {
     case 'empty':
+      throw new Error('file of type empty is no longer supported in session body');
     case 'dir':
     case 'git':
       return f;

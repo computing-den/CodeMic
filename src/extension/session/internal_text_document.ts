@@ -17,7 +17,7 @@ export default class InternalTextDocument implements t.InternalDocument {
   }
 
   get isEmpty(): boolean {
-    return this.lines.length <= 1 && this.lines.every(line => !line);
+    return this.lines.length <= 1 && !this.lines[0];
   }
 
   getContent(): Uint8Array {

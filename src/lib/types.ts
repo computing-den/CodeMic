@@ -562,6 +562,7 @@ export type ShowTextEditorEvent = {
   selections: Selection[];
   visibleRange: LineRange;
   revUri?: string;
+  justOpened: boolean;
 
   // The following are the reverse selection and visible range of the uri, not the revUri
   revSelections?: Selection[];
@@ -663,7 +664,7 @@ export type CloseTextDocumentEventCompact = {
   t: 3;
   u: number;
   c: number;
-  rt: string;
+  // rt: string;
   re: EndOfLine;
 };
 
@@ -673,6 +674,7 @@ export type ShowTextEditorEventCompact = {
   c: number;
   s: SelectionCompact[];
   v: LineRangeCompact;
+  jo?: boolean; // undefined defaults to false
   ru?: number;
   rs?: SelectionCompact[];
   rv?: LineRangeCompact;
@@ -833,12 +835,12 @@ export interface InternalDocument {
 
 // export type Worktree = { [key: Uri]: File };
 
-export type File = DirFile | /*EmptyFile | */ BlobFile | GitFile;
+export type File = DirFile | BlobFile | GitFile;
 export type DirFile = {
   type: 'dir';
 };
-// export type EmptyFile = {
-//   type: 'empty';
+// export type BlankFile = {
+//   type: 'blank';
 // };
 export type BlobFile = {
   type: 'blob';

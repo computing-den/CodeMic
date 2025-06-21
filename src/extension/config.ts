@@ -12,10 +12,12 @@ export type Config = {
   logSessionRRUpdateStep: boolean;
   logTrackPlayerUpdateStep: boolean;
   logMasterAndTracksTimeUpdates: boolean;
+  logVscWorkspaceStepper?: boolean;
   exportFullBody?: boolean;
   testWithLastParams?: boolean;
   testRepeatCount?: number;
   testComplexityMultiplier?: number;
+  stepOnly?: boolean;
   debug: boolean;
 };
 

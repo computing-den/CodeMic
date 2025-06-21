@@ -4,7 +4,7 @@ export default defineConfig([
   {
     label: 'tests',
     files: 'dist/*.test.js',
-    version: 'stable',
+    version: '1.101.1',
     workspaceFolder: './test_data/test_workspace',
     mocha: {
       ui: 'tdd',

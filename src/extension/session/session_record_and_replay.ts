@@ -178,7 +178,7 @@ export default class SessionRecordAndReplay {
     await this.session.core.createWorkspaceDir();
 
     // Initialize internal workspace.
-    this.internalWorkspace.restoreInitState();
+    await this.internalWorkspace.restoreInitState();
 
     // Make sure cut and seek clocks are valid.
     // if (options?.cutClock && options?.clock) {

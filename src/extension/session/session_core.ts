@@ -411,15 +411,22 @@ export default class SessionCore {
     fs.writeFileSync(path.join(this.dataPath, 'blobs', sha1), data, { flush: true, encoding: 'utf8' });
   }
 
-  async readFile(file: t.File): Promise<Uint8Array> {
+  async readFile(file: t.File, encoding: 'utf8'): Promise<string>;
+  async readFile(file: t.File, encoding?: 'buffer'): Promise<Uint8Array>;
+  async readFile(file: t.File, encoding?: string): Promise<Uint8Array | string> {
+    let content: Uint8Array;
     switch (file.type) {
       case 'blob':
-        return this.readBlob(file.sha1);
-      case 'empty':
-        return new Uint8Array();
+        content = await this.readBlob(file.sha1);
+        break;
+      // case 'empty':
+      //   content = new Uint8Array();
+      //   break;
       default:
         throw new Error(`file type "${file.type}" not supported`);
     }
+
+    return encoding === 'utf8' ? new TextDecoder().decode(content) : content;
   }
 
   async writeFile(uri: string, file: t.File) {
@@ -431,11 +438,11 @@ export default class SessionCore {
       case 'blob':
         await this.copyBlobTo(file.sha1, fsPath);
         break;
-      case 'empty':
-        if (scheme === 'file') {
-          await storage.writeString(fsPath, '');
-        }
-        break;
+      // case 'empty':
+      //   if (scheme === 'file') {
+      //     await storage.writeString(fsPath, '');
+      //   }
+      //   break;
       default:
         throw new Error(`writeFile unknown type ${file.type}`);
     }

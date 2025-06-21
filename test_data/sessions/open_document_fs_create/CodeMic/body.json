@@ -1,0 +1,58 @@
+{
+  "full": true,
+  "editorEvents": [
+    {
+      "type": "fsCreate",
+      "id": 1,
+      "uri": "workspace:abc.txt",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "c5085600a9399124476fd9553fe4a812491b5209" }
+    },
+    { "type": "fsCreate", "id": 2, "uri": "workspace:adir", "clock": 0, "file": { "type": "dir" } },
+    {
+      "type": "fsCreate",
+      "id": 3,
+      "uri": "workspace:adir/stuff.txt",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "40f2c8a06bfc6607b06f1f63bb1740bbd9b8f118" }
+    },
+    { "type": "openTextDocument", "id": 12, "uri": "workspace:hi.txt", "clock": 22.20398835100048, "eol": "\n" },
+    {
+      "type": "textInsert",
+      "id": 13,
+      "uri": "workspace:hi.txt",
+      "clock": 22.20398835100048,
+      "revRange": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 2 } },
+      "text": "Hi",
+      "updateSelection": false
+    },
+    {
+      "type": "showTextEditor",
+      "id": 18,
+      "uri": "workspace:hi.txt",
+      "justOpened": true,
+      "clock": 22.20398835100048,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 0 }
+    },
+    {
+      "type": "select",
+      "id": 19,
+      "uri": "workspace:hi.txt",
+      "clock": 22.20398835100048,
+      "selections": [{ "anchor": { "line": 0, "character": 2 }, "active": { "line": 0, "character": 2 } }],
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }]
+    },
+    {
+      "type": "fsCreate",
+      "id": 20,
+      "uri": "workspace:hi.txt",
+      "clock": 22.20398835100048,
+      "file": { "type": "blob", "sha1": "94dd9e08c129c785f7f256e82fbe0a30e6d1ae40" }
+    }
+  ],
+  "audioTracks": [],
+  "videoTracks": [],
+  "focusTimeline": [{ "clock": 22.20398835100048, "uri": "workspace:hi.txt", "number": 0, "text": "Hi" }],
+  "defaultEol": "\n"
+}

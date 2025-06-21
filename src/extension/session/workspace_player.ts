@@ -61,7 +61,7 @@ class WorkspacePlayer {
   }
 
   async seekWithData(seekData: SeekData, useStepper?: boolean) {
-    if (seekData.steps.length > STEP_COUNT_THRESHOLD && useStepper !== true) {
+    if (seekData.steps.length > STEP_COUNT_THRESHOLD && useStepper !== true && !config.stepOnly) {
       if (config.logTrackPlayerUpdateStep) {
         console.log('updateImmediately: applying wholesale', seekData);
       }

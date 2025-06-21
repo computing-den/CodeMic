@@ -1,113 +1,95 @@
 {
   "full": true,
   "editorEvents": [
-    {
-      "type": "fsCreate",
-      "id": 2,
-      "uri": "workspace:abc.txt",
-      "clock": 0,
-      "file": { "type": "blob", "sha1": "ba8d7655d12d8ebabf0ec47eb01f57cba267fa92" }
-    },
-    { "type": "fsCreate", "id": 3, "uri": "untitled:Untitled-1", "clock": 0, "file": { "type": "empty" } },
-    { "type": "openTextDocument", "id": 4, "uri": "untitled:Untitled-1", "clock": 0, "eol": "\n" },
-    {
-      "type": "textChange",
-      "id": 5,
-      "uri": "untitled:Untitled-1",
-      "clock": 0,
-      "contentChanges": [
-        { "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 0 } }, "text": "Dirty" }
-      ],
-      "revContentChanges": [
-        { "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 5 } }, "text": "" }
-      ],
-      "updateSelection": false
-    },
+    {"type": "fsCreate", "id": 1, "uri": "workspace:abc.txt", "clock": 0, "file": {"type": "blob", "sha1": "c5085600a9399124476fd9553fe4a812491b5209"}},
+    {"type": "fsCreate", "id": 2, "uri": "workspace:adir", "clock": 0, "file": {"type": "dir"}},
+    {"type": "fsCreate", "id": 3, "uri": "workspace:adir/stuff.txt", "clock": 0, "file": {"type": "blob", "sha1": "40f2c8a06bfc6607b06f1f63bb1740bbd9b8f118"}},
+    {"type": "openTextDocument", "id": 4, "uri": "untitled:Untitled-1", "clock": 1.0176178980000006, "eol": "\n"},
     {
       "type": "showTextEditor",
-      "id": 6,
+      "id": 5,
       "uri": "untitled:Untitled-1",
-      "clock": 0,
-      "selections": [{ "anchor": { "line": 0, "character": 5 }, "active": { "line": 0, "character": 5 } }],
-      "visibleRange": { "start": 0, "end": 0 }
+      "clock": 1.0176178980000006,
+      "selections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}],
+      "visibleRange": {"start": 0, "end": 0},
+      "justOpened": true
     },
     {
-      "type": "fsCreate",
-      "id": 7,
-      "uri": "workspace:New%20stuff.perl",
-      "clock": 5.067503739,
-      "file": { "type": "empty" }
+      "type": "textInsert",
+      "id": 6,
+      "uri": "untitled:Untitled-1",
+      "clock": 2.07555731,
+      "revRange": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+      "text": "H",
+      "updateSelection": true
     },
-    { "type": "openTextDocument", "id": 8, "uri": "workspace:New%20stuff.perl", "clock": 5.067503739, "eol": "\n" },
     {
       "type": "textInsert",
       "id": 9,
-      "uri": "workspace:New%20stuff.perl",
-      "clock": 5.067503739,
-      "revRange": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 5 } },
-      "text": "Dirty",
+      "uri": "untitled:Untitled-1",
+      "clock": 2.2793583709999985,
+      "revRange": {"start": {"line": 0, "character": 1}, "end": {"line": 0, "character": 2}},
+      "text": "i",
+      "updateSelection": true
+    },
+    {"type": "openTextDocument", "id": 12, "uri": "workspace:hi.txt", "clock": 6.636549532000002, "eol": "\n"},
+    {
+      "type": "textInsert",
+      "id": 13,
+      "uri": "workspace:hi.txt",
+      "clock": 6.636549532000002,
+      "revRange": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 2}},
+      "text": "Hi",
       "updateSelection": false
     },
     {
       "type": "textChange",
-      "id": 12,
+      "id": 16,
       "uri": "untitled:Untitled-1",
-      "clock": 5.067503739,
-      "contentChanges": [
-        { "text": "", "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 5 } } }
-      ],
-      "revContentChanges": [
-        { "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 0 } }, "text": "Dirty" }
-      ],
+      "clock": 6.636549532000002,
+      "contentChanges": [{"text": "", "range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 2}}}],
+      "revContentChanges": [{"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}}, "text": "Hi"}],
       "updateSelection": false
     },
     {
       "type": "select",
-      "id": 13,
+      "id": 17,
       "uri": "untitled:Untitled-1",
-      "clock": 5.067503739,
-      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
-      "revSelections": [{ "anchor": { "line": 0, "character": 5 }, "active": { "line": 0, "character": 5 } }]
+      "clock": 6.636549532000002,
+      "selections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}],
+      "revSelections": [{"anchor": {"line": 0, "character": 2}, "active": {"line": 0, "character": 2}}]
     },
+    {"type": "closeTextDocument", "id": 18, "uri": "untitled:Untitled-1", "clock": 6.636549532000002, "revEol": "\n"},
     {
       "type": "closeTextEditor",
-      "id": 14,
+      "id": 19,
       "uri": "untitled:Untitled-1",
+      "clock": 6.636549532000002,
       "active": true,
-      "clock": 5.067503739,
-      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
-      "revVisibleRange": { "start": 0, "end": 0 }
+      "revSelections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}],
+      "revVisibleRange": {"start": 0, "end": 0}
     },
     {
       "type": "showTextEditor",
-      "id": 15,
-      "uri": "workspace:New%20stuff.perl",
-      "clock": 5.067503739,
-      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
-      "visibleRange": { "start": 0, "end": 0 }
+      "id": 20,
+      "uri": "workspace:hi.txt",
+      "clock": 6.636549532000002,
+      "selections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}],
+      "visibleRange": {"start": 0, "end": 0},
+      "justOpened": true
     },
     {
       "type": "select",
-      "id": 16,
-      "uri": "workspace:New%20stuff.perl",
-      "clock": 5.067503739,
-      "selections": [{ "anchor": { "line": 0, "character": 5 }, "active": { "line": 0, "character": 5 } }],
-      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }]
+      "id": 21,
+      "uri": "workspace:hi.txt",
+      "clock": 6.636549532000002,
+      "selections": [{"anchor": {"line": 0, "character": 2}, "active": {"line": 0, "character": 2}}],
+      "revSelections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}]
     },
-    {
-      "type": "fsChange",
-      "id": 17,
-      "uri": "workspace:New%20stuff.perl",
-      "clock": 5.170411519999995,
-      "file": { "type": "blob", "sha1": "6b5a06ae49acf38c1119aa226c68fad7228b22aa" },
-      "revFile": { "type": "empty" }
-    }
+    {"type": "fsCreate", "id": 22, "uri": "workspace:hi.txt", "clock": 6.737522179000001, "file": {"type": "blob", "sha1": "94dd9e08c129c785f7f256e82fbe0a30e6d1ae40"}}
   ],
   "audioTracks": [],
   "videoTracks": [],
-  "focusTimeline": [
-    { "clock": 0, "uri": "untitled:Untitled-1", "number": 0, "text": "Dirty" },
-    { "clock": 5.067503739, "uri": "workspace:New%20stuff.perl", "number": 0, "text": "Dirty" }
-  ],
+  "focusTimeline": [{"clock": 1.0176178980000006, "uri": "untitled:Untitled-1", "number": 0, "text": "Hi"}, {"clock": 6.636549532000002, "uri": "workspace:hi.txt", "number": 0, "text": "Hi"}],
   "defaultEol": "\n"
 }

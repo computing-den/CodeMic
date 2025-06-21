@@ -28,9 +28,9 @@ type SessionTestStep = {
 // cannot show the list of tests.
 // const testSessions = fs.readdirSync(testSessionsPath, { encoding: 'utf8' });
 suite('Sessions Test Suite', () => {
-  test('Session my_test_session', () => testSession('my_test_session'));
-  test('Session save_untitled', () => testSession('save_untitled'));
-  test('Session delete_file_externally', () => testSession('delete_file_externally'));
+  test('open_document_fs_create', () => testSession('open_document_fs_create'));
+  test('save_untitled', () => testSession('save_untitled'));
+  test('switch_untitled_to_c_and_save', () => testSession('switch_untitled_to_c_and_save'));
 });
 
 async function testSession(sessionHandle: string) {
@@ -49,7 +49,9 @@ async function testSession(sessionHandle: string) {
     for (let i = 0; i < (config.testRepeatCount ?? 1); i++) {
       const steps = createRandomSessionTestSteps(clockStrs);
       await writeJSON(lastPlanPath, steps);
-      console.log(`#${i + 1} New test plan: ${steps.map(sessionTestStepToString).join(' -> ')}`);
+      console.log(
+        `#${i + 1} New test plan: ${steps.map(sessionTestStepToString).join(' -> ')}  (at ${performance.now()})`,
+      );
 
       await prepareForSession(sessionHandle);
       await openSessionInRecorder(head.id);
@@ -165,8 +167,9 @@ function checkTextDocumentsAtClock(testClockPath: string, sessionHandle: string,
     }
   });
 
-  const actualInternalTextDocuments: TextDocument[] =
-    getCodeMic().session!.rr!._test_internalWorkspace.textDocuments.map(textDocument => {
+  const actualInternalTextDocuments: TextDocument[] = getCodeMic()
+    .session!.rr!._test_internalWorkspace.worktree.getTextDocuments()
+    .map(textDocument => {
       return { uri: textDocument.uri, content: textDocument.getText() };
     });
 
@@ -257,11 +260,13 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
       };
     }),
   );
-  const actualInternalTextEditors: t.TestMetaTextEditor[] = internalWorkspace.textEditors.map(textEditor => ({
-    uri: textEditor.document.uri,
-    selections: textEditor.selections,
-    visibleRange: textEditor.visibleRange,
-  }));
+  const actualInternalTextEditors: t.TestMetaTextEditor[] = internalWorkspace.worktree
+    .getTextEditors()
+    .map(textEditor => ({
+      uri: textEditor.uri,
+      selections: textEditor.selections,
+      visibleRange: textEditor.visibleRange,
+    }));
 
   function getDiff(expected: t.TestMetaTextEditor, actual: t.TestMetaTextEditor | undefined) {
     if (
@@ -310,14 +315,16 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
     errors.push(`unexpected text editor state(s) in internal: ${JSON.stringify(diffInternal, null, 2)}`);
   }
 
-  if (meta.activeTextEditor !== internalWorkspace.activeTextEditor?.document.uri) {
+  if (meta.activeTextEditor !== internalWorkspace.worktree.activeTextEditorUri) {
     errors.push(
-      `unexpected internal active text editor: expected ${meta.activeTextEditor}, actual: ${internalWorkspace.activeTextEditor?.document.uri}`,
+      `unexpected internal active text editor: expected ${meta.activeTextEditor}, actual: ${internalWorkspace.worktree.activeTextEditorUri}`,
     );
   }
 
-  const vscActiveTextEditorUri =
-    originalActiveTextEditor && vscWorkspace.uriFromVsc(originalActiveTextEditor.document.uri);
+  let vscActiveTextEditorUri: string | undefined;
+  if (originalActiveTextEditor && vscWorkspace.shouldRecordVscUri(originalActiveTextEditor.document.uri)) {
+    vscActiveTextEditorUri = vscWorkspace.uriFromVsc(originalActiveTextEditor.document.uri);
+  }
   if (meta.activeTextEditor !== vscActiveTextEditorUri) {
     errors.push(
       `unexpected vscode active text editor: expected ${meta.activeTextEditor}, actual: ${vscActiveTextEditorUri}`,
@@ -326,8 +333,12 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
 
   // Restore active text editor.
   if (originalActiveTextEditor) {
+    // Don't use this.openTextDocumentByVscUri because it refuses to
+    // open untitled documents with associated files.
     await vscode.window.showTextDocument(originalActiveTextEditor.document);
   }
+
+  if (errors.length) debugger;
 
   assert.ok(errors.length === 0, `At ${label}: found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
 }
