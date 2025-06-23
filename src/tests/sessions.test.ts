@@ -13,16 +13,17 @@ import { deserializeTestMeta } from '../extension/session/serialization.js';
 import { describe } from 'mocha';
 import config from '../extension/config.js';
 import { pathExists, readJSON, writeJSON } from '../extension/storage.js';
-
-const projectPath = path.resolve(__dirname, '..'); // relative to dist
-const workspacePath = path.resolve(projectPath, 'test_data/test_workspace');
-const testSessionsPath = path.resolve(projectPath, 'test_data/sessions');
-
-type SessionTestStep = {
-  clock: number;
-  clockStr: string;
-  useStepper: boolean;
-};
+import {
+  createRandomSessionTestSteps,
+  getCodeMic,
+  openSessionInRecorder,
+  prepareForSession,
+  readAvailableClockStrs,
+  SessionTestStep,
+  sessionTestStepToString,
+  testSessionsPath,
+  workspacePath,
+} from './test-helpers.js';
 
 // Dynamic tests using fs messes up the vscode test extension. It still works but vscode
 // cannot show the list of tests.
@@ -220,10 +221,10 @@ function checkTextDocumentsAtClock(testClockPath: string, sessionHandle: string,
     errors.push(`extra text document(s) in vscode: ${dirtyExtraActualVsc.map(x => x.uri).join(', ')}`);
   }
   if (diffContentVsc.length > 0) {
-    errors.push(`unexpected text document content(s) in vscode: ${JSON.stringify(diffContentVsc, null, 2)}`);
+    errors.push(`unexpected text document content(s) in vscode: ${lib.pretty(diffContentVsc)}`);
   }
   if (diffDirtyVsc.length > 0) {
-    errors.push(`different text document dirty state(s) in vscode: ${JSON.stringify(diffDirtyVsc, null, 2)}`);
+    errors.push(`different text document dirty state(s) in vscode: ${lib.pretty(diffDirtyVsc)}`);
   }
 
   if (missingActualInternal.length > 0) {
@@ -233,10 +234,10 @@ function checkTextDocumentsAtClock(testClockPath: string, sessionHandle: string,
     errors.push(`extra text document(s) in internal: ${extraActualInternal.map(x => x.uri).join(', ')}`);
   }
   if (diffContentInternal.length > 0) {
-    errors.push(`unexpected text document content(s) in internal: ${JSON.stringify(diffContentInternal, null, 2)}`);
+    errors.push(`unexpected text document content(s) in internal: ${lib.pretty(diffContentInternal)}`);
   }
   if (diffDirtyInternal.length > 0) {
-    errors.push(`different text document dirty state(s) in internal: ${JSON.stringify(diffDirtyInternal, null, 2)}`);
+    errors.push(`different text document dirty state(s) in internal: ${lib.pretty(diffDirtyInternal)}`);
   }
 
   assert.ok(errors.length === 0, `At ${label}: found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
@@ -302,7 +303,7 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
     errors.push(`extra text editor(s) in vscode: ${extraActualVsc.map(x => x.uri).join(', ')}`);
   }
   if (diffVsc.length > 0) {
-    errors.push(`unexpected text editor state(s) in vscode: ${JSON.stringify(diffVsc, null, 2)}`);
+    errors.push(`unexpected text editor state(s) in vscode: ${lib.pretty(diffVsc)}`);
   }
 
   if (missingActualInternal.length > 0) {
@@ -312,7 +313,7 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
     errors.push(`extra text editor(s) in internal: ${extraActualInternal.map(x => x.uri).join(', ')}`);
   }
   if (diffInternal.length > 0) {
-    errors.push(`unexpected text editor state(s) in internal: ${JSON.stringify(diffInternal, null, 2)}`);
+    errors.push(`unexpected text editor state(s) in internal: ${lib.pretty(diffInternal)}`);
   }
 
   if (meta.activeTextEditor !== internalWorkspace.worktree.activeTextEditorUri) {
@@ -341,102 +342,4 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
   if (errors.length) debugger;
 
   assert.ok(errors.length === 0, `At ${label}: found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
-}
-
-function readAvailableClockStrs(sessionHandle: string): string[] {
-  return _.compact(
-    fs
-      .readdirSync(path.resolve(projectPath, 'test_data/sessions', sessionHandle), 'utf8')
-      .map(x => x.match(/^clock_([\d\.]+)$/)?.[1]),
-  );
-}
-
-// function checkFilesAgainstExpectations(exp: TestExpectation) {
-//   const workspaceFiles = fs.readdirSync(workspacePath, { recursive: true, encoding: 'utf8' });
-
-//   for (const f of workspaceFiles) {
-//     const filepath = path.resolve(workspacePath, f);
-//     const stat = fs.statSync(filepath);
-//     if (stat.isFile()) {
-//       const expPart = exp.parts.find(part => part.type === 'file' && part.path === f) as TestFileExpectation;
-//       assert.ok(expPart, `At ${exp.label}: file ${f} is not expected to be in the workspace`);
-//       const content = fs.readFileSync(filepath, { encoding: 'utf8' });
-//       assert.strictEqual(content, expPart.content, `At ${exp.label}: file ${f}'s content does not match expectation`);
-//     }
-//   }
-
-//   for (const part of exp.parts) {
-//     if (part.type === 'file') {
-//       const found = workspaceFiles.find(f => part.path === f);
-//       assert.ok(found, `At ${exp.label}: file ${part.path} was expected but not found in the workspace`);
-//     }
-//   }
-// }
-
-function getCodeMic(): CodeMic {
-  return getCodeMicExtension().exports;
-}
-
-function getCodeMicExtension(): vscode.Extension<CodeMic> {
-  const ext = vscode.extensions.getExtension<CodeMic>('ComputingDen.codemic');
-  assert.ok(ext);
-  return ext;
-}
-
-async function prepareForSession(sessionHandle: string) {
-  await openCodeMicView();
-
-  // Go to welcome page / refresh welcome page.
-  await vscode.commands.executeCommand('codemic.openHome');
-
-  // Delete workspace content
-  for (const file of fs.readdirSync(workspacePath)) {
-    fs.rmSync(path.resolve(workspacePath, file), { recursive: true });
-  }
-
-  // Copy session into workspace.
-  fs.cpSync(
-    path.resolve(projectPath, 'test_data/sessions', sessionHandle, 'CodeMic'),
-    path.resolve(workspacePath, '.CodeMic'),
-    { recursive: true },
-  );
-
-  // Go to welcome page / refresh welcome page.
-  await vscode.commands.executeCommand('codemic.refreshHome');
-}
-
-async function openSessionInRecorder(id: string) {
-  await getCodeMic().handleMessage({ type: 'welcome/openSessionInRecorder', sessionId: id });
-  assert.strictEqual(getCodeMic().session?.head.id, id);
-  assert.strictEqual(getCodeMic().recorder?.tabId, 'editor-view');
-}
-
-// function getWorkspacePath(): string {
-//   const workspacePath = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
-//   assert.ok(workspacePath, 'workspace not set');
-//   return workspacePath;
-// }
-
-async function openCodeMicView() {
-  if (!getCodeMicExtension().isActive) {
-    await getCodeMicExtension().activate();
-  }
-  assert.ok(getCodeMicExtension().isActive);
-  await vscode.commands.executeCommand('workbench.view.extension.codemic-view-container');
-  await vscode.commands.executeCommand('codemic-view.focus');
-  assert.ok(getCodeMic().context.webviewProvider.visible);
-}
-
-function createRandomSessionTestSteps(clockStrs: string[]): SessionTestStep[] {
-  let resClockStrs = _.orderBy(clockStrs, Number);
-  for (let i = 0; i < clockStrs.length * (config.testComplexityMultiplier ?? 1); i++) {
-    const candidate = _.sample(clockStrs);
-    if (candidate && candidate !== resClockStrs.at(-1)) resClockStrs.push(candidate);
-  }
-
-  return resClockStrs.map(clockStr => ({ clockStr, clock: Number(clockStr), useStepper: _.sample([true, false]) }));
-}
-
-function sessionTestStepToString(step: SessionTestStep): string {
-  return (step.useStepper ? 'step:' : 'sync:') + step.clockStr;
 }

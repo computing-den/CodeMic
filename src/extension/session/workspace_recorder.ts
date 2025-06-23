@@ -41,7 +41,6 @@ import QueueRunner from '../../lib/queue_runner.js';
 
 class WorkspaceRecorder {
   recording = false;
-  // onError?: (error: Error) => any;
 
   private session: LoadedSession;
 
@@ -77,15 +76,7 @@ class WorkspaceRecorder {
 
     this.recording = true;
 
-    // update focus
-    // this.updateFocus();
-
-    // {
-    //   const disposable = vscode.window.tabGroups.onDidChangeTabGroups(async tabGroupChangeEvent => {
-    //     console.log('onDidChangeTabGroups');
-    //   });
-    //   this.disposables.push(disposable);
-    // }
+    await this.waitForStableFs();
 
     // Listen to tabs opening/closing/changing.
     {
@@ -193,6 +184,47 @@ class WorkspaceRecorder {
     this.disposables = [];
   }
 
+  private waitForStableFs(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const done = () => {
+        watcher.dispose();
+
+        const waitedForMs = Date.now() - startTimestamp;
+        if (waitedForMs < maxWait - stableFsDur / 2) {
+          if (config.debug) {
+            console.log(`waitForStableFs fs is stable after ${waitedForMs / 1000}s`);
+          }
+          resolve();
+        } else {
+          reject(new Error(`Waited for ${maxWait / 1000} seconds but the file system kept changing.`));
+        }
+      };
+
+      const fsChanged = (uri: vscode.Uri) => {
+        if (this.vscWorkspace.shouldRecordVscUri(uri)) {
+          if (config.debug) {
+            console.log('waitForStableFs got change: ', this.vscWorkspace.uriFromVsc(uri));
+          }
+          doneDebounced();
+        }
+      };
+
+      const stableFsDur = 600;
+      const maxWait = 3000;
+      const startTimestamp = Date.now();
+      const doneDebounced = _.debounce(done, stableFsDur, { maxWait });
+
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(this.session.workspace, '**/*'),
+      );
+      watcher.onDidCreate(fsChanged);
+      watcher.onDidChange(fsChanged);
+      watcher.onDidDelete(fsChanged);
+
+      doneDebounced();
+    });
+  }
+
   private setFocus() {
     if (!this.worktree.activeTextEditorUri) return;
     const item = this.worktree.get(this.worktree.activeTextEditorUri);
@@ -220,7 +252,9 @@ class WorkspaceRecorder {
 
     const uri = this.vscWorkspace.uriFromVsc(vscTextDocument.uri);
     if (vscContentChanges.length === 0) {
-      console.log(`textChange vscContentChanges for ${uri} is empty`);
+      if (config.debug) {
+        console.log(`textChange vscContentChanges for ${uri} is empty`);
+      }
       return;
     }
 
@@ -638,17 +672,22 @@ class WorkspaceRecorder {
     logRawEvent(`event: fsCreate ${vscUri}`);
     if (!this.vscWorkspace.shouldRecordVscUri(vscUri)) return;
     const uri = this.vscWorkspace.uriFromVsc(vscUri);
-
-    logAcceptedEvent(`accepted save for ${uri}`);
-
     const stat = await fs.promises.stat(vscUri.fsPath);
-    assert(stat.isFile() || stat.isDirectory(), `Expected ${vscUri.fsPath} to be a regular file or directory.`);
 
-    const data = await fs.promises.readFile(vscUri.fsPath);
-    const sha1 = await misc.computeSHA1(data);
-    const file: t.File = { type: 'blob', sha1 };
-    await this.session.core.writeBlob(sha1, data);
+    let file: t.File;
+    if (stat.isFile()) {
+      const data = await fs.promises.readFile(vscUri.fsPath);
+      const sha1 = await misc.computeSHA1(data);
+      file = { type: 'blob', sha1 };
+      await this.session.core.writeBlob(sha1, data);
+    } else if (stat.isDirectory()) {
+      file = { type: 'dir' };
+    } else {
+      // No need to record anything other than files and directories.
+      return;
+    }
 
+    logAcceptedEvent(`accepted fsCreate for ${uri}`);
     this.worktree.addOrUpdateFile(uri, file);
 
     this.insertEvent(
@@ -667,11 +706,13 @@ class WorkspaceRecorder {
     logRawEvent(`event: fsChange ${vscUri}`);
     if (!this.vscWorkspace.shouldRecordVscUri(vscUri)) return;
 
-    const uri = this.vscWorkspace.uriFromVsc(vscUri);
-    logAcceptedEvent(`accepted save for ${uri}`);
-
     const stat = await fs.promises.stat(vscUri.fsPath);
-    assert(stat.isFile(), `Expected ${vscUri.fsPath} to be a regular file.`);
+    const uri = this.vscWorkspace.uriFromVsc(vscUri);
+
+    // No need to record changes to directories when their content change.
+    if (!stat.isFile()) return;
+
+    logAcceptedEvent(`accepted fsChange for ${uri}`);
 
     const data = await fs.promises.readFile(vscUri.fsPath);
     const sha1 = await misc.computeSHA1(data);
@@ -705,18 +746,20 @@ class WorkspaceRecorder {
     logRawEvent(`event: fsDelete ${vscUri}`);
     if (!this.vscWorkspace.shouldRecordVscUri(vscUri)) return;
 
+    // const stat = await fs.promises.stat(vscUri.fsPath);
     const uri = this.vscWorkspace.uriFromVsc(vscUri);
+
+    // // No need to record anything other than files and directories.
+    // if (!stat.isFile() && !stat.isDirectory()) return;
+
     logAcceptedEvent(`accepted delete for ${uri}`);
 
-    // const stat = await fs.promises.stat(vscUri.fsPath);
-    // assert(stat.isFile() || stat.isDirectory(), `Expected ${vscUri.fsPath} to be a regular file or directory.`);
-
-    // const data = await fs.promises.readFile(vscUri.fsPath);
-    // const sha1 = await misc.computeSHA1(data);
-    // const file: t.File = { type: 'blob', sha1 };
-
+    // We can't check if the deleted file was a file, directory, or something else that
+    // we didn't even decide to record in fsCreate. So, don't throw error if not
+    // in worktree.
     const item = this.worktree.getOpt(uri);
-    assert(item, `Received file delete event for ${vscUri.fsPath} but it's not in the internal worktree`);
+    if (!item) return;
+
     assert(item.file, `Received file delete event for ${vscUri.fsPath} but internal worktree item does not have file`);
     const revFile = item.file;
     item.closeFile();

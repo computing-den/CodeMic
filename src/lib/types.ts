@@ -32,7 +32,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'player/comment'; text: string; clock?: number }; response: OKResponse }
   | { request: { type: 'player/likeSession'; value: boolean }; response: OKResponse }
   | { request: { type: 'recorder/openTab'; tabId: RecorderUITabId }; response: OKResponse }
-  | { request: { type: 'recorder/load' }; response: OKResponse }
+  | { request: { type: 'recorder/load'; skipConfirmation?: boolean }; response: OKResponse }
   | { request: { type: 'recorder/play' }; response: OKResponse }
   | { request: { type: 'recorder/record' }; response: OKResponse }
   | { request: { type: 'recorder/pause' }; response: OKResponse }

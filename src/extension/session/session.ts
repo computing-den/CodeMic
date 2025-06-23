@@ -127,6 +127,7 @@ export class Session {
         });
         this.rr = new SessionRecordAndReplay(this as LoadedSession);
         await this.rr.enqueueScan();
+        await this.editor.write();
       },
     );
   }

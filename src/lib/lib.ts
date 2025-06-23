@@ -569,3 +569,7 @@ export async function tryCatch<T>(promise: Promise<T>): Promise<[null, T] | [Err
     return [error as Error, null];
   }
 }
+
+export function pretty(value: any): string {
+  return JSON.stringify(value, null, 2);
+}

@@ -155,22 +155,35 @@ export default class SessionRecordAndReplay {
     await this.pauseOnError(this.queue.enqueue(this.update.bind(this, diffMs)));
   }
 
+  /**
+   * useStepper is only useful during testing to test the stepper.
+   */
   private async seek(clock: number, useStepper?: boolean) {
     this.clock = Math.min(this.session.head.duration, clock);
-    await this.workspacePlayer.seek(clock, useStepper);
+
+    if (useStepper) {
+      await this.workspacePlayer.seek(clock, useStepper);
+    } else {
+      const uriSet: t.UriSet = new Set();
+      await this.internalWorkspace.seek(this.clock, uriSet);
+      await this.vscWorkspace.sync(Array.from(uriSet));
+    }
+
     await this.syncMedia({ hard: true });
     this.updateLoop.resetDiff();
   }
 
   private async sync(clock?: number) {
-    assert(!this.running, 'Cannot sync while playing/recording');
+    // assert(!this.running, 'Cannot sync while playing/recording');
 
     if (clock !== undefined) {
-      this.clock = clock;
-      await this.internalWorkspace.seek(clock);
+      this.clock = Math.min(this.session.head.duration, clock);
     }
+    await this.internalWorkspace.seek(this.clock);
     await this.vscWorkspace.sync();
-    await this.syncMedia();
+
+    await this.syncMedia({ hard: true });
+    this.updateLoop.resetDiff();
   }
 
   private async loadWorkspace(options?: { clock?: number }) {
@@ -493,7 +506,7 @@ export default class SessionRecordAndReplay {
     await this.vscWorkspace.sync(Array.from(uriSet));
 
     // Sync media
-    await this.syncMedia();
+    await this.syncMedia({ hard: true });
   }
 
   /**

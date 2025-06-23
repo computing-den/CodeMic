@@ -471,7 +471,7 @@ class CodeMic {
         assert(this.session);
         assert(this.recorder);
         assert(this.session.temp);
-        if (await this.loadRecorder(this.session)) {
+        if (await this.loadRecorder(this.session, { skipConfirmation: req.skipConfirmation })) {
           this.recorder.tabId = 'editor-view';
         }
         await this.updateFrontend();
@@ -491,7 +491,7 @@ class CodeMic {
       }
       case 'recorder/pause': {
         assert(this.session?.isLoaded());
-        this.session.rr.pause();
+        await this.session.editor.write({ pause: true, ifDirty: true });
         await this.updateFrontend();
         return ok;
       }
@@ -731,7 +731,7 @@ class CodeMic {
     }
   }
 
-  async loadRecorder(session: Session, clock?: number): Promise<boolean> {
+  async loadRecorder(session: Session, opts?: { clock?: number; skipConfirmation?: boolean }): Promise<boolean> {
     // NOTE: Do not attempt to download the session here.
     //       After a vscode restart, the session is no longer temp
     //       but it doesn't yet have a body either until scan is done.
@@ -744,24 +744,26 @@ class CodeMic {
     if (session.temp) {
       session.core.verifyAndNormalizeTemp();
 
-      if (await Session.Core.sessionExists(session.workspace)) {
-        const confirmTitle = 'Overwrite';
-        const answer = await vscode.window.showWarningMessage(
-          `A session already exists at ${session.workspace}. Do you want to overwrite it?`,
-          { modal: true },
-          { title: 'Cancel', isCloseAffordance: true },
-          { title: confirmTitle },
-        );
-        if (answer?.title !== confirmTitle) return false;
-      } else {
-        const confirmTitle = 'Continue';
-        const answer = await vscode.window.showWarningMessage(
-          `Contents of ${session.workspace} will be overwritten during recording and playback.`,
-          { modal: true },
-          { title: 'Cancel', isCloseAffordance: true },
-          { title: confirmTitle },
-        );
-        if (answer?.title !== confirmTitle) return false;
+      if (!opts?.skipConfirmation) {
+        if (await Session.Core.sessionExists(session.workspace)) {
+          const confirmTitle = 'Overwrite';
+          const answer = await vscode.window.showWarningMessage(
+            `A session already exists at ${session.workspace}. Do you want to overwrite it?`,
+            { modal: true },
+            { title: 'Cancel', isCloseAffordance: true },
+            { title: confirmTitle },
+          );
+          if (answer?.title !== confirmTitle) return false;
+        } else {
+          const confirmTitle = 'Continue';
+          const answer = await vscode.window.showWarningMessage(
+            `Contents of ${session.workspace} will be overwritten during recording and playback.`,
+            { modal: true },
+            { title: 'Cancel', isCloseAffordance: true },
+            { title: confirmTitle },
+          );
+          if (answer?.title !== confirmTitle) return false;
+        }
       }
 
       // Commit the temp session. Copies the temp session to its final destination based on workspace and handle.
@@ -780,11 +782,11 @@ class CodeMic {
     await VscWorkspace.setUpWorkspace_MAY_RESTART_VSCODE(this.context, {
       screen: t.Screen.Recorder,
       workspace: session.workspace,
-      recorder: { mustScan: session.mustScan, clock },
+      recorder: { mustScan: session.mustScan, clock: opts?.clock },
       userMetadata: this.userMetadata,
     });
 
-    await session.prepare({ clock });
+    await session.prepare({ clock: opts?.clock });
     return true;
   }
 
@@ -860,7 +862,7 @@ class CodeMic {
         break;
       }
       case t.Screen.Recorder: {
-        if (params.session.temp || (await this.loadRecorder(params.session, params.clock))) {
+        if (params.session.temp || (await this.loadRecorder(params.session, { clock: params.clock }))) {
           if (params.session.temp) {
             this.recorder = { tabId: 'details-view' };
           } else {
