@@ -1,0 +1,13 @@
+{
+  "id": "77d35454-0a3a-4a9d-9f36-0a782b853993",
+  "handle": "show_text_editor_no_document",
+  "title": "showTextEditor event without openTextDocument",
+  "description": "",
+  "author": "sean_shirazi",
+  "duration": 1.512529727,
+  "modificationTimestamp": "2025-06-24T11:45:30.374Z",
+  "toc": [],
+  "formatVersion": 2,
+  "ignorePatterns": "# Ignore the .git directory\n.git\n\n# Node.js dependencies\nnode_modules\n\n# Python byte-compiled / optimized / DLL files\n__pycache__\n*.py[cod]\n*$py.class\n\n",
+  "hasCover": false
+}

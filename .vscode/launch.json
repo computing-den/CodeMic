@@ -29,9 +29,10 @@
       "args": [
         "${workspaceFolder}/test_data/test_workspace",
         "--disable-extensions",
-        "--extensionDevelopmentPath=${workspaceFolder}",
-        "--extensionTestsPath=${workspaceFolder}/dist/test-runner.js"
+        "--extensionDevelopmentPath=${workspaceFolder}"
+        // "--extensionTestsPath=${workspaceFolder}/dist/test-runner.js"
       ],
+      "testConfiguration": "${workspaceFolder}/.vscode-test.mjs",
       "preLaunchTask": "${defaultBuildTask}",
       "sourceMaps": true,
       "outFiles": ["${workspaceFolder}/dist/**/*"]

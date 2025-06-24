@@ -32,6 +32,7 @@ suite('Sessions Test Suite', () => {
   test('open_document_fs_create', () => testSession('open_document_fs_create'));
   test('save_untitled', () => testSession('save_untitled'));
   test('switch_untitled_to_c_and_save', () => testSession('switch_untitled_to_c_and_save'));
+  test('show_text_editor_no_document', () => testSession('show_text_editor_no_document'));
 });
 
 async function testSession(sessionHandle: string) {
@@ -78,7 +79,7 @@ async function testSessionSteps(sessionHandle: string, steps: SessionTestStep[])
 
     // Check files and open text documents.
     checkFilesAtClock(testClockPath, sessionHandle, label);
-    checkTextDocumentsAtClock(testClockPath, sessionHandle, label, meta);
+    await checkTextDocumentsAtClock(testClockPath, sessionHandle, label, meta);
     await checkTextEditorsAtClock(testClockPath, sessionHandle, label, meta);
   }
 }
@@ -121,7 +122,12 @@ function checkFilesAtClock(testClockPath: string, sessionHandle: string, label: 
   }
 }
 
-function checkTextDocumentsAtClock(testClockPath: string, sessionHandle: string, label: string, meta: t.TestMeta) {
+async function checkTextDocumentsAtClock(
+  testClockPath: string,
+  sessionHandle: string,
+  label: string,
+  meta: t.TestMeta,
+) {
   // Compare text documents' content against internal
   // Compare text documents' content against vscode
   // Must not have extra internal text documents
@@ -168,11 +174,15 @@ function checkTextDocumentsAtClock(testClockPath: string, sessionHandle: string,
     }
   });
 
-  const actualInternalTextDocuments: TextDocument[] = getCodeMic()
-    .session!.rr!._test_internalWorkspace.worktree.getTextDocuments()
-    .map(textDocument => {
-      return { uri: textDocument.uri, content: textDocument.getText() };
-    });
+  const actualInternalTextDocuments: TextDocument[] = await Promise.all(
+    getCodeMic()
+      .session!.rr!._test_internalWorkspace.worktree.getTextDocuments()
+      .map(async textDocument => ({
+        uri: textDocument.uri,
+        content: textDocument.getText(),
+        dirty: await getCodeMic().session!.rr!._test_internalWorkspace.worktree.get(textDocument.uri).isDirty(),
+      })),
+  );
 
   function getDiff(expected: TextDocument, actual: TextDocument | undefined) {
     if (expected && actual && expected.content !== actual.content) {
@@ -200,6 +210,7 @@ function checkTextDocumentsAtClock(testClockPath: string, sessionHandle: string,
   );
 
   const extraActualInternal = _.differenceBy(actualInternalTextDocuments, expectedTextDocuments, 'uri');
+  const dirtyExtraActualInternal = _.filter(extraActualInternal, 'dirty');
   const missingActualInternal = _.differenceBy(expectedTextDocuments, actualInternalTextDocuments, 'uri');
   const diffContentInternal = _.compact(
     _.map(expectedTextDocuments, expected =>
@@ -230,8 +241,8 @@ function checkTextDocumentsAtClock(testClockPath: string, sessionHandle: string,
   if (missingActualInternal.length > 0) {
     errors.push(`missing text document(s) in internal: ${missingActualInternal.map(x => x.uri).join(', ')}`);
   }
-  if (extraActualInternal.length > 0) {
-    errors.push(`extra text document(s) in internal: ${extraActualInternal.map(x => x.uri).join(', ')}`);
+  if (dirtyExtraActualInternal.length > 0) {
+    errors.push(`extra text document(s) in internal: ${dirtyExtraActualInternal.map(x => x.uri).join(', ')}`);
   }
   if (diffContentInternal.length > 0) {
     errors.push(`unexpected text document content(s) in internal: ${lib.pretty(diffContentInternal)}`);

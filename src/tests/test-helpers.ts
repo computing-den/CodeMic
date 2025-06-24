@@ -124,6 +124,18 @@ export async function closeAllTabs() {
   }
 }
 
-export function areEventsEqual(actual: EditorEvent[], expected: EditorEvent[]) {
-  return _.isEqualWith(actual, expected, (a, b, key) => (key === 'clock' ? true : undefined));
+export function areEventsAlmostEqual(actual: EditorEvent[], expected: EditorEvent[]): boolean {
+  return _.isEqualWith(actual, expected, (a, b, key) => (key === 'clock' || key === 'id' ? true : undefined));
+}
+
+export function isEventAlmostEqual(actual: EditorEvent, expected: EditorEvent): boolean {
+  return _.isEqualWith(actual, expected, (a, b, key) => (key === 'clock' || key === 'id' ? true : undefined));
+}
+
+export function repeater(cb: () => any): () => Promise<void> {
+  return async () => {
+    for (let i = 0; i < (config.testRepeatCount ?? 1); i++) {
+      await cb();
+    }
+  };
 }

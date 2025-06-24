@@ -77,7 +77,7 @@ const extensionJs = await esbuild.context({
 const testsJs = await esbuild.context({
   ...common,
   entryPoints: [
-    'src/tests/test-runner.ts',
+    // 'src/tests/test-runner.ts',
     ...fs
       .readdirSync('src/tests/', { recursive: true, encoding: 'utf8' })
       .filter(x => x.endsWith('.test.ts'))
