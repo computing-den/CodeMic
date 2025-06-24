@@ -273,8 +273,8 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
     if (
       expected &&
       actual &&
-      (!lib.areSelectionsEqual(expected.selections, actual.selections) ||
-        !expected.visibleRange.isEqual(actual.visibleRange))
+      (!lib.selAreEqual(expected.selections, actual.selections) ||
+        !lib.lineRangeIsEqual(expected.visibleRange, actual.visibleRange))
     ) {
       return { uri: expected.uri, expected: _.omit(expected, 'uri'), actual: _.omit(actual, 'uri') };
     }

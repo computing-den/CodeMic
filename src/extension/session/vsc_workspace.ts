@@ -1,7 +1,6 @@
 import * as t from '../../lib/types.js';
 import InternalTextDocument from './internal_text_document.js';
 import * as lib from '../../lib/lib.js';
-import { Position, Range, Selection, LineRange } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import * as misc from '../misc.js';
 import * as storage from '../storage.js';
@@ -109,45 +108,45 @@ export default class VscWorkspace {
   //   return Boolean(vscWorkspace === workspace);
   // }
 
-  static toVscPosition(position: Position): vscode.Position {
+  static toVscPosition(position: t.Position): vscode.Position {
     return new vscode.Position(position.line, position.character);
   }
 
-  static fromVscPosition(vscodePosition: vscode.Position): Position {
-    return new Position(vscodePosition.line, vscodePosition.character);
+  static fromVscPosition(vscodePosition: vscode.Position): t.Position {
+    return { line: vscodePosition.line, character: vscodePosition.character };
   }
 
-  static toVscRange(range: Range): vscode.Range {
+  static toVscRange(range: t.Range): vscode.Range {
     return new vscode.Range(VscWorkspace.toVscPosition(range.start), VscWorkspace.toVscPosition(range.end));
   }
 
-  static fromVscRange(vscRange: vscode.Range): Range {
-    return new Range(VscWorkspace.fromVscPosition(vscRange.start), VscWorkspace.fromVscPosition(vscRange.end));
+  static fromVscRange(vscRange: vscode.Range): t.Range {
+    return { start: VscWorkspace.fromVscPosition(vscRange.start), end: VscWorkspace.fromVscPosition(vscRange.end) };
   }
 
-  static fromVscLineRange(vscRange: vscode.Range): LineRange {
-    return new LineRange(vscRange.start.line, vscRange.end.line);
+  static fromVscLineRange(vscRange: vscode.Range): t.LineRange {
+    return { start: vscRange.start.line, end: vscRange.end.line };
   }
 
-  static toVscSelection(selection: Selection): vscode.Selection {
+  static toVscSelection(selection: t.Selection): vscode.Selection {
     return new vscode.Selection(
       VscWorkspace.toVscPosition(selection.anchor),
       VscWorkspace.toVscPosition(selection.active),
     );
   }
 
-  static fromVscSelection(vscSelection: vscode.Selection): Selection {
-    return new Selection(
-      VscWorkspace.fromVscPosition(vscSelection.anchor),
-      VscWorkspace.fromVscPosition(vscSelection.active),
-    );
+  static fromVscSelection(vscSelection: vscode.Selection): t.Selection {
+    return {
+      anchor: VscWorkspace.fromVscPosition(vscSelection.anchor),
+      active: VscWorkspace.fromVscPosition(vscSelection.active),
+    };
   }
 
-  static toVscSelections(selections: Selection[]): readonly vscode.Selection[] {
+  static toVscSelections(selections: t.Selection[]): readonly vscode.Selection[] {
     return selections.map(VscWorkspace.toVscSelection);
   }
 
-  static fromVscSelections(vscSelections: readonly vscode.Selection[]): Selection[] {
+  static fromVscSelections(vscSelections: readonly vscode.Selection[]): t.Selection[] {
     return vscSelections.map(VscWorkspace.fromVscSelection);
   }
 
@@ -241,7 +240,7 @@ export default class VscWorkspace {
         }
         const eol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
         const internalTextDocument = InternalTextDocument.fromText(uri, revText, eol);
-        const irContentChanges: lib.ContentChange[] = [
+        const irContentChanges: t.ContentChange[] = [
           { range: internalTextDocument.getRange(), text: vscTextDocument.getText() },
         ];
         const irRevContentChanges = internalTextDocument.applyContentChanges(irContentChanges, true);
@@ -476,7 +475,7 @@ export default class VscWorkspace {
       `Failed to open editor for ${uri.toString()}`,
     );
     if (options?.skipConfirmation) {
-      const value = await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+      await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
     } else {
       await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
     }
@@ -686,7 +685,7 @@ export default class VscWorkspace {
     }
   }
 
-  getVscTextDocumentRange(document: vscode.TextDocument): Range {
+  getVscTextDocumentRange(document: vscode.TextDocument): t.Range {
     return VscWorkspace.fromVscRange(document.validateRange(new vscode.Range(0, 0, document.lineCount, 0)));
   }
 

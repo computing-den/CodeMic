@@ -1,7 +1,7 @@
 import { URI } from 'vscode-uri';
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
-import { LineRange, Selection, lastSortedIndex, getWorkspaceUriHierarchy } from '../../lib/lib.js';
+import { lastSortedIndex, getWorkspaceUriHierarchy } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import { LoadedSession } from './session.js';
 import InternalWorkspaceStepper from './internal_workspace_stepper.js';
@@ -114,8 +114,8 @@ export class LiveWorktreeItem {
   }
 
   async openTextEditor(opts?: {
-    selections?: Selection[];
-    visibleRange?: LineRange;
+    selections?: t.Selection[];
+    visibleRange?: t.LineRange;
     eol?: t.EndOfLine;
   }): Promise<InternalTextEditor> {
     // Shortcut if text editor already open with document.

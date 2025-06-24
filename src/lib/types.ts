@@ -1,4 +1,4 @@
-import type { Position, Range, LineRange, Selection, ContentChange } from './lib.js';
+// import type { Position, Range, LineRange, Selection, ContentChange } from './lib.js';
 
 // Having the response types separately improves typescript error messages.
 export type StoreResponse = { type: 'store'; store: Store };
@@ -484,6 +484,31 @@ export interface WorkspaceStepper {
   applySaveEvent(e: SaveEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyTextInsertEvent(e: TextInsertEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
 }
+
+export type Position = {
+  line: number;
+  character: number;
+};
+
+export type Range = {
+  start: Position;
+  end: Position;
+};
+
+export type Selection = {
+  anchor: Position;
+  active: Position;
+};
+
+export type ContentChange = {
+  text: string;
+  range: Range;
+};
+
+export type LineRange = {
+  start: number;
+  end: number;
+};
 
 export type EditorEvent =
   | FsCreateEvent

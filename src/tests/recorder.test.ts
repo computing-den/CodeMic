@@ -5,7 +5,7 @@ import _ from 'lodash';
 import * as lib from '../lib/lib.js';
 import { pathExists } from '../extension/storage.js';
 import {
-  areEventsEqual,
+  areEventsEqual as areEventsAlmostEqual,
   closeAllTabs,
   exampleFilesPath,
   getCodeMic,
@@ -14,7 +14,6 @@ import {
 } from './test-helpers.js';
 import config from '../extension/config.js';
 import { EditorEvent } from '../lib/types.js';
-import { deserializeEditorEventsFull, deserializeSessionBody } from '../extension/session/serialization.js';
 
 suite('Recorder', () => {
   test('fs changes', recordFsChanges);
@@ -111,7 +110,7 @@ async function recordFsChanges() {
     errors.push(`missing files: ${missingActualFiles.join(', ')}`);
   }
 
-  const expectedEvents = deserializeEditorEventsFull([
+  const expectedEvents: EditorEvent[] = [
     {
       type: 'fsCreate',
       id: 1,
@@ -171,10 +170,10 @@ async function recordFsChanges() {
       clock: 0.4067855650000001,
       revFile: { type: 'blob', sha1: 'd6688b7b322bcc76be5690a58d76b9b9386216dc' },
     },
-  ]);
+  ];
   const actualEvents = codemic.session!.body?.editorEvents!;
 
-  const areEqual = areEventsEqual(actualEvents, expectedEvents);
+  const areEqual = areEventsAlmostEqual(actualEvents, expectedEvents);
   if (!areEqual) {
     errors.push(
       `unexpected editor events.\nActual: ${lib.pretty(actualEvents)}\nExpected: ${lib.pretty(expectedEvents)}`,

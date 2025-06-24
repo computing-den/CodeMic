@@ -1,6 +1,5 @@
 import _ from 'lodash';
 import * as t from '../../lib/types.js';
-import { Range, Selection, Position, ContentChange } from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 
 export default class InternalTextDocument implements t.InternalDocument {
@@ -24,7 +23,7 @@ export default class InternalTextDocument implements t.InternalDocument {
     return new TextEncoder().encode(this.getText());
   }
 
-  getText(range?: Range): string {
+  getText(range?: t.Range): string {
     if (range) {
       assert(this.isRangeValid(range), 'InternalTextDocument getText: invalid range');
       if (range.start.line === range.end.line) {
@@ -42,7 +41,7 @@ export default class InternalTextDocument implements t.InternalDocument {
     }
   }
 
-  isRangeValid(range: Range): boolean {
+  isRangeValid(range: t.Range): boolean {
     return (
       range.start.line >= 0 &&
       range.start.character >= 0 &&
@@ -56,11 +55,11 @@ export default class InternalTextDocument implements t.InternalDocument {
    * We calculate in increasing order instead of doing it in reverse because it makes calculating
    * the line and character shifts for the reverse content changes easier.
    */
-  applyContentChanges(contentChanges: ContentChange[], calcReverse: true): ContentChange[];
-  applyContentChanges(contentChanges: ContentChange[], calcReverse: false): undefined;
-  applyContentChanges(contentChanges: ContentChange[], calcReverse: boolean) {
+  applyContentChanges(contentChanges: t.ContentChange[], calcReverse: true): t.ContentChange[];
+  applyContentChanges(contentChanges: t.ContentChange[], calcReverse: false): undefined;
+  applyContentChanges(contentChanges: t.ContentChange[], calcReverse: boolean) {
     const { lines } = this;
-    let revContentChanges: ContentChange[] | undefined;
+    let revContentChanges: t.ContentChange[] | undefined;
     let totalLineShift: number = 0;
     let lastLineShifted = 0;
     let lastLineCharShift = 0;
@@ -77,7 +76,7 @@ export default class InternalTextDocument implements t.InternalDocument {
         const startChar = range.start.character + (lastLineShifted === startLine ? lastLineCharShift : 0);
         const endLine = range.end.line + totalLineShift;
         const endChar = range.end.character + (lastLineShifted === endLine ? lastLineCharShift : 0);
-        range = new Range(new Position(startLine, startChar), new Position(endLine, endChar));
+        range = { start: { line: startLine, character: startChar }, end: { line: endLine, character: endChar } };
       }
 
       const newLines = text.split(/\r?\n/);
@@ -111,15 +110,15 @@ export default class InternalTextDocument implements t.InternalDocument {
       }
 
       // Calculate final position.
-      const finalPosition = new Position(
-        range.end.line + extraLineCount,
-        newLines[newLines.length - 1].length - lastLineSuffix.length,
-      );
+      const finalPosition = {
+        line: range.end.line + extraLineCount,
+        character: newLines[newLines.length - 1].length - lastLineSuffix.length,
+      };
 
       // Insert into revContentChanges.
       if (revContentChanges) {
         // Calculate reverse range
-        const revRange = new Range(range.start, finalPosition);
+        const revRange = { start: range.start, end: finalPosition };
         revContentChanges!.push({ range: revRange, text: revText! });
       }
 
@@ -132,8 +131,11 @@ export default class InternalTextDocument implements t.InternalDocument {
     return revContentChanges;
   }
 
-  getRange(): Range {
-    if (!this.lines.length) return new Range(new Position(0, 0), new Position(0, 0));
-    return new Range(new Position(0, 0), new Position(this.lines.length - 1, this.lines[this.lines.length - 1].length));
+  getRange(): t.Range {
+    if (!this.lines.length) return { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+    return {
+      start: { line: 0, character: 0 },
+      end: { line: this.lines.length - 1, character: this.lines[this.lines.length - 1].length },
+    };
   }
 }

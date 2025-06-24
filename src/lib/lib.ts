@@ -244,88 +244,66 @@ export class Rect {
   }
 }
 
-export class Position {
-  constructor(public line: number, public character: number) {
-    assert(line >= 0, 'Position line must be >= 0');
-    assert(character >= 0, 'Position character must be >= 0');
-  }
-
-  isEqual(other: Position): boolean {
-    return this.line === other.line && this.character === other.character;
-  }
-
-  compareTo(other: Position): number {
-    if (this.line < other.line) return -1;
-    if (this.line > other.line) return 1;
-    if (this.character < other.character) return -1;
-    if (this.character > other.character) return 1;
-    return 0;
-  }
-
-  isAfter(other: Position): boolean {
-    return this.compareTo(other) > 0;
-  }
-
-  isAfterOrEqual(other: Position): boolean {
-    return this.compareTo(other) >= 0;
-  }
-
-  isBefore(other: Position): boolean {
-    return this.compareTo(other) < 0;
-  }
-
-  isBeforeOrEqual(other: Position): boolean {
-    return this.compareTo(other) <= 0;
-  }
+export function posCompare(a: t.Position, b: t.Position): number {
+  if (a.line < b.line) return -1;
+  if (a.line > b.line) return 1;
+  if (a.character < b.character) return -1;
+  if (a.character > b.character) return 1;
+  return 0;
 }
 
-export class Range {
-  constructor(public start: Position, public end: Position) {}
-
-  isEqual(other: Range) {
-    return this.start.isEqual(other.start) && this.end.isEqual(other.end);
-  }
+export function posIsAfter(a: t.Position, b: t.Position): boolean {
+  return posCompare(a, b) > 0;
 }
 
-export class Selection {
-  constructor(public anchor: Position, public active: Position) {}
-
-  get start(): Position {
-    return this.anchor.isBeforeOrEqual(this.active) ? this.anchor : this.active;
-  }
-  get end(): Position {
-    return this.anchor.isAfter(this.active) ? this.anchor : this.active;
-  }
-
-  isEqual(other: Selection): boolean {
-    return this.anchor.isEqual(other.anchor) && this.active.isEqual(other.active);
-  }
-
-  static areEqual(a: Selection[], b: Selection[]): boolean {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      if (!a[i].isEqual(b[i])) return false;
-    }
-    return true;
-  }
+export function posIsAfterOrEqual(a: t.Position, b: t.Position): boolean {
+  return posCompare(a, b) >= 0;
 }
 
-export class ContentChange {
-  constructor(public text: string, public range: Range) {}
+export function posIsBefore(a: t.Position, b: t.Position): boolean {
+  return posCompare(a, b) < 0;
 }
 
-export class LineRange {
-  constructor(public start: number, public end: number) {}
-  isEqual(other: LineRange) {
-    return this.start === other.start && this.end === other.end;
+export function posIsBeforeOrEqual(a: t.Position, b: t.Position): boolean {
+  return posCompare(a, b) <= 0;
+}
+
+export function posIsEqual(a: t.Position, b: t.Position): boolean {
+  return a.line === b.line && a.character === b.character;
+}
+
+export function rangeIsEqual(a: t.Range, b: t.Range): boolean {
+  return posIsEqual(a.start, b.start) && posIsEqual(a.end, b.end);
+}
+
+export function selStart(a: t.Selection): t.Position {
+  return posIsBeforeOrEqual(a.anchor, a.active) ? a.anchor : a.active;
+}
+export function selEnd(a: t.Selection): t.Position {
+  return posIsAfter(a.anchor, a.active) ? a.anchor : a.active;
+}
+
+export function selIsEqual(a: t.Selection, b: t.Selection): boolean {
+  return posIsEqual(a.anchor, b.anchor) && posIsEqual(a.active, b.active);
+}
+
+export function selAreEqual(a: t.Selection[], b: t.Selection[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!selIsEqual(a[i], b[i])) return false;
   }
+  return true;
 }
 
-export function areSelectionsEqual(a: Selection[], b: Selection[]): boolean {
-  return a.length === b.length && _.zip(a, b).every(([m, n]) => m!.isEqual(n!));
+export function lineRangeIsEqual(a: t.LineRange, b: t.LineRange): boolean {
+  return a.start === b.start && a.end === b.end;
 }
 
-export function getSelectionsAfterTextChangeEvent(e: t.TextChangeEvent): Selection[] {
+// export function areSelectionsEqual(a: t.Selection[], b: t.Selection[]): boolean {
+//   return a.length === b.length && _.zip(a, b).every(([m, n]) => m!.isEqual(n!));
+// }
+
+export function getSelectionsAfterTextChangeEvent(e: t.TextChangeEvent): t.Selection[] {
   // e.contentChanges: [
   //   {"text": "!", "range": [0, 2, 0, 2]},
   //   {"text": "!", "range": [1, 9, 1, 9]}
@@ -343,10 +321,10 @@ export function getSelectionsAfterTextChangeEvent(e: t.TextChangeEvent): Selecti
   //   [1, 9, 1, 9]]
   // ]
 
-  return e.revContentChanges.map(cc => new Selection(cc.range.end, cc.range.end));
+  return e.revContentChanges.map(cc => ({ anchor: cc.range.end, active: cc.range.end }));
 }
 
-export function getSelectionsBeforeTextChangeEvent(e: t.TextChangeEvent): Selection[] {
+export function getSelectionsBeforeTextChangeEvent(e: t.TextChangeEvent): t.Selection[] {
   // e.contentChanges: [
   //   {"text": "!", "range": [0, 2, 0, 2]},
   //   {"text": "!", "range": [1, 9, 1, 9]}
@@ -363,15 +341,15 @@ export function getSelectionsBeforeTextChangeEvent(e: t.TextChangeEvent): Select
   //   [0, 2, 0, 2],
   //   [1, 9, 1, 9]]
   // ]
-  return e.contentChanges.map(cc => new Selection(cc.range.start, cc.range.end));
+  return e.contentChanges.map(cc => ({ anchor: cc.range.start, active: cc.range.end }));
 }
 
-export function getSelectionsAfterTextInsertEvent(e: t.TextInsertEvent): Selection[] {
-  return [new Selection(e.revRange.end, e.revRange.end)];
+export function getSelectionsAfterTextInsertEvent(e: t.TextInsertEvent): t.Selection[] {
+  return [{ anchor: e.revRange.end, active: e.revRange.end }];
 }
 
-export function getSelectionsBeforeTextInsertEvent(e: t.TextInsertEvent): Selection[] {
-  return [new Selection(e.revRange.start, e.revRange.start)];
+export function getSelectionsBeforeTextInsertEvent(e: t.TextInsertEvent): t.Selection[] {
+  return [{ anchor: e.revRange.start, active: e.revRange.start }];
 }
 
 export function getTextChangeEventFromTextInsertEvent(e: t.TextInsertEvent): t.TextChangeEvent {
@@ -380,8 +358,8 @@ export function getTextChangeEventFromTextInsertEvent(e: t.TextInsertEvent): t.T
     id: e.id,
     uri: e.uri,
     clock: e.clock,
-    contentChanges: [new ContentChange(e.text, new Range(e.revRange.start, e.revRange.start))],
-    revContentChanges: [new ContentChange('', e.revRange)],
+    contentChanges: [{ text: e.text, range: { start: e.revRange.start, end: e.revRange.start } }],
+    revContentChanges: [{ text: '', range: e.revRange }],
     updateSelection: e.updateSelection,
   };
 }

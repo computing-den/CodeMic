@@ -24,7 +24,6 @@
  */
 
 import * as t from '../../lib/types.js';
-import { Selection, ContentChange } from '../../lib/lib.js';
 import * as lib from '../../lib/lib.js';
 import InternalWorkspace, { LiveWorktree } from './internal_workspace.js';
 import assert from '../../lib/assert.js';
@@ -271,15 +270,15 @@ class WorkspaceRecorder {
 
     // Read https://github.com/microsoft/vscode/issues/11487 about contentChanges array.
     const irContentChanges = vscContentChanges
-      .map(c => new ContentChange(c.text, VscWorkspace.fromVscRange(c.range)))
-      .sort((a, b) => a.range.start.compareTo(b.range.start));
+      .map(c => ({ text: c.text, range: VscWorkspace.fromVscRange(c.range) }))
+      .sort((a, b) => lib.posCompare(a.range.start, b.range.start));
 
     // Validate ranges and make sure there are no overlaps.
     for (const [i, cc] of irContentChanges.entries()) {
       assert(irTextDocument.isRangeValid(cc.range), 'textChange: invalid range');
       if (i > 0) {
         assert(
-          cc.range.start.isAfterOrEqual(irContentChanges[i - 1].range.end),
+          lib.posIsAfterOrEqual(cc.range.start, irContentChanges[i - 1].range.end),
           // ih.isRangeNonOverlapping(irContentChanges[i - 1].range, cc.range),
           'textChange: got content changes with overlapping ranges',
         );
@@ -295,7 +294,10 @@ class WorkspaceRecorder {
     // - There is only one cursor: only one content change.
     // - No text is replaced: the range's start and end are the same.
     let irEvent: t.EditorEvent;
-    if (irContentChanges.length === 1 && irContentChanges[0].range.start.isEqual(irContentChanges[0].range.end)) {
+    if (
+      irContentChanges.length === 1 &&
+      lib.posIsEqual(irContentChanges[0].range.start, irContentChanges[0].range.end)
+    ) {
       // example:
       // contentChanges:    [{"text":"a\nb","range":{"start":{"line":0,"character":5},"end":{"line":0,"character":5}}}]
       // revContentChanges: [{"range":{"start":{"line":0,"character":5},"end":{"line":1,"character":1}},"text":""}]
@@ -578,8 +580,8 @@ class WorkspaceRecorder {
       const calculatedSelections = lib.getSelectionsAfterTextChangeEvent(lastEvent);
       const calculatedRevSelections = lib.getSelectionsBeforeTextChangeEvent(lastEvent);
       if (
-        Selection.areEqual(calculatedSelections, irTextEditor.selections) &&
-        Selection.areEqual(calculatedRevSelections, revSelections)
+        lib.selAreEqual(calculatedSelections, irTextEditor.selections) &&
+        lib.selAreEqual(calculatedRevSelections, revSelections)
       ) {
         this.session.editor.updateEventAt({ updateSelection: true }, lastEventIndex);
         this.setFocus();
@@ -593,8 +595,8 @@ class WorkspaceRecorder {
       const calculatedSelections = lib.getSelectionsAfterTextInsertEvent(lastEvent);
       const calculatedRevSelections = lib.getSelectionsBeforeTextInsertEvent(lastEvent);
       if (
-        Selection.areEqual(calculatedSelections, irTextEditor.selections) &&
-        Selection.areEqual(calculatedRevSelections, revSelections)
+        lib.selAreEqual(calculatedSelections, irTextEditor.selections) &&
+        lib.selAreEqual(calculatedRevSelections, revSelections)
       ) {
         this.session.editor.updateEventAt({ updateSelection: true }, lastEventIndex);
         this.setFocus();
@@ -637,7 +639,7 @@ class WorkspaceRecorder {
     assert(irTextEditor);
 
     // Avoid redundant scrolls.
-    if (irTextEditor.visibleRange.isEqual(visibleRange)) return;
+    if (lib.lineRangeIsEqual(irTextEditor.visibleRange, visibleRange)) return;
 
     const revVisibleRange = irTextEditor.visibleRange;
     irTextEditor.scroll(visibleRange);

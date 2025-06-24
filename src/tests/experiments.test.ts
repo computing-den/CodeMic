@@ -8,7 +8,6 @@ import { pathExists } from '../extension/storage.js';
 import { closeAllTabs, exampleFilesPath, getCodeMic, openCodeMicView, workspacePath } from './test-helpers.js';
 import config from '../extension/config.js';
 import { EditorEvent } from '../lib/types.js';
-import { deserializeEditorEventsFull } from '../extension/session/serialization.js';
 
 suite('Experiments', () => {
   test('Record 1', recordSession1);
@@ -69,7 +68,7 @@ async function recordSession1() {
   await codemic.handleMessage({ type: 'recorder/pause' });
   await lib.timeout(200);
 
-  const expectedEvents = deserializeEditorEventsFull([
+  const expectedEvents: EditorEvent[] = [
     {
       type: 'fsCreate',
       id: 1,
@@ -148,7 +147,7 @@ async function recordSession1() {
       },
       justOpened: true,
     },
-  ]);
+  ];
 
   log('XXX', lib.pretty(codemic.session!.body?.editorEvents));
 

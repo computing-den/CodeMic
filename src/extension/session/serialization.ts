@@ -1,5 +1,5 @@
 import * as t from '../../lib/types.js';
-import { Range, LineRange, Selection, ContentChange, Position, nextId } from '../../lib/lib.js';
+import { nextId } from '../../lib/lib.js';
 import _ from 'lodash';
 import config from '../config.js';
 
@@ -136,19 +136,19 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
   }
 }
 
-function serializeContentChange(cc: ContentChange): t.ContentChangeCompact {
+function serializeContentChange(cc: t.ContentChange): t.ContentChangeCompact {
   return { t: cc.text, r: serializeRange(cc.range) };
 }
 
-function serializeRange(r: Range): t.RangeCompact {
+function serializeRange(r: t.Range): t.RangeCompact {
   return [r.start.line, r.start.character, r.end.line, r.end.character];
 }
 
-function serializeLineRange(r: LineRange): t.LineRangeCompact {
+function serializeLineRange(r: t.LineRange): t.LineRangeCompact {
   return [r.start, r.end];
 }
 
-function serializeSelection(r: Selection): t.SelectionCompact {
+function serializeSelection(r: t.Selection): t.SelectionCompact {
   return [r.anchor.line, r.anchor.character, r.active.line, r.active.character];
 }
 
@@ -205,23 +205,15 @@ export function deserializeSessionBodyV1(body: t.BodyFormatV1.SessionBodyCompact
 }
 
 export function deserializeSessionBodyV2(body: t.SessionBodyExport): t.SessionBody {
-  if (body.full) {
-    return {
-      editorEvents: deserializeEditorEventsFull(body.editorEvents),
-      audioTracks: body.audioTracks,
-      videoTracks: body.videoTracks,
-      defaultEol: body.defaultEol,
-      focusTimeline: body.focusTimeline,
-    };
-  } else {
-    return {
-      editorEvents: _.map(body.editorEvents, t => deserializeEditorEvent(t, body.uris)),
-      audioTracks: body.audioTracks,
-      videoTracks: body.videoTracks,
-      defaultEol: body.defaultEol,
-      focusTimeline: body.focusTimeline.map(f => deserializeFocus(f, body.uris)),
-    };
-  }
+  if (body.full) return _.omit(body, 'full');
+
+  return {
+    editorEvents: _.map(body.editorEvents, t => deserializeEditorEvent(t, body.uris)),
+    audioTracks: body.audioTracks,
+    videoTracks: body.videoTracks,
+    defaultEol: body.defaultEol,
+    focusTimeline: body.focusTimeline.map(f => deserializeFocus(f, body.uris)),
+  };
 }
 
 function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.EditorEvent {
@@ -342,64 +334,6 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
   }
 }
 
-export function deserializeEditorEventsFull(es: t.EditorEvent[]): t.EditorEvent[] {
-  return es.map(deserializeEditorEventFull);
-}
-
-function deserializeEditorEventFull(e: t.EditorEvent): t.EditorEvent {
-  switch (e.type) {
-    case 'fsCreate':
-      return e;
-    case 'textChange':
-      return {
-        ...e,
-        contentChanges: e.contentChanges.map(deserializeContentChangeFull),
-        revContentChanges: e.revContentChanges.map(deserializeContentChangeFull),
-      };
-    case 'openTextDocument':
-      return e;
-    case 'closeTextDocument':
-      return e;
-    case 'showTextEditor':
-      return {
-        ...e,
-        selections: e.selections?.map(deserializeSelectionFull),
-        visibleRange: e.visibleRange && deserializeLineRangeFull(e.visibleRange),
-        revSelections: e.revSelections?.map(deserializeSelectionFull),
-        revVisibleRange: e.revVisibleRange && deserializeLineRangeFull(e.revVisibleRange),
-      };
-    case 'closeTextEditor':
-      return {
-        ...e,
-        revSelections: e.revSelections?.map(deserializeSelectionFull),
-        revVisibleRange: e.revVisibleRange && deserializeLineRangeFull(e.revVisibleRange),
-      };
-    case 'select':
-      return {
-        ...e,
-        selections: e.selections.map(deserializeSelectionFull),
-        revSelections: e.revSelections.map(deserializeSelectionFull),
-      };
-    case 'scroll':
-      return {
-        ...e,
-        visibleRange: deserializeLineRangeFull(e.visibleRange),
-        revVisibleRange: deserializeLineRangeFull(e.revVisibleRange),
-      };
-    case 'save':
-      return e;
-    case 'textInsert':
-      return {
-        ...e,
-        revRange: deserializeRangeFull(e.revRange),
-      };
-    case 'fsChange':
-      return e;
-    case 'fsDelete':
-      return e;
-  }
-}
-
 function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: string): t.EditorEvent {
   switch (e.t) {
     case 0:
@@ -443,8 +377,10 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         id: nextId(),
         uri,
         clock: deserializeClock(e.c),
-        selections: e.s?.map(deserializeSelection) ?? [new Selection(new Position(0, 0), new Position(0, 0))],
-        visibleRange: (e.v && deserializeLineRange(e.v)) ?? new LineRange(0, 1),
+        selections: e.s?.map(deserializeSelection) ?? [
+          { anchor: { line: 0, character: 0 }, active: { line: 0, character: 0 } },
+        ],
+        visibleRange: (e.v && deserializeLineRange(e.v)) ?? { start: 0, end: 1 },
         justOpened: false,
         revUri: e.ru,
         revSelections: e.rs?.map(deserializeSelection),
@@ -513,39 +449,20 @@ function deserializeFileV1(f: t.BodyFormatV1.File): t.File {
   }
 }
 
-function deserializeContentChange(cc: t.ContentChangeCompact): ContentChange {
-  return new ContentChange(cc.t, deserializeRange(cc.r));
+function deserializeContentChange(cc: t.ContentChangeCompact): t.ContentChange {
+  return { text: cc.t, range: deserializeRange(cc.r) };
 }
 
-function deserializeRange(r: t.RangeCompact): Range {
-  return new Range(new Position(r[0], r[1]), new Position(r[2], r[3]));
+function deserializeRange(r: t.RangeCompact): t.Range {
+  return { start: { line: r[0], character: r[1] }, end: { line: r[2], character: r[3] } };
 }
 
-function deserializeLineRange(r: t.LineRangeCompact): LineRange {
-  return new LineRange(r[0], r[1]);
+function deserializeLineRange(r: t.LineRangeCompact): t.LineRange {
+  return { start: r[0], end: r[1] };
 }
 
-function deserializeSelection(r: t.SelectionCompact): Selection {
-  return new Selection(new Position(r[0], r[1]), new Position(r[2], r[3]));
-}
-
-function deserializeContentChangeFull(cc: ContentChange): ContentChange {
-  return new ContentChange(cc.text, deserializeRangeFull(cc.range));
-}
-
-function deserializeRangeFull(r: Range): Range {
-  return new Range(new Position(r.start.line, r.start.character), new Position(r.end.line, r.end.character));
-}
-
-function deserializeLineRangeFull(r: LineRange): LineRange {
-  return new LineRange(r.start, r.end);
-}
-
-function deserializeSelectionFull(r: Selection): Selection {
-  return new Selection(
-    new Position(r.anchor.line, r.anchor.character),
-    new Position(r.active.line, r.active.character),
-  );
+function deserializeSelection(r: t.SelectionCompact): t.Selection {
+  return { anchor: { line: r[0], character: r[1] }, active: { line: r[2], character: r[3] } };
 }
 
 function deserializeClock(clock: number): number {
