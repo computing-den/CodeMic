@@ -1,0 +1,13 @@
+{
+  "id": "408cf53c-e9ca-48d1-acf4-e429e630a4cc",
+  "handle": "rename_file",
+  "title": "Rename file",
+  "description": "",
+  "author": "sean_shirazi",
+  "duration": 11.906725683000001,
+  "modificationTimestamp": "2025-06-24T13:14:44.719Z",
+  "toc": [],
+  "formatVersion": 2,
+  "ignorePatterns": "# Ignore the .git directory\n.git\n\n# Node.js dependencies\nnode_modules\n\n# Python byte-compiled / optimized / DLL files\n__pycache__\n*.py[cod]\n*$py.class\n\n",
+  "hasCover": false
+}

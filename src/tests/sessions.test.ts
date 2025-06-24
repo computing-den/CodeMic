@@ -33,6 +33,7 @@ suite('Sessions Test Suite', () => {
   test('save_untitled', () => testSession('save_untitled'));
   test('switch_untitled_to_c_and_save', () => testSession('switch_untitled_to_c_and_save'));
   test('show_text_editor_no_document', () => testSession('show_text_editor_no_document'));
+  test('rename_file', () => testSession('rename_file'));
 });
 
 async function testSession(sessionHandle: string) {

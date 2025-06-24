@@ -454,31 +454,32 @@ class WorkspaceRecorder {
     assert(irItem.textDocument);
 
     // If irText is not the same as vscText, insert textChange.
-    // I don't really know when this is supposed to happen. So, for now, let's assert
-    // it until we find a use case for it.
+    // This may happen after renaming a file from a -> b:
+    // + a's document is closed
+    // + its editor is closed
+    // + b's document is opened (with a's content)
+    // + its editor is shown
+    // + b's file is created
+    // + a's file is deleted
     const irText = irItem.textDocument.getText();
     const vscText = vscTextDocument.getText();
-    assert(
-      irText === vscText,
-      `openTextDocument ${uri} has different content.\nInternally:\n\n${irText}\n\nIn Vscode:\n\n${vscText}\n\n`,
-    );
-    // if (irText !== vscText) {
-    //   const irRange = irTextDocument.getRange();
-    //   const irContentChanges: ContentChange[] = [{ range: irRange, text: vscText }];
-    //   const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
-    //   this.insertEvent(
-    //     {
-    //       type: 'textChange',
-    //       id: lib.nextId(),
-    //       uri,
-    //       clock: this.clock,
-    //       contentChanges: irContentChanges,
-    //       revContentChanges: irRevContentChanges,
-    //       updateSelection: false,
-    //     },
-    //     { coalescing: !irItemAlreadyHadDocument },
-    //   );
-    // }
+    if (irText !== vscText) {
+      const irRange = irItem.textDocument.getRange();
+      const irContentChanges: t.ContentChange[] = [{ range: irRange, text: vscText }];
+      const irRevContentChanges = irItem.textDocument.applyContentChanges(irContentChanges, true);
+      this.insertEvent(
+        {
+          type: 'textChange',
+          id: lib.nextId(),
+          uri,
+          clock: this.clock,
+          contentChanges: irContentChanges,
+          revContentChanges: irRevContentChanges,
+          updateSelection: false,
+        },
+        { coalescing: !irItemAlreadyHadDocument },
+      );
+    }
   }
 
   private async closeTextDocument(vscTextDocument: vscode.TextDocument) {
