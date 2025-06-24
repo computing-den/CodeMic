@@ -4,7 +4,17 @@ import path from 'path';
 import _ from 'lodash';
 import * as lib from '../lib/lib.js';
 import { pathExists } from '../extension/storage.js';
-import { closeAllTabs, exampleFilesPath, getCodeMic, openCodeMicView, workspacePath } from './test-helpers.js';
+import {
+  areEventsEqual,
+  closeAllTabs,
+  exampleFilesPath,
+  getCodeMic,
+  openCodeMicView,
+  workspacePath,
+} from './test-helpers.js';
+import config from '../extension/config.js';
+import { EditorEvent } from '../lib/types.js';
+import { deserializeEditorEventsFull, deserializeSessionBody } from '../extension/session/serialization.js';
 
 suite('Recorder', () => {
   test('fs changes', recordFsChanges);
@@ -13,7 +23,7 @@ suite('Recorder', () => {
 async function recordFsChanges() {
   // Deleting workspacePath directly will interfere with file system watcher.
   // fs.rmSync(path.resolve(workspacePath), { recursive: true });
-  console.log(`=== Creating files in ${workspacePath}`);
+  log(`=== Creating files in ${workspacePath}`);
   fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
   fs.mkdirSync(path.resolve(workspacePath, 'src'), { recursive: true });
   fs.mkdirSync(path.resolve(workspacePath, 'images'), { recursive: true });
@@ -23,48 +33,48 @@ async function recordFsChanges() {
   fs.cpSync(path.resolve(exampleFilesPath, '1.jpg'), path.resolve(workspacePath, 'images/1.jpg'), { force: true });
   fs.cpSync(path.resolve(exampleFilesPath, '2.jpg'), path.resolve(workspacePath, 'images/2.jpg'), { force: true });
 
-  console.log(`=== Closing all tabs`);
+  log(`=== Closing all tabs`);
   await closeAllTabs();
-  console.log(`=== Opening CodeMic view`);
+  log(`=== Opening CodeMic view`);
   await openCodeMicView();
   const codemic = getCodeMic();
 
-  console.log(`=== Opening new session`);
+  log(`=== Opening new session`);
   await codemic.handleMessage({ type: 'welcome/openNewSessionInRecorder' });
   await codemic.handleMessage({
     type: 'recorder/updateDetails',
     changes: { title: 'Test Session 1', handle: 'test_session_1' },
   });
-  console.log(`=== Scanning new session`);
+  log(`=== Scanning new session`);
   await codemic.handleMessage({ type: 'recorder/load', skipConfirmation: true });
 
   assert.ok(await pathExists(path.resolve(workspacePath, '.CodeMic', 'head.json')), 'head.json does not exist');
   assert.ok(await pathExists(path.resolve(workspacePath, '.CodeMic', 'body.json')), 'body.json does not exist');
 
-  console.log(`=== Start recording`);
+  log(`=== Start recording`);
   await codemic.handleMessage({ type: 'recorder/record' });
   await lib.timeout(100);
 
-  console.log(`=== Create 3.jpg`);
+  log(`=== Create 3.jpg`);
   fs.cpSync(path.resolve(exampleFilesPath, '3.jpg'), path.resolve(workspacePath, 'images/3.jpg'), { force: true });
   await lib.timeout(100);
 
-  console.log(`=== Change 1.jpg`);
+  log(`=== Change 1.jpg`);
   fs.cpSync(path.resolve(exampleFilesPath, '4.jpg'), path.resolve(workspacePath, 'images/1.jpg'), { force: true });
   await lib.timeout(100);
 
-  console.log(`=== Delete 2.jpg`);
+  log(`=== Delete 2.jpg`);
   fs.rmSync(path.resolve(workspacePath, 'images/2.jpg'), { force: true });
   await lib.timeout(100);
 
-  console.log(`=== Pause`);
+  log(`=== Pause`);
   await lib.timeout(200); // Let fs events be processed.
   await codemic.handleMessage({ type: 'recorder/pause' });
 
-  console.log(`=== seek to 0`);
+  log(`=== seek to 0`);
   await codemic.handleMessage({ type: 'recorder/seek', clock: 0 });
 
-  console.log(`=== Start recording again`);
+  log(`=== Resume recording`);
   await codemic.handleMessage({ type: 'recorder/record' });
   await lib.timeout(300);
 
@@ -101,7 +111,7 @@ async function recordFsChanges() {
     errors.push(`missing files: ${missingActualFiles.join(', ')}`);
   }
 
-  const expectedEvents = [
+  const expectedEvents = deserializeEditorEventsFull([
     {
       type: 'fsCreate',
       id: 1,
@@ -161,10 +171,10 @@ async function recordFsChanges() {
       clock: 0.4067855650000001,
       revFile: { type: 'blob', sha1: 'd6688b7b322bcc76be5690a58d76b9b9386216dc' },
     },
-  ];
-  const actualEvents = codemic.session!.body?.editorEvents;
+  ]);
+  const actualEvents = codemic.session!.body?.editorEvents!;
 
-  const areEqual = _.isEqualWith(expectedEvents, actualEvents, (a, b, key) => (key === 'clock' ? true : undefined));
+  const areEqual = areEventsEqual(actualEvents, expectedEvents);
   if (!areEqual) {
     errors.push(
       `unexpected editor events.\nActual: ${lib.pretty(actualEvents)}\nExpected: ${lib.pretty(expectedEvents)}`,
@@ -174,4 +184,8 @@ async function recordFsChanges() {
   assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
 
   // await lib.timeout(1_000_000);
+}
+
+function log(...args: any) {
+  if (config.debug) console.log(...args);
 }

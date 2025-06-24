@@ -205,15 +205,23 @@ export function deserializeSessionBodyV1(body: t.BodyFormatV1.SessionBodyCompact
 }
 
 export function deserializeSessionBodyV2(body: t.SessionBodyExport): t.SessionBody {
-  if (body.full) return _.omit(body, 'full');
-
-  return {
-    editorEvents: _.map(body.editorEvents, t => deserializeEditorEvent(t, body.uris)),
-    audioTracks: body.audioTracks,
-    videoTracks: body.videoTracks,
-    defaultEol: body.defaultEol,
-    focusTimeline: body.focusTimeline.map(f => deserializeFocus(f, body.uris)),
-  };
+  if (body.full) {
+    return {
+      editorEvents: deserializeEditorEventsFull(body.editorEvents),
+      audioTracks: body.audioTracks,
+      videoTracks: body.videoTracks,
+      defaultEol: body.defaultEol,
+      focusTimeline: body.focusTimeline,
+    };
+  } else {
+    return {
+      editorEvents: _.map(body.editorEvents, t => deserializeEditorEvent(t, body.uris)),
+      audioTracks: body.audioTracks,
+      videoTracks: body.videoTracks,
+      defaultEol: body.defaultEol,
+      focusTimeline: body.focusTimeline.map(f => deserializeFocus(f, body.uris)),
+    };
+  }
 }
 
 function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.EditorEvent {
@@ -331,6 +339,64 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         clock: deserializeClock(e.c),
         revFile: e.rf,
       };
+  }
+}
+
+export function deserializeEditorEventsFull(es: t.EditorEvent[]): t.EditorEvent[] {
+  return es.map(deserializeEditorEventFull);
+}
+
+function deserializeEditorEventFull(e: t.EditorEvent): t.EditorEvent {
+  switch (e.type) {
+    case 'fsCreate':
+      return e;
+    case 'textChange':
+      return {
+        ...e,
+        contentChanges: e.contentChanges.map(deserializeContentChangeFull),
+        revContentChanges: e.revContentChanges.map(deserializeContentChangeFull),
+      };
+    case 'openTextDocument':
+      return e;
+    case 'closeTextDocument':
+      return e;
+    case 'showTextEditor':
+      return {
+        ...e,
+        selections: e.selections?.map(deserializeSelectionFull),
+        visibleRange: e.visibleRange && deserializeLineRangeFull(e.visibleRange),
+        revSelections: e.revSelections?.map(deserializeSelectionFull),
+        revVisibleRange: e.revVisibleRange && deserializeLineRangeFull(e.revVisibleRange),
+      };
+    case 'closeTextEditor':
+      return {
+        ...e,
+        revSelections: e.revSelections?.map(deserializeSelectionFull),
+        revVisibleRange: e.revVisibleRange && deserializeLineRangeFull(e.revVisibleRange),
+      };
+    case 'select':
+      return {
+        ...e,
+        selections: e.selections.map(deserializeSelectionFull),
+        revSelections: e.revSelections.map(deserializeSelectionFull),
+      };
+    case 'scroll':
+      return {
+        ...e,
+        visibleRange: deserializeLineRangeFull(e.visibleRange),
+        revVisibleRange: deserializeLineRangeFull(e.revVisibleRange),
+      };
+    case 'save':
+      return e;
+    case 'textInsert':
+      return {
+        ...e,
+        revRange: deserializeRangeFull(e.revRange),
+      };
+    case 'fsChange':
+      return e;
+    case 'fsDelete':
+      return e;
   }
 }
 
@@ -461,6 +527,25 @@ function deserializeLineRange(r: t.LineRangeCompact): LineRange {
 
 function deserializeSelection(r: t.SelectionCompact): Selection {
   return new Selection(new Position(r[0], r[1]), new Position(r[2], r[3]));
+}
+
+function deserializeContentChangeFull(cc: ContentChange): ContentChange {
+  return new ContentChange(cc.text, deserializeRangeFull(cc.range));
+}
+
+function deserializeRangeFull(r: Range): Range {
+  return new Range(new Position(r.start.line, r.start.character), new Position(r.end.line, r.end.character));
+}
+
+function deserializeLineRangeFull(r: LineRange): LineRange {
+  return new LineRange(r.start, r.end);
+}
+
+function deserializeSelectionFull(r: Selection): Selection {
+  return new Selection(
+    new Position(r.anchor.line, r.anchor.character),
+    new Position(r.active.line, r.active.character),
+  );
 }
 
 function deserializeClock(clock: number): number {

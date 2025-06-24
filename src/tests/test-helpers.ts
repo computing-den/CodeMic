@@ -5,6 +5,7 @@ import _ from 'lodash';
 import * as vscode from 'vscode';
 import CodeMic from '../extension/codemic.js';
 import config from '../extension/config.js';
+import { EditorEvent } from '../lib/types.js';
 
 export type SessionTestStep = {
   clock: number;
@@ -121,4 +122,8 @@ export async function closeAllTabs() {
       await vscode.window.tabGroups.close(tab);
     }
   }
+}
+
+export function areEventsEqual(actual: EditorEvent[], expected: EditorEvent[]) {
+  return _.isEqualWith(actual, expected, (a, b, key) => (key === 'clock' ? true : undefined));
 }
