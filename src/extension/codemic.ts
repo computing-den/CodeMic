@@ -453,12 +453,12 @@ class CodeMic {
         await this.updateFrontend();
         return ok;
       }
-      // case 'player/update': {
-      //   throw new Error('DELETE THIS');
-      //   // assert(this.session.isLoaded())
-      //   // this.player.updateState(req.changes);
-      //   // return ok
-      // }
+      case 'player/syncWorkspace': {
+        assert(this.session?.isLoaded());
+        await this.session.rr.enqueueSync();
+        await this.updateFrontend();
+        return ok;
+      }
       case 'recorder/openTab': {
         assert(this.session);
         assert(this.recorder);

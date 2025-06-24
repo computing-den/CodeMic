@@ -209,6 +209,14 @@ export default class Player extends React.Component<Props> {
         disabled: !this.getVideoElem()?.src,
       },
       {
+        title: 'Sync workspace',
+        icon: 'codicon-sync',
+        onClick: () => postMessage({ type: 'player/syncWorkspace' }),
+        // NOTE: change of video src does not trigger an update
+        //       but it's ok for now, since state/props change during playback.
+        disabled: !session.loaded || session.playing,
+      },
+      {
         title: 'Edit: open this session in the Studio',
         icon: 'codicon-edit',
         onClick: () => postMessage({ type: 'player/openInRecorder' }),
