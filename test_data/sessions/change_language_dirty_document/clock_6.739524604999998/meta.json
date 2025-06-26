@@ -1,0 +1,6 @@
+{
+  "dirtyTextDocuments": ["workspace:src/main.c"],
+  "openTextEditors": [{"uri": "workspace:src/main.c", "selections": [[3, 13, 3, 13]], "visibleRange": [0, 5]}],
+  "activeTextEditor": "workspace:src/main.c",
+  "languageIds": {"workspace:src/main.c": "plaintext"}
+}

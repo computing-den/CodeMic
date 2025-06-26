@@ -446,6 +446,7 @@ class WorkspaceRecorder {
     ) {
       irItem.restoreClosedDirtyDocument();
       assert(irItem.textDocument);
+      const revLanguageId = irItem.textDocument.languageId;
       irItem.textDocument.languageId = vscTextDocument.languageId;
       const e: t.UpdateTextDocumentEvent = {
         type: 'updateTextDocument',
@@ -453,14 +454,12 @@ class WorkspaceRecorder {
         uri: lastEvent.uri,
         clock: lastEvent.clock,
         languageId: vscTextDocument.languageId,
-        revLanguageId: irItem.closedDirtyTextDocument.languageId,
+        revLanguageId,
       };
       this.session.editor.setEventAt(e, lastEventIndex);
-
-      return;
     }
 
-    // Insert internal document.
+    // Insert internal document if there's none.
     const irItemAlreadyHadDocument = irItem.textDocument;
     if (!irItemAlreadyHadDocument) {
       logAcceptedEvent(`accepted openTextDocument for ${uri}`);
