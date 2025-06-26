@@ -66,9 +66,12 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
   async applyFsChangeEvent(e: t.FsChangeEvent, direction: t.Direction) {
     const vscTextDocument = this.vscWorkspace.findVscTextDocumentByUri(e.uri);
     const file = direction === t.Direction.Forwards ? e.file : e.revFile;
+    const originalText = vscTextDocument?.getText();
+
+    // Writing the file may automatically revert the document in vscode if it wasn't dirty.
     await this.session.core.writeFile(e.uri, file);
 
-    // We must revert the document so that vscode won't later warn about the file having
+    // We revert the document so that vscode won't later warn about the file having
     // been changed when we try to save the file.
     //
     // Then, if the text in the document was different from what's now in the
@@ -76,11 +79,11 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     if (vscTextDocument) {
       await this.vscWorkspace.revertVscTextDocument(vscTextDocument);
       const textInFile = await this.session.core.readFile(file, 'utf8');
-      if (vscTextDocument.getText() !== textInFile) {
+      if (originalText !== textInFile) {
         await this.vscWorkspace.deferRestoreTextEditorByVscUri(async () => {
           const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument);
           const success = await vscTextEditor.edit(builder => {
-            builder.replace(this.vscWorkspace.getVscTextDocumentVscRange(vscTextDocument), textInFile);
+            builder.replace(this.vscWorkspace.getVscTextDocumentVscRange(vscTextDocument), originalText!);
           });
           assert(success, 'vscode text editor edit failed');
         });

@@ -24,6 +24,7 @@ test('showTextEditor event without openTextDocument', recordOpenTextEditorWithou
 test('rename file', recordRenameFile);
 test('rename file and open again immediately', recordRenameFileAndOpenAgainImmediately);
 test('rename file and open again with delay', recordRenameFileAndOpenAgainWithDelay);
+test('start with dirty document then open and and save', recordStartWithDirtydocsOpenAndSave);
 // });
 
 async function recordFsChanges() {
@@ -1234,6 +1235,300 @@ async function recordRenameFileAndOpenAgainWithDelay() {
       file: {
         type: 'blob',
         sha1: 'eab6555aced7835586ca27f868b20246a1460dd4',
+      },
+    },
+  ];
+
+  const actualEvents = JSON.parse(lib.pretty(codemic.session!.body?.editorEvents!)) as EditorEvent[];
+
+  const errors: string[] = [];
+
+  const missingActualEvents = _.differenceWith(expectedEvents, actualEvents, isEventAlmostEqual);
+  const extraActualEvents = _.differenceWith(actualEvents, expectedEvents, isEventAlmostEqual);
+
+  if (missingActualEvents.length) {
+    errors.push(`missing editor event IDs: ${missingActualEvents.map(x => x.id).join(', ')}`);
+  }
+  if (extraActualEvents.length) {
+    errors.push(`extra editor event IDs: ${extraActualEvents.map(x => x.id).join(', ')}`);
+  }
+
+  if (missingActualEvents.length || extraActualEvents.length) {
+    errors.push(`Actual events: ${lib.pretty(actualEvents)}\nExpected events: ${lib.pretty(expectedEvents)}`);
+  }
+
+  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
+
+  // log('XXX', lib.pretty(codemic.session!.body?.editorEvents));
+
+  // await lib.timeout(1_000_000);
+}
+
+async function recordStartWithDirtydocsOpenAndSave() {
+  log(`=== Creating files in ${workspacePath}`);
+  fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
+  fs.mkdirSync(path.resolve(workspacePath, 'src'), { recursive: true });
+  fs.writeFileSync(path.resolve(workspacePath, 'README.txt'), 'Hello there!\n');
+  fs.writeFileSync(path.resolve(workspacePath, 'src/inside.txt'), 'Inside text\nSecond line\n');
+  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n');
+
+  log(`=== Closing all tabs`);
+  await closeAllTabs();
+  log(`=== Opening CodeMic view`);
+  await openCodeMicView();
+  const codemic = getCodeMic();
+
+  log(`=== Open main.c`);
+  const mainTextEditor = await vscode.window.showTextDocument(
+    vscode.Uri.file(path.resolve(workspacePath, 'src/main.c')),
+    { preview: false },
+  );
+  assert.ok(
+    await mainTextEditor.edit(builder => {
+      builder.replace(new vscode.Range(3, 0, 3, 13), '    return 99;');
+    }),
+  );
+
+  await lib.timeout(200);
+
+  log(`=== Opening new session`);
+  await codemic.handleMessage({ type: 'welcome/openNewSessionInRecorder' });
+  await lib.timeout(200);
+  await codemic.handleMessage({
+    type: 'recorder/updateDetails',
+    changes: { title: 'start with dirty document open and save', handle: 'start_with_dirty_document_open_and_save' },
+  });
+  await lib.timeout(200);
+  log(`=== Scanning new session`);
+  await codemic.handleMessage({ type: 'recorder/load', skipConfirmation: true });
+
+  assert.ok(await pathExists(path.resolve(workspacePath, '.CodeMic', 'head.json')), 'head.json does not exist');
+  assert.ok(await pathExists(path.resolve(workspacePath, '.CodeMic', 'body.json')), 'body.json does not exist');
+
+  // await codemic.handleMessage({ type: 'recorder/makeTest' });
+
+  log(`=== Start recording`);
+  await codemic.handleMessage({ type: 'recorder/record' });
+  await lib.timeout(1000);
+
+  log(`=== Open inside.txt`);
+  const insideTextEditor = await vscode.window.showTextDocument(
+    vscode.Uri.file(path.resolve(workspacePath, 'src/inside.txt')),
+  );
+  assert.ok(
+    await insideTextEditor.edit(builder => {
+      builder.replace(new vscode.Range(1, 0, 2, 0), 'Third line\n');
+    }),
+  );
+  await lib.timeout(1000);
+
+  // log(`=== Pause to make test`);
+  // await codemic.handleMessage({ type: 'recorder/pause' });
+  // await lib.timeout(300);
+  // await codemic.handleMessage({ type: 'recorder/makeTest' });
+
+  log(`=== Resume recording`);
+  await codemic.handleMessage({ type: 'recorder/record' });
+  await lib.timeout(300);
+
+  await insideTextEditor.document.save();
+  await lib.timeout(300);
+
+  log(`=== Pause`);
+  await codemic.handleMessage({ type: 'recorder/pause' });
+  await lib.timeout(200);
+
+  // await codemic.handleMessage({ type: 'recorder/makeTest' });
+
+  const expectedEvents: EditorEvent[] = [
+    {
+      type: 'fsCreate',
+      id: 1,
+      uri: 'workspace:README.txt',
+      clock: 0,
+      file: {
+        type: 'blob',
+        sha1: 'c2d38c73bb59ed15790b19661bf31a53b5e856b9',
+      },
+    },
+    {
+      type: 'fsCreate',
+      id: 2,
+      uri: 'workspace:src',
+      clock: 0,
+      file: {
+        type: 'dir',
+      },
+    },
+    {
+      type: 'fsCreate',
+      id: 3,
+      uri: 'workspace:src/inside.txt',
+      clock: 0,
+      file: {
+        type: 'blob',
+        sha1: 'f65d313996cb2dcb64c4a28646b89bb7afb2956d',
+      },
+    },
+    {
+      type: 'fsCreate',
+      id: 4,
+      uri: 'workspace:src/main.c',
+      clock: 0,
+      file: {
+        type: 'blob',
+        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+      },
+    },
+    {
+      type: 'openTextDocument',
+      id: 5,
+      uri: 'workspace:src/main.c',
+      clock: 0,
+      eol: '\n',
+      languageId: 'c',
+    },
+    {
+      type: 'textChange',
+      id: 6,
+      uri: 'workspace:src/main.c',
+      clock: 0,
+      contentChanges: [
+        {
+          range: {
+            start: {
+              line: 0,
+              character: 0,
+            },
+            end: {
+              line: 5,
+              character: 0,
+            },
+          },
+          text: '#include <stdio.h>\n\nint main() {\n    return 99;\n}\n',
+        },
+      ],
+      revContentChanges: [
+        {
+          range: {
+            start: {
+              line: 0,
+              character: 0,
+            },
+            end: {
+              line: 5,
+              character: 0,
+            },
+          },
+          text: '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n',
+        },
+      ],
+      updateSelection: false,
+    },
+    {
+      type: 'showTextEditor',
+      id: 7,
+      uri: 'workspace:src/main.c',
+      clock: 0,
+      selections: [
+        {
+          anchor: {
+            line: 0,
+            character: 0,
+          },
+          active: {
+            line: 0,
+            character: 0,
+          },
+        },
+      ],
+      visibleRange: {
+        start: 0,
+        end: 5,
+      },
+      justOpened: true,
+    },
+    {
+      type: 'openTextDocument',
+      id: 8,
+      uri: 'workspace:src/inside.txt',
+      clock: 1.0136507159999997,
+      eol: '\n',
+      languageId: 'plaintext',
+    },
+    {
+      type: 'showTextEditor',
+      id: 9,
+      uri: 'workspace:src/inside.txt',
+      clock: 1.0136507159999997,
+      selections: [
+        {
+          anchor: {
+            line: 0,
+            character: 0,
+          },
+          active: {
+            line: 0,
+            character: 0,
+          },
+        },
+      ],
+      visibleRange: {
+        start: 0,
+        end: 2,
+      },
+      justOpened: true,
+      revUri: 'workspace:src/main.c',
+    },
+    {
+      type: 'textChange',
+      id: 10,
+      uri: 'workspace:src/inside.txt',
+      clock: 1.0136507159999997,
+      contentChanges: [
+        {
+          text: 'Third line\n',
+          range: {
+            start: {
+              line: 1,
+              character: 0,
+            },
+            end: {
+              line: 2,
+              character: 0,
+            },
+          },
+        },
+      ],
+      revContentChanges: [
+        {
+          range: {
+            start: {
+              line: 1,
+              character: 0,
+            },
+            end: {
+              line: 2,
+              character: 0,
+            },
+          },
+          text: 'Second line\n',
+        },
+      ],
+      updateSelection: false,
+    },
+    {
+      type: 'fsChange',
+      id: 11,
+      uri: 'workspace:src/inside.txt',
+      clock: 2.12722597,
+      file: {
+        type: 'blob',
+        sha1: 'be004e9e66d027a2b2a89c091c0f9633c77f2ee0',
+      },
+      revFile: {
+        type: 'blob',
+        sha1: 'f65d313996cb2dcb64c4a28646b89bb7afb2956d',
       },
     },
   ];

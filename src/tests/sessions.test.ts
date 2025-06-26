@@ -35,6 +35,8 @@ test('switch_untitled_to_c_and_save', () => testSession('switch_untitled_to_c_an
 test('show_text_editor', () => testSession('show_text_editor'));
 test('rename_file', () => testSession('rename_file'));
 test('change_language_dirty_document', () => testSession('change_language_dirty_document'));
+test('start_with_dirty_document_open_and_save', () => testSession('start_with_dirty_document_open_and_save'));
+
 // });
 
 async function testSession(sessionHandle: string) {
@@ -112,7 +114,7 @@ function checkFilesAtClock(testClockPath: string, sessionHandle: string, label: 
     if (expectedStat.isFile()) {
       const expectedContent = fs.readFileSync(path.resolve(expectedFilesPath, file), 'utf8');
       const actualContent = fs.readFileSync(path.resolve(workspacePath, file), 'utf8');
-      assert.strictEqual(actualContent, expectedContent, `At ${label}: foundf unexpected content in file ${file}`);
+      assert.strictEqual(actualContent, expectedContent, `At ${label}: found unexpected content in file ${file}`);
     } else if (expectedStat.isDirectory()) {
       assert.ok(
         fs.statSync(path.resolve(workspacePath, file)).isDirectory(),

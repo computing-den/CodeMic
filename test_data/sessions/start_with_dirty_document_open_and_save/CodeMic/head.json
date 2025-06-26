@@ -1,0 +1,12 @@
+{
+  "id": "a6d1ee0b-5239-452e-9e97-bc6126fc1c6e",
+  "handle": "start_with_dirty_document_open_and_save",
+  "title": "start with dirty document open and save",
+  "description": "",
+  "duration": 2.638855099000001,
+  "modificationTimestamp": "2025-06-26T16:18:24.583Z",
+  "toc": [],
+  "formatVersion": 2,
+  "ignorePatterns": "# Ignore the .git directory\n.git\n\n# Node.js dependencies\nnode_modules\n\n# Python byte-compiled / optimized / DLL files\n__pycache__\n*.py[cod]\n*$py.class\n\n",
+  "hasCover": false
+}

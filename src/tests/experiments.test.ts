@@ -10,6 +10,7 @@ import {
   closeAllTabs,
   exampleFilesPath,
   getCodeMic,
+  isEventAlmostEqual,
   openCodeMicView,
   workspacePath,
 } from './test-helpers.js';
