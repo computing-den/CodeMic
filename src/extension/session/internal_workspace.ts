@@ -18,7 +18,7 @@ export type SeekData = { steps: SeekStep[]; direction: t.Direction };
  * If we have item.editor.document, then we must have item.document.
  */
 export class LiveWorktreeItem {
-  private closedDirtyDocument?: t.InternalDocument;
+  private _closedDirtyDocument?: t.InternalDocument;
 
   constructor(
     public worktree: LiveWorktree,
@@ -38,6 +38,10 @@ export class LiveWorktreeItem {
 
   get textEditor(): InternalTextEditor | undefined {
     if (this._editor instanceof InternalTextEditor) return this._editor;
+  }
+
+  get closedDirtyTextDocument(): InternalTextDocument | undefined {
+    if (this._closedDirtyDocument instanceof InternalTextDocument) return this._closedDirtyDocument;
   }
 
   setFile(file: t.File) {
@@ -60,7 +64,7 @@ export class LiveWorktreeItem {
   }
 
   async isDirty(): Promise<boolean> {
-    if (this.closedDirtyDocument) return true;
+    // if (this.closedDirtyDocument) return true;
 
     const dContent = this._document?.getContent();
     if (dContent) {
@@ -77,47 +81,46 @@ export class LiveWorktreeItem {
     return false;
   }
 
-  async openTextDocument(opts?: { eol?: t.EndOfLine }): Promise<InternalTextDocument> {
+  // Restore the document that was closed while dirty.
+  restoreClosedDirtyDocument() {
+    assert(!this._document);
+    assert(
+      this._closedDirtyDocument instanceof InternalTextDocument,
+      `internal dirty item is not a text document ${this.uri}`,
+    );
+    const document = this._closedDirtyDocument;
+
+    // Update document and editor.
+    this._closedDirtyDocument = undefined;
+    if (this._editor) this._editor.document = document;
+    return (this._document = document);
+  }
+
+  async openTextDocument(opts: { eol: t.EndOfLine; languageId: string }): Promise<InternalTextDocument> {
     // Shortcut if document already open.
     if (this.textDocument) return this.textDocument;
-
-    // Shortcut if document was closed while dirty.
-    if (this.closedDirtyDocument) {
-      assert(
-        this.closedDirtyDocument instanceof InternalTextDocument,
-        `internal dirty item is not a text document ${this.uri}`,
-      );
-      const document = this.closedDirtyDocument;
-      this.closedDirtyDocument = undefined;
-
-      if (this._editor) this._editor.document = document;
-      return (this._document = document);
-    }
 
     // Create new text document.
     const eol = opts?.eol ?? this.worktree.session.body.defaultEol;
     const buffer = await this.getContent();
-    const document = InternalTextDocument.fromBuffer(this.uri, buffer, eol);
+    const document = InternalTextDocument.fromBuffer(this.uri, buffer, eol, opts.languageId);
 
     // Update document and editor.
+    this._closedDirtyDocument = undefined;
     if (this._editor) this._editor.document = document;
     return (this._document = document);
   }
 
   async closeTextDocument() {
     if (await this.isDirty()) {
-      this.closedDirtyDocument = this._document;
+      this._closedDirtyDocument = this._document;
     }
     this._document = undefined;
     if (this._editor) this._editor.document = undefined;
     this.possiblyDeleteSelf();
   }
 
-  async openTextEditor(opts?: {
-    selections?: t.Selection[];
-    visibleRange?: t.LineRange;
-    eol?: t.EndOfLine;
-  }): Promise<InternalTextEditor> {
+  async openTextEditor(opts?: { selections?: t.Selection[]; visibleRange?: t.LineRange }): Promise<InternalTextEditor> {
     // Shortcut if text editor already open with document.
     if (this.textEditor?.document) {
       if (opts?.selections) this.textEditor.select(opts.selections);
@@ -126,8 +129,11 @@ export class LiveWorktreeItem {
     }
 
     // Create new text editor.
-    const document = await this.openTextDocument({ eol: opts?.eol });
-    const editor = new InternalTextEditor(this.uri, document, opts?.selections, opts?.visibleRange);
+    // NOTE: this_.document may be undefined. This happens when reversing the
+    // following events after saving an untitled:
+    // + closeTextDocument
+    // + closeTextEditor
+    const editor = new InternalTextEditor(this.uri, this.textDocument, opts?.selections, opts?.visibleRange);
     return (this._editor = editor);
   }
 
@@ -137,7 +143,7 @@ export class LiveWorktreeItem {
   }
 
   private possiblyDeleteSelf() {
-    if (!this._file && !this._document && !this._editor && !this.closedDirtyDocument) {
+    if (!this._file && !this._document && !this._editor && !this._closedDirtyDocument) {
       // Assert that it doesn't have children in worktree.
       if (URI.parse(this.uri).scheme === 'workspace') {
         const children = this.worktree.getUris().filter(uri => uri.startsWith(this.uri + '/'));

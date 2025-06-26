@@ -478,6 +478,7 @@ export interface WorkspaceStepper {
   applyTextChangeEvent(e: TextChangeEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyOpenTextDocumentEvent(e: OpenTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyCloseTextDocumentEvent(e: CloseTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
+  applyUpdateTextDocumentEvent(e: UpdateTextDocumentEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyShowTextEditorEvent(e: ShowTextEditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applyCloseTextEditorEvent(e: CloseTextEditorEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
   applySelectEvent(e: SelectEvent, direction: Direction, uriSet?: UriSet): Promise<void>;
@@ -518,6 +519,7 @@ export type EditorEvent =
   | TextChangeEvent
   | OpenTextDocumentEvent
   | CloseTextDocumentEvent
+  | UpdateTextDocumentEvent
   | ShowTextEditorEvent
   | CloseTextEditorEvent
   | SelectEvent
@@ -567,6 +569,7 @@ export type OpenTextDocumentEvent = {
   clock: number;
   // text?: string;
   eol: EndOfLine;
+  languageId: string;
   // isInWorktree?: boolean;
 };
 
@@ -577,6 +580,17 @@ export type CloseTextDocumentEvent = {
   clock: number;
   // revText: string;
   revEol: EndOfLine;
+  revLanguageId: string;
+};
+
+export type UpdateTextDocumentEvent = {
+  type: 'updateTextDocument';
+  id: number;
+  uri: string;
+  clock: number;
+  // eol: EndOfLine;
+  languageId: string;
+  revLanguageId: string;
 };
 
 export type ShowTextEditorEvent = {
@@ -659,7 +673,8 @@ export type EditorEventCompact =
   | SaveEventCompact
   | TextInsertEventCompact
   | FsChangeEventCompact
-  | FsDeleteEventCompact;
+  | FsDeleteEventCompact
+  | UpdateTextDocumentEventCompact;
 
 export type FsCreateEventCompact = {
   t: 0;
@@ -683,6 +698,7 @@ export type OpenTextDocumentEventCompact = {
   c: number;
   // x?: string;
   e: EndOfLine;
+  l: string;
   // i?: boolean;
 };
 
@@ -692,6 +708,7 @@ export type CloseTextDocumentEventCompact = {
   c: number;
   // rt: string;
   re: EndOfLine;
+  rl: string;
 };
 
 export type ShowTextEditorEventCompact = {
@@ -762,6 +779,14 @@ export type FsDeleteEventCompact = {
   u: number;
   c: number;
   rf: File;
+};
+
+export type UpdateTextDocumentEventCompact = {
+  t: 12;
+  u: number;
+  c: number;
+  l: string;
+  rl: string;
 };
 
 export type PositionCompact = [number, number];
@@ -930,6 +955,7 @@ export type TestMeta = {
   dirtyTextDocuments: string[];
   openTextEditors: TestMetaTextEditor[];
   activeTextEditor?: string;
+  languageIds: Record<string, string>;
 };
 
 export type TestMetaTextEditor = {
@@ -942,6 +968,7 @@ export type TestMetaCompact = {
   dirtyTextDocuments: string[];
   openTextEditors: TestMetaTextEditorCompact[];
   activeTextEditor?: string;
+  languageIds: Record<string, string>;
 };
 
 export type TestMetaTextEditorCompact = {

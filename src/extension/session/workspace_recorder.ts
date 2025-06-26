@@ -431,12 +431,41 @@ class WorkspaceRecorder {
 
     const irItem = this.worktree.getOpt(uri) ?? this.worktree.add(uri);
 
+    // In VSCode, changing language is modeled as a close followed by an open text document.
+    // So, if the document was just closed, update the close event to a language change.
+    // This is not strictly necessary, but it makes the replay simpler and may avoid
+    // an extra textChange event if the document was dirty at the time of closing.
+    const lastEventIndex = this.session.body.editorEvents.length - 1;
+    const lastEvent = this.session.body.editorEvents.at(lastEventIndex);
+    if (
+      irItem.closedDirtyTextDocument &&
+      irItem.closedDirtyTextDocument.languageId !== vscTextDocument.languageId &&
+      lastEvent?.uri === uri &&
+      lastEvent.type === 'closeTextDocument' &&
+      lastEvent.clock > this.clock - 1
+    ) {
+      irItem.restoreClosedDirtyDocument();
+      assert(irItem.textDocument);
+      irItem.textDocument.languageId = vscTextDocument.languageId;
+      const e: t.UpdateTextDocumentEvent = {
+        type: 'updateTextDocument',
+        id: lastEvent.id,
+        uri: lastEvent.uri,
+        clock: lastEvent.clock,
+        languageId: vscTextDocument.languageId,
+        revLanguageId: irItem.closedDirtyTextDocument.languageId,
+      };
+      this.session.editor.setEventAt(e, lastEventIndex);
+
+      return;
+    }
+
     // Insert internal document.
     const irItemAlreadyHadDocument = irItem.textDocument;
     if (!irItemAlreadyHadDocument) {
       logAcceptedEvent(`accepted openTextDocument for ${uri}`);
       const eol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
-      await irItem.openTextDocument({ eol });
+      await irItem.openTextDocument({ eol, languageId: vscTextDocument.languageId });
 
       this.insertEvent(
         {
@@ -445,6 +474,7 @@ class WorkspaceRecorder {
           uri,
           clock: this.clock,
           eol,
+          languageId: vscTextDocument.languageId,
         },
         { coalescing: false },
       );
@@ -499,6 +529,7 @@ class WorkspaceRecorder {
         uri,
         clock: this.clock,
         revEol,
+        revLanguageId: vscTextDocument.languageId,
       },
       { coalescing: false },
     );
@@ -537,11 +568,19 @@ class WorkspaceRecorder {
 
     const selections = VscWorkspace.fromVscSelections(vscTextEditor.selections);
     const visibleRange = VscWorkspace.fromVscLineRange(vscTextEditor.visibleRanges[0]);
-    const eol = VscWorkspace.eolFromVsc(vscTextEditor.document.eol);
+    // const eol = VscWorkspace.eolFromVsc(vscTextEditor.document.eol);
     const justOpened = !item.textEditor;
-    await item.openTextEditor({ selections, visibleRange, eol });
-    this.worktree.activeTextEditorUri = uri;
 
+    // If text document has not been opened, open it first and insert 'openTextDocument' event.
+    // This can happen when a document was opened by user while not recorder was on pause and then
+    // resumed.
+    if (!item.textDocument) {
+      await this.openTextDocument(vscTextEditor.document);
+    }
+
+    // Now, open text editor and insert 'showTextEditor' event.
+    await item.openTextEditor({ selections, visibleRange });
+    this.worktree.activeTextEditorUri = uri;
     this.insertEvent(
       {
         type: 'showTextEditor',
@@ -571,7 +610,7 @@ class WorkspaceRecorder {
     assert(irTextEditor);
 
     const lastEventIndex = this.session.body.editorEvents.length - 1;
-    const lastEvent = this.session.body.editorEvents[lastEventIndex];
+    const lastEvent = this.session.body.editorEvents.at(lastEventIndex);
     const revSelections = irTextEditor.selections;
     irTextEditor.select(selections);
 
@@ -647,7 +686,7 @@ class WorkspaceRecorder {
 
     // Merge successive scrolls.
     const lastEventIndex = this.session.body.editorEvents.length - 1;
-    const lastEvent = this.session.body.editorEvents[lastEventIndex];
+    const lastEvent = this.session.body.editorEvents.at(lastEventIndex);
     if (lastEvent?.uri === uri && lastEvent.type === 'scroll' && lastEvent.clock > this.clock - 0.5) {
       logAcceptedEvent(
         `accepted scroll for ${uri} visible range: ${visibleRange.start}:${visibleRange.end} (SHORTCUT)`,

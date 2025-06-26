@@ -1,22 +1,64 @@
 {
   "full": true,
   "editorEvents": [
-    {"type": "fsCreate", "id": 12, "uri": "workspace:abc.txt", "clock": 0, "file": {"type": "blob", "sha1": "c5085600a9399124476fd9553fe4a812491b5209"}},
-    {"type": "fsCreate", "id": 13, "uri": "workspace:adir", "clock": 0, "file": {"type": "dir"}},
-    {"type": "fsCreate", "id": 14, "uri": "workspace:adir/stuff.txt", "clock": 0, "file": {"type": "blob", "sha1": "40f2c8a06bfc6607b06f1f63bb1740bbd9b8f118"}},
-    {"type": "fsCreate", "id": 15, "uri": "workspace:public", "clock": 0, "file": {"type": "dir"}},
-    {"type": "fsCreate", "id": 16, "uri": "workspace:public/images", "clock": 0, "file": {"type": "dir"}},
-    {"type": "fsCreate", "id": 17, "uri": "workspace:public/images/1.jpg", "clock": 0, "file": {"type": "blob", "sha1": "0eb737949842ed40e8ec946ec14055977bb4f265"}},
-    {"type": "fsCreate", "id": 18, "uri": "workspace:public/images/2.jpg", "clock": 0, "file": {"type": "blob", "sha1": "d6688b7b322bcc76be5690a58d76b9b9386216dc"}},
-    {"type": "openTextDocument", "id": 19, "uri": "workspace:abc.txt", "clock": 0, "eol": "\n"},
-    {"type": "openTextDocument", "id": 20, "uri": "untitled:Untitled-1", "clock": 0, "eol": "\n"},
+    {
+      "type": "fsCreate",
+      "id": 12,
+      "uri": "workspace:abc.txt",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "c5085600a9399124476fd9553fe4a812491b5209" }
+    },
+    { "type": "fsCreate", "id": 13, "uri": "workspace:adir", "clock": 0, "file": { "type": "dir" } },
+    {
+      "type": "fsCreate",
+      "id": 14,
+      "uri": "workspace:adir/stuff.txt",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "40f2c8a06bfc6607b06f1f63bb1740bbd9b8f118" }
+    },
+    { "type": "fsCreate", "id": 15, "uri": "workspace:public", "clock": 0, "file": { "type": "dir" } },
+    { "type": "fsCreate", "id": 16, "uri": "workspace:public/images", "clock": 0, "file": { "type": "dir" } },
+    {
+      "type": "fsCreate",
+      "id": 17,
+      "uri": "workspace:public/images/1.jpg",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "0eb737949842ed40e8ec946ec14055977bb4f265" }
+    },
+    {
+      "type": "fsCreate",
+      "id": 18,
+      "uri": "workspace:public/images/2.jpg",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "d6688b7b322bcc76be5690a58d76b9b9386216dc" }
+    },
+    {
+      "type": "openTextDocument",
+      "id": 19,
+      "uri": "workspace:abc.txt",
+      "clock": 0,
+      "eol": "\n",
+      "languageId": "plaintext"
+    },
+    {
+      "type": "openTextDocument",
+      "id": 20,
+      "uri": "untitled:Untitled-1",
+      "clock": 0,
+      "eol": "\n",
+      "languageId": "plaintext"
+    },
     {
       "type": "textChange",
       "id": 21,
       "uri": "untitled:Untitled-1",
       "clock": 0,
-      "contentChanges": [{"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}}, "text": "Dirty"}],
-      "revContentChanges": [{"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 5}}, "text": ""}],
+      "contentChanges": [
+        { "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 0 } }, "text": "Dirty" }
+      ],
+      "revContentChanges": [
+        { "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 5 } }, "text": "" }
+      ],
       "updateSelection": false
     },
     {
@@ -24,8 +66,8 @@
       "id": 22,
       "uri": "workspace:abc.txt",
       "clock": 0,
-      "selections": [{"anchor": {"line": 2, "character": 0}, "active": {"line": 2, "character": 0}}],
-      "visibleRange": {"start": 0, "end": 2},
+      "selections": [{ "anchor": { "line": 2, "character": 0 }, "active": { "line": 2, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 2 },
       "justOpened": true
     },
     {
@@ -33,8 +75,8 @@
       "id": 23,
       "uri": "untitled:Untitled-1",
       "clock": 0,
-      "selections": [{"anchor": {"line": 0, "character": 5}, "active": {"line": 0, "character": 5}}],
-      "visibleRange": {"start": 0, "end": 0},
+      "selections": [{ "anchor": { "line": 0, "character": 5 }, "active": { "line": 0, "character": 5 } }],
+      "visibleRange": { "start": 0, "end": 0 },
       "justOpened": true
     },
     {
@@ -42,36 +84,63 @@
       "id": 24,
       "uri": "untitled:Untitled-1",
       "clock": 6.8112579430000055,
-      "selections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 5}}],
-      "revSelections": [{"anchor": {"line": 0, "character": 5}, "active": {"line": 0, "character": 5}}]
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 5 } }],
+      "revSelections": [{ "anchor": { "line": 0, "character": 5 }, "active": { "line": 0, "character": 5 } }]
     },
     {
       "type": "textChange",
       "id": 25,
       "uri": "untitled:Untitled-1",
       "clock": 7.317945034999999,
-      "contentChanges": [{"text": "#include <stdio.h>\n\nint main() {\n    return 0;\n}\n", "range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 5}}}],
-      "revContentChanges": [{"range": {"start": {"line": 0, "character": 0}, "end": {"line": 5, "character": 0}}, "text": "Dirty"}],
+      "contentChanges": [
+        {
+          "text": "#include <stdio.h>\n\nint main() {\n    return 0;\n}\n",
+          "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 5 } }
+        }
+      ],
+      "revContentChanges": [
+        { "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 5, "character": 0 } }, "text": "Dirty" }
+      ],
       "updateSelection": false
     },
-    {"type": "scroll", "id": 26, "uri": "untitled:Untitled-1", "clock": 7.317945034999999, "visibleRange": {"start": 0, "end": 5}, "revVisibleRange": {"start": 0, "end": 0}},
+    {
+      "type": "scroll",
+      "id": 26,
+      "uri": "untitled:Untitled-1",
+      "clock": 7.317945034999999,
+      "visibleRange": { "start": 0, "end": 5 },
+      "revVisibleRange": { "start": 0, "end": 0 }
+    },
     {
       "type": "select",
       "id": 27,
       "uri": "untitled:Untitled-1",
       "clock": 7.317945034999999,
-      "selections": [{"anchor": {"line": 5, "character": 0}, "active": {"line": 5, "character": 0}}],
-      "revSelections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 5}}]
+      "selections": [{ "anchor": { "line": 5, "character": 0 }, "active": { "line": 5, "character": 0 } }],
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 5 } }]
     },
-    {"type": "closeTextDocument", "id": 28, "uri": "untitled:Untitled-1", "clock": 8.027894424000001, "revEol": "\n"},
-    {"type": "openTextDocument", "id": 29, "uri": "untitled:Untitled-1", "clock": 8.027894424000001, "eol": "\n"},
-    {"type": "openTextDocument", "id": 30, "uri": "workspace:adir/main.c", "clock": 19.221786625000007, "eol": "\n"},
+    {
+      "type": "updateTextDocument",
+      "id": 28,
+      "uri": "untitled:Untitled-1",
+      "clock": 8.027894424000001,
+      "languageId": "c",
+      "revLanguageId": "plaintext"
+    },
+    {
+      "type": "openTextDocument",
+      "id": 30,
+      "uri": "workspace:adir/main.c",
+      "clock": 19.221786625000007,
+      "eol": "\n",
+      "languageId": "c"
+    },
     {
       "type": "textInsert",
       "id": 31,
       "uri": "workspace:adir/main.c",
       "clock": 19.221786625000007,
-      "revRange": {"start": {"line": 0, "character": 0}, "end": {"line": 5, "character": 0}},
+      "revRange": { "start": { "line": 0, "character": 0 }, "end": { "line": 5, "character": 0 } },
       "text": "#include <stdio.h>\n\nint main() {\n    return 0;\n}\n",
       "updateSelection": false
     },
@@ -80,8 +149,15 @@
       "id": 32,
       "uri": "untitled:Untitled-1",
       "clock": 19.221786625000007,
-      "contentChanges": [{"text": "", "range": {"start": {"line": 0, "character": 0}, "end": {"line": 5, "character": 0}}}],
-      "revContentChanges": [{"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}}, "text": "#include <stdio.h>\n\nint main() {\n    return 0;\n}\n"}],
+      "contentChanges": [
+        { "text": "", "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 5, "character": 0 } } }
+      ],
+      "revContentChanges": [
+        {
+          "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 0 } },
+          "text": "#include <stdio.h>\n\nint main() {\n    return 0;\n}\n"
+        }
+      ],
       "updateSelection": false
     },
     {
@@ -89,27 +165,41 @@
       "id": 33,
       "uri": "untitled:Untitled-1",
       "clock": 19.221786625000007,
-      "selections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}],
-      "revSelections": [{"anchor": {"line": 5, "character": 0}, "active": {"line": 5, "character": 0}}]
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "revSelections": [{ "anchor": { "line": 5, "character": 0 }, "active": { "line": 5, "character": 0 } }]
     },
-    {"type": "scroll", "id": 34, "uri": "untitled:Untitled-1", "clock": 19.221786625000007, "visibleRange": {"start": 0, "end": 0}, "revVisibleRange": {"start": 0, "end": 5}},
-    {"type": "closeTextDocument", "id": 35, "uri": "untitled:Untitled-1", "clock": 19.221786625000007, "revEol": "\n"},
+    {
+      "type": "scroll",
+      "id": 34,
+      "uri": "untitled:Untitled-1",
+      "clock": 19.221786625000007,
+      "visibleRange": { "start": 0, "end": 0 },
+      "revVisibleRange": { "start": 0, "end": 5 }
+    },
+    {
+      "type": "closeTextDocument",
+      "id": 35,
+      "uri": "untitled:Untitled-1",
+      "clock": 19.221786625000007,
+      "revEol": "\n",
+      "revLanguageId": "c"
+    },
     {
       "type": "closeTextEditor",
       "id": 36,
       "uri": "untitled:Untitled-1",
       "clock": 19.221786625000007,
       "active": true,
-      "revSelections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}],
-      "revVisibleRange": {"start": 0, "end": 0}
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "revVisibleRange": { "start": 0, "end": 0 }
     },
     {
       "type": "showTextEditor",
       "id": 37,
       "uri": "workspace:adir/main.c",
       "clock": 19.221786625000007,
-      "selections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}],
-      "visibleRange": {"start": 0, "end": 5},
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 5 },
       "justOpened": true
     },
     {
@@ -117,17 +207,23 @@
       "id": 38,
       "uri": "workspace:adir/main.c",
       "clock": 19.221786625000007,
-      "selections": [{"anchor": {"line": 5, "character": 0}, "active": {"line": 5, "character": 0}}],
-      "revSelections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}]
+      "selections": [{ "anchor": { "line": 5, "character": 0 }, "active": { "line": 5, "character": 0 } }],
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }]
     },
-    {"type": "fsCreate", "id": 39, "uri": "workspace:adir/main.c", "clock": 19.221786625000007, "file": {"type": "blob", "sha1": "c3d880f1ad32e1ff90bb87a79c56efa553c66023"}}
+    {
+      "type": "fsCreate",
+      "id": 39,
+      "uri": "workspace:adir/main.c",
+      "clock": 19.221786625000007,
+      "file": { "type": "blob", "sha1": "c3d880f1ad32e1ff90bb87a79c56efa553c66023" }
+    }
   ],
   "audioTracks": [],
   "videoTracks": [],
   "focusTimeline": [
-    {"clock": 0, "uri": "untitled:Untitled-1", "number": 0, "text": "#include <stdio.h>"},
-    {"clock": 7.317945034999999, "uri": "untitled:Untitled-1", "number": 5, "text": ""},
-    {"clock": 19.221786625000007, "uri": "workspace:adir/main.c", "number": 5, "text": ""}
+    { "clock": 0, "uri": "untitled:Untitled-1", "number": 0, "text": "#include <stdio.h>" },
+    { "clock": 7.317945034999999, "uri": "untitled:Untitled-1", "number": 5, "text": "" },
+    { "clock": 19.221786625000007, "uri": "workspace:adir/main.c", "number": 5, "text": "" }
   ],
   "defaultEol": "\n"
 }

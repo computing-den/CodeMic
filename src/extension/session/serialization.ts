@@ -49,6 +49,7 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
         e: e.eol,
+        l: e.languageId,
       };
 
     case 'closeTextDocument':
@@ -58,6 +59,7 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         c: serializeClock(e.clock),
         // rt: e.revText,
         re: e.revEol,
+        rl: e.revLanguageId,
       };
 
     case 'showTextEditor':
@@ -133,6 +135,16 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         c: serializeClock(e.clock),
         rf: e.revFile,
       };
+    case 'updateTextDocument':
+      return {
+        t: 12,
+        u: uriMap.get(e.uri)!,
+        c: serializeClock(e.clock),
+        l: e.languageId,
+        rl: e.revLanguageId,
+      };
+    default:
+      throw new Error(`Unknown event: ${JSON.stringify(e)}`);
   }
 }
 
@@ -178,6 +190,7 @@ export function serializeTestMeta(meta: t.TestMeta): t.TestMetaCompact {
       visibleRange: serializeLineRange(e.visibleRange),
     })),
     activeTextEditor: meta.activeTextEditor,
+    languageIds: meta.languageIds,
   };
 }
 
@@ -243,6 +256,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         uri: uris[e.u],
         clock: deserializeClock(e.c),
         eol: e.e,
+        languageId: e.l,
       };
     case 3:
       return {
@@ -252,6 +266,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         clock: deserializeClock(e.c),
         // revText: e.rt,
         revEol: e.re,
+        revLanguageId: e.rl,
       };
     case 4:
       return {
@@ -331,6 +346,17 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         clock: deserializeClock(e.c),
         revFile: e.rf,
       };
+    case 12:
+      return {
+        type: 'updateTextDocument',
+        id: nextId(),
+        uri: uris[e.u],
+        clock: deserializeClock(e.c),
+        languageId: e.l,
+        revLanguageId: e.rl,
+      };
+    default:
+      throw new Error(`Unknown event: ${JSON.stringify(e)}`);
   }
 }
 
@@ -361,6 +387,7 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         uri,
         clock: deserializeClock(e.c),
         eol: e.e,
+        languageId: getLangaugeIdFromUri(uri),
       };
     case 3:
       return {
@@ -370,6 +397,7 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         clock: deserializeClock(e.c),
         // revText: e.rt,
         revEol: e.re,
+        revLanguageId: getLangaugeIdFromUri(uri),
       };
     case 4:
       return {
@@ -507,5 +535,21 @@ export function deserializeTestMeta(compact: t.TestMetaCompact): t.TestMeta {
       visibleRange: deserializeLineRange(e.visibleRange),
     })),
     activeTextEditor: compact.activeTextEditor,
+    languageIds: compact.languageIds,
   };
+}
+
+function getLangaugeIdFromUri(uri: string): string {
+  if (uri.endsWith('.js')) return 'javascript';
+  if (uri.endsWith('.jsx')) return 'javascriptreact';
+  if (uri.endsWith('.ts')) return 'typescript';
+  if (uri.endsWith('.tsx')) return 'typescriptreact';
+  if (uri.endsWith('.json')) return 'json';
+  if (uri.endsWith('.css')) return 'css';
+  if (uri.endsWith('.html')) return 'html';
+  if (uri.endsWith('.md')) return 'markdown';
+  if (uri.endsWith('.c')) return 'c';
+  if (uri.endsWith('.py')) return 'python';
+
+  return 'plaintext';
 }

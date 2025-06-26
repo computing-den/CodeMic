@@ -18,12 +18,13 @@ import {
 import config from '../extension/config.js';
 import { EditorEvent } from '../lib/types.js';
 
-suite('Recorder', () => {
-  test('fs changes', recordFsChanges);
-  test('showTextEditor event without openTextDocument', recordOpenTextEditorWithoutDocument);
-  test('rename file', recordRenameFile);
-  test('rename file and open again', recordRenameFileAndOpenAgain);
-});
+// suite('Recorder', () => {
+test('fs changes', recordFsChanges);
+test('showTextEditor event without openTextDocument', recordOpenTextEditorWithoutDocument);
+test('rename file', recordRenameFile);
+test('rename file and open again immediately', recordRenameFileAndOpenAgainImmediately);
+test('rename file and open again with delay', recordRenameFileAndOpenAgainWithDelay);
+// });
 
 async function recordFsChanges() {
   // Deleting workspacePath directly will interfere with file system watcher.
@@ -301,10 +302,19 @@ async function recordOpenTextEditorWithoutDocument() {
       uri: 'workspace:src/main.c',
       clock: 0.10239563100000032,
       eol: '\n',
+      languageId: 'c',
+    },
+    {
+      type: 'openTextDocument',
+      id: 7,
+      uri: 'workspace:src/inside.txt',
+      clock: 1.3122504769999999,
+      eol: '\n',
+      languageId: 'plaintext',
     },
     {
       type: 'showTextEditor',
-      id: 7,
+      id: 8,
       uri: 'workspace:src/inside.txt',
       clock: 0.4705662360000001,
       selections: [
@@ -425,6 +435,7 @@ async function recordRenameFile() {
       uri: 'workspace:src/main.c',
       clock: 0.10272586700000011,
       eol: '\n',
+      languageId: 'c',
     },
     {
       type: 'showTextEditor',
@@ -478,6 +489,7 @@ async function recordRenameFile() {
       uri: 'workspace:src/new.c',
       clock: 0.45762532299999975,
       eol: '\n',
+      languageId: 'c',
     },
     {
       type: 'textChange',
@@ -545,6 +557,7 @@ async function recordRenameFile() {
       uri: 'workspace:src/main.c',
       clock: 0.5646270330000002,
       revEol: '\n',
+      revLanguageId: 'c',
     },
     {
       type: 'fsCreate',
@@ -593,7 +606,7 @@ async function recordRenameFile() {
   // await lib.timeout(1_000_000);
 }
 
-async function recordRenameFileAndOpenAgain() {
+async function recordRenameFileAndOpenAgainImmediately() {
   log(`=== Creating files in ${workspacePath}`);
   fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
   fs.mkdirSync(path.resolve(workspacePath, 'src'), { recursive: true });
@@ -671,6 +684,7 @@ async function recordRenameFileAndOpenAgain() {
       uri: 'workspace:src/main.c',
       clock: 0.10307382400000006,
       eol: '\n',
+      languageId: 'c',
     },
     {
       type: 'showTextEditor',
@@ -724,6 +738,7 @@ async function recordRenameFileAndOpenAgain() {
       uri: 'workspace:src/new.c',
       clock: 0.3059229349999996,
       eol: '\n',
+      languageId: 'c',
     },
     {
       type: 'textChange',
@@ -791,6 +806,7 @@ async function recordRenameFileAndOpenAgain() {
       uri: 'workspace:src/main.c',
       clock: 0.3059229349999996,
       revEol: '\n',
+      revLanguageId: 'c',
     },
     {
       type: 'fsCreate',
@@ -818,6 +834,7 @@ async function recordRenameFileAndOpenAgain() {
       uri: 'workspace:src/main.c',
       clock: 1.3696773119999996,
       eol: '\n',
+      languageId: 'c',
     },
     {
       type: 'textChange',
@@ -856,6 +873,335 @@ async function recordRenameFileAndOpenAgain() {
       ],
       updateSelection: false,
     },
+    {
+      type: 'showTextEditor',
+      id: 14,
+      uri: 'workspace:src/main.c',
+      clock: 1.3696773119999996,
+      selections: [
+        {
+          anchor: {
+            line: 0,
+            character: 0,
+          },
+          active: {
+            line: 0,
+            character: 0,
+          },
+        },
+      ],
+      visibleRange: {
+        start: 0,
+        end: 0,
+      },
+      justOpened: true,
+      revUri: 'workspace:src/new.c',
+    },
+    {
+      type: 'fsCreate',
+      id: 15,
+      uri: 'workspace:src/main.c',
+      clock: 1.4714212319999995,
+      file: {
+        type: 'blob',
+        sha1: 'eab6555aced7835586ca27f868b20246a1460dd4',
+      },
+    },
+  ];
+
+  const actualEvents = JSON.parse(lib.pretty(codemic.session!.body?.editorEvents!)) as EditorEvent[];
+
+  const errors: string[] = [];
+
+  const missingActualEvents = _.differenceWith(expectedEvents, actualEvents, isEventAlmostEqual);
+  const extraActualEvents = _.differenceWith(actualEvents, expectedEvents, isEventAlmostEqual);
+
+  if (missingActualEvents.length) {
+    errors.push(`missing editor event IDs: ${missingActualEvents.map(x => x.id).join(', ')}`);
+  }
+  if (extraActualEvents.length) {
+    errors.push(`extra editor event IDs: ${extraActualEvents.map(x => x.id).join(', ')}`);
+  }
+
+  if (missingActualEvents.length || extraActualEvents.length) {
+    errors.push(`Actual events: ${lib.pretty(actualEvents)}\nExpected events: ${lib.pretty(expectedEvents)}`);
+  }
+
+  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
+
+  // log('XXX', lib.pretty(codemic.session!.body?.editorEvents));
+
+  // await lib.timeout(1_000_000);
+}
+
+async function recordRenameFileAndOpenAgainWithDelay() {
+  log(`=== Creating files in ${workspacePath}`);
+  fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
+  fs.mkdirSync(path.resolve(workspacePath, 'src'), { recursive: true });
+  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n');
+
+  log(`=== Closing all tabs`);
+  await closeAllTabs();
+  log(`=== Opening CodeMic view`);
+  await openCodeMicView();
+  const codemic = getCodeMic();
+
+  log(`=== Opening new session`);
+  await codemic.handleMessage({ type: 'welcome/openNewSessionInRecorder' });
+  await lib.timeout(200);
+  await codemic.handleMessage({
+    type: 'recorder/updateDetails',
+    changes: { title: 'Rename file', handle: 'rename_file' },
+  });
+  await lib.timeout(200);
+  log(`=== Scanning new session`);
+  await codemic.handleMessage({ type: 'recorder/load', skipConfirmation: true });
+
+  assert.ok(await pathExists(path.resolve(workspacePath, '.CodeMic', 'head.json')), 'head.json does not exist');
+  assert.ok(await pathExists(path.resolve(workspacePath, '.CodeMic', 'body.json')), 'body.json does not exist');
+
+  log(`=== Start recording`);
+  await codemic.handleMessage({ type: 'recorder/record' });
+  await lib.timeout(100);
+
+  log(`=== Open main.c`);
+  await vscode.window.showTextDocument(vscode.Uri.file(path.resolve(workspacePath, 'src/main.c')), { preview: false });
+  await lib.timeout(200);
+
+  log(`=== Rename main.c to new.c`);
+  const edit = new WorkspaceEdit();
+  edit.renameFile(
+    vscode.Uri.file(path.resolve(workspacePath, 'src/main.c')),
+    vscode.Uri.file(path.resolve(workspacePath, 'src/new.c')),
+  );
+  await vscode.workspace.applyEdit(edit);
+  await lib.timeout(1000);
+
+  log(`=== Recreate and reopen main.c`);
+  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), '// This is a new file');
+  await lib.timeout(1000);
+  await vscode.window.showTextDocument(vscode.Uri.file(path.resolve(workspacePath, 'src/main.c')), { preview: false });
+  await lib.timeout(1000);
+
+  log(`=== Pause`);
+  await codemic.handleMessage({ type: 'recorder/pause' });
+  await lib.timeout(200);
+
+  const expectedEvents: EditorEvent[] = [
+    {
+      type: 'fsCreate',
+      id: 1,
+      uri: 'workspace:src',
+      clock: 0,
+      file: {
+        type: 'dir',
+      },
+    },
+    {
+      type: 'fsCreate',
+      id: 2,
+      uri: 'workspace:src/main.c',
+      clock: 0,
+      file: {
+        type: 'blob',
+        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+      },
+    },
+    {
+      type: 'openTextDocument',
+      id: 3,
+      uri: 'workspace:src/main.c',
+      clock: 0.10307382400000006,
+      eol: '\n',
+      languageId: 'c',
+    },
+    {
+      type: 'showTextEditor',
+      id: 4,
+      uri: 'workspace:src/main.c',
+      clock: 0.10307382400000006,
+      selections: [
+        {
+          anchor: {
+            line: 0,
+            character: 0,
+          },
+          active: {
+            line: 0,
+            character: 0,
+          },
+        },
+      ],
+      visibleRange: {
+        start: 0,
+        end: 5,
+      },
+      justOpened: true,
+    },
+    {
+      type: 'closeTextEditor',
+      id: 5,
+      uri: 'workspace:src/main.c',
+      clock: 0.3059229349999996,
+      active: true,
+      revSelections: [
+        {
+          anchor: {
+            line: 0,
+            character: 0,
+          },
+          active: {
+            line: 0,
+            character: 0,
+          },
+        },
+      ],
+      revVisibleRange: {
+        start: 0,
+        end: 5,
+      },
+    },
+    {
+      type: 'openTextDocument',
+      id: 6,
+      uri: 'workspace:src/new.c',
+      clock: 0.3059229349999996,
+      eol: '\n',
+      languageId: 'c',
+    },
+    {
+      type: 'textChange',
+      id: 7,
+      uri: 'workspace:src/new.c',
+      clock: 0.3059229349999996,
+      contentChanges: [
+        {
+          range: {
+            start: {
+              line: 0,
+              character: 0,
+            },
+            end: {
+              line: 0,
+              character: 0,
+            },
+          },
+          text: '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n',
+        },
+      ],
+      revContentChanges: [
+        {
+          range: {
+            start: {
+              line: 0,
+              character: 0,
+            },
+            end: {
+              line: 5,
+              character: 0,
+            },
+          },
+          text: '',
+        },
+      ],
+      updateSelection: false,
+    },
+    {
+      type: 'showTextEditor',
+      id: 8,
+      uri: 'workspace:src/new.c',
+      clock: 0.3059229349999996,
+      selections: [
+        {
+          anchor: {
+            line: 0,
+            character: 0,
+          },
+          active: {
+            line: 0,
+            character: 0,
+          },
+        },
+      ],
+      visibleRange: {
+        start: 0,
+        end: 5,
+      },
+      justOpened: true,
+    },
+    {
+      type: 'closeTextDocument',
+      id: 9,
+      uri: 'workspace:src/main.c',
+      clock: 0.3059229349999996,
+      revEol: '\n',
+      revLanguageId: 'c',
+    },
+    {
+      type: 'fsCreate',
+      id: 10,
+      uri: 'workspace:src/new.c',
+      clock: 0.40816207599999965,
+      file: {
+        type: 'blob',
+        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+      },
+    },
+    {
+      type: 'fsDelete',
+      id: 11,
+      uri: 'workspace:src/main.c',
+      clock: 0.40816207599999965,
+      revFile: {
+        type: 'blob',
+        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+      },
+    },
+    {
+      type: 'openTextDocument',
+      id: 12,
+      uri: 'workspace:src/main.c',
+      clock: 1.3696773119999996,
+      eol: '\n',
+      languageId: 'c',
+    },
+    // {
+    //   type: 'textChange',
+    //   id: 13,
+    //   uri: 'workspace:src/main.c',
+    //   clock: 1.3696773119999996,
+    //   contentChanges: [
+    //     {
+    //       range: {
+    //         start: {
+    //           line: 0,
+    //           character: 0,
+    //         },
+    //         end: {
+    //           line: 0,
+    //           character: 0,
+    //         },
+    //       },
+    //       text: '// This is a new file',
+    //     },
+    //   ],
+    //   revContentChanges: [
+    //     {
+    //       range: {
+    //         start: {
+    //           line: 0,
+    //           character: 0,
+    //         },
+    //         end: {
+    //           line: 0,
+    //           character: 21,
+    //         },
+    //       },
+    //       text: '',
+    //     },
+    //   ],
+    //   updateSelection: false,
+    // },
     {
       type: 'showTextEditor',
       id: 14,

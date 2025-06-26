@@ -1,1 +1,6 @@
-{"dirtyTextDocuments": [], "openTextEditors": [{"uri": "workspace:hi.txt", "selections": [[0, 2, 0, 2]], "visibleRange": [0, 0]}], "activeTextEditor": "workspace:hi.txt"}
+{
+  "dirtyTextDocuments": [],
+  "openTextEditors": [{ "uri": "workspace:hi.txt", "selections": [[0, 2, 0, 2]], "visibleRange": [0, 0] }],
+  "activeTextEditor": "workspace:hi.txt",
+  "languageIds": { "workspace:hi.txt": "plaintext" }
+}

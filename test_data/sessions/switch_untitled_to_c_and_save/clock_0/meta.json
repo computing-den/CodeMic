@@ -1,5 +1,9 @@
 {
   "dirtyTextDocuments": ["untitled:Untitled-1"],
-  "openTextEditors": [{"uri": "untitled:Untitled-1", "selections": [[0, 5, 0, 5]], "visibleRange": [0, 0]}, {"uri": "workspace:abc.txt", "selections": [[2, 0, 2, 0]], "visibleRange": [0, 2]}],
-  "activeTextEditor": "untitled:Untitled-1"
+  "openTextEditors": [
+    { "uri": "untitled:Untitled-1", "selections": [[0, 5, 0, 5]], "visibleRange": [0, 0] },
+    { "uri": "workspace:abc.txt", "selections": [[2, 0, 2, 0]], "visibleRange": [0, 2] }
+  ],
+  "activeTextEditor": "untitled:Untitled-1",
+  "languageIds": { "untitled:Untitled-1": "plaintext", "workspace:abc.txt": "plaintext" }
 }

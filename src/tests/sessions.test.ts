@@ -28,13 +28,13 @@ import {
 // Dynamic tests using fs messes up the vscode test extension. It still works but vscode
 // cannot show the list of tests.
 // const testSessions = fs.readdirSync(testSessionsPath, { encoding: 'utf8' });
-suite('Sessions Test Suite', () => {
-  test('open_document_fs_create', () => testSession('open_document_fs_create'));
-  test('save_untitled', () => testSession('save_untitled'));
-  test('switch_untitled_to_c_and_save', () => testSession('switch_untitled_to_c_and_save'));
-  test('show_text_editor_no_document', () => testSession('show_text_editor_no_document'));
-  test('rename_file', () => testSession('rename_file'));
-});
+// suite('Sessions Test Suite', () => {
+test('open_document_fs_create', () => testSession('open_document_fs_create'));
+test('save_untitled', () => testSession('save_untitled'));
+test('switch_untitled_to_c_and_save', () => testSession('switch_untitled_to_c_and_save'));
+test('show_text_editor', () => testSession('show_text_editor'));
+test('rename_file', () => testSession('rename_file'));
+// });
 
 async function testSession(sessionHandle: string) {
   const sessionTestDataPath = path.resolve(testSessionsPath, sessionHandle);
@@ -134,7 +134,9 @@ async function checkTextDocumentsAtClock(
   // Must not have extra internal text documents
   // Must not have extra *dirty* vscode documents
 
-  type TextDocument = { content: string; uri: string; dirty?: boolean };
+  type TextDocument = { content: string; uri: string; dirty?: boolean; languageId: string };
+
+  const vscWorkspace = getCodeMic().session!.rr!._test_vscWorkspace;
 
   const expectedTextDocumentsPath = path.resolve(testClockPath, 'text_documents');
   const expectedTextDocumentsPaths = fs.readdirSync(expectedTextDocumentsPath, {
@@ -150,25 +152,25 @@ async function checkTextDocumentsAtClock(
       const content = fs.readFileSync(file, 'utf8');
       if (p.startsWith('Untitled-')) {
         const uri = URI.from({ scheme: 'untitled', path: p }).toString();
-        return { uri, content, dirty: meta.dirtyTextDocuments.includes(uri) };
+        return { uri, content, dirty: meta.dirtyTextDocuments.includes(uri), languageId: meta.languageIds[uri] };
       } else {
         const uri = lib.workspaceUri(p);
-        return { uri, content, dirty: meta.dirtyTextDocuments.includes(uri) };
+        return { uri, content, dirty: meta.dirtyTextDocuments.includes(uri), languageId: meta.languageIds[uri] };
       }
     }),
   );
 
   const actualVscTextDocuments: TextDocument[] = vscode.workspace.textDocuments.map(textDocument => {
     const content = textDocument.getText();
-
+    const dirty = vscWorkspace.isVscTextDocumentDirty(textDocument);
     switch (textDocument.uri.scheme) {
       case 'file': {
         const uri = lib.workspaceUriFrom(workspacePath, textDocument.uri.fsPath);
-        return { uri, content, dirty: meta.dirtyTextDocuments.includes(uri) };
+        return { uri, content, dirty, languageId: textDocument.languageId };
       }
       case 'untitled': {
         const uri = URI.from({ scheme: 'untitled', path: textDocument.uri.path }).toString();
-        return { uri, content, dirty: meta.dirtyTextDocuments.includes(uri) };
+        return { uri, content, dirty, languageId: textDocument.languageId };
       }
       default:
         throw new Error(`unknown scheme: ${textDocument.uri.scheme}`);
@@ -182,18 +184,24 @@ async function checkTextDocumentsAtClock(
         uri: textDocument.uri,
         content: textDocument.getText(),
         dirty: await getCodeMic().session!.rr!._test_internalWorkspace.worktree.get(textDocument.uri).isDirty(),
+        languageId: textDocument.languageId,
       })),
   );
 
   function getDiff(expected: TextDocument, actual: TextDocument | undefined) {
-    if (expected && actual && expected.content !== actual.content) {
+    if (actual && expected.content !== actual.content) {
       return { uri: expected.uri, expected: expected.content, actual: actual.content };
     }
   }
 
   function getDiffDirty(expected: TextDocument, actual: TextDocument | undefined) {
-    if (expected?.dirty !== undefined && actual?.dirty !== undefined && expected.dirty !== actual.dirty) {
+    if (expected.dirty !== undefined && actual?.dirty !== undefined && expected.dirty !== actual.dirty) {
       return { uri: expected.uri, expected: expected.dirty, actual: actual.dirty };
+    }
+  }
+  function getDiffLanguageId(expected: TextDocument, actual: TextDocument | undefined) {
+    if (actual && expected.languageId !== actual.languageId) {
+      return { uri: expected.uri, expected: expected.languageId, actual: actual?.languageId };
     }
   }
 
@@ -209,6 +217,11 @@ async function checkTextDocumentsAtClock(
       getDiffDirty(expected, _.find(actualVscTextDocuments, ['uri', expected.uri])),
     ),
   );
+  const diffLanguageIdVsc = _.compact(
+    _.map(expectedTextDocuments, expected =>
+      getDiffLanguageId(expected, _.find(actualVscTextDocuments, ['uri', expected.uri])),
+    ),
+  );
 
   const extraActualInternal = _.differenceBy(actualInternalTextDocuments, expectedTextDocuments, 'uri');
   const dirtyExtraActualInternal = _.filter(extraActualInternal, 'dirty');
@@ -221,6 +234,11 @@ async function checkTextDocumentsAtClock(
   const diffDirtyInternal = _.compact(
     _.map(expectedTextDocuments, expected =>
       getDiffDirty(expected, _.find(actualInternalTextDocuments, ['uri', expected.uri])),
+    ),
+  );
+  const diffLanguageIdInternal = _.compact(
+    _.map(expectedTextDocuments, expected =>
+      getDiffLanguageId(expected, _.find(actualInternalTextDocuments, ['uri', expected.uri])),
     ),
   );
 
@@ -238,6 +256,9 @@ async function checkTextDocumentsAtClock(
   if (diffDirtyVsc.length > 0) {
     errors.push(`different text document dirty state(s) in vscode: ${lib.pretty(diffDirtyVsc)}`);
   }
+  if (diffLanguageIdVsc.length > 0) {
+    errors.push(`different text document language IDs in vscode: ${lib.pretty(diffLanguageIdVsc)}`);
+  }
 
   if (missingActualInternal.length > 0) {
     errors.push(`missing text document(s) in internal: ${missingActualInternal.map(x => x.uri).join(', ')}`);
@@ -250,6 +271,9 @@ async function checkTextDocumentsAtClock(
   }
   if (diffDirtyInternal.length > 0) {
     errors.push(`different text document dirty state(s) in internal: ${lib.pretty(diffDirtyInternal)}`);
+  }
+  if (diffLanguageIdInternal.length > 0) {
+    errors.push(`different text document language IDs in internal: ${lib.pretty(diffLanguageIdInternal)}`);
   }
 
   assert.ok(errors.length === 0, `At ${label}: found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);

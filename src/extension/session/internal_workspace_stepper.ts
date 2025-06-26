@@ -57,12 +57,12 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     if (direction === t.Direction.Forwards) {
       textDocument.applyContentChanges(e.contentChanges, false);
       if (e.updateSelection) {
-        await item.openTextEditor({ selections: lib.getSelectionsAfterTextChangeEvent(e), eol: textDocument.eol });
+        await item.openTextEditor({ selections: lib.getSelectionsAfterTextChangeEvent(e) });
       }
     } else {
       textDocument.applyContentChanges(e.revContentChanges, false);
       if (e.updateSelection) {
-        await item.openTextEditor({ selections: lib.getSelectionsBeforeTextChangeEvent(e), eol: textDocument.eol });
+        await item.openTextEditor({ selections: lib.getSelectionsBeforeTextChangeEvent(e) });
       }
     }
   }
@@ -72,7 +72,7 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
 
     if (direction === t.Direction.Forwards) {
       const item = this.worktree.getOpt(e.uri) ?? this.worktree.add(e.uri);
-      await item.openTextDocument({ eol: e.eol });
+      await item.openTextDocument({ eol: e.eol, languageId: e.languageId });
     } else {
       await this.worktree.get(e.uri).closeTextDocument();
     }
@@ -85,7 +85,19 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
       await this.worktree.get(e.uri).closeTextDocument();
     } else {
       const item = this.worktree.getOpt(e.uri) ?? this.worktree.add(e.uri);
-      await item.openTextDocument({ eol: e.revEol });
+      await item.openTextDocument({ eol: e.revEol, languageId: e.revLanguageId });
+    }
+  }
+
+  async applyUpdateTextDocumentEvent(e: t.UpdateTextDocumentEvent, direction: t.Direction, uriSet?: t.UriSet) {
+    if (uriSet) uriSet.add(e.uri);
+
+    const textDocument = this.worktree.get(e.uri).textDocument;
+    assert(textDocument);
+    if (direction === t.Direction.Forwards) {
+      textDocument.languageId = e.languageId;
+    } else {
+      textDocument.languageId = e.revLanguageId;
     }
   }
 

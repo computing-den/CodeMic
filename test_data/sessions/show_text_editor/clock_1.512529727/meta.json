@@ -1,0 +1,6 @@
+{
+  "dirtyTextDocuments": [],
+  "openTextEditors": [{ "uri": "workspace:src/inside.txt", "selections": [[0, 0, 0, 0]], "visibleRange": [0, 2] }],
+  "activeTextEditor": "workspace:src/inside.txt",
+  "languageIds": { "workspace:src/inside.txt": "plaintext", "workspace:src/main.c": "c" }
+}

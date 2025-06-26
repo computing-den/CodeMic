@@ -128,7 +128,10 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
 
   async applyOpenTextDocumentEvent(e: t.OpenTextDocumentEvent, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
-      await this.vscWorkspace.openTextDocumentByUri(e.uri, { createFileIfNecessary: true });
+      const vscTextDocument = await this.vscWorkspace.openTextDocumentByUri(e.uri, { createFileIfNecessary: true });
+      if (vscTextDocument.languageId !== e.languageId) {
+        await vscode.languages.setTextDocumentLanguage(vscTextDocument, e.languageId);
+      }
     } else {
       // Cannot close vscode text document directly.
       // We don't want to revert and close a dirty document. The only way vscode,
@@ -152,8 +155,17 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
         await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
       }
     } else {
-      await this.vscWorkspace.openTextDocumentByUri(e.uri, { createFileIfNecessary: true });
+      const vscTextDocument = await this.vscWorkspace.openTextDocumentByUri(e.uri, { createFileIfNecessary: true });
+      if (vscTextDocument.languageId !== e.revLanguageId) {
+        await vscode.languages.setTextDocumentLanguage(vscTextDocument, e.revLanguageId);
+      }
     }
+  }
+
+  async applyUpdateTextDocumentEvent(e: t.UpdateTextDocumentEvent, direction: t.Direction, uriSet?: t.UriSet) {
+    const languageId = direction === t.Direction.Forwards ? e.languageId : e.revLanguageId;
+    let vscTextDocument = await this.vscWorkspace.openTextDocumentByUri(e.uri);
+    vscTextDocument = await vscode.languages.setTextDocumentLanguage(vscTextDocument, languageId);
   }
 
   async applyShowTextEditorEvent(e: t.ShowTextEditorEvent, direction: t.Direction) {

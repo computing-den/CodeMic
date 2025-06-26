@@ -16,7 +16,14 @@
       "clock": 0,
       "file": { "type": "blob", "sha1": "40f2c8a06bfc6607b06f1f63bb1740bbd9b8f118" }
     },
-    { "type": "openTextDocument", "id": 12, "uri": "workspace:hi.txt", "clock": 22.20398835100048, "eol": "\n" },
+    {
+      "type": "openTextDocument",
+      "id": 12,
+      "uri": "workspace:hi.txt",
+      "clock": 22.20398835100048,
+      "eol": "\n",
+      "languageId": "plaintext"
+    },
     {
       "type": "textInsert",
       "id": 13,

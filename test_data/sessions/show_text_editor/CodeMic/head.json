@@ -1,7 +1,7 @@
 {
   "id": "77d35454-0a3a-4a9d-9f36-0a782b853993",
-  "handle": "show_text_editor_no_document",
-  "title": "showTextEditor event without openTextDocument",
+  "handle": "show_text_editor",
+  "title": "showTextEditor event",
   "description": "",
   "author": "sean_shirazi",
   "duration": 1.512529727,

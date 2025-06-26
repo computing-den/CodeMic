@@ -1,5 +1,6 @@
 {
   "dirtyTextDocuments": [],
   "openTextEditors": [{ "uri": "workspace:abc.txt", "selections": [[0, 0, 0, 0]], "visibleRange": [0, 2] }],
-  "activeTextEditor": "workspace:abc.txt"
+  "activeTextEditor": "workspace:abc.txt",
+  "languageIds": { "workspace:abc.txt": "plaintext" }
 }

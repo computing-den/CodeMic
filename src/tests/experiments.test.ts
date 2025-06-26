@@ -16,9 +16,9 @@ import {
 import config from '../extension/config.js';
 import { EditorEvent } from '../lib/types.js';
 
-suite('Experiments', () => {
-  test('Record 1', recordSession1);
-});
+// suite('Experiments', () => {
+test('Record 1', recordSession1);
+// });
 
 async function recordSession1() {}
 

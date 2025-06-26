@@ -554,6 +554,7 @@ export default class SessionCore {
         case 'textChange':
         case 'openTextDocument':
         case 'closeTextDocument':
+        case 'updateTextDocument':
         case 'showTextEditor':
         case 'closeTextEditor':
         case 'select':

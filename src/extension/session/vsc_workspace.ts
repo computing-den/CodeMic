@@ -223,6 +223,7 @@ export default class VscWorkspace {
         uri,
         clock: 0,
         eol: VscWorkspace.eolFromVsc(vscTextDocument.eol),
+        languageId: vscTextDocument.languageId,
       });
 
       if (this.isVscTextDocumentDirty(vscTextDocument)) {
@@ -239,7 +240,7 @@ export default class VscWorkspace {
             throw new Error(`uriFromVsc: unknown scheme: ${vscTextDocument.uri}`);
         }
         const eol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
-        const internalTextDocument = InternalTextDocument.fromText(uri, revText, eol);
+        const internalTextDocument = InternalTextDocument.fromText(uri, revText, eol, vscTextDocument.languageId);
         const irContentChanges: t.ContentChange[] = [
           { range: internalTextDocument.getRange(), text: vscTextDocument.getText() },
         ];
@@ -390,6 +391,17 @@ export default class VscWorkspace {
         }
       }
       await vscode.workspace.applyEdit(edit);
+    }
+
+    // Update languageId of vscode text documents.
+    for (const targetUri of targetUris) {
+      const irTextDocument = worktree.getOpt(targetUri)?.textDocument;
+      let vscTextDocument = this.findVscTextDocumentByUri(targetUri);
+      if (!irTextDocument || !vscTextDocument) continue;
+
+      if (irTextDocument.languageId !== vscTextDocument.languageId) {
+        vscTextDocument = await vscode.languages.setTextDocumentLanguage(vscTextDocument, irTextDocument.languageId);
+      }
     }
 
     // all text editor tabs that are not in internalWorkspace's textEditors should be closed
@@ -743,6 +755,7 @@ export default class VscWorkspace {
       uri,
       _.times(vscTextDocument.lineCount, i => vscTextDocument.lineAt(i).text),
       VscWorkspace.eolFromVsc(vscTextDocument.eol),
+      vscTextDocument.languageId,
     );
   }
 
@@ -934,6 +947,43 @@ export default class VscWorkspace {
     }
     vscOpenTextEditors = _.orderBy(vscOpenTextEditors, 'uri');
 
+    // Text documents languageId
+    let languageIds: Record<string, string> = {};
+    {
+      const vscTextDocuments = relevantVscTextDocuments.map(d => ({
+        languageId: d.languageId,
+        uri: this.uriFromVsc(d.uri),
+      }));
+      const internalTextDocuments = await Promise.all(
+        this.worktree.getTextDocuments().map(async d => ({
+          languageId: d.languageId,
+          uri: d.uri,
+        })),
+      );
+
+      const diffTextDocumentUris: string[] = [];
+      for (const internal of internalTextDocuments) {
+        const vsc = _.find(vscTextDocuments, ['uri', internal.uri]);
+        if (vsc && vsc.languageId !== internal.languageId) {
+          diffTextDocumentUris.push(internal.uri);
+        }
+      }
+
+      if (!_.isEmpty(diffTextDocumentUris)) {
+        const diffInternalTextDocuments = _.filter(internalTextDocuments, ({ uri }) =>
+          _.includes(diffTextDocumentUris, uri),
+        );
+        const diffVscTextDocuments = _.filter(vscTextDocuments, ({ uri }) => _.includes(diffTextDocumentUris, uri));
+        throw new Error(
+          `Internal and VSCode text documents have different language IDs:\n` +
+            `internal documents diff: ${JSON.stringify(diffInternalTextDocuments, null, 2)}\n` +
+            `vscode documents diff: ${JSON.stringify(diffVscTextDocuments, null, 2)}\n`,
+        );
+      }
+
+      languageIds = Object.fromEntries(vscTextDocuments.concat(internalTextDocuments).map(x => [x.uri, x.languageId]));
+    }
+
     // Assert that internal and vscode text editors are the same.
     let internalOpenTextEditors: t.TestMetaTextEditor[] = this.worktree.getTextEditors().map(textEditor => ({
       uri: textEditor.uri,
@@ -965,6 +1015,7 @@ export default class VscWorkspace {
         originalActiveTextEditor && this.shouldRecordVscUri(originalActiveTextEditor.document.uri)
           ? this.uriFromVsc(originalActiveTextEditor.document.uri)
           : undefined,
+      languageIds,
     };
     await storage.writeJSON(path.resolve(testClockPath, 'meta.json'), serializeTestMeta(meta));
   }

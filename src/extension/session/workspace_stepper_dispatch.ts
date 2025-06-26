@@ -19,6 +19,8 @@ export default function workspaceStepperDispatch(
       return stepper.applyOpenTextDocumentEvent(e, direction, uriSet);
     case 'closeTextDocument':
       return stepper.applyCloseTextDocumentEvent(e, direction, uriSet);
+    case 'updateTextDocument':
+      return stepper.applyUpdateTextDocumentEvent(e, direction, uriSet);
     case 'showTextEditor':
       return stepper.applyShowTextEditorEvent(e, direction, uriSet);
     case 'closeTextEditor':

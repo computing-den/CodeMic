@@ -104,16 +104,13 @@ export default class SessionEditor {
   }
 
   /**
-   * Must not update clock of event.
+   * Must not change clock of event.
    */
-  updateEventAt(update: Partial<t.EditorEvent>, at: number) {
+  setEventAt(newEvent: t.EditorEvent, at: number) {
     assert(this.session.isLoaded());
-    assert(!('clock' in update));
-
-    const e = this.session.body.editorEvents[at];
+    const e = this.session.body.editorEvents.at(at);
     assert(e);
-
-    const newEvent = { ...e, ...update } as t.EditorEvent;
+    assert(e.clock === newEvent.clock);
     if (_.isEqual(e, newEvent)) return;
 
     this.insertApplySessionPatch(
@@ -123,6 +120,16 @@ export default class SessionEditor {
       },
       { coalescing: true },
     );
+  }
+
+  /**
+   * Must not update clock of event.
+   */
+  updateEventAt(update: Partial<t.EditorEvent>, at: number) {
+    assert(this.session.isLoaded());
+    const e = this.session.body.editorEvents.at(at);
+    assert(e);
+    this.setEventAt({ ...e, ...update } as t.EditorEvent, at);
   }
 
   setFocus(focus: t.Focus, isDocumentEmpty: boolean) {
@@ -483,11 +490,12 @@ export default class SessionEditor {
   private insertSessionSnapshot(snapshot: t.SessionSnapshot, opts?: { coalescing?: boolean }) {
     assert(this.session.isLoaded());
     if (!opts?.coalescing || this.sessionSnapshotIndex === -1) {
+      // Insert new snapshot.
       this.sessionSnapshotIndex++;
       this.sessionSnapshots.length = this.sessionSnapshotIndex;
       this.sessionSnapshots.push(snapshot);
     } else {
-      // Merge snapshots.
+      // Merge with last snapshot.
       this.sessionSnapshots.length = this.sessionSnapshotIndex + 1;
       const old = this.sessionSnapshots[this.sessionSnapshotIndex];
       const effects = old.effects.concat(snapshot.effects);

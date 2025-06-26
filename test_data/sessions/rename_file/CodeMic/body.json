@@ -1,37 +1,77 @@
 {
   "full": true,
   "editorEvents": [
-    {"type": "fsCreate", "id": 1, "uri": "workspace:abc.txt", "clock": 0, "file": {"type": "blob", "sha1": "c5085600a9399124476fd9553fe4a812491b5209"}},
-    {"type": "fsCreate", "id": 2, "uri": "workspace:adir", "clock": 0, "file": {"type": "dir"}},
-    {"type": "fsCreate", "id": 3, "uri": "workspace:adir/stuff.txt", "clock": 0, "file": {"type": "blob", "sha1": "40f2c8a06bfc6607b06f1f63bb1740bbd9b8f118"}},
-    {"type": "openTextDocument", "id": 4, "uri": "workspace:abc.txt", "clock": 0, "eol": "\n"},
+    {
+      "type": "fsCreate",
+      "id": 1,
+      "uri": "workspace:abc.txt",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "c5085600a9399124476fd9553fe4a812491b5209" }
+    },
+    { "type": "fsCreate", "id": 2, "uri": "workspace:adir", "clock": 0, "file": { "type": "dir" } },
+    {
+      "type": "fsCreate",
+      "id": 3,
+      "uri": "workspace:adir/stuff.txt",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "40f2c8a06bfc6607b06f1f63bb1740bbd9b8f118" }
+    },
+    {
+      "type": "openTextDocument",
+      "id": 4,
+      "uri": "workspace:abc.txt",
+      "clock": 0,
+      "eol": "\n",
+      "languageId": "plaintext"
+    },
     {
       "type": "showTextEditor",
       "id": 5,
       "uri": "workspace:abc.txt",
       "clock": 0,
-      "selections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}],
-      "visibleRange": {"start": 0, "end": 2},
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 2 },
       "justOpened": true
     },
-    {"type": "closeTextDocument", "id": 6, "uri": "workspace:abc.txt", "clock": 5.9762733930000005, "revEol": "\n"},
+    {
+      "type": "closeTextDocument",
+      "id": 6,
+      "uri": "workspace:abc.txt",
+      "clock": 5.9762733930000005,
+      "revEol": "\n",
+      "revLanguageId": "plaintext"
+    },
     {
       "type": "closeTextEditor",
       "id": 7,
       "uri": "workspace:abc.txt",
       "clock": 5.9762733930000005,
       "active": true,
-      "revSelections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}],
-      "revVisibleRange": {"start": 0, "end": 2}
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "revVisibleRange": { "start": 0, "end": 2 }
     },
-    {"type": "openTextDocument", "id": 8, "uri": "workspace:def.txt", "clock": 5.9762733930000005, "eol": "\n"},
+    {
+      "type": "openTextDocument",
+      "id": 8,
+      "uri": "workspace:def.txt",
+      "clock": 5.9762733930000005,
+      "eol": "\n",
+      "languageId": "plaintext"
+    },
     {
       "type": "textChange",
       "id": 9,
       "uri": "workspace:def.txt",
       "clock": 5.9762733930000005,
-      "contentChanges": [{"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}}, "text": "hi there\nMy friends...\n"}],
-      "revContentChanges": [{"range": {"start": {"line": 0, "character": 0}, "end": {"line": 2, "character": 0}}, "text": ""}],
+      "contentChanges": [
+        {
+          "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 0 } },
+          "text": "hi there\nMy friends...\n"
+        }
+      ],
+      "revContentChanges": [
+        { "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 2, "character": 0 } }, "text": "" }
+      ],
       "updateSelection": false
     },
     {
@@ -39,15 +79,30 @@
       "id": 10,
       "uri": "workspace:def.txt",
       "clock": 5.9762733930000005,
-      "selections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}],
-      "visibleRange": {"start": 0, "end": 2},
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 2 },
       "justOpened": true
     },
-    {"type": "fsCreate", "id": 11, "uri": "workspace:def.txt", "clock": 6.076982077999999, "file": {"type": "blob", "sha1": "c5085600a9399124476fd9553fe4a812491b5209"}},
-    {"type": "fsDelete", "id": 12, "uri": "workspace:abc.txt", "clock": 6.076982077999999, "revFile": {"type": "blob", "sha1": "c5085600a9399124476fd9553fe4a812491b5209"}}
+    {
+      "type": "fsCreate",
+      "id": 11,
+      "uri": "workspace:def.txt",
+      "clock": 6.076982077999999,
+      "file": { "type": "blob", "sha1": "c5085600a9399124476fd9553fe4a812491b5209" }
+    },
+    {
+      "type": "fsDelete",
+      "id": 12,
+      "uri": "workspace:abc.txt",
+      "clock": 6.076982077999999,
+      "revFile": { "type": "blob", "sha1": "c5085600a9399124476fd9553fe4a812491b5209" }
+    }
   ],
   "audioTracks": [],
   "videoTracks": [],
-  "focusTimeline": [{"clock": 0, "uri": "workspace:abc.txt", "number": 0, "text": "hi there"}, {"clock": 5.9762733930000005, "uri": "workspace:def.txt", "number": 0, "text": "hi there"}],
+  "focusTimeline": [
+    { "clock": 0, "uri": "workspace:abc.txt", "number": 0, "text": "hi there" },
+    { "clock": 5.9762733930000005, "uri": "workspace:def.txt", "number": 0, "text": "hi there" }
+  ],
   "defaultEol": "\n"
 }
