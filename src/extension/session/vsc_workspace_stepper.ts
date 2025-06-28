@@ -1,15 +1,3 @@
-/**
- * Issues with vscode.workspace.applyEdit() for the textChange event:
- * 1. applyEdit() will open the text editor when editing a single file
- *   (and maybe multiple files?). Which is a problem when reversing the following
- *   events generated after saving an untitled document to a file:
- *   openTextDocument -> textInsert -> showTextEditor.
- *   So, when reversing the openTextDocument, we check again if there's a text editor
- *   and close it.
- * 2. applyEdit() doesn't open the text editor immediately. It takes a while even
- *   though we await it. Possible report: https://github.com/microsoft/vscode/issues/187396
- */
-
 import * as t from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
@@ -33,15 +21,25 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
   ) {}
 
   async applyEditorEvent(e: t.EditorEvent, direction: t.Direction) {
-    if (config.logVscWorkspaceStepper) {
-      console.log(
-        `applyEditorEvent ${e.type} ${direction === 0 ? 'forward' : 'backward'} to ${
-          e.uri
-        }. Before current tabs: ${this.vscWorkspace.getRelevantTabUris()}`,
-      );
-    }
-
+    await this.logBeforeAfterStep(e, direction, true);
     await workspaceStepperDispatch(this, e, direction);
+    await this.logBeforeAfterStep(e, direction, false);
+  }
+
+  private async logBeforeAfterStep(e: t.EditorEvent, direction: t.Direction, before: boolean) {
+    if (!config.logVscWorkspaceStepper) return;
+
+    // const data = before
+    //   ? '-'
+    //   : await this.vscWorkspace.deferRestoreTextEditorByVscUri(async () => {
+    //       const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri('workspace:src/main.c');
+    //       return JSON.stringify(VscWorkspace.fromVscSelection(vscTextEditor.selection));
+    //     });
+    const data = '-';
+
+    const prefix = before ? 'applyEditorEvent' : '----------------';
+    const line = `${prefix} ${direction === 0 ? '->' : '<-'} ${e.id} ${e.type} to ${e.uri}`;
+    console.log(`${line}: ${data}`);
   }
 
   async applySeekStep(step: SeekStep, direction: t.Direction) {
@@ -51,51 +49,22 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
 
   async applyFsCreateEvent(e: t.FsCreateEvent, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
-      await this.session.core.writeFile(e.uri, e.file);
-
-      // Sometimes, fsCreate comes after openTextDocument.
-      const vscTextDocument = this.vscWorkspace.findVscTextDocumentByUri(e.uri);
-      if (vscTextDocument) {
-        await this.vscWorkspace.revertVscTextDocument(vscTextDocument);
-      }
+      await this.writeUnderlyingFileWithoutChangingDocument(e.uri, e.file);
     } else {
       await fs.promises.rm(URI.parse(this.session.core.resolveUri(e.uri)).fsPath);
     }
   }
 
   async applyFsChangeEvent(e: t.FsChangeEvent, direction: t.Direction) {
-    const vscTextDocument = this.vscWorkspace.findVscTextDocumentByUri(e.uri);
     const file = direction === t.Direction.Forwards ? e.file : e.revFile;
-    const originalText = vscTextDocument?.getText();
-
-    // Writing the file may automatically revert the document in vscode if it wasn't dirty.
-    await this.session.core.writeFile(e.uri, file);
-
-    // We revert the document so that vscode won't later warn about the file having
-    // been changed when we try to save the file.
-    //
-    // Then, if the text in the document was different from what's now in the
-    // file, we restore that text.
-    if (vscTextDocument) {
-      await this.vscWorkspace.revertVscTextDocument(vscTextDocument);
-      const textInFile = await this.session.core.readFile(file, 'utf8');
-      if (originalText !== textInFile) {
-        await this.vscWorkspace.deferRestoreTextEditorByVscUri(async () => {
-          const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument);
-          const success = await vscTextEditor.edit(builder => {
-            builder.replace(this.vscWorkspace.getVscTextDocumentVscRange(vscTextDocument), originalText!);
-          });
-          assert(success, 'vscode text editor edit failed');
-        });
-      }
-    }
+    await this.writeUnderlyingFileWithoutChangingDocument(e.uri, file);
   }
 
   async applyFsDeleteEvent(e: t.FsDeleteEvent, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
       await fs.promises.rm(URI.parse(this.session.core.resolveUri(e.uri)).fsPath);
     } else {
-      await this.session.core.writeFile(e.uri, e.revFile);
+      await this.writeUnderlyingFileWithoutChangingDocument(e.uri, e.revFile);
     }
   }
 
@@ -135,32 +104,62 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
       if (vscTextDocument.languageId !== e.languageId) {
         await vscode.languages.setTextDocumentLanguage(vscTextDocument, e.languageId);
       }
+
+      // If we have these events:
+      // + openTextDocument (for a workspace uri that doesn't exist yet)
+      // + textChange
+      // + showTextEditor
+      // + fsCreate
+      // Then if we sync back to clock 0, the file will be deleted and the text editor
+      // will be closed, but the vscode text document may stay there.
+      // Then later when we try to step through the same events, we open the text document
+      // with the old content instead of empty. There is no way to close a vscode text document
+      // directly.
+      // So here we must make sure that the content always matches the internal document.
+      const item = this.internalWorkspace.worktree.get(e.uri);
+      const text = await item.getContentText();
+      if (text !== vscTextDocument.getText()) {
+        await this.vscWorkspace.deferRestoreTextEditorByVscUri(async () => {
+          await this.replaceTextDocumentContent(vscTextDocument, text);
+        });
+      }
     } else {
+      await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
+
       // Cannot close vscode text document directly.
       // We don't want to revert and close a dirty document. The only way vscode,
       // issues a closeTextDocument on a dirty document is when switching language ID.
-      // Also, see top of the file for explanation.
-      const item = this.internalWorkspace.worktree.getOpt(e.uri);
-      if (!(await item?.isDirty())) {
-        await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
-      }
+      // const item = this.internalWorkspace.worktree.getOpt(e.uri);
+      // if (!(await item?.isDirty())) {
+      //   await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
+      // }
     }
   }
 
   async applyCloseTextDocumentEvent(e: t.CloseTextDocumentEvent, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
-      // Cannot close vscode text document directly.
-      // We don't want to revert and close a dirty document. The only way vscode,
-      // issues a closeTextDocument on a dirty document is when switching language ID.
-      // Also, see top of the file for explanation.
-      const item = this.internalWorkspace.worktree.getOpt(e.uri);
-      if (!(await item?.isDirty())) {
-        await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
-      }
+      await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
+
+      // // Cannot close vscode text document directly.
+      // // We don't want to revert and close a dirty document. The only way vscode,
+      // // issues a closeTextDocument on a dirty document is when switching language ID.
+      // const item = this.internalWorkspace.worktree.getOpt(e.uri);
+      // if (!(await item?.isDirty())) {
+      //   await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
+      // }
     } else {
       const vscTextDocument = await this.vscWorkspace.openTextDocumentByUri(e.uri, { createFileIfNecessary: true });
       if (vscTextDocument.languageId !== e.revLanguageId) {
         await vscode.languages.setTextDocumentLanguage(vscTextDocument, e.revLanguageId);
+      }
+
+      // Set content from internal.
+      const item = this.internalWorkspace.worktree.get(e.uri);
+      const text = await item.getContentText();
+      if (text !== vscTextDocument.getText()) {
+        await this.vscWorkspace.deferRestoreTextEditorByVscUri(async () => {
+          await this.replaceTextDocumentContent(vscTextDocument, text);
+        });
       }
     }
   }
@@ -236,7 +235,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
 
         // If this showTextEditor event was to open e.uri for the first time,
         // close it.
-        if (e.justOpened || !e.revUri) {
+        if (e.justOpened) {
           // console.log(
           //   `vsc stepper: reversing applyShowTextEditor, trying to close: ${e.uri} because ${
           //     e.justOpened ? 'was just opened' : 'there is no revUri'
@@ -301,6 +300,37 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
 
   async applyTextInsertEvent(e: t.TextInsertEvent, direction: t.Direction) {
     await this.applyTextChangeEvent(lib.getTextChangeEventFromTextInsertEvent(e), direction);
+  }
+
+  private async writeUnderlyingFileWithoutChangingDocument(uri: string, file: t.File) {
+    const vscTextDocument = this.vscWorkspace.findVscTextDocumentByUri(uri);
+    const originalText = vscTextDocument?.getText();
+
+    // Writing the file may automatically revert the document in vscode if it wasn't dirty.
+    await this.session.core.writeFile(uri, file);
+
+    // We revert the document so that vscode won't later warn about the file having
+    // been changed when we try to save the file.
+    //
+    // Then, if the text in the document was different from what's now in the
+    // file, we restore that text.
+    if (vscTextDocument) {
+      await this.vscWorkspace.deferRestoreTextEditorByVscUri(async () => {
+        await this.vscWorkspace.revertVscTextDocument(vscTextDocument);
+        const textInFile = await this.session.core.readFile(file, 'utf8');
+        if (originalText !== textInFile) {
+          await this.replaceTextDocumentContent(vscTextDocument, originalText!);
+        }
+      });
+    }
+  }
+
+  private async replaceTextDocumentContent(vscTextDocument: vscode.TextDocument, text: string) {
+    const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument);
+    const success = await vscTextEditor.edit(builder => {
+      builder.replace(this.vscWorkspace.getVscTextDocumentVscRange(vscTextDocument), text);
+    });
+    assert(success, 'vscode text editor edit failed');
   }
 }
 

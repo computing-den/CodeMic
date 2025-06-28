@@ -203,11 +203,11 @@ export default class VscWorkspace {
     //   events.push({ type: 'fsCreate', id: lib.nextId(), uri, clock: 0, file: { type: 'empty' } });
     // }
 
-    // Walk through text documents and create openTextDocument events.
+    // Walk through open text documents create openTextDocument events.
     // If document is dirty, insert text change event as well.
     // Ignore files outside workspace or with schemes other than untitled or file.
     // Ignore deleted files.
-    for (const vscTextDocument of vscode.workspace.textDocuments) {
+    for (const vscTextDocument of _.orderBy(vscode.workspace.textDocuments, d => d.uri.toString())) {
       if (!this.shouldRecordVscUri(vscTextDocument.uri)) continue;
 
       // If file is deleted but the text editor is still there, ignore it.
@@ -261,7 +261,7 @@ export default class VscWorkspace {
     // Walk through open tabs and create showTextEditor events.
     // Ignore anything for which we don't have an openTextDocument event.
     const originalActiveTextEditor = vscode.window.activeTextEditor;
-    for (const vscUri of this.getRelevantTabVscUris()) {
+    for (const vscUri of _.orderBy(this.getRelevantTabVscUris())) {
       const uri = this.uriFromVsc(vscUri);
 
       // Ignore if we don't have an openTextDocument event.
@@ -401,6 +401,7 @@ export default class VscWorkspace {
 
       if (irTextDocument.languageId !== vscTextDocument.languageId) {
         vscTextDocument = await vscode.languages.setTextDocumentLanguage(vscTextDocument, irTextDocument.languageId);
+        // assert(vscTextDocument.languageId === irTextDocument.languageId);
       }
     }
 
@@ -505,6 +506,16 @@ export default class VscWorkspace {
   /**
    * Restore active text editor after awaiting cb() unless the active text
    * editor has the same uri as exception.
+   *
+   * Issues with vscode.workspace.applyEdit():
+   * 1. applyEdit() will open the text editor when editing a single file
+   *   (and maybe multiple files?). Which is a problem when reversing the following
+   *   events generated after saving an untitled document to a file:
+   *   openTextDocument -> textInsert -> showTextEditor.
+   *   So, when reversing the openTextDocument, we check again if there's a text editor
+   *   and close it.
+   * 2. applyEdit() doesn't open the text editor immediately. It takes a while even
+   *   though we await it. Possible bug report: https://github.com/microsoft/vscode/issues/187396
    */
   async deferRestoreTextEditorByVscUri<T>(cb: () => T, opts?: { exception?: vscode.Uri }): Promise<T> {
     // Remember the current ative text editor to restore later.

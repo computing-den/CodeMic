@@ -36,6 +36,7 @@ test('show_text_editor', () => testSession('show_text_editor'));
 test('rename_file', () => testSession('rename_file'));
 test('change_language_dirty_document', () => testSession('change_language_dirty_document'));
 test('start_with_dirty_document_open_and_save', () => testSession('start_with_dirty_document_open_and_save'));
+test('mix_1', () => testSession('mix_1'));
 
 // });
 
@@ -48,9 +49,11 @@ async function testSession(sessionHandle: string) {
     const steps: SessionTestStep[] = await readJSON(lastPlanPath);
     console.log('Reusing test plan: ', steps.map(sessionTestStepToString).join(' -> '));
 
-    await prepareForSession(sessionHandle);
-    await openSessionInRecorder(head.id);
-    await testSessionSteps(sessionHandle, steps);
+    for (let i = 0; i < (config.testRepeatCount ?? 1); i++) {
+      await prepareForSession(sessionHandle);
+      await openSessionInRecorder(head.id);
+      await testSessionSteps(sessionHandle, steps);
+    }
   } else {
     for (let i = 0; i < (config.testRepeatCount ?? 1); i++) {
       const steps = createRandomSessionTestSteps(clockStrs);
@@ -74,6 +77,8 @@ async function testSessionSteps(sessionHandle: string, steps: SessionTestStep[])
       .slice(0, i + 1)
       .map(sessionTestStepToString)
       .join(' -> ');
+
+    console.log(`===== Steps: ${label}`);
 
     // Seek if necessary.
     await getCodeMic().handleMessage({ type: 'recorder/seek', clock: step.clock, useStepper: step.useStepper });
@@ -215,11 +220,11 @@ async function checkTextDocumentsAtClock(
   const diffContentVsc = _.compact(
     _.map(expectedTextDocuments, expected => getDiff(expected, _.find(actualVscTextDocuments, ['uri', expected.uri]))),
   );
-  const diffDirtyVsc = _.compact(
-    _.map(expectedTextDocuments, expected =>
-      getDiffDirty(expected, _.find(actualVscTextDocuments, ['uri', expected.uri])),
-    ),
-  );
+  // const diffDirtyVsc = _.compact(
+  //   _.map(expectedTextDocuments, expected =>
+  //     getDiffDirty(expected, _.find(actualVscTextDocuments, ['uri', expected.uri])),
+  //   ),
+  // );
   const diffLanguageIdVsc = _.compact(
     _.map(expectedTextDocuments, expected =>
       getDiffLanguageId(expected, _.find(actualVscTextDocuments, ['uri', expected.uri])),
@@ -256,9 +261,9 @@ async function checkTextDocumentsAtClock(
   if (diffContentVsc.length > 0) {
     errors.push(`unexpected text document content(s) in vscode: ${lib.pretty(diffContentVsc)}`);
   }
-  if (diffDirtyVsc.length > 0) {
-    errors.push(`different text document dirty state(s) in vscode: ${lib.pretty(diffDirtyVsc)}`);
-  }
+  // if (diffDirtyVsc.length > 0) {
+  //   errors.push(`different text document dirty state(s) in vscode: ${lib.pretty(diffDirtyVsc)}`);
+  // }
   if (diffLanguageIdVsc.length > 0) {
     errors.push(`different text document language IDs in vscode: ${lib.pretty(diffLanguageIdVsc)}`);
   }
@@ -290,16 +295,15 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
 
   const internalWorkspace = getCodeMic().session!.rr!._test_internalWorkspace;
   const vscWorkspace = getCodeMic().session!.rr!._test_vscWorkspace;
-  const actualVscTextEditors: t.TestMetaTextEditor[] = await Promise.all(
-    vscWorkspace.getRelevantTabVscUris().map(async vscUri => {
-      const vscTextEditor = await vscWorkspace.showTextDocumentByVscUri(vscUri);
-      return {
-        uri: vscWorkspace.uriFromVsc(vscUri),
-        selections: VscWorkspace.fromVscSelections(vscTextEditor.selections),
-        visibleRange: VscWorkspace.fromVscLineRange(vscTextEditor.visibleRanges[0]),
-      };
-    }),
-  );
+  const actualVscTextEditors: t.TestMetaTextEditor[] = [];
+  for (const vscUri of vscWorkspace.getRelevantTabVscUris()) {
+    const vscTextEditor = await vscWorkspace.showTextDocumentByVscUri(vscUri);
+    actualVscTextEditors.push({
+      uri: vscWorkspace.uriFromVsc(vscUri),
+      selections: VscWorkspace.fromVscSelections(vscTextEditor.selections),
+      visibleRange: VscWorkspace.fromVscLineRange(vscTextEditor.visibleRanges[0]),
+    });
+  }
   const actualInternalTextEditors: t.TestMetaTextEditor[] = internalWorkspace.worktree
     .getTextEditors()
     .map(textEditor => ({

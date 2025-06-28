@@ -33,7 +33,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
     this.bus = new b.Bus(this.postParcel.bind(this), this.handleMessage.bind(this));
     this.view = webviewView;
 
-    console.log('resolveWebviewView localResourceRoots', this.extension.extensionUri);
+    // console.log('resolveWebviewView localResourceRoots', this.extension.extensionUri);
 
     // NOTE: Reassigning webview options causes the webview page to refresh!
     // Also, cannot mutate localResourceRoots directly. Must reassign options.
@@ -51,7 +51,7 @@ class WebviewProvider implements vscode.WebviewViewProvider {
       ],
     };
 
-    console.log('resolveWebviewView options: ', webviewView.webview.options);
+    // console.log('resolveWebviewView options: ', webviewView.webview.options);
 
     webviewView.webview.html = this.getHtmlForWebview();
     webviewView.webview.onDidReceiveMessage(this.bus.handleParcel.bind(this.bus));

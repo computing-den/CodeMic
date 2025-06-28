@@ -433,20 +433,16 @@ class WorkspaceRecorder {
 
     // In VSCode, changing language is modeled as a close followed by an open text document.
     // So, if the document was just closed, update the close event to a language change.
-    // This is not strictly necessary, but it makes the replay simpler and may avoid
-    // an extra textChange event if the document was dirty at the time of closing.
     const lastEventIndex = this.session.body.editorEvents.length - 1;
     const lastEvent = this.session.body.editorEvents.at(lastEventIndex);
-    if (
-      irItem.closedDirtyTextDocument &&
-      irItem.closedDirtyTextDocument.languageId !== vscTextDocument.languageId &&
-      lastEvent?.uri === uri &&
-      lastEvent.type === 'closeTextDocument' &&
-      lastEvent.clock > this.clock - 1
-    ) {
-      irItem.restoreClosedDirtyDocument();
+    if (lastEvent?.uri === uri && lastEvent.type === 'closeTextDocument') {
+      if (irItem.closedDirtyTextDocument) {
+        irItem.restoreClosedDirtyDocument();
+      } else {
+        const eol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
+        await irItem.openTextDocument({ eol, languageId: vscTextDocument.languageId });
+      }
       assert(irItem.textDocument);
-      const revLanguageId = irItem.textDocument.languageId;
       irItem.textDocument.languageId = vscTextDocument.languageId;
       const e: t.UpdateTextDocumentEvent = {
         type: 'updateTextDocument',
@@ -454,7 +450,7 @@ class WorkspaceRecorder {
         uri: lastEvent.uri,
         clock: lastEvent.clock,
         languageId: vscTextDocument.languageId,
-        revLanguageId,
+        revLanguageId: lastEvent.revLanguageId,
       };
       this.session.editor.setEventAt(e, lastEventIndex);
     }
@@ -521,12 +517,19 @@ class WorkspaceRecorder {
     const revEol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
     await this.worktree.get(uri).closeTextDocument();
 
+    let revText: string | undefined;
+    const item = this.worktree.get(uri);
+    if (await item.isDirty()) {
+      revText = await item.getContentText();
+    }
+
     this.insertEvent(
       {
         type: 'closeTextDocument',
         id: lib.nextId(),
         uri,
         clock: this.clock,
+        revText,
         revEol,
         revLanguageId: vscTextDocument.languageId,
       },

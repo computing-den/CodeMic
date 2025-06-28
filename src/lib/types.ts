@@ -560,6 +560,7 @@ export type TextChangeEvent = {
   contentChanges: ContentChange[];
   revContentChanges: ContentChange[];
   updateSelection: boolean;
+  // wasDirty: boolean;
 };
 
 export type OpenTextDocumentEvent = {
@@ -578,7 +579,7 @@ export type CloseTextDocumentEvent = {
   id: number;
   uri: string;
   clock: number;
-  // revText: string;
+  revText?: string;
   revEol: EndOfLine;
   revLanguageId: string;
 };
@@ -659,6 +660,7 @@ export type TextInsertEvent = {
   text: string;
   revRange: Range; // range.start is the position before text insert, while range.end is the position after text insert
   updateSelection: boolean;
+  // wasDirty: boolean;
 };
 
 export type EditorEventCompact =
@@ -690,6 +692,7 @@ export type TextChangeEventCompact = {
   cc: ContentChangeCompact[];
   rcc: ContentChangeCompact[];
   us?: boolean; // undefined defaults to true
+  // w?: boolean; // undefined defaults to true
 };
 
 export type OpenTextDocumentEventCompact = {
@@ -706,7 +709,7 @@ export type CloseTextDocumentEventCompact = {
   t: 3;
   u: number;
   c: number;
-  // rt: string;
+  rt?: string;
   re: EndOfLine;
   rl: string;
 };
@@ -765,6 +768,7 @@ export type TextInsertEventCompact = {
   x: string;
   r: RangeCompact;
   us?: boolean; // undefined defaults to true
+  // w?: boolean; // undefined defaults to true
 };
 
 export type FsChangeEventCompact = {

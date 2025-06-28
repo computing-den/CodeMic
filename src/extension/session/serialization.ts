@@ -42,6 +42,7 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         cc: e.contentChanges.map(serializeContentChange),
         rcc: e.revContentChanges.map(serializeContentChange),
         us: e.updateSelection ? undefined : false,
+        // w: e.wasDirty ? undefined : false,
       };
     case 'openTextDocument':
       return {
@@ -57,7 +58,7 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         t: 3,
         u: uriMap.get(e.uri)!,
         c: serializeClock(e.clock),
-        // rt: e.revText,
+        rt: e.revText,
         re: e.revEol,
         rl: e.revLanguageId,
       };
@@ -119,6 +120,7 @@ function serializeEditorEvent(e: t.EditorEvent, uriMap: UriMap): t.EditorEventCo
         x: e.text,
         r: serializeRange(e.revRange),
         us: e.updateSelection ? undefined : false,
+        // w: e.wasDirty ? undefined : false,
       };
     case 'fsChange':
       return {
@@ -248,6 +250,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         contentChanges: e.cc.map(deserializeContentChange),
         revContentChanges: e.rcc.map(deserializeContentChange),
         updateSelection: e.us ?? true,
+        // wasDirty: e.w ?? true,
       };
     case 2:
       return {
@@ -264,7 +267,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         id: nextId(),
         uri: uris[e.u],
         clock: deserializeClock(e.c),
-        // revText: e.rt,
+        revText: e.rt,
         revEol: e.re,
         revLanguageId: e.rl,
       };
@@ -328,6 +331,7 @@ function deserializeEditorEvent(e: t.EditorEventCompact, uris: string[]): t.Edit
         text: e.x,
         revRange: deserializeRange(e.r),
         updateSelection: e.us ?? true,
+        // wasDirty: e.w ?? true,
       };
     case 10:
       return {
@@ -379,6 +383,7 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         contentChanges: e.cc.map(deserializeContentChange),
         revContentChanges: e.rcc.map(deserializeContentChange),
         updateSelection: e.u ?? true,
+        // wasDirty: true,
       };
     case 2:
       return {
@@ -395,7 +400,7 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         id: nextId(),
         uri,
         clock: deserializeClock(e.c),
-        // revText: e.rt,
+        revText: e.rt,
         revEol: e.re,
         revLanguageId: getLangaugeIdFromUri(uri),
       };
@@ -461,6 +466,7 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         text: e.x,
         revRange: deserializeRange(e.r),
         updateSelection: e.u ?? true,
+        // wasDirty: true,
       };
   }
 }

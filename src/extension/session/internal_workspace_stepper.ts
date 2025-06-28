@@ -85,7 +85,10 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
       await this.worktree.get(e.uri).closeTextDocument();
     } else {
       const item = this.worktree.getOpt(e.uri) ?? this.worktree.add(e.uri);
-      await item.openTextDocument({ eol: e.revEol, languageId: e.revLanguageId });
+      const textDocument = await item.openTextDocument({ eol: e.revEol, languageId: e.revLanguageId });
+      if (e.revText !== undefined) {
+        textDocument.applyContentChanges([{ range: textDocument.getRange(), text: e.revText }], false);
+      }
     }
   }
 

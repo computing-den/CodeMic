@@ -1,0 +1,1134 @@
+{
+  "full": true,
+  "editorEvents": [
+    {
+      "type": "fsCreate",
+      "id": 1,
+      "uri": "workspace:README.txt",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "c2d38c73bb59ed15790b19661bf31a53b5e856b9" }
+    },
+    { "type": "fsCreate", "id": 2, "uri": "workspace:src", "clock": 0, "file": { "type": "dir" } },
+    { "type": "fsCreate", "id": 3, "uri": "workspace:src/dir_a", "clock": 0, "file": { "type": "dir" } },
+    {
+      "type": "fsCreate",
+      "id": 4,
+      "uri": "workspace:src/inside.txt",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "be004e9e66d027a2b2a89c091c0f9633c77f2ee0" }
+    },
+    {
+      "type": "fsCreate",
+      "id": 5,
+      "uri": "workspace:src/main.c",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "c3d880f1ad32e1ff90bb87a79c56efa553c66023" }
+    },
+    {
+      "type": "openTextDocument",
+      "id": 6,
+      "uri": "workspace:src/inside.txt",
+      "clock": 0,
+      "eol": "\n",
+      "languageId": "plaintext"
+    },
+    {
+      "type": "openTextDocument",
+      "id": 7,
+      "uri": "workspace:src/main.c",
+      "clock": 0,
+      "eol": "\n",
+      "languageId": "plaintext"
+    },
+    {
+      "type": "showTextEditor",
+      "id": 8,
+      "uri": "workspace:src/main.c",
+      "clock": 0,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 5 },
+      "justOpened": true
+    },
+    {
+      "type": "showTextEditor",
+      "id": 9,
+      "uri": "workspace:src/inside.txt",
+      "clock": 0,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 2 },
+      "justOpened": true
+    },
+    {
+      "type": "select",
+      "id": 10,
+      "uri": "workspace:src/inside.txt",
+      "clock": 1.5197141149999955,
+      "selections": [{ "anchor": { "line": 2, "character": 0 }, "active": { "line": 2, "character": 0 } }],
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }]
+    },
+    {
+      "type": "textInsert",
+      "id": 11,
+      "uri": "workspace:src/inside.txt",
+      "clock": 2.7371951139999875,
+      "revRange": { "start": { "line": 2, "character": 0 }, "end": { "line": 2, "character": 1 } },
+      "text": "H",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 12,
+      "uri": "workspace:src/inside.txt",
+      "clock": 2.9404976750000063,
+      "revRange": { "start": { "line": 2, "character": 1 }, "end": { "line": 2, "character": 2 } },
+      "text": "e",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 13,
+      "uri": "workspace:src/inside.txt",
+      "clock": 3.143036883000008,
+      "revRange": { "start": { "line": 2, "character": 2 }, "end": { "line": 2, "character": 3 } },
+      "text": "l",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 14,
+      "uri": "workspace:src/inside.txt",
+      "clock": 3.243592334000001,
+      "revRange": { "start": { "line": 2, "character": 3 }, "end": { "line": 2, "character": 4 } },
+      "text": "l",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 15,
+      "uri": "workspace:src/inside.txt",
+      "clock": 3.4471597110000007,
+      "revRange": { "start": { "line": 2, "character": 4 }, "end": { "line": 2, "character": 5 } },
+      "text": "o",
+      "updateSelection": true
+    },
+    {
+      "type": "showTextEditor",
+      "id": 16,
+      "uri": "workspace:src/main.c",
+      "clock": 5.676708190999998,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 5 },
+      "justOpened": false,
+      "revUri": "workspace:src/inside.txt",
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "revVisibleRange": { "start": 0, "end": 5 }
+    },
+    {
+      "type": "updateTextDocument",
+      "id": 17,
+      "uri": "workspace:src/main.c",
+      "clock": 10.947397444999995,
+      "languageId": "c",
+      "revLanguageId": "plaintext"
+    },
+    {
+      "type": "select",
+      "id": 19,
+      "uri": "workspace:src/main.c",
+      "clock": 13.076955548999994,
+      "selections": [{ "anchor": { "line": 3, "character": 13 }, "active": { "line": 3, "character": 13 } }],
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }]
+    },
+    {
+      "type": "select",
+      "id": 20,
+      "uri": "workspace:src/main.c",
+      "clock": 15.101686120000018,
+      "selections": [{ "anchor": { "line": 2, "character": 12 }, "active": { "line": 2, "character": 12 } }],
+      "revSelections": [{ "anchor": { "line": 3, "character": 13 }, "active": { "line": 3, "character": 13 } }]
+    },
+    {
+      "type": "textInsert",
+      "id": 21,
+      "uri": "workspace:src/main.c",
+      "clock": 16.013125653999992,
+      "revRange": { "start": { "line": 2, "character": 12 }, "end": { "line": 3, "character": 4 } },
+      "text": "\n    ",
+      "updateSelection": false
+    },
+    {
+      "type": "scroll",
+      "id": 22,
+      "uri": "workspace:src/main.c",
+      "clock": 16.013125653999992,
+      "visibleRange": { "start": 0, "end": 6 },
+      "revVisibleRange": { "start": 0, "end": 5 }
+    },
+    {
+      "type": "select",
+      "id": 23,
+      "uri": "workspace:src/main.c",
+      "clock": 16.013125653999992,
+      "selections": [{ "anchor": { "line": 3, "character": 4 }, "active": { "line": 3, "character": 4 } }],
+      "revSelections": [{ "anchor": { "line": 2, "character": 12 }, "active": { "line": 2, "character": 12 } }]
+    },
+    {
+      "type": "textInsert",
+      "id": 24,
+      "uri": "workspace:src/main.c",
+      "clock": 18.140449589999996,
+      "revRange": { "start": { "line": 3, "character": 4 }, "end": { "line": 3, "character": 5 } },
+      "text": "p",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 25,
+      "uri": "workspace:src/main.c",
+      "clock": 18.241545428000006,
+      "revRange": { "start": { "line": 3, "character": 5 }, "end": { "line": 3, "character": 6 } },
+      "text": "r",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 26,
+      "uri": "workspace:src/main.c",
+      "clock": 18.34297644600001,
+      "revRange": { "start": { "line": 3, "character": 6 }, "end": { "line": 3, "character": 7 } },
+      "text": "i",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 27,
+      "uri": "workspace:src/main.c",
+      "clock": 18.444551434000015,
+      "revRange": { "start": { "line": 3, "character": 7 }, "end": { "line": 3, "character": 8 } },
+      "text": "n",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 28,
+      "uri": "workspace:src/main.c",
+      "clock": 18.648612709000002,
+      "revRange": { "start": { "line": 3, "character": 8 }, "end": { "line": 3, "character": 9 } },
+      "text": "t",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 29,
+      "uri": "workspace:src/main.c",
+      "clock": 18.852104503000003,
+      "revRange": { "start": { "line": 3, "character": 9 }, "end": { "line": 3, "character": 10 } },
+      "text": "f",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 30,
+      "uri": "workspace:src/main.c",
+      "clock": 19.255824707000016,
+      "revRange": { "start": { "line": 3, "character": 10 }, "end": { "line": 3, "character": 12 } },
+      "text": "()",
+      "updateSelection": false
+    },
+    {
+      "type": "select",
+      "id": 31,
+      "uri": "workspace:src/main.c",
+      "clock": 19.255824707000016,
+      "selections": [{ "anchor": { "line": 3, "character": 11 }, "active": { "line": 3, "character": 11 } }],
+      "revSelections": [{ "anchor": { "line": 3, "character": 10 }, "active": { "line": 3, "character": 10 } }]
+    },
+    {
+      "type": "textChange",
+      "id": 32,
+      "uri": "workspace:src/main.c",
+      "clock": 19.357022684000018,
+      "contentChanges": [
+        { "text": ")", "range": { "start": { "line": 3, "character": 11 }, "end": { "line": 3, "character": 12 } } }
+      ],
+      "revContentChanges": [
+        { "range": { "start": { "line": 3, "character": 11 }, "end": { "line": 3, "character": 12 } }, "text": ")" }
+      ],
+      "updateSelection": false
+    },
+    {
+      "type": "select",
+      "id": 33,
+      "uri": "workspace:src/main.c",
+      "clock": 19.357022684000018,
+      "selections": [{ "anchor": { "line": 3, "character": 12 }, "active": { "line": 3, "character": 12 } }],
+      "revSelections": [{ "anchor": { "line": 3, "character": 11 }, "active": { "line": 3, "character": 11 } }]
+    },
+    {
+      "type": "select",
+      "id": 34,
+      "uri": "workspace:src/main.c",
+      "clock": 20.470334445000006,
+      "selections": [{ "anchor": { "line": 3, "character": 11 }, "active": { "line": 3, "character": 11 } }],
+      "revSelections": [{ "anchor": { "line": 3, "character": 12 }, "active": { "line": 3, "character": 12 } }]
+    },
+    {
+      "type": "textInsert",
+      "id": 35,
+      "uri": "workspace:src/main.c",
+      "clock": 21.079154201000023,
+      "revRange": { "start": { "line": 3, "character": 11 }, "end": { "line": 3, "character": 13 } },
+      "text": "\"\"",
+      "updateSelection": false
+    },
+    {
+      "type": "select",
+      "id": 36,
+      "uri": "workspace:src/main.c",
+      "clock": 21.079154201000023,
+      "selections": [{ "anchor": { "line": 3, "character": 12 }, "active": { "line": 3, "character": 12 } }],
+      "revSelections": [{ "anchor": { "line": 3, "character": 11 }, "active": { "line": 3, "character": 11 } }]
+    },
+    {
+      "type": "textInsert",
+      "id": 37,
+      "uri": "workspace:src/main.c",
+      "clock": 25.023985983000017,
+      "revRange": { "start": { "line": 3, "character": 12 }, "end": { "line": 3, "character": 13 } },
+      "text": "H",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 38,
+      "uri": "workspace:src/main.c",
+      "clock": 25.226386536,
+      "revRange": { "start": { "line": 3, "character": 13 }, "end": { "line": 3, "character": 14 } },
+      "text": "e",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 39,
+      "uri": "workspace:src/main.c",
+      "clock": 25.632113199000006,
+      "revRange": { "start": { "line": 3, "character": 14 }, "end": { "line": 3, "character": 15 } },
+      "text": "l",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 40,
+      "uri": "workspace:src/main.c",
+      "clock": 25.835119123000002,
+      "revRange": { "start": { "line": 3, "character": 15 }, "end": { "line": 3, "character": 16 } },
+      "text": "l",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 41,
+      "uri": "workspace:src/main.c",
+      "clock": 26.037484290000013,
+      "revRange": { "start": { "line": 3, "character": 16 }, "end": { "line": 3, "character": 17 } },
+      "text": "o",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 42,
+      "uri": "workspace:src/main.c",
+      "clock": 26.239879856,
+      "revRange": { "start": { "line": 3, "character": 17 }, "end": { "line": 3, "character": 18 } },
+      "text": " ",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 43,
+      "uri": "workspace:src/main.c",
+      "clock": 26.44323223000001,
+      "revRange": { "start": { "line": 3, "character": 18 }, "end": { "line": 3, "character": 19 } },
+      "text": "w",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 44,
+      "uri": "workspace:src/main.c",
+      "clock": 26.544300073000006,
+      "revRange": { "start": { "line": 3, "character": 19 }, "end": { "line": 3, "character": 20 } },
+      "text": "o",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 45,
+      "uri": "workspace:src/main.c",
+      "clock": 26.644708105000014,
+      "revRange": { "start": { "line": 3, "character": 20 }, "end": { "line": 3, "character": 21 } },
+      "text": "r",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 46,
+      "uri": "workspace:src/main.c",
+      "clock": 26.74556448399999,
+      "revRange": { "start": { "line": 3, "character": 21 }, "end": { "line": 3, "character": 22 } },
+      "text": "l",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 47,
+      "uri": "workspace:src/main.c",
+      "clock": 26.949064119000003,
+      "revRange": { "start": { "line": 3, "character": 22 }, "end": { "line": 3, "character": 23 } },
+      "text": "d",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 48,
+      "uri": "workspace:src/main.c",
+      "clock": 27.454769214000017,
+      "revRange": { "start": { "line": 3, "character": 23 }, "end": { "line": 3, "character": 24 } },
+      "text": " ",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 49,
+      "uri": "workspace:src/main.c",
+      "clock": 27.757747250000005,
+      "revRange": { "start": { "line": 3, "character": 24 }, "end": { "line": 3, "character": 25 } },
+      "text": "%",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 50,
+      "uri": "workspace:src/main.c",
+      "clock": 28.268693145000018,
+      "revRange": { "start": { "line": 3, "character": 25 }, "end": { "line": 3, "character": 26 } },
+      "text": "s",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 51,
+      "uri": "workspace:src/main.c",
+      "clock": 29.990125693,
+      "revRange": { "start": { "line": 3, "character": 26 }, "end": { "line": 3, "character": 27 } },
+      "text": "\\",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 52,
+      "uri": "workspace:src/main.c",
+      "clock": 30.293552543999994,
+      "revRange": { "start": { "line": 3, "character": 27 }, "end": { "line": 3, "character": 28 } },
+      "text": "n",
+      "updateSelection": true
+    },
+    {
+      "type": "textChange",
+      "id": 53,
+      "uri": "workspace:src/main.c",
+      "clock": 31.005180643000017,
+      "contentChanges": [
+        { "text": "\"", "range": { "start": { "line": 3, "character": 28 }, "end": { "line": 3, "character": 29 } } }
+      ],
+      "revContentChanges": [
+        { "range": { "start": { "line": 3, "character": 28 }, "end": { "line": 3, "character": 29 } }, "text": "\"" }
+      ],
+      "updateSelection": false
+    },
+    {
+      "type": "select",
+      "id": 54,
+      "uri": "workspace:src/main.c",
+      "clock": 31.005180643000017,
+      "selections": [{ "anchor": { "line": 3, "character": 29 }, "active": { "line": 3, "character": 29 } }],
+      "revSelections": [{ "anchor": { "line": 3, "character": 28 }, "active": { "line": 3, "character": 28 } }]
+    },
+    {
+      "type": "textInsert",
+      "id": 55,
+      "uri": "workspace:src/main.c",
+      "clock": 31.72019193099999,
+      "revRange": { "start": { "line": 3, "character": 29 }, "end": { "line": 3, "character": 30 } },
+      "text": ",",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 56,
+      "uri": "workspace:src/main.c",
+      "clock": 32.32714016299998,
+      "revRange": { "start": { "line": 3, "character": 30 }, "end": { "line": 3, "character": 31 } },
+      "text": " ",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 57,
+      "uri": "workspace:src/main.c",
+      "clock": 34.85687047199999,
+      "revRange": { "start": { "line": 3, "character": 31 }, "end": { "line": 3, "character": 33 } },
+      "text": "\"\"",
+      "updateSelection": false
+    },
+    {
+      "type": "select",
+      "id": 58,
+      "uri": "workspace:src/main.c",
+      "clock": 34.85687047199999,
+      "selections": [{ "anchor": { "line": 3, "character": 32 }, "active": { "line": 3, "character": 32 } }],
+      "revSelections": [{ "anchor": { "line": 3, "character": 31 }, "active": { "line": 3, "character": 31 } }]
+    },
+    {
+      "type": "textInsert",
+      "id": 59,
+      "uri": "workspace:src/main.c",
+      "clock": 36.072182385000005,
+      "revRange": { "start": { "line": 3, "character": 32 }, "end": { "line": 3, "character": 33 } },
+      "text": "!",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 60,
+      "uri": "workspace:src/main.c",
+      "clock": 36.274687586,
+      "revRange": { "start": { "line": 3, "character": 33 }, "end": { "line": 3, "character": 34 } },
+      "text": "!",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 61,
+      "uri": "workspace:src/main.c",
+      "clock": 36.37623142700001,
+      "revRange": { "start": { "line": 3, "character": 34 }, "end": { "line": 3, "character": 35 } },
+      "text": "!",
+      "updateSelection": true
+    },
+    {
+      "type": "textChange",
+      "id": 62,
+      "uri": "workspace:src/main.c",
+      "clock": 38.09787600999999,
+      "contentChanges": [
+        { "text": "\"", "range": { "start": { "line": 3, "character": 35 }, "end": { "line": 3, "character": 36 } } }
+      ],
+      "revContentChanges": [
+        { "range": { "start": { "line": 3, "character": 35 }, "end": { "line": 3, "character": 36 } }, "text": "\"" }
+      ],
+      "updateSelection": false
+    },
+    {
+      "type": "select",
+      "id": 63,
+      "uri": "workspace:src/main.c",
+      "clock": 38.09787600999999,
+      "selections": [{ "anchor": { "line": 3, "character": 36 }, "active": { "line": 3, "character": 36 } }],
+      "revSelections": [{ "anchor": { "line": 3, "character": 35 }, "active": { "line": 3, "character": 35 } }]
+    },
+    {
+      "type": "textInsert",
+      "id": 64,
+      "uri": "workspace:src/main.c",
+      "clock": 38.299936432,
+      "revRange": { "start": { "line": 3, "character": 36 }, "end": { "line": 3, "character": 37 } },
+      "text": ")",
+      "updateSelection": true
+    },
+    {
+      "type": "textChange",
+      "id": 65,
+      "uri": "workspace:src/main.c",
+      "clock": 40.628630334000015,
+      "contentChanges": [
+        { "text": "", "range": { "start": { "line": 3, "character": 37 }, "end": { "line": 3, "character": 38 } } }
+      ],
+      "revContentChanges": [
+        { "range": { "start": { "line": 3, "character": 37 }, "end": { "line": 3, "character": 37 } }, "text": ")" }
+      ],
+      "updateSelection": false
+    },
+    {
+      "type": "textInsert",
+      "id": 66,
+      "uri": "workspace:src/main.c",
+      "clock": 41.33588845000002,
+      "revRange": { "start": { "line": 3, "character": 37 }, "end": { "line": 3, "character": 38 } },
+      "text": ";",
+      "updateSelection": true
+    },
+    {
+      "type": "fsChange",
+      "id": 67,
+      "uri": "workspace:src/main.c",
+      "clock": 43.966597781000004,
+      "file": { "type": "blob", "sha1": "ae11cd95738021b8cad4fbea021863e7195ad571" },
+      "revFile": { "type": "blob", "sha1": "c3d880f1ad32e1ff90bb87a79c56efa553c66023" }
+    },
+    {
+      "type": "openTextDocument",
+      "id": 68,
+      "uri": "workspace:src/dir_a/myperl.perl",
+      "clock": 70.00252679900007,
+      "eol": "\n",
+      "languageId": "plaintext"
+    },
+    {
+      "type": "showTextEditor",
+      "id": 69,
+      "uri": "workspace:src/dir_a/myperl.perl",
+      "clock": 70.00252679900007,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 0 },
+      "justOpened": true,
+      "revUri": "workspace:src/main.c"
+    },
+    {
+      "type": "fsCreate",
+      "id": 70,
+      "uri": "workspace:src/dir_a/myperl.perl",
+      "clock": 70.10755880900007,
+      "file": { "type": "blob", "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
+    },
+    {
+      "type": "closeTextDocument",
+      "id": 71,
+      "uri": "workspace:src/dir_a/myperl.perl",
+      "clock": 104.97853030800003,
+      "revEol": "\n",
+      "revLanguageId": "plaintext"
+    },
+    {
+      "type": "closeTextEditor",
+      "id": 72,
+      "uri": "workspace:src/dir_a/myperl.perl",
+      "clock": 104.97853030800003,
+      "active": true,
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "revVisibleRange": { "start": 0, "end": 0 }
+    },
+    {
+      "type": "showTextEditor",
+      "id": 73,
+      "uri": "workspace:src/main.c",
+      "clock": 104.97853030800003,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 6 },
+      "justOpened": false,
+      "revSelections": [{ "anchor": { "line": 3, "character": 38 }, "active": { "line": 3, "character": 38 } }],
+      "revVisibleRange": { "start": 0, "end": 6 }
+    },
+    {
+      "type": "select",
+      "id": 74,
+      "uri": "workspace:src/main.c",
+      "clock": 104.97853030800003,
+      "selections": [{ "anchor": { "line": 3, "character": 38 }, "active": { "line": 3, "character": 38 } }],
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }]
+    },
+    {
+      "type": "fsDelete",
+      "id": 75,
+      "uri": "workspace:src/dir_a/myperl.perl",
+      "clock": 105.07970349600002,
+      "revFile": { "type": "blob", "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
+    },
+    {
+      "type": "openTextDocument",
+      "id": 76,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 135.271521803,
+      "eol": "\n",
+      "languageId": "perl"
+    },
+    {
+      "type": "showTextEditor",
+      "id": 77,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 135.271521803,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 0 },
+      "justOpened": true,
+      "revUri": "workspace:src/main.c"
+    },
+    {
+      "type": "fsCreate",
+      "id": 78,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 135.271521803,
+      "file": { "type": "blob", "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
+    },
+    {
+      "type": "textInsert",
+      "id": 79,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 138.83477198000003,
+      "revRange": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 1 } },
+      "text": "m",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 80,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 139.03754393000006,
+      "revRange": { "start": { "line": 0, "character": 1 }, "end": { "line": 0, "character": 2 } },
+      "text": "y",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 81,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 139.13917789700005,
+      "revRange": { "start": { "line": 0, "character": 2 }, "end": { "line": 0, "character": 3 } },
+      "text": " ",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 82,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 139.44310246800003,
+      "revRange": { "start": { "line": 0, "character": 3 }, "end": { "line": 0, "character": 4 } },
+      "text": "x",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 83,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 139.84949724300006,
+      "revRange": { "start": { "line": 0, "character": 4 }, "end": { "line": 0, "character": 5 } },
+      "text": " ",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 84,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 140.05091683600008,
+      "revRange": { "start": { "line": 0, "character": 5 }, "end": { "line": 0, "character": 6 } },
+      "text": "=",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 85,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 140.15218606000008,
+      "revRange": { "start": { "line": 0, "character": 6 }, "end": { "line": 0, "character": 7 } },
+      "text": " ",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 86,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 140.45566976700013,
+      "revRange": { "start": { "line": 0, "character": 7 }, "end": { "line": 0, "character": 8 } },
+      "text": "5",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 87,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 140.96110918300013,
+      "revRange": { "start": { "line": 0, "character": 8 }, "end": { "line": 0, "character": 9 } },
+      "text": ";",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 88,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 142.07297922200013,
+      "revRange": { "start": { "line": 0, "character": 9 }, "end": { "line": 1, "character": 0 } },
+      "text": "\n",
+      "updateSelection": false
+    },
+    {
+      "type": "scroll",
+      "id": 89,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 142.07297922200013,
+      "visibleRange": { "start": 0, "end": 1 },
+      "revVisibleRange": { "start": 0, "end": 0 }
+    },
+    {
+      "type": "select",
+      "id": 90,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 142.07297922200013,
+      "selections": [{ "anchor": { "line": 1, "character": 0 }, "active": { "line": 1, "character": 0 } }],
+      "revSelections": [{ "anchor": { "line": 0, "character": 9 }, "active": { "line": 0, "character": 9 } }]
+    },
+    {
+      "type": "textInsert",
+      "id": 91,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 142.47749788100015,
+      "revRange": { "start": { "line": 1, "character": 0 }, "end": { "line": 1, "character": 1 } },
+      "text": "s",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 92,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 142.57831787300015,
+      "revRange": { "start": { "line": 1, "character": 1 }, "end": { "line": 1, "character": 2 } },
+      "text": "a",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 93,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 142.7841505440001,
+      "revRange": { "start": { "line": 1, "character": 2 }, "end": { "line": 1, "character": 3 } },
+      "text": "y",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 94,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 143.29027053600007,
+      "revRange": { "start": { "line": 1, "character": 3 }, "end": { "line": 1, "character": 4 } },
+      "text": " ",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 95,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 144.60407018800007,
+      "revRange": { "start": { "line": 1, "character": 4 }, "end": { "line": 1, "character": 6 } },
+      "text": "\"\"",
+      "updateSelection": false
+    },
+    {
+      "type": "select",
+      "id": 96,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 144.60407018800007,
+      "selections": [{ "anchor": { "line": 1, "character": 5 }, "active": { "line": 1, "character": 5 } }],
+      "revSelections": [{ "anchor": { "line": 1, "character": 4 }, "active": { "line": 1, "character": 4 } }]
+    },
+    {
+      "type": "textInsert",
+      "id": 97,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 144.90663548200007,
+      "revRange": { "start": { "line": 1, "character": 5 }, "end": { "line": 1, "character": 6 } },
+      "text": "s",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 98,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 145.00840567900002,
+      "revRange": { "start": { "line": 1, "character": 6 }, "end": { "line": 1, "character": 7 } },
+      "text": "o",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 99,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 145.21026165300003,
+      "revRange": { "start": { "line": 1, "character": 7 }, "end": { "line": 1, "character": 8 } },
+      "text": "m",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 100,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 145.31094988000004,
+      "revRange": { "start": { "line": 1, "character": 8 }, "end": { "line": 1, "character": 9 } },
+      "text": "e",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 101,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 145.51303590500007,
+      "revRange": { "start": { "line": 1, "character": 9 }, "end": { "line": 1, "character": 10 } },
+      "text": "t",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 102,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 145.51303590500007,
+      "revRange": { "start": { "line": 1, "character": 10 }, "end": { "line": 1, "character": 11 } },
+      "text": "h",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 103,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 145.51303590500007,
+      "revRange": { "start": { "line": 1, "character": 11 }, "end": { "line": 1, "character": 12 } },
+      "text": "i",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 104,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 145.71509949800006,
+      "revRange": { "start": { "line": 1, "character": 12 }, "end": { "line": 1, "character": 13 } },
+      "text": "n",
+      "updateSelection": true
+    },
+    {
+      "type": "textInsert",
+      "id": 105,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 146.22128747200006,
+      "revRange": { "start": { "line": 1, "character": 13 }, "end": { "line": 1, "character": 14 } },
+      "text": "g",
+      "updateSelection": true
+    },
+    {
+      "type": "textChange",
+      "id": 106,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 146.72844306000005,
+      "contentChanges": [
+        { "text": "\"", "range": { "start": { "line": 1, "character": 14 }, "end": { "line": 1, "character": 15 } } }
+      ],
+      "revContentChanges": [
+        { "range": { "start": { "line": 1, "character": 14 }, "end": { "line": 1, "character": 15 } }, "text": "\"" }
+      ],
+      "updateSelection": false
+    },
+    {
+      "type": "select",
+      "id": 107,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 146.72844306000005,
+      "selections": [{ "anchor": { "line": 1, "character": 15 }, "active": { "line": 1, "character": 15 } }],
+      "revSelections": [{ "anchor": { "line": 1, "character": 14 }, "active": { "line": 1, "character": 14 } }]
+    },
+    {
+      "type": "textInsert",
+      "id": 108,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 147.84071572499997,
+      "revRange": { "start": { "line": 1, "character": 15 }, "end": { "line": 1, "character": 16 } },
+      "text": ";",
+      "updateSelection": true
+    },
+    {
+      "type": "closeTextDocument",
+      "id": 109,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 166.66463269700014,
+      "revText": "my x = 5;\nsay \"something\";",
+      "revEol": "\n",
+      "revLanguageId": "perl"
+    },
+    {
+      "type": "closeTextEditor",
+      "id": 110,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 166.66463269700014,
+      "active": true,
+      "revSelections": [{ "anchor": { "line": 1, "character": 16 }, "active": { "line": 1, "character": 16 } }],
+      "revVisibleRange": { "start": 0, "end": 1 }
+    },
+    {
+      "type": "openTextDocument",
+      "id": 111,
+      "uri": "workspace:src/perl.pl",
+      "clock": 166.66463269700014,
+      "eol": "\n",
+      "languageId": "perl"
+    },
+    {
+      "type": "textChange",
+      "id": 112,
+      "uri": "workspace:src/perl.pl",
+      "clock": 166.66463269700014,
+      "contentChanges": [
+        {
+          "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 0 } },
+          "text": "my x = 5;\nsay \"something\";"
+        }
+      ],
+      "revContentChanges": [
+        { "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 1, "character": 16 } }, "text": "" }
+      ],
+      "updateSelection": false
+    },
+    {
+      "type": "showTextEditor",
+      "id": 113,
+      "uri": "workspace:src/perl.pl",
+      "clock": 166.66463269700014,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 1 },
+      "justOpened": true
+    },
+    {
+      "type": "select",
+      "id": 114,
+      "uri": "workspace:src/perl.pl",
+      "clock": 166.66463269700014,
+      "selections": [{ "anchor": { "line": 1, "character": 16 }, "active": { "line": 1, "character": 16 } }],
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }]
+    },
+    {
+      "type": "fsCreate",
+      "id": 115,
+      "uri": "workspace:src/perl.pl",
+      "clock": 166.66463269700014,
+      "file": { "type": "blob", "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
+    },
+    {
+      "type": "fsDelete",
+      "id": 116,
+      "uri": "workspace:src/dir_a/perl.pl",
+      "clock": 166.66463269700014,
+      "revFile": { "type": "blob", "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
+    },
+    {
+      "type": "textChange",
+      "id": 117,
+      "uri": "workspace:src/perl.pl",
+      "clock": 234.0835595169999,
+      "contentChanges": [
+        { "text": "", "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 1, "character": 16 } } }
+      ],
+      "revContentChanges": [
+        {
+          "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 0 } },
+          "text": "my x = 5;\nsay \"something\";"
+        }
+      ],
+      "updateSelection": false
+    },
+    {
+      "type": "select",
+      "id": 118,
+      "uri": "workspace:src/perl.pl",
+      "clock": 234.0835595169999,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "revSelections": [{ "anchor": { "line": 1, "character": 16 }, "active": { "line": 1, "character": 16 } }]
+    },
+    {
+      "type": "scroll",
+      "id": 119,
+      "uri": "workspace:src/perl.pl",
+      "clock": 234.0835595169999,
+      "visibleRange": { "start": 0, "end": 0 },
+      "revVisibleRange": { "start": 0, "end": 1 }
+    },
+    {
+      "type": "closeTextEditor",
+      "id": 120,
+      "uri": "workspace:src/perl.pl",
+      "clock": 234.0835595169999,
+      "active": true,
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "revVisibleRange": { "start": 0, "end": 0 }
+    },
+    {
+      "type": "closeTextDocument",
+      "id": 121,
+      "uri": "workspace:src/perl.pl",
+      "clock": 234.0835595169999,
+      "revEol": "\n",
+      "revLanguageId": "perl"
+    },
+    {
+      "type": "showTextEditor",
+      "id": 122,
+      "uri": "workspace:src/main.c",
+      "clock": 234.0835595169999,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 6 },
+      "justOpened": false,
+      "revSelections": [{ "anchor": { "line": 3, "character": 38 }, "active": { "line": 3, "character": 38 } }],
+      "revVisibleRange": { "start": 0, "end": 6 }
+    },
+    {
+      "type": "select",
+      "id": 123,
+      "uri": "workspace:src/main.c",
+      "clock": 234.0835595169999,
+      "selections": [{ "anchor": { "line": 3, "character": 38 }, "active": { "line": 3, "character": 38 } }],
+      "revSelections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }]
+    },
+    {
+      "type": "openTextDocument",
+      "id": 124,
+      "uri": "workspace:src/perl.pl",
+      "clock": 240.78385727699987,
+      "eol": "\n",
+      "languageId": "perl"
+    },
+    {
+      "type": "showTextEditor",
+      "id": 125,
+      "uri": "workspace:src/perl.pl",
+      "clock": 240.78385727699987,
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 0 },
+      "justOpened": true,
+      "revUri": "workspace:src/main.c"
+    }
+  ],
+  "audioTracks": [],
+  "videoTracks": [],
+  "focusTimeline": [
+    { "clock": 0, "uri": "workspace:src/inside.txt", "number": 0, "text": "Inside text" },
+    { "clock": 1.5197141149999955, "uri": "workspace:src/inside.txt", "number": 2, "text": "Hello" },
+    { "clock": 5.676708190999998, "uri": "workspace:src/main.c", "number": 0, "text": "#include <stdio.h>" },
+    { "clock": 13.076955548999994, "uri": "workspace:src/main.c", "number": 3, "text": "    return 0;" },
+    {
+      "clock": 15.101686120000018,
+      "uri": "workspace:src/main.c",
+      "number": 3,
+      "text": "    printf(\"Hello world %s\\n\", \"!!!\");"
+    },
+    { "clock": 70.00252679900007, "uri": "workspace:src/dir_a/myperl.perl", "number": 0, "text": "" },
+    {
+      "clock": 104.97853030800003,
+      "uri": "workspace:src/main.c",
+      "number": 3,
+      "text": "    printf(\"Hello world %s\\n\", \"!!!\");"
+    },
+    { "clock": 135.271521803, "uri": "workspace:src/dir_a/perl.pl", "number": 0, "text": "my x = 5;" },
+    { "clock": 142.07297922200013, "uri": "workspace:src/dir_a/perl.pl", "number": 1, "text": "say \"something\";" },
+    { "clock": 166.66463269700014, "uri": "workspace:src/perl.pl", "number": 1, "text": "" },
+    {
+      "clock": 234.0835595169999,
+      "uri": "workspace:src/main.c",
+      "number": 3,
+      "text": "    printf(\"Hello world %s\\n\", \"!!!\");"
+    },
+    { "clock": 240.78385727699987, "uri": "workspace:src/perl.pl", "number": 0, "text": "" }
+  ],
+  "defaultEol": "\n"
+}
