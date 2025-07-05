@@ -551,3 +551,18 @@ export async function tryCatch<T>(promise: Promise<T>): Promise<[null, T] | [Err
 export function pretty(value: any): string {
   return JSON.stringify(value, null, 2);
 }
+
+export function getLangaugeIdFromUri(uri: string): string {
+  if (uri.endsWith('.js')) return 'javascript';
+  if (uri.endsWith('.jsx')) return 'javascriptreact';
+  if (uri.endsWith('.ts')) return 'typescript';
+  if (uri.endsWith('.tsx')) return 'typescriptreact';
+  if (uri.endsWith('.json')) return 'json';
+  if (uri.endsWith('.css')) return 'css';
+  if (uri.endsWith('.html')) return 'html';
+  if (uri.endsWith('.md')) return 'markdown';
+  if (uri.endsWith('.c')) return 'c';
+  if (uri.endsWith('.py')) return 'python';
+
+  return 'plaintext';
+}

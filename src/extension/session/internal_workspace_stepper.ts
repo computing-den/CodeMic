@@ -109,19 +109,37 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     // In v2, revSelection and revVisibleRange refer to the uri editor while the selection
     // and the visible range of the revUri remain untouched.
     // recorderVersion: undefined means latest version.
+    //
+    // In v1, showTextEditor is not necessarily preceded by an openTextDocument.
+    // In v2, the recorder makes sure that showTextEditor is preceded by an openTextDocument.
 
     if (e.recorderVersion === 1) {
       if (direction === t.Direction.Forwards) {
         if (uriSet) uriSet.add(e.uri);
 
         const item = this.worktree.get(e.uri);
+        if (!item.textDocument) {
+          await item.openTextDocument({
+            eol: this.session.body.defaultEol,
+            languageId: lib.getLangaugeIdFromUri(e.uri),
+          });
+        }
         await item.openTextEditor({ selections: e.selections, visibleRange: e.visibleRange });
         this.worktree.activeTextEditorUri = e.uri;
-      } else if (e.revUri) {
-        if (uriSet) uriSet.add(e.revUri);
-        const item = this.worktree.get(e.revUri);
-        await item.openTextEditor({ selections: e.revSelections, visibleRange: e.revVisibleRange });
-        this.worktree.activeTextEditorUri = e.revUri;
+      } else {
+        if (e.revUri) {
+          if (uriSet) uriSet.add(e.revUri);
+          const item = this.worktree.get(e.revUri);
+          await item.openTextEditor({ selections: e.revSelections, visibleRange: e.revVisibleRange });
+          this.worktree.activeTextEditorUri = e.revUri;
+        }
+
+        // If this showTextEditor event was to open e.uri for the first time,
+        // close it.
+        if (e.justOpened) {
+          if (uriSet) uriSet.add(e.uri);
+          this.worktree.get(e.uri).closeTextEditor();
+        }
       }
     } else {
       if (direction === t.Direction.Forwards) {

@@ -1,5 +1,5 @@
 import * as t from '../../lib/types.js';
-import { nextId } from '../../lib/lib.js';
+import { nextId, getLangaugeIdFromUri } from '../../lib/lib.js';
 import _ from 'lodash';
 import config from '../config.js';
 
@@ -210,6 +210,64 @@ export function deserializeSessionBody(body: any, formatVersion: number): t.Sess
 export function deserializeSessionBodyV1(body: t.BodyFormatV1.SessionBodyCompact): t.SessionBody {
   let editorEvents = _.flatMap(body.editorTracks, (t, uri) => _.map(t, e => deserializeEditorEventV1(e, uri)));
   editorEvents = _.orderBy(editorEvents, 'clock');
+
+  // Since v1 didn't support file system events, we had a lot of openTextDocument
+  // for untitled documents that were then immediately saved to file.
+  // They were always openTextDocument->showTextEditor->closeTextEditor.
+  // Remove them.
+  const untitledRegex = /^untitled:Untitled-\d+$/;
+  for (let i = 0; i < editorEvents.length - 2; ) {
+    const [a, b, c] = [editorEvents[i], editorEvents[i + 1], editorEvents[i + 2]];
+    if (
+      a.type === 'openTextDocument' &&
+      untitledRegex.test(a.uri) &&
+      b.type === 'showTextEditor' &&
+      b.uri === a.uri &&
+      c.type === 'closeTextEditor' &&
+      c.uri === a.uri
+    ) {
+      editorEvents.splice(i, 3);
+    } else {
+      i++;
+    }
+  }
+
+  // When creating a new file, we have an openTextDocument with isInWorktree: false.
+  // Turn those into fsCreate with blank file if scheme is file.
+  for (let i = 0; i < editorEvents.length; ) {
+    const a = editorEvents[i];
+    if (
+      a.type === 'openTextDocument' &&
+      !untitledRegex.test(a.uri) &&
+      a._isInWorktree === false &&
+      !editorEvents.slice(0, i).some(b => a.uri === b.uri && b.type === 'fsCreate')
+    ) {
+      const fsCreate: t.EditorEvent = {
+        type: 'fsCreate',
+        id: nextId(),
+        uri: a.uri,
+        clock: a.clock,
+        file: { type: 'blank' },
+      };
+      editorEvents.splice(i, 0, fsCreate);
+      i += 2;
+    } else {
+      i++;
+    }
+  }
+
+  // Set showTextEditor.justOpened to true if there's no showTextEditor for that uri
+  // before it.
+  for (let i = 0; i < editorEvents.length; i++) {
+    const a = editorEvents[i];
+    if (
+      a.type === 'showTextEditor' &&
+      !editorEvents.slice(0, i).some(b => a.uri === b.uri && b.type === 'showTextEditor')
+    ) {
+      a.justOpened = true;
+    }
+  }
+
   return {
     editorEvents,
     audioTracks: body.audioTracks.map(deserializeAudioTrackV1),
@@ -393,6 +451,7 @@ function deserializeEditorEventV1(e: t.BodyFormatV1.EditorEventCompact, uri: str
         clock: deserializeClock(e.c),
         eol: e.e,
         languageId: getLangaugeIdFromUri(uri),
+        _isInWorktree: e.i,
       };
     case 3:
       return {
@@ -543,19 +602,4 @@ export function deserializeTestMeta(compact: t.TestMetaCompact): t.TestMeta {
     activeTextEditor: compact.activeTextEditor,
     languageIds: compact.languageIds,
   };
-}
-
-function getLangaugeIdFromUri(uri: string): string {
-  if (uri.endsWith('.js')) return 'javascript';
-  if (uri.endsWith('.jsx')) return 'javascriptreact';
-  if (uri.endsWith('.ts')) return 'typescript';
-  if (uri.endsWith('.tsx')) return 'typescriptreact';
-  if (uri.endsWith('.json')) return 'json';
-  if (uri.endsWith('.css')) return 'css';
-  if (uri.endsWith('.html')) return 'html';
-  if (uri.endsWith('.md')) return 'markdown';
-  if (uri.endsWith('.c')) return 'c';
-  if (uri.endsWith('.py')) return 'python';
-
-  return 'plaintext';
 }

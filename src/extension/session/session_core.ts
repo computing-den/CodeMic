@@ -348,7 +348,10 @@ export default class SessionCore {
       await this.download({ skipIfExists: true, progress: options.progress, abortController: options.abortController });
     }
     const compact = await storage.readJSON<any>(path.join(this.dataPath, 'body.json'));
-    return deserializeSessionBody(compact, this.session.head.formatVersion);
+    const body = deserializeSessionBody(compact, this.session.head.formatVersion);
+    // deserializer converts to the latest format.
+    this.session.head.formatVersion = SessionCore.LATEST_FORMAT_VERSION;
+    return body;
   }
 
   async bodyExists() {
@@ -419,9 +422,9 @@ export default class SessionCore {
       case 'blob':
         content = await this.readBlob(file.sha1);
         break;
-      // case 'empty':
-      //   content = new Uint8Array();
-      //   break;
+      case 'blank':
+        content = new Uint8Array();
+        break;
       default:
         throw new Error(`file type "${file.type}" not supported`);
     }
@@ -438,11 +441,10 @@ export default class SessionCore {
       case 'blob':
         await this.copyBlobTo(file.sha1, fsPath);
         break;
-      // case 'empty':
-      //   if (scheme === 'file') {
-      //     await storage.writeString(fsPath, '');
-      //   }
-      //   break;
+      case 'blank':
+        assert(scheme === 'workspace');
+        await storage.writeString(fsPath, '');
+        break;
       default:
         throw new Error(`writeFile unknown type ${file.type}`);
     }

@@ -9,7 +9,7 @@ import _ from 'lodash';
 import { LoadedSession } from './session.js';
 import VscWorkspace from './vsc_workspace.js';
 import { URI } from 'vscode-uri';
-import { pathExists } from '../storage.js';
+import * as storage from '../storage.js';
 import config from '../config.js';
 import InternalWorkspace from './internal_workspace.js';
 
@@ -180,6 +180,9 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     // In v2, revSelection and revVisibleRange refer to the uri editor while the selection
     // and the visible range of the revUri remain untouched.
     // recorderVersion: undefined means latest version.
+    //
+    // In v1, showTextEditor is not necessarily preceded by an openTextDocument.
+    // In v2, the recorder makes sure that showTextEditor is preceded by an openTextDocument.
 
     if (e.recorderVersion === 1) {
       if (direction === t.Direction.Forwards) {
@@ -190,13 +193,21 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
         if (e.visibleRange) {
           await vscode.commands.executeCommand('revealLine', { lineNumber: e.visibleRange.start, at: 'top' });
         }
-      } else if (e.revUri) {
-        const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(e.revUri, { preserveFocus: false });
-        if (e.revSelections) {
-          vscTextEditor.selections = VscWorkspace.toVscSelections(e.revSelections);
+      } else {
+        if (e.revUri) {
+          const vscTextEditor = await this.vscWorkspace.showTextDocumentByUri(e.revUri, { preserveFocus: false });
+          if (e.revSelections) {
+            vscTextEditor.selections = VscWorkspace.toVscSelections(e.revSelections);
+          }
+          if (e.revVisibleRange) {
+            await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start, at: 'top' });
+          }
         }
-        if (e.revVisibleRange) {
-          await vscode.commands.executeCommand('revealLine', { lineNumber: e.revVisibleRange.start, at: 'top' });
+
+        // If this showTextEditor event was to open e.uri for the first time,
+        // close it.
+        if (e.justOpened) {
+          await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
         }
       }
     } else {
@@ -236,11 +247,6 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
         // If this showTextEditor event was to open e.uri for the first time,
         // close it.
         if (e.justOpened) {
-          // console.log(
-          //   `vsc stepper: reversing applyShowTextEditor, trying to close: ${e.uri} because ${
-          //     e.justOpened ? 'was just opened' : 'there is no revUri'
-          //   }`,
-          // );
           await this.vscWorkspace.closeVscTextEditorByUri(e.uri, { skipConfirmation: true });
         }
       }
@@ -284,18 +290,17 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
   async applySaveEvent(e: t.SaveEvent, direction: t.Direction) {
     // NOTE: This is only for old body format v1. We no longer store save events.
     // NOTE: if we open an untitled document and then save it, the save event
-    //       sometimes comes before the openTextDocument event. In that case,
-    //       just ignore it and let openTextDocument event handle it by creating
-    //       the file on disk.
-    //
-    // TODO when an untitled document is saved, does e.uri refer to the untitled
-    // document or the one on file?
-    throw new Error('TODO');
-    // const vscTextDocument = this.vscWorkspace.findVscTextDocumentByUri(e.uri);
-    // if (vscTextDocument) {
-    //   await fs.promises.writeFile(vscTextDocument.uri.fsPath, vscTextDocument.getText());
-    //   await this.vscWorkspace.revertVscTextDocument(vscTextDocument);
-    // }
+    //       sometimes comes before the openTextDocument event.
+
+    if (direction === t.Direction.Forwards) {
+      const vscTextDocument = this.vscWorkspace.findVscTextDocumentByUri(e.uri);
+      if (!vscTextDocument) return;
+
+      await storage.writeString(vscTextDocument.uri.fsPath, vscTextDocument.getText());
+      await this.vscWorkspace.revertVscTextDocument(vscTextDocument);
+    } else {
+      // nothing
+    }
   }
 
   async applyTextInsertEvent(e: t.TextInsertEvent, direction: t.Direction) {

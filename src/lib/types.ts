@@ -571,7 +571,7 @@ export type OpenTextDocumentEvent = {
   // text?: string;
   eol: EndOfLine;
   languageId: string;
-  // isInWorktree?: boolean;
+  _isInWorktree?: boolean; // only for v1
 };
 
 export type CloseTextDocumentEvent = {
@@ -890,13 +890,13 @@ export interface InternalDocument {
 
 // export type Worktree = { [key: Uri]: File };
 
-export type File = DirFile | BlobFile | GitFile;
+export type File = DirFile | BlobFile | BlankFile | GitFile;
 export type DirFile = {
   type: 'dir';
 };
-// export type BlankFile = {
-//   type: 'blank';
-// };
+export type BlankFile = {
+  type: 'blank';
+};
 export type BlobFile = {
   type: 'blob';
   sha1: string;
@@ -1061,9 +1061,9 @@ export namespace BodyFormatV1 {
   export type OpenTextDocumentEventCompact = {
     t: 2;
     c: number;
-    // x?: string;
+    x?: string;
     e: EndOfLine;
-    // i: boolean;
+    i: boolean;
   };
 
   export type CloseTextDocumentEventCompact = {

@@ -96,6 +96,11 @@ class CodeMic {
       vscode.commands.registerCommand('codemic.reportIssue', () => this.reportIssue()),
     );
 
+    // Set up URI handler.
+    this.context.extension.subscriptions.push(
+      vscode.window.registerUriHandler({ handleUri: this.handleUri.bind(this) }),
+    );
+
     // Set up webview.
     this.context.webviewProvider.onMessage = this.handleMessage.bind(this);
     this.context.webviewProvider.onViewOpen = this.viewOpened.bind(this);
@@ -192,6 +197,12 @@ class CodeMic {
     } catch (error) {
       console.error(error);
     }
+  }
+
+  handleUri(uri: vscode.Uri): vscode.ProviderResult<void> {
+    vscode.window.showErrorMessage(
+      `Please update CodeMic to the latest version to enable opening session using an external link`,
+    );
   }
 
   async handleMessage(req: t.FrontendRequest): Promise<t.BackendResponse> {

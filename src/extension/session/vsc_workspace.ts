@@ -349,6 +349,18 @@ export default class VscWorkspace {
           }
           break;
         }
+        case 'blank': {
+          if (stat && !stat.isFile()) {
+            await fs.promises.rm(fsPath, { force: true, recursive: true });
+            urisChangedOnDisk.add(targetUri);
+          }
+          const content = stat?.isFile() && (await fs.promises.readFile(fsPath));
+          if (!content || content.byteLength !== 0) {
+            await storage.writeString(fsPath, '');
+            urisChangedOnDisk.add(targetUri);
+          }
+          break;
+        }
         default:
           throw new Error(`Cannot sync file of type ${item.file.type}`);
       }
@@ -649,6 +661,8 @@ export default class VscWorkspace {
     for (let i = 1; i < 100; i++) {
       let name = `Untitled-${i}`;
       if (!openTextDocumentsPaths.includes(name)) {
+        // openTextDocument won't open the editor whereas
+        // 'workbench.action.files.newUntitledFile' does.
         await vscode.workspace.openTextDocument();
         // await vscode.commands.executeCommand('workbench.action.files.newUntitledFile');
       }
