@@ -12,6 +12,12 @@ export default defineConfig([
       parallel: false,
       asyncOnly: true,
     },
+    installExtensions: [
+      // Install Prettier from Marketplace
+      'esbenp.prettier-vscode',
+      // OR from local .vsix (uncomment below and adjust the path)
+      // path.resolve('./path/to/prettier.vsix'),
+    ],
   },
   // you can specify additional test configurations, too
 ]);

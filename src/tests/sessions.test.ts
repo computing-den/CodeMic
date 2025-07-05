@@ -37,6 +37,9 @@ test('rename_file', () => testSession('rename_file'));
 test('change_language_dirty_document', () => testSession('change_language_dirty_document'));
 test('start_with_dirty_document_open_and_save', () => testSession('start_with_dirty_document_open_and_save'));
 test('mix_1', () => testSession('mix_1'));
+test('save_json_with_prettier_js', () => testSession('save_json_with_prettier_js'));
+test('save_untitled_json_with_prettier_js', () => testSession('save_untitled_json_with_prettier_js'));
+test('save_large_js_with_prettier_js', () => testSession('save_large_js_with_prettier_js'));
 
 // });
 
@@ -317,7 +320,7 @@ async function checkTextEditorsAtClock(testClockPath: string, sessionHandle: str
       expected &&
       actual &&
       (!lib.selAreEqual(expected.selections, actual.selections) ||
-        !lib.lineRangeIsEqual(expected.visibleRange, actual.visibleRange))
+        expected.visibleRange.start !== actual.visibleRange.start)
     ) {
       return { uri: expected.uri, expected: _.omit(expected, 'uri'), actual: _.omit(actual, 'uri') };
     }

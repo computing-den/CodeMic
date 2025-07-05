@@ -1,0 +1,6 @@
+{
+  "dirtyTextDocuments": [],
+  "openTextEditors": [{"uri": "workspace:src/test.js", "selections": [[11, 1, 11, 1]], "visibleRange": [0, 34]}],
+  "activeTextEditor": "workspace:src/test.js",
+  "languageIds": {"workspace:src/test.js": "javascript"}
+}

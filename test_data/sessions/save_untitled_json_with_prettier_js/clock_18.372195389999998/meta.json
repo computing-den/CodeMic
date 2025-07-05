@@ -1,0 +1,6 @@
+{
+  "dirtyTextDocuments": [],
+  "openTextEditors": [{"uri": "workspace:test.json", "selections": [[3, 0, 3, 0]], "visibleRange": [0, 3]}],
+  "activeTextEditor": "workspace:test.json",
+  "languageIds": {"workspace:test.json": "json"}
+}

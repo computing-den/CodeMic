@@ -1,0 +1,13 @@
+{
+  "id": "29dae651-8165-43ba-8e98-0b673949ace6",
+  "handle": "save_untitled_json_with_prettier_js",
+  "title": "Save untitled JSON with prettier.js",
+  "description": "",
+  "author": "sean_shirazi",
+  "duration": 18.372195389999998,
+  "modificationTimestamp": "2025-07-05T12:10:06.823Z",
+  "toc": [],
+  "formatVersion": 2,
+  "ignorePatterns": "# Ignore the .git directory\n.git\n\n# Node.js dependencies\nnode_modules\n\n# Python byte-compiled / optimized / DLL files\n__pycache__\n*.py[cod]\n*$py.class\n\n",
+  "hasCover": false
+}

@@ -51,7 +51,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
     if (direction === t.Direction.Forwards) {
       await this.writeUnderlyingFileWithoutChangingDocument(e.uri, e.file);
     } else {
-      await fs.promises.rm(URI.parse(this.session.core.resolveUri(e.uri)).fsPath);
+      await fs.promises.rm(URI.parse(this.session.core.resolveUri(e.uri)).fsPath, { recursive: true, force: true });
     }
   }
 
@@ -62,7 +62,7 @@ class VscWorkspaceStepper implements t.WorkspaceStepper {
 
   async applyFsDeleteEvent(e: t.FsDeleteEvent, direction: t.Direction) {
     if (direction === t.Direction.Forwards) {
-      await fs.promises.rm(URI.parse(this.session.core.resolveUri(e.uri)).fsPath);
+      await fs.promises.rm(URI.parse(this.session.core.resolveUri(e.uri)).fsPath, { recursive: true, force: true });
     } else {
       await this.writeUnderlyingFileWithoutChangingDocument(e.uri, e.revFile);
     }

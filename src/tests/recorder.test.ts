@@ -25,6 +25,7 @@ test('rename file', recordRenameFile);
 test('rename file and open again immediately', recordRenameFileAndOpenAgainImmediately);
 test('rename file and open again with delay', recordRenameFileAndOpenAgainWithDelay);
 test('start with dirty document then open and and save', recordStartWithDirtydocsOpenAndSave);
+test('save json with prettier.js', recordSaveJSONWithPrettierJs);
 // });
 
 async function recordFsChanges() {
@@ -1529,6 +1530,332 @@ async function recordStartWithDirtydocsOpenAndSave() {
       revFile: {
         type: 'blob',
         sha1: 'f65d313996cb2dcb64c4a28646b89bb7afb2956d',
+      },
+    },
+  ];
+
+  const actualEvents = JSON.parse(lib.pretty(codemic.session!.body?.editorEvents!)) as EditorEvent[];
+
+  const errors: string[] = [];
+
+  const missingActualEvents = _.differenceWith(expectedEvents, actualEvents, isEventAlmostEqual);
+  const extraActualEvents = _.differenceWith(actualEvents, expectedEvents, isEventAlmostEqual);
+
+  if (missingActualEvents.length) {
+    errors.push(`missing editor event IDs: ${missingActualEvents.map(x => x.id).join(', ')}`);
+  }
+  if (extraActualEvents.length) {
+    errors.push(`extra editor event IDs: ${extraActualEvents.map(x => x.id).join(', ')}`);
+  }
+
+  if (missingActualEvents.length || extraActualEvents.length) {
+    errors.push(`Actual events: ${lib.pretty(actualEvents)}\nExpected events: ${lib.pretty(expectedEvents)}`);
+  }
+
+  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
+
+  // log('XXX', lib.pretty(codemic.session!.body?.editorEvents));
+
+  // await lib.timeout(1_000_000);
+}
+
+async function recordSaveJSONWithPrettierJs() {
+  log(`=== Creating files in ${workspacePath}`);
+  fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
+  fs.mkdirSync(path.resolve(workspacePath, '.vscode'), { recursive: true });
+  fs.writeFileSync(path.resolve(workspacePath, 'test.json'), '');
+  fs.writeFileSync(path.resolve(workspacePath, 'README.txt'), 'Hello there!\n');
+  fs.writeFileSync(
+    path.resolve(workspacePath, '.vscode/settings.json'),
+    '{\n  "editor.formatOnSave": true,\n  "[json]": {\n    "editor.defaultFormatter": "esbenp.prettier-vscode"\n  }\n}',
+  );
+
+  log(`=== Closing all tabs`);
+  await closeAllTabs();
+  log(`=== Opening CodeMic view`);
+  await openCodeMicView();
+  const codemic = getCodeMic();
+
+  const prettierExt = vscode.extensions.getExtension('esbenp.prettier-vscode');
+  assert.ok(prettierExt, 'esbenp.prettier-vscode is not installed');
+
+  await lib.timeout(200);
+
+  log(`=== Opening new session`);
+  await codemic.handleMessage({ type: 'welcome/openNewSessionInRecorder' });
+  await lib.timeout(200);
+  await codemic.handleMessage({
+    type: 'recorder/updateDetails',
+    changes: { title: 'save json with prettier.js', handle: 'save_json_with_prettier_js' },
+  });
+  await lib.timeout(200);
+
+  log(`=== Scanning new session`);
+  await codemic.handleMessage({ type: 'recorder/load', skipConfirmation: true });
+
+  assert.ok(await pathExists(path.resolve(workspacePath, '.CodeMic', 'head.json')), 'head.json does not exist');
+  assert.ok(await pathExists(path.resolve(workspacePath, '.CodeMic', 'body.json')), 'body.json does not exist');
+
+  // await codemic.handleMessage({ type: 'recorder/makeTest' });
+
+  log(`=== Start recording`);
+  await codemic.handleMessage({ type: 'recorder/record' });
+  await lib.timeout(200);
+  const vscWorkspace = codemic.session!.rr?._test_vscWorkspace!;
+
+  log(`=== Open test.json`);
+  const textEditor = await vscWorkspace.showTextDocumentByUri('workspace:test.json');
+
+  assert.ok(
+    await textEditor.edit(builder => {
+      builder.replace(
+        vscWorkspace.getVscTextDocumentVscRange(textEditor.document),
+        '{\n"version":\n\n\n"2025-07-01.01"\n}\n',
+      );
+    }),
+  );
+  await lib.timeout(300);
+
+  assert.ok(await textEditor.document.save(), 'test.json was not saved');
+  await lib.timeout(300);
+
+  log(`=== Pause`);
+  await codemic.handleMessage({ type: 'recorder/pause' });
+  await lib.timeout(200);
+
+  // await codemic.handleMessage({ type: 'recorder/makeTest' });
+
+  // log(`=== Resume recording`);
+  // await codemic.handleMessage({ type: 'recorder/record' });
+  // await lib.timeout(300);
+
+  // await insideTextEditor.document.save();
+  // await lib.timeout(300);
+
+  // // await codemic.handleMessage({ type: 'recorder/makeTest' });
+
+  const expectedEvents: EditorEvent[] = [
+    {
+      type: 'fsCreate',
+      id: 1,
+      uri: 'workspace:.vscode',
+      clock: 0,
+      file: {
+        type: 'dir',
+      },
+    },
+    {
+      type: 'fsCreate',
+      id: 2,
+      uri: 'workspace:.vscode/settings.json',
+      clock: 0,
+      file: {
+        type: 'blob',
+        sha1: '3f7383a9de50314c9c50b66cd1a1c953ca858dec',
+      },
+    },
+    {
+      type: 'fsCreate',
+      id: 3,
+      uri: 'workspace:README.txt',
+      clock: 0,
+      file: {
+        type: 'blob',
+        sha1: 'c2d38c73bb59ed15790b19661bf31a53b5e856b9',
+      },
+    },
+    {
+      type: 'fsCreate',
+      id: 4,
+      uri: 'workspace:test.json',
+      clock: 0,
+      file: {
+        type: 'blob',
+        sha1: 'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+      },
+    },
+    {
+      type: 'openTextDocument',
+      id: 5,
+      uri: 'workspace:test.json',
+      clock: 0.2068292200000001,
+      eol: '\n',
+      languageId: 'json',
+    },
+    {
+      type: 'showTextEditor',
+      id: 6,
+      uri: 'workspace:test.json',
+      clock: 0.2068292200000001,
+      selections: [
+        {
+          anchor: {
+            line: 0,
+            character: 0,
+          },
+          active: {
+            line: 0,
+            character: 0,
+          },
+        },
+      ],
+      visibleRange: {
+        start: 0,
+        end: 0,
+      },
+      justOpened: true,
+    },
+    {
+      type: 'textInsert',
+      id: 7,
+      uri: 'workspace:test.json',
+      clock: 0.2068292200000001,
+      revRange: {
+        start: {
+          line: 0,
+          character: 0,
+        },
+        end: {
+          line: 6,
+          character: 0,
+        },
+      },
+      text: '{\n"version":\n\n\n"2025-07-01.01"\n}\n',
+      updateSelection: true,
+    },
+    {
+      type: 'scroll',
+      id: 8,
+      uri: 'workspace:test.json',
+      clock: 0.2068292200000001,
+      visibleRange: {
+        start: 0,
+        end: 6,
+      },
+      revVisibleRange: {
+        start: 0,
+        end: 0,
+      },
+    },
+    {
+      type: 'textChange',
+      id: 9,
+      uri: 'workspace:test.json',
+      clock: 1.3220568389999998,
+      contentChanges: [
+        {
+          text: '  ',
+          range: {
+            start: {
+              line: 1,
+              character: 0,
+            },
+            end: {
+              line: 1,
+              character: 0,
+            },
+          },
+        },
+        {
+          text: ' ',
+          range: {
+            start: {
+              line: 1,
+              character: 10,
+            },
+            end: {
+              line: 4,
+              character: 0,
+            },
+          },
+        },
+      ],
+      revContentChanges: [
+        {
+          range: {
+            start: {
+              line: 1,
+              character: 0,
+            },
+            end: {
+              line: 1,
+              character: 2,
+            },
+          },
+          text: '',
+        },
+        {
+          range: {
+            start: {
+              line: 1,
+              character: 12,
+            },
+            end: {
+              line: 1,
+              character: 13,
+            },
+          },
+          text: '\n\n\n',
+        },
+      ],
+      updateSelection: false,
+    },
+    {
+      type: 'select',
+      id: 10,
+      uri: 'workspace:test.json',
+      clock: 1.3220568389999998,
+      selections: [
+        {
+          anchor: {
+            line: 3,
+            character: 0,
+          },
+          active: {
+            line: 3,
+            character: 0,
+          },
+        },
+      ],
+      revSelections: [
+        {
+          anchor: {
+            line: 6,
+            character: 0,
+          },
+          active: {
+            line: 6,
+            character: 0,
+          },
+        },
+      ],
+    },
+    {
+      type: 'scroll',
+      id: 11,
+      uri: 'workspace:test.json',
+      clock: 1.3220568389999998,
+      visibleRange: {
+        start: 0,
+        end: 3,
+      },
+      revVisibleRange: {
+        start: 0,
+        end: 6,
+      },
+    },
+    {
+      type: 'fsChange',
+      id: 12,
+      uri: 'workspace:test.json',
+      clock: 1.422560993,
+      file: {
+        type: 'blob',
+        sha1: 'b65b4cc253c24f8f544c786bcb16f19a4aaa943b',
+      },
+      revFile: {
+        type: 'blob',
+        sha1: 'da39a3ee5e6b4b0d3255bfef95601890afd80709',
       },
     },
   ];

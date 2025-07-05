@@ -21,6 +21,10 @@
  * possible to open a text document with file uri if the file doesn't exist on disk.
  * So, during recording, we have to issue an fsCreate event ourselves possibly with
  * empty content. Essentially reversing the order of events.
+ *
+ * Language change (automatic or manual) is modeled as a closeTextDocument
+ * followed by an openTextDocument. But, the vscode text document that closes
+ * and opens has the same reference identity.
  */
 
 import * as t from '../../lib/types.js';
@@ -48,13 +52,6 @@ class WorkspaceRecorder {
 
   private disposables: vscode.Disposable[] = [];
   private queue = new QueueRunner();
-  // private scrolling: boolean = false;
-  // private scrollStartRange?: Range;
-  // private lastUri?: t.Uri;
-  // private lastPosition?: Position;
-  // private lastLine: number | undefined;
-
-  // private textDocumentsUrisBeingCreated = new Set<string>();
 
   private get clock(): number {
     return this.session.rr.clock;
@@ -433,6 +430,7 @@ class WorkspaceRecorder {
 
     // In VSCode, changing language is modeled as a close followed by an open text document.
     // So, if the document was just closed, update the close event to a language change.
+    // But, the vscode text document that closes and opens has the same reference identity.
     const lastEventIndex = this.session.body.editorEvents.length - 1;
     const lastEvent = this.session.body.editorEvents.at(lastEventIndex);
     if (lastEvent?.uri === uri && lastEvent.type === 'closeTextDocument') {
@@ -512,16 +510,21 @@ class WorkspaceRecorder {
     if (!this.vscWorkspace.shouldRecordVscUri(vscTextDocument.uri)) return;
 
     const uri = this.vscWorkspace.uriFromVsc(vscTextDocument.uri);
+
+    // const revEol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
+    const item = this.worktree.getOpt(uri);
+    if (!item?.textDocument) {
+      console.log(`got closeTextDocument for ${uri} but it doesn't exist internally. Ignored.`);
+      return;
+    }
+
     logAcceptedEvent(`accepted closeTextDocument for ${uri}`);
 
-    const revEol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
-    await this.worktree.get(uri).closeTextDocument();
-
-    let revText: string | undefined;
-    const item = this.worktree.get(uri);
-    if (await item.isDirty()) {
-      revText = await item.getContentText();
-    }
+    const isDirty = await item.isDirty();
+    const revText = isDirty ? item.textDocument.getText() : undefined;
+    const revEol = item.textDocument.eol;
+    const revLanguageId = item.textDocument.languageId;
+    await item.closeTextDocument();
 
     this.insertEvent(
       {
@@ -531,7 +534,7 @@ class WorkspaceRecorder {
         clock: this.clock,
         revText,
         revEol,
-        revLanguageId: vscTextDocument.languageId,
+        revLanguageId,
       },
       { coalescing: false },
     );

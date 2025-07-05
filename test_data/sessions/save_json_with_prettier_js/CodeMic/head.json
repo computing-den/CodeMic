@@ -1,0 +1,12 @@
+{
+  "id": "4e42b89d-d181-4b96-ae9b-645dbecd99f7",
+  "handle": "save_json_with_prettier_js",
+  "title": "save json with prettier.js",
+  "description": "",
+  "duration": 1.0310285360000004,
+  "modificationTimestamp": "2025-07-05T12:04:07.700Z",
+  "toc": [],
+  "formatVersion": 2,
+  "ignorePatterns": "# Ignore the .git directory\n.git\n\n# Node.js dependencies\nnode_modules\n\n# Python byte-compiled / optimized / DLL files\n__pycache__\n*.py[cod]\n*$py.class\n\n",
+  "hasCover": false
+}
