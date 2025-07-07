@@ -443,14 +443,14 @@ export default class SessionEditor {
   /**
    * Session may not be loaded in which case only its head is written.
    */
-  async write(opts?: { pause?: boolean; ifDirty?: boolean }) {
+  async write(opts?: { ifDirty?: boolean }) {
     assert(this.session);
     assert(!this.session.temp);
     this.writeThrottled.cancel();
 
-    if (opts?.pause && this.session.rr?.running) {
-      this.session.rr.pause();
-    }
+    // if (opts?.pause && this.session.rr?.running) {
+    //   this.session.rr.pause();
+    // }
 
     if (!opts?.ifDirty || this.dirty) {
       await this.session.core.write();

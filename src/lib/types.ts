@@ -39,7 +39,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/pause' }; response: OKResponse }
   | { request: { type: 'recorder/seek'; clock: number; useStepper?: boolean }; response: OKResponse }
   | { request: { type: 'recorder/syncWorkspace'; clock?: number }; response: OKResponse }
-  | { request: { type: 'recorder/save' }; response: OKResponse }
+  // | { request: { type: 'recorder/save' }; response: OKResponse }
   | { request: { type: 'recorder/publish' }; response: OKResponse }
   | { request: { type: 'recorder/undo' }; response: OKResponse }
   | { request: { type: 'recorder/redo' }; response: OKResponse }

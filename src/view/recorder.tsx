@@ -141,9 +141,9 @@ class DetailsView extends React.Component<DetailsViewProps> {
     await postMessage({ type: 'recorder/updateDetails', changes });
   };
 
-  save = async () => {
-    await postMessage({ type: 'recorder/save' });
-  };
+  // save = async () => {
+  //   await postMessage({ type: 'recorder/save' });
+  // };
 
   publish = async () => {
     await postMessage({ type: 'recorder/publish' });

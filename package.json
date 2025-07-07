@@ -92,6 +92,18 @@
           "light": "./resources/light/question.svg",
           "dark": "./resources/dark/question.svg"
         }
+      },
+      {
+        "command": "codemic.play",
+        "title": "CodeMic play"
+      },
+      {
+        "command": "codemic.record",
+        "title": "CodeMic record"
+      },
+      {
+        "command": "codemic.pause",
+        "title": "CodeMic pause"
       }
     ],
     "menus": {

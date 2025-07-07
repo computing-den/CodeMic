@@ -1,3 +1,4 @@
+import vscode from 'vscode';
 import * as t from '../../lib/types.js';
 import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
@@ -10,13 +11,8 @@ import WorkspacePlayer from './workspace_player.js';
 import WorkspaceRecorder from './workspace_recorder.js';
 import VscWorkspace from './vsc_workspace.js';
 import QueueRunner from '../../lib/queue_runner.js';
-import _, { inRange } from 'lodash';
+import _ from 'lodash';
 import { UpdateLoopAsync } from '../../lib/update_loop_async.js';
-import { isDuration } from 'moment';
-import { v4 as uuid } from 'uuid';
-import { mediaManager } from '../../view/media_manager.js';
-import path from 'path';
-import fs from 'fs';
 
 enum Status {
   Init,
@@ -44,6 +40,7 @@ export default class SessionRecordAndReplay {
   private workspacePlayer: WorkspacePlayer;
   private workspaceRecorder: WorkspaceRecorder;
 
+  private statusBarItem: vscode.StatusBarItem;
   private queue = new QueueRunner();
 
   // private audioTrackPlayers: AudioTrackPlayer[];
@@ -67,6 +64,9 @@ export default class SessionRecordAndReplay {
 
     this.updateLoop = new UpdateLoopAsync(this.enqueueUpdate.bind(this), UPDATE_LOOP_INTERVAL_MS);
 
+    // Create status bar item.
+    this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+
     // for (const c of this.audioTrackPlayers) this.initAudioPlayer(c);
     // this.initVideoPlayer();
     // this.workspacePlayer.onError = this.gotError.bind(this);
@@ -81,8 +81,16 @@ export default class SessionRecordAndReplay {
     return Boolean(this.running && this.mode.recorder);
   }
 
+  get inRecorderMode(): boolean {
+    return this.mode.recorder;
+  }
+
   get playing(): boolean {
     return Boolean(this.running && !this.mode.recorder);
+  }
+
+  get inPlayerMode(): boolean {
+    return !this.mode.recorder;
   }
 
   get _test_internalWorkspace(): InternalWorkspace {
@@ -121,22 +129,44 @@ export default class SessionRecordAndReplay {
    * This may be called from gotError which may be called from inside a queue
    * task. So it must not be queued itself.
    */
-  pause() {
+  async pause(opts?: { withError?: true }) {
+    if (!this.running) return;
+
     this.updateLoop.stop();
     this.queue.clear();
-    this.mode.status = Status.Paused;
-
-    // Pause workspace.
+    this.mode.status = opts?.withError ? Status.Error : Status.Paused;
     if (this.mode.recorder) {
-      this.workspaceRecorder.pause();
+      this.statusBarItem.text = '$(record) Record';
+      this.statusBarItem.tooltip = 'CodeMic: click to continue recording';
+      this.statusBarItem.backgroundColor = undefined;
+      this.statusBarItem.command = 'codemic.record';
     } else {
-      this.workspacePlayer.pause();
+      this.statusBarItem.text = '$(play) Play';
+      this.statusBarItem.tooltip = 'CodeMic: click to continue playing';
+      this.statusBarItem.backgroundColor = undefined;
+      1;
+      this.statusBarItem.command = 'codemic.play';
     }
+    this.statusBarItem.show();
 
     // Pause media.
     // Must not await on the queue because pause() may be called from inside a
     // queue task.
     this.enqueuePauseAllMedia().catch(console.error);
+
+    // Pause workspace.
+    if (this.mode.recorder) {
+      this.workspaceRecorder.pause();
+      await this.session.editor.write({ ifDirty: true }); // will write history too
+    } else {
+      this.workspacePlayer.pause();
+      await this.session.core.writeHistoryClock();
+    }
+  }
+
+  async dispose() {
+    this.statusBarItem.hide();
+    await this.pause();
   }
 
   async enqueueSyncAfterSessionChange(change: t.SessionChange) {
@@ -246,6 +276,11 @@ export default class SessionRecordAndReplay {
 
     this.mode.recorder = false;
     this.mode.status = Status.Running;
+    this.statusBarItem.text = '$(debug-pause) Pause';
+    this.statusBarItem.tooltip = 'CodeMic: click to pause playing';
+    this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+    this.statusBarItem.command = 'codemic.pause';
+    this.statusBarItem.show();
 
     // Seek and sync.
     if (this.isAlmostAtTheEnd()) {
@@ -264,6 +299,11 @@ export default class SessionRecordAndReplay {
 
     this.mode.recorder = true;
     this.mode.status = Status.Running;
+    this.statusBarItem.text = '$(debug-pause) Pause';
+    this.statusBarItem.tooltip = 'CodeMic: click to pause recording';
+    this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+    this.statusBarItem.command = 'codemic.pause';
+    this.statusBarItem.show();
 
     // Seek and sync.
     this.clock = this.session.head.duration;
@@ -319,7 +359,7 @@ export default class SessionRecordAndReplay {
 
       // Pause if reached the end during playback.
       if (!this.mode.recorder && this.clock === this.session.head.duration) {
-        this.pause();
+        await this.pause();
       }
 
       // Trigger callback to update frontend.
@@ -663,8 +703,7 @@ export default class SessionRecordAndReplay {
   }
 
   private gotError() {
-    this.pause();
-    this.mode.status = Status.Error;
+    this.pause({ withError: true });
   }
 
   private isAlmostAtTheEnd() {

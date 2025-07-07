@@ -95,6 +95,25 @@ class CodeMic {
     this.context.extension.subscriptions.push(
       vscode.commands.registerCommand('codemic.reportIssue', () => this.reportIssue()),
     );
+    this.context.extension.subscriptions.push(
+      vscode.commands.registerCommand('codemic.pause', async () => {
+        await this.session?.rr?.pause();
+        await this.updateFrontend();
+      }),
+    );
+    this.context.extension.subscriptions.push(
+      vscode.commands.registerCommand('codemic.play', async () => {
+        await this.session?.rr?.enqueuePlay();
+        if (this.session?.rr?.inPlayerMode) {
+          await this.session.core.writeHistoryOpenClose();
+        }
+      }),
+    );
+    this.context.extension.subscriptions.push(
+      vscode.commands.registerCommand('codemic.record', async () => {
+        await this.session?.rr?.enqueueRecord();
+      }),
+    );
 
     // Set up URI handler.
     this.context.extension.subscriptions.push(
@@ -386,7 +405,7 @@ class CodeMic {
         this.session.core.assertFormatVersionSupport();
         let cancel = false;
         if (this.session.rr?.playing) {
-          this.session.rr.pause();
+          await this.session.rr.pause();
 
           const confirmTitle = 'Edit';
           const answer = await vscode.window.showWarningMessage(
@@ -440,8 +459,7 @@ class CodeMic {
       }
       case 'player/pause': {
         assert(this.session?.isLoaded());
-        this.session.rr.pause();
-        await this.session.core.writeHistoryClock();
+        await this.session.rr.pause();
         await this.updateFrontend();
         return ok;
       }
@@ -502,7 +520,7 @@ class CodeMic {
       }
       case 'recorder/pause': {
         assert(this.session?.isLoaded());
-        await this.session.editor.write({ pause: true, ifDirty: true });
+        await this.session.rr.pause();
         await this.updateFrontend();
         return ok;
       }
@@ -518,16 +536,16 @@ class CodeMic {
         await this.updateFrontend();
         return ok;
       }
-      case 'recorder/save': {
-        assert(this.session?.isLoaded());
-        await this.session.editor.write({ pause: true });
-        await this.updateFrontend();
-        return ok;
-      }
+      // case 'recorder/save': {
+      //   assert(this.session?.isLoaded());
+      //   await this.session.editor.write({ pause: true });
+      //   await this.updateFrontend();
+      //   return ok;
+      // }
       case 'recorder/publish': {
         try {
           assert(this.session?.isLoaded());
-          await this.session.editor.write({ pause: true });
+          await this.session.rr.pause();
           await this.context.withProgress(
             { title: `Publishing session ${this.session.head.handle}`, cancellable: true },
             async (progress, abortController) => {
@@ -923,7 +941,7 @@ class CodeMic {
         break;
       }
       case t.Screen.Player: {
-        this.session?.rr?.pause();
+        await this.session?.rr?.dispose();
         this.session = undefined;
         break;
       }
@@ -942,9 +960,10 @@ class CodeMic {
           if (answer?.title !== exit) return false;
         }
 
+        await this.session.rr?.dispose();
         this.session.editor.finishEditing();
         if (!this.session.temp) {
-          await this.session.editor.write({ pause: true });
+          await this.session.editor.write({ ifDirty: true });
           await this.session.core.gcBlobs();
         }
         this.session = undefined;
