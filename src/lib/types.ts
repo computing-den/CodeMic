@@ -428,7 +428,7 @@ export type SessionBodyCompact = {
 
 export type Focus = {
   uri: string;
-  number: number;
+  line: number;
   text: string;
   clock: number;
 };

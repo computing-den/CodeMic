@@ -101,8 +101,8 @@
   "audioTracks": [],
   "videoTracks": [],
   "focusTimeline": [
-    { "clock": 0, "uri": "workspace:abc.txt", "number": 0, "text": "hi there" },
-    { "clock": 5.9762733930000005, "uri": "workspace:def.txt", "number": 0, "text": "hi there" }
+    { "clock": 0, "uri": "workspace:abc.txt", "line": 0, "text": "hi there" },
+    { "clock": 5.9762733930000005, "uri": "workspace:def.txt", "line": 0, "text": "hi there" }
   ],
   "defaultEol": "\n"
 }

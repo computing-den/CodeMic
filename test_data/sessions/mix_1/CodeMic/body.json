@@ -1102,33 +1102,33 @@
   "audioTracks": [],
   "videoTracks": [],
   "focusTimeline": [
-    { "clock": 0, "uri": "workspace:src/inside.txt", "number": 0, "text": "Inside text" },
-    { "clock": 1.5197141149999955, "uri": "workspace:src/inside.txt", "number": 2, "text": "Hello" },
-    { "clock": 5.676708190999998, "uri": "workspace:src/main.c", "number": 0, "text": "#include <stdio.h>" },
-    { "clock": 13.076955548999994, "uri": "workspace:src/main.c", "number": 3, "text": "    return 0;" },
+    { "clock": 0, "uri": "workspace:src/inside.txt", "line": 0, "text": "Inside text" },
+    { "clock": 1.5197141149999955, "uri": "workspace:src/inside.txt", "line": 2, "text": "Hello" },
+    { "clock": 5.676708190999998, "uri": "workspace:src/main.c", "line": 0, "text": "#include <stdio.h>" },
+    { "clock": 13.076955548999994, "uri": "workspace:src/main.c", "line": 3, "text": "    return 0;" },
     {
       "clock": 15.101686120000018,
       "uri": "workspace:src/main.c",
-      "number": 3,
+      "line": 3,
       "text": "    printf(\"Hello world %s\\n\", \"!!!\");"
     },
-    { "clock": 70.00252679900007, "uri": "workspace:src/dir_a/myperl.perl", "number": 0, "text": "" },
+    { "clock": 70.00252679900007, "uri": "workspace:src/dir_a/myperl.perl", "line": 0, "text": "" },
     {
       "clock": 104.97853030800003,
       "uri": "workspace:src/main.c",
-      "number": 3,
+      "line": 3,
       "text": "    printf(\"Hello world %s\\n\", \"!!!\");"
     },
-    { "clock": 135.271521803, "uri": "workspace:src/dir_a/perl.pl", "number": 0, "text": "my x = 5;" },
-    { "clock": 142.07297922200013, "uri": "workspace:src/dir_a/perl.pl", "number": 1, "text": "say \"something\";" },
-    { "clock": 166.66463269700014, "uri": "workspace:src/perl.pl", "number": 1, "text": "" },
+    { "clock": 135.271521803, "uri": "workspace:src/dir_a/perl.pl", "line": 0, "text": "my x = 5;" },
+    { "clock": 142.07297922200013, "uri": "workspace:src/dir_a/perl.pl", "line": 1, "text": "say \"something\";" },
+    { "clock": 166.66463269700014, "uri": "workspace:src/perl.pl", "line": 1, "text": "" },
     {
       "clock": 234.0835595169999,
       "uri": "workspace:src/main.c",
-      "number": 3,
+      "line": 3,
       "text": "    printf(\"Hello world %s\\n\", \"!!!\");"
     },
-    { "clock": 240.78385727699987, "uri": "workspace:src/perl.pl", "number": 0, "text": "" }
+    { "clock": 240.78385727699987, "uri": "workspace:src/perl.pl", "line": 0, "text": "" }
   ],
   "defaultEol": "\n"
 }

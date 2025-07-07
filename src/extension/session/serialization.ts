@@ -179,7 +179,7 @@ function serializeFocus(focus: t.Focus, uriMap: UriMap): t.FocusCompact {
     c: serializeClock(focus.clock),
     u: uriMap.get(focus.uri)!,
     t: focus.text,
-    n: focus.number,
+    n: focus.line,
   };
 }
 
@@ -570,7 +570,7 @@ function deserializeFocus(focus: t.FocusCompact, uris: string[]): t.Focus {
   return {
     clock: deserializeClock(focus.c),
     uri: uris[focus.u],
-    number: focus.n,
+    line: focus.n,
     text: focus.t,
   };
 }
@@ -579,7 +579,7 @@ function deserializeFocusV1(focus: t.BodyFormatV1.FocusCompact): t.Focus {
   return {
     clock: deserializeClock(focus.c),
     uri: focus.u,
-    number: focus.n,
+    line: focus.n,
     text: focus.t,
   };
 }

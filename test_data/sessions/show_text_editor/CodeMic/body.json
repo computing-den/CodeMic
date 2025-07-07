@@ -52,6 +52,6 @@
   ],
   "audioTracks": [],
   "videoTracks": [],
-  "focusTimeline": [{ "clock": 1.304033872, "uri": "workspace:src/inside.txt", "number": 0, "text": "Inside text" }],
+  "focusTimeline": [{ "clock": 1.304033872, "uri": "workspace:src/inside.txt", "line": 0, "text": "Inside text" }],
   "defaultEol": "\n"
 }

@@ -134,8 +134,8 @@
   "audioTracks": [],
   "videoTracks": [],
   "focusTimeline": [
-    { "clock": 1.0176178980000006, "uri": "untitled:Untitled-1", "number": 0, "text": "Hi" },
-    { "clock": 6.636549532000002, "uri": "workspace:hi.txt", "number": 0, "text": "Hi" }
+    { "clock": 1.0176178980000006, "uri": "untitled:Untitled-1", "line": 0, "text": "Hi" },
+    { "clock": 6.636549532000002, "uri": "workspace:hi.txt", "line": 0, "text": "Hi" }
   ],
   "defaultEol": "\n"
 }

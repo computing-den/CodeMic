@@ -230,7 +230,7 @@ class WorkspaceRecorder {
       {
         clock: this.clock,
         uri: item.textEditor.uri,
-        number: item.textEditor.currentLine,
+        line: item.textEditor.currentLine,
         text: item.textEditor.currentLineText,
       },
       item.textDocument?.isEmpty ?? true,

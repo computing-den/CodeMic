@@ -1,18 +1,43 @@
 {
   "full": true,
   "editorEvents": [
-    {"type": "fsCreate", "id": 1, "uri": "workspace:.vscode", "clock": 0, "file": {"type": "dir"}},
-    {"type": "fsCreate", "id": 2, "uri": "workspace:.vscode/settings.json", "clock": 0, "file": {"type": "blob", "sha1": "3f7383a9de50314c9c50b66cd1a1c953ca858dec"}},
-    {"type": "fsCreate", "id": 3, "uri": "workspace:README.txt", "clock": 0, "file": {"type": "blob", "sha1": "c2d38c73bb59ed15790b19661bf31a53b5e856b9"}},
-    {"type": "fsCreate", "id": 4, "uri": "workspace:test.json", "clock": 0, "file": {"type": "blob", "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709"}},
-    {"type": "openTextDocument", "id": 5, "uri": "workspace:test.json", "clock": 0.20858525499999997, "eol": "\n", "languageId": "json"},
+    { "type": "fsCreate", "id": 1, "uri": "workspace:.vscode", "clock": 0, "file": { "type": "dir" } },
+    {
+      "type": "fsCreate",
+      "id": 2,
+      "uri": "workspace:.vscode/settings.json",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "3f7383a9de50314c9c50b66cd1a1c953ca858dec" }
+    },
+    {
+      "type": "fsCreate",
+      "id": 3,
+      "uri": "workspace:README.txt",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "c2d38c73bb59ed15790b19661bf31a53b5e856b9" }
+    },
+    {
+      "type": "fsCreate",
+      "id": 4,
+      "uri": "workspace:test.json",
+      "clock": 0,
+      "file": { "type": "blob", "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
+    },
+    {
+      "type": "openTextDocument",
+      "id": 5,
+      "uri": "workspace:test.json",
+      "clock": 0.20858525499999997,
+      "eol": "\n",
+      "languageId": "json"
+    },
     {
       "type": "showTextEditor",
       "id": 6,
       "uri": "workspace:test.json",
       "clock": 0.20858525499999997,
-      "selections": [{"anchor": {"line": 0, "character": 0}, "active": {"line": 0, "character": 0}}],
-      "visibleRange": {"start": 0, "end": 0},
+      "selections": [{ "anchor": { "line": 0, "character": 0 }, "active": { "line": 0, "character": 0 } }],
+      "visibleRange": { "start": 0, "end": 0 },
       "justOpened": true
     },
     {
@@ -20,23 +45,33 @@
       "id": 7,
       "uri": "workspace:test.json",
       "clock": 0.20858525499999997,
-      "revRange": {"start": {"line": 0, "character": 0}, "end": {"line": 6, "character": 0}},
+      "revRange": { "start": { "line": 0, "character": 0 }, "end": { "line": 6, "character": 0 } },
       "text": "{\n\"version\":\n\n\n\"2025-07-01.01\"\n}\n",
       "updateSelection": true
     },
-    {"type": "scroll", "id": 8, "uri": "workspace:test.json", "clock": 0.20858525499999997, "visibleRange": {"start": 0, "end": 6}, "revVisibleRange": {"start": 0, "end": 0}},
+    {
+      "type": "scroll",
+      "id": 8,
+      "uri": "workspace:test.json",
+      "clock": 0.20858525499999997,
+      "visibleRange": { "start": 0, "end": 6 },
+      "revVisibleRange": { "start": 0, "end": 0 }
+    },
     {
       "type": "textChange",
       "id": 9,
       "uri": "workspace:test.json",
       "clock": 0.7281950310000003,
       "contentChanges": [
-        {"text": "  ", "range": {"start": {"line": 1, "character": 0}, "end": {"line": 1, "character": 0}}},
-        {"text": " ", "range": {"start": {"line": 1, "character": 10}, "end": {"line": 4, "character": 0}}}
+        { "text": "  ", "range": { "start": { "line": 1, "character": 0 }, "end": { "line": 1, "character": 0 } } },
+        { "text": " ", "range": { "start": { "line": 1, "character": 10 }, "end": { "line": 4, "character": 0 } } }
       ],
       "revContentChanges": [
-        {"range": {"start": {"line": 1, "character": 0}, "end": {"line": 1, "character": 2}}, "text": ""},
-        {"range": {"start": {"line": 1, "character": 12}, "end": {"line": 1, "character": 13}}, "text": "\n\n\n"}
+        { "range": { "start": { "line": 1, "character": 0 }, "end": { "line": 1, "character": 2 } }, "text": "" },
+        {
+          "range": { "start": { "line": 1, "character": 12 }, "end": { "line": 1, "character": 13 } },
+          "text": "\n\n\n"
+        }
       ],
       "updateSelection": false
     },
@@ -45,21 +80,28 @@
       "id": 10,
       "uri": "workspace:test.json",
       "clock": 0.7281950310000003,
-      "selections": [{"anchor": {"line": 3, "character": 0}, "active": {"line": 3, "character": 0}}],
-      "revSelections": [{"anchor": {"line": 6, "character": 0}, "active": {"line": 6, "character": 0}}]
+      "selections": [{ "anchor": { "line": 3, "character": 0 }, "active": { "line": 3, "character": 0 } }],
+      "revSelections": [{ "anchor": { "line": 6, "character": 0 }, "active": { "line": 6, "character": 0 } }]
     },
-    {"type": "scroll", "id": 11, "uri": "workspace:test.json", "clock": 0.7281950310000003, "visibleRange": {"start": 0, "end": 3}, "revVisibleRange": {"start": 0, "end": 6}},
+    {
+      "type": "scroll",
+      "id": 11,
+      "uri": "workspace:test.json",
+      "clock": 0.7281950310000003,
+      "visibleRange": { "start": 0, "end": 3 },
+      "revVisibleRange": { "start": 0, "end": 6 }
+    },
     {
       "type": "fsChange",
       "id": 12,
       "uri": "workspace:test.json",
       "clock": 0.7281950310000003,
-      "file": {"type": "blob", "sha1": "b65b4cc253c24f8f544c786bcb16f19a4aaa943b"},
-      "revFile": {"type": "blob", "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709"}
+      "file": { "type": "blob", "sha1": "b65b4cc253c24f8f544c786bcb16f19a4aaa943b" },
+      "revFile": { "type": "blob", "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
     }
   ],
   "audioTracks": [],
   "videoTracks": [],
-  "focusTimeline": [{"clock": 0.20858525499999997, "uri": "workspace:test.json", "number": 3, "text": ""}],
+  "focusTimeline": [{ "clock": 0.20858525499999997, "uri": "workspace:test.json", "line": 3, "text": "" }],
   "defaultEol": "\n"
 }

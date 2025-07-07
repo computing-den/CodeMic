@@ -140,13 +140,13 @@ export default class SessionEditor {
     // Try to update the last one. Otherwise, insert a new focus.
     if (
       lastFocus &&
-      (focus.clock - lastFocus.clock < 1 || (lastFocus.uri === focus.uri && lastFocus.number === focus.number))
+      (focus.clock - lastFocus.clock < 1 || (lastFocus.uri === focus.uri && lastFocus.line === focus.line))
     ) {
       // In the last moment before closing an untitled document, we empty its content to avoid
       // the saving confirmation dialog. This must not affect the focus.
       if (isDocumentEmpty && URI.parse(focus.uri).scheme === 'untitled') return;
 
-      const newFocus = { ...lastFocus, uri: focus.uri, number: focus.number, text: focus.text };
+      const newFocus: t.Focus = { ...lastFocus, uri: focus.uri, line: focus.line, text: focus.text };
       if (!_.isEqual(lastFocus, newFocus)) {
         const focusTimeline = lib.spliceImmutable(this.session.body.focusTimeline, lastFocusIndex, 1, newFocus);
         this.insertApplySessionPatch({ body: { focusTimeline } }, { coalescing: true });

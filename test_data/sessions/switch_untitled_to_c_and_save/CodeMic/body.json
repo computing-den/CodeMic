@@ -221,9 +221,9 @@
   "audioTracks": [],
   "videoTracks": [],
   "focusTimeline": [
-    { "clock": 0, "uri": "untitled:Untitled-1", "number": 0, "text": "#include <stdio.h>" },
-    { "clock": 7.317945034999999, "uri": "untitled:Untitled-1", "number": 5, "text": "" },
-    { "clock": 19.221786625000007, "uri": "workspace:adir/main.c", "number": 5, "text": "" }
+    { "clock": 0, "uri": "untitled:Untitled-1", "line": 0, "text": "#include <stdio.h>" },
+    { "clock": 7.317945034999999, "uri": "untitled:Untitled-1", "line": 5, "text": "" },
+    { "clock": 19.221786625000007, "uri": "workspace:adir/main.c", "line": 5, "text": "" }
   ],
   "defaultEol": "\n"
 }
