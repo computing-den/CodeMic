@@ -28,7 +28,7 @@ export default class Player extends React.Component<Props> {
   seeking = false;
 
   load = async () => {
-    await postMessage({ type: 'player/load' });
+    await postMessage({ type: 'player/load', clock: this.props.session.history?.lastWatchedClock });
   };
 
   play = async () => {
@@ -265,7 +265,9 @@ export default class Player extends React.Component<Props> {
               className="subsection subsection_spaced"
               primaryAction={primaryAction}
               actions={toolbarActions}
-              clock={session.clock}
+              clock={
+                !session.loaded && session.history?.lastWatchedClock ? session.history.lastWatchedClock : session.clock
+              }
               duration={head.duration}
             />
             <div

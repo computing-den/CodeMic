@@ -25,7 +25,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'welcome/deleteSession'; sessionId: string }; response: OKResponse }
   | { request: { type: 'welcome/likeSession'; sessionId: string; value: boolean }; response: OKResponse }
   | { request: { type: 'player/openInRecorder' }; response: OKResponse }
-  | { request: { type: 'player/load' }; response: OKResponse }
+  | { request: { type: 'player/load'; clock?: number }; response: OKResponse }
   | { request: { type: 'player/play' }; response: OKResponse }
   | { request: { type: 'player/pause' }; response: OKResponse }
   | { request: { type: 'player/seek'; clock: number }; response: OKResponse }

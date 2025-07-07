@@ -66,6 +66,24 @@
         background: #000000aa;
         z-index: 1;
       }
+
+      & .progress {
+        z-index: 1;
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 2px;
+        background: #444;
+
+        & .filled {
+          position: absolute;
+          top: 0;
+          right: 0;
+          width: 100%;
+          background: #cc0000;
+        }
+      }
     }
 
     .caption {

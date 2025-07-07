@@ -79,6 +79,11 @@ export function SessionListing(props: SessionListingProps) {
       <div className="cover-container">
         <Cover local={local} head={head} />
         <div className="duration">{lib.formatTimeSeconds(head.duration)}</div>
+        {history?.lastWatchedClock ? (
+          <div className="progress">
+            <div className="filled" style={{ height: (history.lastWatchedClock / head.duration) * 100 + '%' }} />
+          </div>
+        ) : null}
       </div>
       <WithAvatar username={head.author} className="caption" small>
         <div className="title">{head.title || 'Untitled'}</div>

@@ -167,7 +167,7 @@ class CodeMic {
       const session = await Session.Core.readLocal(this.context, workspace, { mustScan: recorder?.mustScan });
       assert(session, 'Failed to read sesion after setting workspace folder');
 
-      // Open screen. This is also load the session.
+      // Open screen. This will also load the session.
       if (screen === t.Screen.Player) {
         await this.openScreen({ screen, session, load: true });
       } else if (screen === t.Screen.Recorder) {
@@ -445,7 +445,7 @@ class CodeMic {
           userMetadata: this.userMetadata,
         });
 
-        await this.session.prepare();
+        await this.session.prepare({ clock: req.clock });
         this.enrichSessions([this.session.head.id]).catch(console.error);
         await this.updateFrontend();
         return ok;

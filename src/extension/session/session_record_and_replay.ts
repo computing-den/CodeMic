@@ -240,6 +240,7 @@ export default class SessionRecordAndReplay {
     // Seek to clock.
     let targetUris: string[] | undefined;
     if (options?.clock) {
+      this.clock = Math.max(0, Math.min(this.session.head.duration, options.clock));
       const uriSet: t.UriSet = new Set();
       await this.internalWorkspace.seek(options.clock, uriSet);
       targetUris = Array.from(uriSet);
