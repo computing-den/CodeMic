@@ -442,7 +442,7 @@ export default class SessionCore {
         await this.copyBlobTo(file.sha1, fsPath);
         break;
       case 'blank':
-        assert(scheme === 'workspace');
+        assert(scheme === 'file');
         await storage.writeString(fsPath, '');
         break;
       default:
