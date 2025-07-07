@@ -132,6 +132,14 @@ export default class Player extends React.Component<Props> {
     postMessage({ type: 'account/open', join: true });
   };
 
+  stepBackward = async () => {
+    await postMessage({ type: 'player/seek', clock: this.props.session.clock - 5 });
+  };
+
+  stepForward = async () => {
+    await postMessage({ type: 'player/seek', clock: this.props.session.clock + 5 });
+  };
+
   componentDidUpdate(prevProps: Props) {
     this.updateCoverContainerHeight();
 
@@ -201,6 +209,18 @@ export default class Player extends React.Component<Props> {
       //   onClick: () => postMessage({ type: 'player/likeSession', value: !liked }),
       // },
       {
+        title: 'Jump 5s backwards',
+        icon: 'codicon-chevron-left',
+        onClick: this.stepBackward,
+        disabled: !session.loaded || session.clock === 0,
+      },
+      {
+        title: 'Jump 5s forward',
+        icon: 'codicon-chevron-right',
+        onClick: this.stepForward,
+        disabled: !session.loaded || session.clock === session.head.duration,
+      },
+      {
         title: 'Picture-in-Picture',
         children: <PictureInPicture />,
         onClick: this.togglePictureInPicture,
@@ -212,8 +232,6 @@ export default class Player extends React.Component<Props> {
         title: 'Sync workspace',
         icon: 'codicon-sync',
         onClick: () => postMessage({ type: 'player/syncWorkspace' }),
-        // NOTE: change of video src does not trigger an update
-        //       but it's ok for now, since state/props change during playback.
         disabled: !session.loaded || session.playing,
       },
       {

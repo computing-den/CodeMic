@@ -189,7 +189,7 @@ export default class SessionRecordAndReplay {
    * useStepper is only useful during testing to test the stepper.
    */
   private async seek(clock: number, useStepper?: boolean) {
-    this.clock = Math.min(this.session.head.duration, clock);
+    this.clock = Math.max(0, Math.min(this.session.head.duration, clock));
 
     if (useStepper) {
       await this.workspacePlayer.seek(clock, useStepper);
@@ -207,7 +207,7 @@ export default class SessionRecordAndReplay {
     // assert(!this.running, 'Cannot sync while playing/recording');
 
     if (clock !== undefined) {
-      this.clock = Math.min(this.session.head.duration, clock);
+      this.clock = Math.max(0, Math.min(this.session.head.duration, clock));
     }
     await this.internalWorkspace.seek(this.clock);
     await this.vscWorkspace.sync();

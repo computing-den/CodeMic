@@ -208,29 +208,31 @@ export function deserializeSessionBody(body: any, formatVersion: number): t.Sess
 }
 
 export function deserializeSessionBodyV1(body: t.BodyFormatV1.SessionBodyCompact): t.SessionBody {
+  const untitledRegex = /^untitled:Untitled-\d+$/;
   let editorEvents = _.flatMap(body.editorTracks, (t, uri) => _.map(t, e => deserializeEditorEventV1(e, uri)));
   editorEvents = _.orderBy(editorEvents, 'clock');
 
-  // Since v1 didn't support file system events, we had a lot of openTextDocument
-  // for untitled documents that were then immediately saved to file.
-  // They were always openTextDocument->showTextEditor->closeTextEditor.
-  // Remove them.
-  const untitledRegex = /^untitled:Untitled-\d+$/;
-  for (let i = 0; i < editorEvents.length - 2; ) {
-    const [a, b, c] = [editorEvents[i], editorEvents[i + 1], editorEvents[i + 2]];
-    if (
-      a.type === 'openTextDocument' &&
-      untitledRegex.test(a.uri) &&
-      b.type === 'showTextEditor' &&
-      b.uri === a.uri &&
-      c.type === 'closeTextEditor' &&
-      c.uri === a.uri
-    ) {
-      editorEvents.splice(i, 3);
-    } else {
-      i++;
-    }
-  }
+  // NOTE: the following removes a showTextEditor. The next showTextEditor's revUri is going to be
+  // wrong which causes the wrong value to be set for activeTextEditor (often undefined) when rewinding.
+  // // Since v1 didn't support file system events, we had a lot of openTextDocument
+  // // for untitled documents that were then immediately saved to file.
+  // // They were always openTextDocument->showTextEditor->closeTextEditor.
+  // // Remove them.
+  // for (let i = 0; i < editorEvents.length - 2; ) {
+  //   const [a, b, c] = [editorEvents[i], editorEvents[i + 1], editorEvents[i + 2]];
+  //   if (
+  //     a.type === 'openTextDocument' &&
+  //     untitledRegex.test(a.uri) &&
+  //     b.type === 'showTextEditor' &&
+  //     b.uri === a.uri &&
+  //     c.type === 'closeTextEditor' &&
+  //     c.uri === a.uri
+  //   ) {
+  //     editorEvents.splice(i, 3);
+  //   } else {
+  //     i++;
+  //   }
+  // }
 
   // When creating a new file, we have an openTextDocument with isInWorktree: false.
   // Turn those into fsCreate with blank file if scheme is file.

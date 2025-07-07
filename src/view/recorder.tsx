@@ -409,6 +409,14 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     }
   }
 
+  async function stepBackward() {
+    await postMessage({ type: 'player/seek', clock: session.clock - 5 });
+  }
+
+  async function stepForward() {
+    await postMessage({ type: 'player/seek', clock: session.clock + 5 });
+  }
+
   let primaryAction: MT.PrimaryAction;
   if (session.recording) {
     primaryAction = {
@@ -440,6 +448,18 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
           disabled: session.recording,
           onClick: () => onPlay(selectionClockRange?.start),
         },
+    {
+      title: 'Jump 5s backwards',
+      icon: 'codicon-chevron-left',
+      onClick: stepBackward,
+      disabled: session.recording || session.clock === 0,
+    },
+    {
+      title: 'Jump 5s forward',
+      icon: 'codicon-chevron-right',
+      onClick: stepForward,
+      disabled: session.recording || session.clock === session.head.duration,
+    },
 
     {
       title: 'Picture-in-Picture',
