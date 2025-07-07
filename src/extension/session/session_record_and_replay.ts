@@ -201,6 +201,7 @@ export default class SessionRecordAndReplay {
 
     await this.syncMedia({ hard: true });
     this.updateLoop.resetDiff();
+    this.session.onProgress?.();
   }
 
   private async sync(clock?: number) {
@@ -214,6 +215,10 @@ export default class SessionRecordAndReplay {
 
     await this.syncMedia({ hard: true });
     this.updateLoop.resetDiff();
+
+    if (clock !== undefined) {
+      this.session.onProgress?.();
+    }
   }
 
   private async loadWorkspace(options?: { clock?: number }) {
