@@ -566,3 +566,25 @@ export function getLangaugeIdFromUri(uri: string): string {
 
   return 'plaintext';
 }
+
+export function getRecorderSelectionClockRange(
+  selection: t.RecorderSelection | undefined,
+  tracks: t.RangedTrack[],
+  toc: t.TocItem[],
+): { start: number; end: number } | undefined {
+  if (selection) {
+    switch (selection.type) {
+      case 'editor':
+        return { start: Math.min(selection.anchor, selection.focus), end: Math.max(selection.anchor, selection.focus) };
+      case 'track': {
+        return tracks.find(x => x.id === selection.id)?.clockRange;
+      }
+      case 'chapter': {
+        const chapter = toc[selection.index];
+        return chapter && { start: chapter.clock, end: chapter.clock };
+      }
+      default:
+        unreachable(selection, 'unknown selection');
+    }
+  }
+}

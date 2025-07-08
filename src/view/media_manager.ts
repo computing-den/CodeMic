@@ -20,15 +20,15 @@ export default class MediaManager {
         assert(!this.trackManagers[req.id], `Media already loaded: ${req.mediaType} id: ${req.id}`);
         if (req.mediaType === 'audio') {
           this.trackManagers[req.id] = new AudioTrackManager(req.id, req.src, req.clock);
-        } else if (req.mediaType === 'video') {
+        } else if (req.mediaType === 'video' || req.mediaType === 'image') {
           // Replace existing video if there's one.
           let videoTrackManager = _.find(this.trackManagers, m => m instanceof VideoTrackManager);
           if (videoTrackManager) {
             delete this.trackManagers[videoTrackManager.id];
-            videoTrackManager.replace(req.id, req.src, req.clock, req.loop, req.blank);
           } else {
-            videoTrackManager = new VideoTrackManager(req.id, req.src, req.clock, req.loop, req.blank);
+            videoTrackManager = new VideoTrackManager(req.id, req.mediaType, req.src);
           }
+          await videoTrackManager.replace(req.id, req.mediaType, req.src, req.clock, req.loop, req.blank);
           this.trackManagers[req.id] = videoTrackManager;
         } else {
           throw new Error(`media/load unknow media type ${req.mediaType}`);
@@ -199,25 +199,47 @@ class AudioTrackManager implements TrackManager {
 class VideoTrackManager implements TrackManager {
   video: HTMLVideoElement;
 
-  constructor(public id: string, public src: string, clock: number, loop?: boolean, blank?: boolean) {
+  constructor(public id: string, public mediaType: t.MediaType, public src: string) {
     if (config.logWebviewVideoEvents) console.log(`VideoTrackManager create video ${id}: ${src}`);
 
     const elem = document.querySelector('#guide-video');
-    assert(elem && elem instanceof HTMLVideoElement, 'Did not find video element');
+    assert(elem instanceof HTMLVideoElement, 'Did not find video element');
     this.video = elem;
 
     this.video.addEventListener('error', this.handleError);
-    this.replace(id, src, clock, loop, blank);
   }
 
-  replace(id: string, src: string, clock: number, loop?: boolean, blank?: boolean) {
+  async replace(id: string, mediaType: t.MediaType, src: string, clock: number, loop?: boolean, blank?: boolean) {
+    if (mediaType === 'image') {
+      let img = new Image();
+      const meta = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        img.onload = () => resolve({ width: img.width, height: img.height });
+        img.onerror = reject;
+        img.src = src;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = meta.width;
+      canvas.height = meta.height;
+      const ctx = canvas.getContext('2d');
+      assert(ctx);
+      ctx.drawImage(img, 0, 0);
+
+      const stream = canvas.captureStream(30);
+      this.video.srcObject = stream;
+      this.video.currentTime = 0;
+    } else {
+      this.video.srcObject = null;
+      this.video.src = src;
+      this.video.currentTime = clock;
+    }
+
     this.id = id;
     this.src = src;
+    this.mediaType = mediaType;
     this.video.muted = false;
     this.video.volume = 1;
     this.video.preload = 'auto';
-    this.video.src = src;
-    this.video.currentTime = clock;
     this.video.preservesPitch = true;
     this.video.loop = Boolean(loop);
     if (blank) {

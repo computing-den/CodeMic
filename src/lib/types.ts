@@ -52,6 +52,9 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/insertVideo'; uri: string; clock: number }; response: OKResponse }
   | { request: { type: 'recorder/deleteVideo'; id: string }; response: OKResponse }
   | { request: { type: 'recorder/updateVideo'; update: Partial<VideoTrack> }; response: OKResponse }
+  | { request: { type: 'recorder/insertImage'; uri: string; clock: number }; response: OKResponse }
+  | { request: { type: 'recorder/deleteImage'; id: string }; response: OKResponse }
+  | { request: { type: 'recorder/updateImage'; update: Partial<ImageTrack> }; response: OKResponse }
   | { request: { type: 'recorder/setCover'; uri: string }; response: OKResponse }
   | { request: { type: 'recorder/deleteCover' }; response: OKResponse }
   | { request: { type: 'recorder/changeSpeed'; range: ClockRange; factor: number }; response: OKResponse }
@@ -324,6 +327,7 @@ export type SessionUIState = {
   workspaceFocusTimeline?: Focus[];
   audioTracks?: AudioTrack[];
   videoTracks?: VideoTrack[];
+  imageTracks?: ImageTrack[];
   history?: SessionHistory;
   publication?: SessionPublication;
   // blobsUriMap?: UriMap;
@@ -333,6 +337,7 @@ export type LoadedSessionUIState = SessionUIState & {
   workspaceFocusTimeline: Focus[];
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
+  imageTracks: ImageTrack[];
   // blobsUriMap: UriMap;
 };
 
@@ -411,6 +416,7 @@ export type SessionBody = {
   editorEvents: EditorEvent[];
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
+  imageTracks: ImageTrack[];
   focusTimeline: Focus[];
   defaultEol: EndOfLine;
 };
@@ -422,6 +428,7 @@ export type SessionBodyCompact = {
   editorEvents: EditorEventCompact[];
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
+  imageTracks: ImageTrack[];
   focusTimeline: FocusCompact[];
   defaultEol: EndOfLine;
 };
@@ -449,15 +456,9 @@ export type RangedTrack = {
 
 export type RangedTrackFile = RangedTrack & { file: File };
 
-/**
- * Multiple audio tracks may refer to the same file.
- */
 export type AudioTrack = RangedTrackFile;
-
-/**
- * Multiple video tracks may refer to the same file.
- */
 export type VideoTrack = RangedTrackFile;
+export type ImageTrack = RangedTrackFile;
 
 // export type UriMap = { [key: string]: string };
 

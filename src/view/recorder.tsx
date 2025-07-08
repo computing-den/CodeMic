@@ -67,9 +67,8 @@ export default class Recorder extends React.Component<RecorderProps> {
     await postMessage({ type: 'recorder/load' });
   };
 
-  play = async (clock?: number) => {
+  play = async () => {
     await mediaManager.prepare();
-    if (clock !== undefined) await postMessage({ type: 'recorder/seek', clock });
     await postMessage({ type: 'recorder/play' });
   };
 
@@ -303,7 +302,12 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
   const [cursor, setCursor] = useState<number>();
   const guideVideoRef = useRef<HTMLVideoElement>(null);
 
-  const selectionClockRange = getSelectionClockRange(session, selection);
+  const tracks = _.concat<t.RangedTrack>(
+    session.audioTracks ?? [],
+    session.videoTracks ?? [],
+    session.imageTracks ?? [],
+  );
+  const selectionClockRange = lib.getRecorderSelectionClockRange(selection, tracks, head.toc);
   const selectedChapterIndex = selection?.type === 'chapter' ? selection.index : undefined;
   const selectedChapter = selectedChapterIndex !== undefined ? head.toc[selectedChapterIndex] : undefined;
   const hasEditorSelection = Boolean(getNonEmptyEditorSelection(selection));
@@ -334,7 +338,7 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     } else if (selection.trackType === 'video') {
       await postMessage({ type: 'recorder/deleteVideo', id: selection.id });
     } else {
-      throw new Error('TODO');
+      await postMessage({ type: 'recorder/deleteImage', id: selection.id });
     }
   }
 
@@ -397,6 +401,20 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     }
   }
 
+  async function insertImage() {
+    const { uris } = await postMessage({
+      type: 'showOpenDialog',
+      options: {
+        title: 'Select image file',
+        filters: { Image: ['jpg', 'jpeg', 'png', 'svg', 'webp'] },
+      },
+    });
+    if (uris?.length === 1) {
+      const clock = selectionClockRange?.start ?? 0;
+      await postMessage({ type: 'recorder/insertImage', uri: uris[0], clock });
+    }
+  }
+
   async function togglePictureInPicture() {
     try {
       if (document.pictureInPictureElement) {
@@ -446,7 +464,7 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
           title: 'Play',
           icon: 'codicon-play',
           disabled: session.recording,
-          onClick: () => onPlay(selectionClockRange?.start),
+          onClick: onPlay,
         },
     {
       title: 'Jump 5s backwards',
@@ -598,7 +616,7 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       title="Insert image"
       icon="codicon codicon-device-camera"
       disabled={session.playing || session.recording}
-      onClick={() => console.log('TODO')}
+      onClick={insertImage}
     />,
     <Toolbar.Button
       // ref={insertChapterButtonRef}
@@ -903,6 +921,8 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
       await postMessage({ type: 'recorder/updateAudio', update: { id: trackDrag.load.id, clockRange } });
     } else if (trackDrag.load.type === 'video') {
       await postMessage({ type: 'recorder/updateVideo', update: { id: trackDrag.load.id, clockRange } });
+    } else if (trackDrag.load.type === 'image') {
+      await postMessage({ type: 'recorder/updateImage', update: { id: trackDrag.load.id, clockRange } });
     }
 
     // Must be after postMessage to avoid flash of old track.
@@ -1112,7 +1132,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 
     // const groupedEditorTracks = groupEditorEvents(recorder.editorTrack!.events, timelineDuration, timelineHeightPx);
     const tracks = _.orderBy(
-      _.concat<t.RangedTrack>(session.audioTracks ?? [], session.videoTracks ?? []),
+      _.concat<t.RangedTrack>(session.audioTracks ?? [], session.videoTracks ?? [], session.imageTracks ?? []),
       track => track.clockRange.start,
     );
 
@@ -1304,8 +1324,14 @@ class RangedTracksUI extends React.Component<RangedTracksUIProps> {
             minHeight: `${TRACK_HEIGHT_PX}px`,
           };
 
-          const icon =
-            track.type === 'audio' ? 'codicon-mic' : track.type === 'video' ? 'codicon-device-camera-video' : '';
+          let icon = '';
+          if (track.type === 'audio') {
+            icon = 'codicon-mic';
+          } else if (track.type === 'video') {
+            icon = 'codicon-device-camera-video';
+          } else if (track.type === 'image') {
+            icon = 'codicon-device-camera';
+          }
 
           return (
             <div
@@ -1767,39 +1793,6 @@ function getClockOfTimelineDrag(baseClock: number, markerDrag: TimelineDrag<any>
 // function getEditorSelectionFocus(selection?: Selection): number | undefined {
 //   if (selection?.type === 'editor') return selection.focus;
 // }
-
-function getSelectionClockRange(
-  session: t.SessionUIState,
-  selection?: t.RecorderSelection,
-): { start: number; end: number } | undefined {
-  if (selection) {
-    switch (selection.type) {
-      case 'editor':
-        return { start: Math.min(selection.anchor, selection.focus), end: Math.max(selection.anchor, selection.focus) };
-      case 'track': {
-        switch (selection.trackType) {
-          case 'audio':
-          case 'video': {
-            const track =
-              session.audioTracks?.find(x => x.id === selection.id) ??
-              session.videoTracks?.find(x => x.id === selection.id);
-            return track?.clockRange;
-          }
-          case 'image':
-            throw new Error('TODO');
-          default:
-            throw new Error('Unknown track type');
-        }
-      }
-      case 'chapter': {
-        const chapter = session.head.toc[selection.index];
-        return chapter && { start: chapter.clock, end: chapter.clock };
-      }
-      default:
-        lib.unreachable(selection, 'unknown selection');
-    }
-  }
-}
 
 function getNonEmptyEditorSelection(selection?: t.RecorderSelection): t.ClockRange | undefined {
   if (selection?.type === 'editor' && selection.focus !== selection.anchor) {

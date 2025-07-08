@@ -451,7 +451,7 @@ export default class SessionCore {
   }
 
   async copyToBlob(src: string, sha1: string) {
-    await fs.promises.cp(src, path.join(this.dataPath, 'blobs', sha1), { recursive: true });
+    await fs.promises.cp(src, path.join(this.dataPath, 'blobs', sha1), { force: true, recursive: true });
   }
 
   async copyBlobTo(sha1: string, dst: string) {
@@ -572,6 +572,7 @@ export default class SessionCore {
     // Find blobs in audio and video tracks.
     for (const track of body.audioTracks) maybeAddFile(track.file);
     for (const track of body.videoTracks) maybeAddFile(track.file);
+    for (const track of body.imageTracks) maybeAddFile(track.file);
 
     return blobs;
   }

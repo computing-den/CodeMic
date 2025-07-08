@@ -650,6 +650,27 @@ class CodeMic {
         await this.updateFrontend();
         return ok;
       }
+      case 'recorder/insertImage': {
+        assert(this.session?.isLoaded());
+        const change = await this.session.editor.insertImageTrack(req.uri, req.clock);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
+        await this.updateFrontend();
+        return ok;
+      }
+      case 'recorder/deleteImage': {
+        assert(this.session?.isLoaded());
+        const change = this.session.editor.deleteImageTrack(req.id);
+        await this.session.rr.enqueueSyncAfterSessionChange(change);
+        await this.updateFrontend();
+        return ok;
+      }
+      case 'recorder/updateImage': {
+        assert(this.session?.isLoaded());
+        const change = this.session.editor.updateImageTrack(req.update);
+        if (change) await this.session.rr.enqueueSyncAfterSessionChange(change);
+        await this.updateFrontend();
+        return ok;
+      }
       case 'recorder/setCover': {
         assert(this.session);
         await this.session.editor.setCover(req.uri);
@@ -1157,6 +1178,7 @@ class CodeMic {
         workspaceFocusTimeline: this.session.body?.focusTimeline,
         audioTracks: this.session.body?.audioTracks,
         videoTracks: this.session.body?.videoTracks,
+        imageTracks: this.session.body?.imageTracks,
         history: this.context.settings.history[this.session.head.id],
         publication: this.publications.get(this.session.head.id),
       };

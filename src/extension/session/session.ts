@@ -122,6 +122,7 @@ export class Session {
           editorEvents: [],
           audioTracks: [],
           videoTracks: [],
+          imageTracks: [],
           focusTimeline: [],
           defaultEol: os.EOL as t.EndOfLine,
         });

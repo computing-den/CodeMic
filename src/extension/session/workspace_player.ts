@@ -8,7 +8,7 @@ import _ from 'lodash';
 import { LoadedSession } from './session.js';
 import VscWorkspace from './vsc_workspace.js';
 
-const STEP_COUNT_THRESHOLD = 10;
+const STEP_COUNT_THRESHOLD = 50;
 
 class WorkspacePlayer {
   playing = false;

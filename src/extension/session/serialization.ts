@@ -20,6 +20,7 @@ export function serializeSessionBody(body: t.SessionBody): t.SessionBodyExport {
     editorEvents: _.map(body.editorEvents, t => serializeEditorEvent(t, uriMap)),
     audioTracks: body.audioTracks,
     videoTracks: body.videoTracks,
+    imageTracks: body.imageTracks,
     defaultEol: body.defaultEol,
     focusTimeline: body.focusTimeline.map(f => serializeFocus(f, uriMap)),
   };
@@ -274,6 +275,7 @@ export function deserializeSessionBodyV1(body: t.BodyFormatV1.SessionBodyCompact
     editorEvents,
     audioTracks: body.audioTracks.map(deserializeAudioTrackV1),
     videoTracks: body.videoTracks.map(deserializeVideoTrackV1),
+    imageTracks: [],
     defaultEol: body.defaultEol,
     focusTimeline: body.focusTimeline.map(deserializeFocusV1),
   };
@@ -286,6 +288,7 @@ export function deserializeSessionBodyV2(body: t.SessionBodyExport): t.SessionBo
     editorEvents: _.map(body.editorEvents, t => deserializeEditorEvent(t, body.uris)),
     audioTracks: body.audioTracks,
     videoTracks: body.videoTracks,
+    imageTracks: body.imageTracks,
     defaultEol: body.defaultEol,
     focusTimeline: body.focusTimeline.map(f => deserializeFocus(f, body.uris)),
   };

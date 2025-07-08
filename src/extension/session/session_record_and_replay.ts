@@ -4,8 +4,6 @@ import * as lib from '../../lib/lib.js';
 import assert from '../../lib/assert.js';
 import type { LoadedSession } from './session.js';
 import config from '../config.js';
-// import AudioTrackPlayer from './audio_track_player.js';
-// import VideoTrackPlayer from './video_track_player.js';
 import InternalWorkspace, { SeekData, SeekStep } from './internal_workspace.js';
 import WorkspacePlayer from './workspace_player.js';
 import WorkspaceRecorder from './workspace_recorder.js';
@@ -288,13 +286,34 @@ export default class SessionRecordAndReplay {
     this.statusBarItem.command = 'codemic.pause';
     this.statusBarItem.show();
 
+    // Find possible seek clock.
+    let seekTo: number | undefined;
+    if (this.session.editor.selection) {
+      const tracks = _.concat<t.RangedTrack>(
+        this.session.body.audioTracks ?? [],
+        this.session.body.videoTracks ?? [],
+        this.session.body.imageTracks ?? [],
+      );
+      const selectionClockRange = lib.getRecorderSelectionClockRange(
+        this.session.editor.selection,
+        tracks,
+        this.session.head.toc,
+      );
+      if (selectionClockRange) {
+        seekTo = selectionClockRange.start;
+      }
+    } else if (this.isAlmostAtTheEnd()) {
+      seekTo = 0;
+    }
+
     // Seek and sync.
-    if (this.isAlmostAtTheEnd()) {
-      this.clock = 0;
-      await this.internalWorkspace.seek(0);
+    if (seekTo !== undefined) {
+      this.clock = seekTo;
+      await this.internalWorkspace.seek(seekTo);
     }
     await this.vscWorkspace.sync();
 
+    await this.syncMedia({ hard: true });
     await this.workspacePlayer.play();
     this.updateLoop.start();
   }
@@ -390,11 +409,18 @@ export default class SessionRecordAndReplay {
     const inRangeVideoTrack = _.findLast(this.session.body.videoTracks, t => this.isTrackInRange(t));
     // const outOfRangeVideoTracks = this.session.body.videoTracks.filter(t => t !== inRangeVideoTrack);
 
+    // Only one image at a time (the last one).
+    // Images are shown using the video element, so they override the video.
+    const inRangeImageTrack = _.findLast(this.session.body.imageTracks, t => this.isTrackInRange(t));
+
+    // TODO once we merge all track types, the order should be which ever comes last.
+    const inRangeVideoOrImageTrack = inRangeImageTrack ?? inRangeVideoTrack;
+
     // If there is at least one video track, but no in-range video, load the
     // blank video on loop so that the frontend has a video it can use to
     // prepare the HTMLVideoElement on user interaction.
     // First check if the blank video is already running.
-    const showingBlankVideo = this.session.body.videoTracks.length > 0 && !inRangeVideoTrack;
+    const showingBlankVideo = this.session.body.videoTracks.length > 0 && !inRangeVideoOrImageTrack;
     if (showingBlankVideo) {
       if (!mediaStatuses[BLANK_VIDEO_ID]) {
         await postMessage({
@@ -436,7 +462,7 @@ export default class SessionRecordAndReplay {
     // We can get away with this for video because there is only one
     // HTMLVideoElement on the page and on the frontend, play() and seek()
     // prepare the HTMLVideoElement immediately.
-    const tracksToLoad = _.compact([...this.session.body.audioTracks, inRangeVideoTrack]).filter(
+    const tracksToLoad = _.compact([...this.session.body.audioTracks, inRangeVideoOrImageTrack]).filter(
       t => !mediaStatuses[t.id],
     );
     await Promise.all(
@@ -456,12 +482,13 @@ export default class SessionRecordAndReplay {
 
     // Combine in range tracks.
     const inRangeAudioTracks = this.session.body.audioTracks.filter(t => this.isTrackInRange(t));
-    const inRangeTracks = _.compact([...inRangeAudioTracks, inRangeVideoTrack]);
+    const inRangeTracks = _.compact([...inRangeAudioTracks, inRangeVideoOrImageTrack]);
 
     // Seek. When opts.hard, seek exactly to current clock, otherwise, seek only
     // if clock is too far off.
     const clockDiffThreshold = 3;
     const shouldSeekTrack = (t: t.RangedTrack) => {
+      if (inRangeVideoOrImageTrack?.type === 'image') return false;
       if (!mediaStatuses[t.id]) return false;
       const trackGlobalClock = this.trackLocalClockToGlobal(mediaStatuses[t.id].currentTime, t);
       const clockDiff = Math.abs(trackGlobalClock - this.clock);
@@ -482,9 +509,10 @@ export default class SessionRecordAndReplay {
     }
 
     // Adjust playback rate to catch up with current clock if track was not already sought.
-    const tracksNotSought = _.difference(inRangeTracks, tracksToSeek).filter(t => mediaStatuses[t.id]);
+    const tracksNotSought = _.difference(inRangeTracks, tracksToSeek);
+    const tracksToAdjustRate = tracksNotSought.filter(t => mediaStatuses[t.id] && t.type !== 'image');
     await Promise.all(
-      tracksNotSought.map(t => {
+      tracksToAdjustRate.map(t => {
         const trackGlobalClock = this.trackLocalClockToGlobal(mediaStatuses[t.id].currentTime, t);
         const rate = lib.adjustTrackPlaybackRate(this.clock, trackGlobalClock);
         if (rate !== undefined && Math.abs(mediaStatuses[t.id].playbackRate - rate) > 0.001) {
@@ -495,7 +523,11 @@ export default class SessionRecordAndReplay {
 
     // Dispose of any audio or video that no longer exists.
     // This only happens in recorder when the user deletes a track.
-    const allTracks = [...this.session.body.audioTracks, ...this.session.body.videoTracks];
+    const allTracks = [
+      ...this.session.body.audioTracks,
+      ...this.session.body.videoTracks,
+      ...this.session.body.imageTracks,
+    ];
     await Promise.all(
       _.map(mediaStatuses, (mediaStatus, id) => {
         const track = allTracks.find(t => t.id === id);

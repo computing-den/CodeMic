@@ -279,6 +279,75 @@ export default class SessionEditor {
     });
   }
 
+  async insertImageTrack(uri: string, clock: number): Promise<t.SessionChange> {
+    assert(this.session.isLoaded());
+    const fsPath = URI.parse(uri).fsPath;
+    const data = await fs.promises.readFile(fsPath);
+    // const metadata = await getMp4MetaData(data);
+
+    // Supported image codec example (h264): 'avc1.64001f'
+    // Supported audio codec example (mp3): 'mp4a.6b'
+    // Unsupported image codec example (h265): 'hev1.1.6.L90.90'
+    // Unsupported audio codec example (aac): 'mp4a.40.2'
+    // if (metadata.imageTracks.some((t: any) => !t.codec.startsWith('avc1'))) {
+    //   throw new Error(
+    //     `Unsupported image codec. Please use H264 + MP3 codecs. Try: ffmpeg -i input.mp4 -c:v libx264 -c:a libmp3lame output.mp4`,
+    //   );
+    // }
+    // if (metadata.audioTracks.some((t: any) => !t.codec.startsWith('mp4a.6b'))) {
+    //   throw new Error(
+    //     `Unsupported audio codec. Please use H264 + MP3 codecs. Try: ffmpeg -i input.mp4 -c:v libx264 -c:a libmp3lame output.mp4`,
+    //   );
+    // }
+
+    const duration = 10;
+    const sha1 = await misc.computeSHA1(data);
+    await this.session.core.copyToBlob(fsPath, sha1);
+    const id = uuid();
+    const imageTrack: t.ImageTrack = {
+      id,
+      type: 'image',
+      clockRange: { start: clock, end: clock + duration },
+      file: { type: 'blob', sha1: sha1 },
+      title: path.basename(fsPath),
+    };
+
+    let { imageTracks } = this.session.body;
+    imageTracks = lib.spliceImmutable(imageTracks, imageTracks.length, 0, imageTrack);
+    const sessionDuration = Math.max(this.session.head.duration, imageTrack.clockRange.end);
+    return this.insertApplySessionPatch({
+      body: { imageTracks },
+      head: { duration: sessionDuration },
+      effects: [{ type: 'setSelection', after: { type: 'track', trackType: 'image', id } }],
+    });
+  }
+
+  deleteImageTrack(id: string): t.SessionChange {
+    assert(this.session.isLoaded());
+    const imageTracks = this.session.body.imageTracks.filter(t => t.id !== id);
+    return this.insertApplySessionPatch({
+      body: { imageTracks },
+      effects: [{ type: 'setSelection', before: { type: 'track', trackType: 'image', id } }],
+    });
+  }
+
+  updateImageTrack(update: Partial<t.ImageTrack>): t.SessionChange | undefined {
+    assert(this.session.isLoaded());
+    assert(update.id);
+    const imageTracks = this.session.body.imageTracks.map(t => (t.id === update.id ? { ...t, ...update } : t));
+    if (_.isEqual(imageTracks, this.session.body.imageTracks)) return;
+    return this.insertApplySessionPatch({
+      body: { imageTracks },
+      effects: [
+        {
+          type: 'setSelection',
+          before: { type: 'track', trackType: 'image', id: update.id },
+          after: { type: 'track', trackType: 'image', id: update.id },
+        },
+      ],
+    });
+  }
+
   updateDuration(duration: number, opts?: { coalescing?: boolean }) {
     this.insertApplySessionPatch({ head: { duration } }, opts);
   }
