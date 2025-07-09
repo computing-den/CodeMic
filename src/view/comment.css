@@ -52,11 +52,10 @@
   gap: var(--spacing-medium);
 }
 
-/* .comment-list { */
-/*   .comment { */
-/*     padding: var(--spacing-medium) var(--container-padding); */
-/*   } */
-/* } */
+.comment-list {
+  display: grid;
+  gap: var(--spacing-medium);
+}
 
 .comment-input {
   /* padding: var(--spacing-medium) var(--container-padding); */

@@ -174,6 +174,10 @@ export default class Player extends React.Component<Props> {
     // const { cache } = this.context;
     const { session, user } = this.props;
     const { head, publication, local } = session;
+    let clock = session.clock;
+    if (!session.loaded && session.history?.lastWatchedClock) {
+      clock = session.history.lastWatchedClock;
+    }
 
     let primaryAction: MT.PrimaryAction;
     if (session.playing) {
@@ -265,9 +269,7 @@ export default class Player extends React.Component<Props> {
               className="subsection subsection_spaced"
               primaryAction={primaryAction}
               actions={toolbarActions}
-              clock={
-                !session.loaded && session.history?.lastWatchedClock ? session.history.lastWatchedClock : session.clock
-              }
+              clock={clock}
               duration={head.duration}
             />
             <div
@@ -312,7 +314,7 @@ export default class Player extends React.Component<Props> {
               </div>
               )*/}
             {head.toc.length > 0 && (
-              <TableOfContent head={head} onClick={this.tocItemClicked} clock={session.clock} loaded={session.loaded} />
+              <TableOfContent head={head} onClick={this.tocItemClicked} clock={clock} loaded={session.loaded} />
             )}
           </Section.Body>
         </Section>
@@ -366,7 +368,13 @@ function TableOfContent(props: {
   const EXPAND_THRESHOLD = 10;
   const [expanded, setExpanded] = useState(false);
   const expandable = props.head.toc.length > EXPAND_THRESHOLD;
-  const toc = expandable && !expanded ? props.head.toc.slice(0, EXPAND_THRESHOLD) : props.head.toc;
+  let toc = props.head.toc;
+  let startIndex = 0;
+  if (expandable && !expanded) {
+    let cur = tocIndex === -1 ? 0 : tocIndex;
+    startIndex = Math.max(0, cur - EXPAND_THRESHOLD + 3);
+    toc = toc.slice(startIndex, startIndex + EXPAND_THRESHOLD);
+  }
 
   function toggleExpansion(e: React.MouseEvent) {
     e.preventDefault();
@@ -376,10 +384,19 @@ function TableOfContent(props: {
 
   return (
     <div className="subsection toc">
+      {startIndex > 0 && (
+        <a className="expand unstyled" href="#" onClick={toggleExpansion}>
+          ...
+        </a>
+      )}
       {toc.map((item, i) => (
         <div
           tabIndex={0}
-          className={cn('item', props.loaded && 'selectable', i === tocIndex && props.loaded && 'active')}
+          className={cn(
+            'item',
+            props.loaded && 'selectable',
+            i + startIndex === tocIndex && (props.loaded || tocIndex > 0) && 'active',
+          )}
           onClick={e => clicked(e, item)}
         >
           <div className="title">{item.title}</div>

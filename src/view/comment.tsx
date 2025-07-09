@@ -82,20 +82,15 @@ export class Comment extends React.Component<CommentProps> {
 // }
 
 export type CommentListProps = { comments?: t.Comment[]; className?: string };
-export class CommentList extends React.Component<CommentListProps> {
-  render() {
-    let { comments, className } = this.props;
-
-    comments = _.orderBy(comments, c => c.creationTimestamp, 'desc');
-
-    return (
-      <div className={cn('comment-list', className)}>
-        {comments?.map(comment => (
-          <Comment comment={comment} />
-        ))}
-      </div>
-    );
-  }
+export function CommentList(props: CommentListProps) {
+  const comments = _.orderBy(props.comments, c => c.creationTimestamp, 'desc');
+  return (
+    <div className={cn('comment-list', props.className)}>
+      {comments.map(comment => (
+        <Comment comment={comment} />
+      ))}
+    </div>
+  );
 }
 
 export type CommentInputProps = {
