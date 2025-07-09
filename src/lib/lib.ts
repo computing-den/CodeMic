@@ -187,26 +187,28 @@ export function isLoadedSession(session: t.SessionUIState): session is t.LoadedS
   return session.loaded;
 }
 
+const PLAYBACK_RATE_THRESHOLDS = [
+  { limit: 3.0, adjustment: 1 },
+  { limit: 2.0, adjustment: 0.4 },
+  { limit: 1.0, adjustment: 0.2 },
+  { limit: 0.6, adjustment: 0.1 },
+  { limit: 0.3, adjustment: 0.02 },
+  { limit: 0.1, adjustment: 0.01 },
+];
+
 /**
  * Returns undefined if playback rate shouldn't change.
  */
 export function adjustTrackPlaybackRate(sessionClock: number, trackClock: number): number | undefined {
   const diff = sessionClock - trackClock;
-  if (Math.abs(diff) > 3.0) {
-    return Math.sign(diff) * 1 + 1;
-  } else if (Math.abs(diff) > 2.0) {
-    return Math.sign(diff) * 0.4 + 1;
-  } else if (Math.abs(diff) > 1.0) {
-    return Math.sign(diff) * 0.2 + 1;
-  } else if (Math.abs(diff) > 0.6) {
-    return Math.sign(diff) * 0.1 + 1;
-  } else if (Math.abs(diff) > 0.3) {
-    return Math.sign(diff) * 0.02 + 1;
-  } else if (Math.abs(diff) > 0.1) {
-    return Math.sign(diff) * 0.01 + 1;
-  } else if (Math.abs(diff) < 0.05) {
-    return 1;
+  const absDiff = Math.abs(diff);
+  const sign = Math.sign(diff);
+
+  for (const { limit, adjustment } of PLAYBACK_RATE_THRESHOLDS) {
+    if (absDiff > limit) return 1 + sign * adjustment;
   }
+  if (absDiff > 0.05) return undefined; // no changes
+  return 1;
 }
 
 export class Vec2 {

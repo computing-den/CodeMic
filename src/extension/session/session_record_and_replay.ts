@@ -488,17 +488,22 @@ export default class SessionRecordAndReplay {
     // if clock is too far off.
     const clockDiffThreshold = 3;
     const shouldSeekTrack = (t: t.RangedTrack) => {
-      if (inRangeVideoOrImageTrack?.type === 'image') return false;
-      if (!mediaStatuses[t.id]) return false;
-      const trackGlobalClock = this.trackLocalClockToGlobal(mediaStatuses[t.id].currentTime, t);
-      const clockDiff = Math.abs(trackGlobalClock - this.clock);
-      return opts?.hard || clockDiff >= clockDiffThreshold;
+      if (opts?.hard) {
+        return true;
+      } else if (t.type === 'image' || !mediaStatuses[t.id]) {
+        return false;
+      } else {
+        const trackGlobalClock = this.trackLocalClockToGlobal(mediaStatuses[t.id].currentTime, t);
+        const clockDiff = Math.abs(trackGlobalClock - this.clock);
+        return clockDiff >= clockDiffThreshold;
+      }
     };
     const tracksToSeek = inRangeTracks.filter(shouldSeekTrack);
     await Promise.all(
-      tracksToSeek.map(t =>
+      tracksToSeek.flatMap(t => [
         postMessage({ type: 'media/seek', mediaType: t.type, id: t.id, clock: this.globalClockToTrackLocal(t) }),
-      ),
+        postMessage({ type: 'media/setPlaybackRate', mediaType: t.type, id: t.id, rate: 1 }),
+      ]),
     );
 
     // Play in-range tracks if session is running. We may call syncMedia() just

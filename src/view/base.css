@@ -28,10 +28,10 @@
   --marker-z-index: 10;
   --range-selection-z-index: -1;
   --range-selection-background: var(--vscode-editor-selectionBackground);
-  --cursor-marker-z-index: 11;
+  --cursor-marker-z-index: 15;
   --line-focus-z-index: 0;
   --track-z-index: 1;
-  --active-track-z-index: 2;
+  --active-track-z-index: 11;
   --popover-z-index: 100;
   --cover-container-border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--popover-border));
   --popover-button-min-width: 60px;
@@ -70,6 +70,9 @@ body.vscode-light {
   /* --editor-track-document-focus-background-hover: #b8b0e4; */
   /* --editor-track-document-focus-border: #8f86bd; */
   /* --editor-track-document-focus-border-active: #8f86bd; */
+
+  --editor-track-resize-handle-color: #000;
+  --editor-track-resize-handle-shadow: #fff;
 }
 body.vscode-dark {
   --ranged-track-border: #007acc;
@@ -106,6 +109,9 @@ body.vscode-dark {
   /* --editor-track-document-focus-border-active: #007acc; */
 
   --marker-cursor-color: #cccccc;
+
+  --editor-track-resize-handle-color: #fff;
+  --editor-track-resize-handle-shadow: #000;
 }
 
 html,

@@ -759,6 +759,7 @@ type TimelineProps = {
 type TimelineState = {
   pxToSecRatio: number;
   trackDrag?: TimelineDrag<t.RangedTrack>;
+  trackExtendDrag?: TimelineDrag<t.RangedTrack>;
   markerDrag?: TimelineDrag<MarkerDragLoad>;
 };
 class Timeline extends React.Component<TimelineProps, TimelineState> {
@@ -898,11 +899,16 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   // };
 
   trackClicked = (e: React.MouseEvent, track: t.RangedTrack) => {
+    e.stopPropagation();
     this.props.setSelection({ type: 'track', trackType: track.type, id: track.id });
   };
 
   trackDragStarted = (e: React.DragEvent, track: t.RangedTrack) => {
-    e.dataTransfer?.setDragImage(new Image(), 0, 0);
+    e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.setDragImage(new Image(), 0, 0);
+      e.dataTransfer.effectAllowed = 'none';
+    }
     // if (track.type === 'editor') return;
 
     const startClockUnderMouse = this.getClockUnderMouse(e.nativeEvent);
@@ -933,6 +939,44 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     const curClockUnderMouse = this.getClockUnderMouse(e.nativeEvent);
     if (curClockUnderMouse !== undefined && this.state.trackDrag) {
       this.setState({ trackDrag: { ...this.state.trackDrag, curClockUnderMouse } });
+    }
+  };
+
+  trackExtendDragStarted = (e: React.DragEvent, track: t.RangedTrack) => {
+    e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.setDragImage(new Image(), 0, 0);
+      e.dataTransfer.effectAllowed = 'none';
+    }
+
+    const startClockUnderMouse = this.getClockUnderMouse(e.nativeEvent);
+    if (startClockUnderMouse !== undefined) {
+      console.log('trackExtendDragStarted', track, startClockUnderMouse);
+      this.setState({
+        trackExtendDrag: { load: track, startClockUnderMouse, curClockUnderMouse: startClockUnderMouse },
+      });
+    }
+  };
+
+  trackExtendDragEnded = async (e: React.DragEvent, _track: t.RangedTrack) => {
+    const { trackExtendDrag } = this.state;
+    if (!trackExtendDrag) return;
+
+    const clockRange = getClockRangeOfTrackExtendDrag(trackExtendDrag);
+    if (trackExtendDrag.load.type === 'image') {
+      await postMessage({ type: 'recorder/updateImage', update: { id: trackExtendDrag.load.id, clockRange } });
+    } else {
+      throw Error(`Cannot extend track ${trackExtendDrag.load.type}`);
+    }
+
+    // Must be after postMessage to avoid flash of old track.
+    this.setState({ trackExtendDrag: undefined });
+  };
+
+  trackExtendDragged = (e: React.DragEvent, _track: t.RangedTrack) => {
+    const curClockUnderMouse = this.getClockUnderMouse(e.nativeEvent);
+    if (curClockUnderMouse !== undefined && this.state.trackExtendDrag) {
+      this.setState({ trackExtendDrag: { ...this.state.trackExtendDrag, curClockUnderMouse } });
     }
   };
 
@@ -1110,7 +1154,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 
   render() {
     const { cursor, selection, session, setSelection, editChapter, selectionRef } = this.props;
-    const { pxToSecRatio, trackDrag, markerDrag } = this.state;
+    const { pxToSecRatio, trackDrag, trackExtendDrag, markerDrag } = this.state;
     // const clockMarker: Marker | undefined =
     //   session.clock > 0 && session.clock !== session.head.duration && !session.recording
     //     ? { id: 'clock', clock: session.clock, type: 'clock' }
@@ -1164,6 +1208,10 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
               onDrag={this.trackDragged}
               onDragStart={this.trackDragStarted}
               onDragEnd={this.trackDragEnded}
+              trackExtendDrag={trackExtendDrag}
+              onExtendDrag={this.trackExtendDragged}
+              onExtendDragStart={this.trackExtendDragStarted}
+              onExtendDragEnd={this.trackExtendDragEnded}
             />
             <div className="markers">
               {cursor !== undefined && (
@@ -1259,6 +1307,11 @@ type RangedTracksUIProps = {
   onDragEnd: (e: React.DragEvent, track: t.RangedTrack) => any;
   onDrag: (e: React.DragEvent, track: t.RangedTrack) => any;
   trackDrag?: TimelineDrag<t.RangedTrack>;
+
+  onExtendDragStart: (e: React.DragEvent, track: t.RangedTrack) => any;
+  onExtendDragEnd: (e: React.DragEvent, track: t.RangedTrack) => any;
+  onExtendDrag: (e: React.DragEvent, track: t.RangedTrack) => any;
+  trackExtendDrag?: TimelineDrag<t.RangedTrack>;
 };
 // type RangedTrackLayout = {
 //   start: number;
@@ -1269,91 +1322,101 @@ type RangedTracksUIProps = {
 // type TrackLayout = {columns: RangedTrackLayoutColumn[]};
 // type RangedTrackLayoutColumn = {};
 // type RangedTrackLayoutColumn = t.RangedTrack[];
-class RangedTracksUI extends React.Component<RangedTracksUIProps> {
-  render() {
-    const { tracks, timelineDuration, selection, onClick, onDrag, onDragStart, onDragEnd, trackDrag } = this.props;
+function RangedTracksUI(props: RangedTracksUIProps) {
+  const {
+    tracks,
+    timelineDuration,
+    selection,
+    onClick,
+    onDrag,
+    onDragStart,
+    onDragEnd,
+    trackDrag,
+    onExtendDrag,
+    onExtendDragStart,
+    onExtendDragEnd,
+    trackExtendDrag,
+  } = props;
 
-    // let layouts: RangedTrackLayout[] = [];
-
-    // Two columns
-    // for (let i = 0; i < tracks.length; ) {
-    //   if (i === tracks.length - 1 || !doClockRangesOverlap(tracks[i], tracks[i + 1])) {
-    //     layouts.push({ start: 0, end: 2, track: tracks[i] });
-    //     i++;
-    //   } else {
-    //     layouts.push({ start: 0, end: 1, track: tracks[i] });
-    //     layouts.push({ start: 1, end: 2, track: tracks[i + 1] });
-    //     i += 2;
-    //   }
-    // }
-
-    // Single column
-    // for (const [i, track] of tracks.entries()) {
-    //   let indent = 0;
-    //   for (const track2 of tracks.slice(0, i)) {
-    //     if (lib.doClockRangesOverlap(track.clockRange, track2.clockRange)) indent++;
-    //   }
-    //   layouts.push({ start: 0, end: 2, track, indent });
-    // }
-
-    // const columnHalfGap = 0.25;
-
-    const layouts: { track: t.RangedTrack; indent: number }[] = tracks.map(track => ({ track, indent: 0 }));
-    for (const [i, layout] of layouts.entries()) {
-      for (const layout2 of layouts.slice(0, i)) {
-        if (lib.doClockRangesOverlap(layout.track.clockRange, layout2.track.clockRange)) {
-          layout.indent = Math.max(layout.indent, layout2.indent) + 1;
-        }
+  const layouts: { track: t.RangedTrack; indent: number }[] = tracks.map(track => ({ track, indent: 0 }));
+  for (const [i, layout] of layouts.entries()) {
+    for (const layout2 of layouts.slice(0, i)) {
+      if (lib.doClockRangesOverlap(layout.track.clockRange, layout2.track.clockRange)) {
+        layout.indent = Math.max(layout.indent, layout2.indent) + 1;
       }
     }
-
-    return (
-      <div className="ranged-tracks">
-        {layouts.map(({ indent, track }, i) => {
-          const indentPx = indent * TRACK_INDENT_PX;
-
-          const clockRange = track.id === trackDrag?.load.id ? getClockRangeOfTrackDrag(trackDrag) : track.clockRange;
-
-          const style = {
-            // left: `calc(${start * 50}% + ${columnHalfGap}rem + ${indent * TRACK_INDENT_PX}px)`,
-            // width: `calc(${(end - start) * 50}% - ${columnHalfGap * 2}rem - ${indent * TRACK_INDENT_PX}px)`,
-            right: `${indentPx}px`,
-            // maxWidth: `calc(50px - ${indentPx})`,
-            top: `${(clockRange.start / timelineDuration) * 100}%`,
-            bottom: `calc(100% - ${(clockRange.end / timelineDuration) * 100}%)`,
-            minHeight: `${TRACK_HEIGHT_PX}px`,
-          };
-
-          let icon = '';
-          if (track.type === 'audio') {
-            icon = 'codicon-mic';
-          } else if (track.type === 'video') {
-            icon = 'codicon-device-camera-video';
-          } else if (track.type === 'image') {
-            icon = 'codicon-device-camera';
-          }
-
-          return (
-            <div
-              key={track.id}
-              className={cn('track', selection?.type === 'track' && selection.id === track.id && 'active')}
-              style={style}
-              onClick={e => onClick(e, track)}
-              onDragStart={e => onDragStart(e, track)}
-              onDrag={e => onDrag(e, track)}
-              onDragEnd={e => onDragEnd(e, track)}
-              draggable
-            >
-              <p>
-                <span className={`codicon va-middle m-right_small ${icon}`} />
-                {track.title}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-    );
   }
+
+  return (
+    <div className="ranged-tracks">
+      {layouts.map(({ indent, track }, i) => {
+        const indentPx = indent * TRACK_INDENT_PX;
+        const selected = selection?.type === 'track' && selection.id === track.id;
+        const dragging = track.id === trackDrag?.load.id;
+        const extending = track.id === trackExtendDrag?.load.id;
+
+        let clockRange = track.clockRange;
+        if (dragging) {
+          clockRange = getClockRangeOfTrackDrag(trackDrag);
+        } else if (extending) {
+          clockRange = getClockRangeOfTrackExtendDrag(trackExtendDrag);
+        }
+
+        const style = {
+          // left: `calc(${start * 50}% + ${columnHalfGap}rem + ${indent * TRACK_INDENT_PX}px)`,
+          // width: `calc(${(end - start) * 50}% - ${columnHalfGap * 2}rem - ${indent * TRACK_INDENT_PX}px)`,
+          right: `${indentPx}px`,
+          // maxWidth: `calc(50px - ${indentPx})`,
+          top: `${(clockRange.start / timelineDuration) * 100}%`,
+          bottom: `calc(100% - ${(clockRange.end / timelineDuration) * 100}%)`,
+          minHeight: `${TRACK_HEIGHT_PX}px`,
+        };
+
+        let icon = '';
+        let showResizeHandle = false;
+        if (track.type === 'audio') {
+          icon = 'codicon-mic';
+        } else if (track.type === 'video') {
+          icon = 'codicon-device-camera-video';
+        } else if (track.type === 'image') {
+          icon = 'codicon-device-camera';
+          showResizeHandle = true;
+        }
+
+        return (
+          <div
+            key={track.id}
+            className={cn(
+              'track',
+              (selected || dragging || extending) && 'active',
+              dragging && 'dragging',
+              extending && 'extending',
+            )}
+            style={style}
+            onClick={e => onClick(e, track)}
+            onDragStart={e => onDragStart(e, track)}
+            onDrag={e => onDrag(e, track)}
+            onDragEnd={e => onDragEnd(e, track)}
+            draggable
+          >
+            <p>
+              <span className={`codicon va-middle m-right_small ${icon}`} />
+              {track.title}
+            </p>
+            {showResizeHandle && (
+              <span
+                className="resize-handle codicon codicon-arrow-both"
+                onDragStart={e => onExtendDragStart(e, track)}
+                onDrag={e => onExtendDrag(e, track)}
+                onDragEnd={e => onExtendDragEnd(e, track)}
+                draggable
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 
   // private fitTrackIntoColumns(track: t.RangedTrack, columns: RangedTrackLayoutColumn[]) {
   //   for (const column of columns) {
@@ -1758,6 +1821,11 @@ function getClockRangeOfTrackDrag(trackDrag: TimelineDrag<t.RangedTrack>): t.Clo
   const start = getClockOfTimelineDrag(clockRange.start, trackDrag);
   const end = start + clockRange.end - clockRange.start;
   return { start, end };
+}
+
+function getClockRangeOfTrackExtendDrag(trackDrag: TimelineDrag<t.RangedTrack>): t.ClockRange {
+  const { clockRange } = trackDrag.load;
+  return { start: clockRange.start, end: getClockOfTimelineDrag(clockRange.end, trackDrag) };
 }
 
 function getClockOfTimelineDrag(baseClock: number, markerDrag: TimelineDrag<any>): number {
