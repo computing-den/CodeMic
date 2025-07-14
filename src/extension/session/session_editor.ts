@@ -364,11 +364,17 @@ export default class SessionEditor {
     this.updateSessionDetailsDirectly({ hasCover: false });
   }
 
-  changeSpeed(range: t.ClockRange, factor: number): t.SessionChange {
+  changeSpeed(range: t.ClockRange, factor: number, adjustMediaTracks: boolean): t.SessionChange {
     assert(this.session.isLoaded());
 
     function withUpdatedClock<T extends { clock: number }>(x: T): T {
       return { ...x, clock: lib.calcClockAfterSpeedChange(x.clock, range, factor) };
+    }
+
+    function adjustTrack<T extends t.RangedTrack>(t: T): T {
+      const newStart = lib.calcClockAfterSpeedChange(t.clockRange.start, range, factor);
+      const diff = newStart - t.clockRange.start;
+      return { ...t, clockRange: { start: newStart, end: t.clockRange.end + diff } };
     }
 
     const editorEvents = this.session.body.editorEvents.map(withUpdatedClock);
@@ -376,9 +382,17 @@ export default class SessionEditor {
     const toc = this.session.head.toc.map(withUpdatedClock);
     const duration = lib.calcClockAfterSpeedChange(this.session.head.duration, range, factor);
     const inverse = lib.invertSpeedChange(range, factor);
+
+    let { audioTracks, videoTracks, imageTracks } = this.session.body;
+    if (adjustMediaTracks) {
+      audioTracks = this.session.body.audioTracks.map(adjustTrack);
+      videoTracks = this.session.body.videoTracks.map(adjustTrack);
+      imageTracks = this.session.body.imageTracks.map(adjustTrack);
+    }
+
     return this.insertApplySessionPatch({
       head: { toc, duration },
-      body: { editorEvents, focusTimeline },
+      body: { editorEvents, focusTimeline, audioTracks, videoTracks, imageTracks },
       effects: [
         { type: 'changeSpeed', range, factor, rrClock: this.session.rr.clock },
         {
@@ -390,11 +404,17 @@ export default class SessionEditor {
     });
   }
 
-  merge(range: t.ClockRange): t.SessionChange {
+  merge(range: t.ClockRange, adjustMediaTracks: boolean): t.SessionChange {
     assert(this.session.isLoaded());
 
     function withUpdatedClock<T extends { clock: number }>(x: T): T {
       return { ...x, clock: lib.calcClockAfterMerge(x.clock, range) };
+    }
+
+    function adjustTrack<T extends t.RangedTrack>(t: T): T {
+      const newStart = lib.calcClockAfterMerge(t.clockRange.start, range);
+      const diff = newStart - t.clockRange.start;
+      return { ...t, clockRange: { start: newStart, end: t.clockRange.end + diff } };
     }
 
     const editorEvents = this.session.body.editorEvents.map(withUpdatedClock);
@@ -402,9 +422,16 @@ export default class SessionEditor {
     const toc = this.session.head.toc.map(withUpdatedClock);
     const duration = lib.calcClockAfterMerge(this.session.head.duration, range);
 
+    let { audioTracks, videoTracks, imageTracks } = this.session.body;
+    if (adjustMediaTracks) {
+      audioTracks = this.session.body.audioTracks.map(adjustTrack);
+      videoTracks = this.session.body.videoTracks.map(adjustTrack);
+      imageTracks = this.session.body.imageTracks.map(adjustTrack);
+    }
+
     return this.insertApplySessionPatch({
       head: { toc, duration },
-      body: { editorEvents, focusTimeline },
+      body: { editorEvents, focusTimeline, audioTracks, videoTracks, imageTracks },
       effects: [
         { type: 'merge', range, rrClock: this.session.rr.clock },
         {
@@ -416,20 +443,33 @@ export default class SessionEditor {
     });
   }
 
-  insertGap(clock: number, gapDuration: number): t.SessionChange {
+  insertGap(clock: number, gapDuration: number, adjustMediaTracks: boolean): t.SessionChange {
     assert(this.session.isLoaded());
 
     function withUpdatedClock<T extends { clock: number }>(x: T): T {
       return { ...x, clock: lib.calcClockAfterInsertGap(x.clock, clock, gapDuration) };
     }
 
+    function adjustTrack<T extends t.RangedTrack>(t: T): T {
+      if (t.clockRange.start <= clock) return t;
+      return { ...t, clockRange: { start: t.clockRange.start + gapDuration, end: t.clockRange.end + gapDuration } };
+    }
+
     const editorEvents = this.session.body.editorEvents.map(withUpdatedClock);
     const focusTimeline = this.session.body.focusTimeline.map(withUpdatedClock);
     const toc = this.session.head.toc.map(withUpdatedClock);
     const duration = lib.calcClockAfterInsertGap(this.session.head.duration, clock, gapDuration);
+
+    let { audioTracks, videoTracks, imageTracks } = this.session.body;
+    if (adjustMediaTracks) {
+      audioTracks = this.session.body.audioTracks.map(adjustTrack);
+      videoTracks = this.session.body.videoTracks.map(adjustTrack);
+      imageTracks = this.session.body.imageTracks.map(adjustTrack);
+    }
+
     return this.insertApplySessionPatch({
       head: { toc, duration },
-      body: { editorEvents, focusTimeline },
+      body: { editorEvents, focusTimeline, audioTracks, videoTracks, imageTracks },
       effects: [
         { type: 'insertGap', clock, duration: gapDuration, rrClock: this.session.rr.clock },
         {
@@ -470,21 +510,32 @@ export default class SessionEditor {
     });
   }
 
-  crop(clock: number): t.SessionChange {
+  crop(clock: number, adjustMediaTracks: boolean): t.SessionChange {
     assert(this.session.isLoaded());
 
-    function pred<T extends { clock: number }>(x: T): boolean {
+    function predClock(x: { clock: number }): boolean {
       return x.clock < clock;
     }
 
-    const [editorEvents, croppedEvents] = _.partition(this.session.body.editorEvents, pred);
-    const focusTimeline = this.session.body.focusTimeline.filter(pred);
-    const toc = this.session.head.toc.filter(pred);
+    function predTrack(t: t.RangedTrack): boolean {
+      return t.clockRange.start < clock;
+    }
+
+    const [editorEvents, croppedEvents] = _.partition(this.session.body.editorEvents, predClock);
+    const focusTimeline = this.session.body.focusTimeline.filter(predClock);
+    const toc = this.session.head.toc.filter(predClock);
     const duration = clock;
+
+    let { audioTracks, videoTracks, imageTracks } = this.session.body;
+    if (adjustMediaTracks) {
+      audioTracks = this.session.body.audioTracks.filter(predTrack);
+      videoTracks = this.session.body.videoTracks.filter(predTrack);
+      imageTracks = this.session.body.imageTracks.filter(predTrack);
+    }
 
     return this.insertApplySessionPatch({
       head: { toc, duration },
-      body: { editorEvents, focusTimeline },
+      body: { editorEvents, focusTimeline, audioTracks, videoTracks, imageTracks },
       effects: [
         {
           type: 'cropEditorEvents',

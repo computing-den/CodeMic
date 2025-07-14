@@ -1,11 +1,12 @@
 .popover {
   position: fixed;
-  background: var(--popover-background);
+  background: var(--vscode-sideBar-background);
   border: 1px solid var(--popover-border-color);
-  color: var(--popover-foreground);
+  /* color: var(--popover-foreground); */
   padding: var(--spacing-medium);
   z-index: var(--popover-z-index);
   border-radius: 5px;
+  box-shadow: var(--popover-box-shadow);
   display: none;
 
   &.open {

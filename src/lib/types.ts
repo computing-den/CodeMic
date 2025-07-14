@@ -57,13 +57,19 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/updateImage'; update: Partial<ImageTrack> }; response: OKResponse }
   | { request: { type: 'recorder/setCover'; uri: string }; response: OKResponse }
   | { request: { type: 'recorder/deleteCover' }; response: OKResponse }
-  | { request: { type: 'recorder/changeSpeed'; range: ClockRange; factor: number }; response: OKResponse }
-  | { request: { type: 'recorder/merge'; range: ClockRange }; response: OKResponse }
-  | { request: { type: 'recorder/insertGap'; clock: number; dur: number }; response: OKResponse }
+  | {
+      request: { type: 'recorder/changeSpeed'; range: ClockRange; factor: number; adjustMediaTracks: boolean };
+      response: OKResponse;
+    }
+  | { request: { type: 'recorder/merge'; range: ClockRange; adjustMediaTracks: boolean }; response: OKResponse }
+  | {
+      request: { type: 'recorder/insertGap'; clock: number; dur: number; adjustMediaTracks: boolean };
+      response: OKResponse;
+    }
   | { request: { type: 'recorder/insertChapter'; title: string; clock: number }; response: OKResponse }
   | { request: { type: 'recorder/updateChapter'; index: number; update: Partial<TocItem> }; response: OKResponse }
   | { request: { type: 'recorder/deleteChapter'; index: number }; response: OKResponse }
-  | { request: { type: 'recorder/crop'; clock: number }; response: OKResponse }
+  | { request: { type: 'recorder/crop'; clock: number; adjustMediaTracks: boolean }; response: OKResponse }
   | { request: { type: 'recorder/makeTest' }; response: OKResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
   | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }

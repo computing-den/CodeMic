@@ -13,7 +13,7 @@ import { mediaManager } from './media_manager.js';
 import Toolbar from './toolbar.jsx';
 import { cn } from './misc.js';
 import _ from 'lodash';
-import { VSCodeButton, VSCodeTextArea, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
+import { VSCodeButton, VSCodeCheckbox, VSCodeTextArea, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 import Popover, { PopoverProps, usePopover } from './popover.jsx';
 import path from 'path';
 import { URI } from 'vscode-uri';
@@ -503,47 +503,55 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
   const speedUpPopover = usePopover();
   const speedUpButtonRef = useRef(null);
 
-  async function changeSpeed(factor: number) {
+  async function changeSpeed(factor: number, adjustMediaTracks: boolean) {
     assert(selection?.type === 'editor');
     const range = getNonEmptyEditorSelection(selection);
     assert(range);
 
     // TODO disable speed control popover buttons till done.
-    await postMessage({ type: 'recorder/changeSpeed', range, factor });
+    await postMessage({ type: 'recorder/changeSpeed', range, factor, adjustMediaTracks });
 
     slowDownPopover.close();
     speedUpPopover.close();
   }
 
-  function slowDown(factor: number) {
-    return changeSpeed(1 / factor);
+  function slowDown(factor: number, adjustMediaTracks: boolean) {
+    return changeSpeed(1 / factor, adjustMediaTracks);
   }
-  function speedUp(factor: number) {
-    return changeSpeed(factor);
+  function speedUp(factor: number, adjustMediaTracks: boolean) {
+    return changeSpeed(factor, adjustMediaTracks);
   }
 
-  async function merge() {
+  const mergePopover = usePopover();
+  const mergeButtonRef = useRef(null);
+
+  async function merge(adjustMediaTracks: boolean) {
     assert(selection?.type === 'editor');
     const range = getNonEmptyEditorSelection(selection);
     assert(range);
 
-    await postMessage({ type: 'recorder/merge', range });
+    await postMessage({ type: 'recorder/merge', range, adjustMediaTracks });
+    mergePopover.close();
   }
 
-  async function crop() {
+  const cropPopover = usePopover();
+  const cropButtonRef = useRef(null);
+
+  async function crop(adjustMediaTracks: boolean) {
     // assert(selection?.type === 'editor');
     const clock = selectionClockRange?.end;
     assert(clock !== undefined);
-    await postMessage({ type: 'recorder/crop', clock });
+    await postMessage({ type: 'recorder/crop', clock, adjustMediaTracks });
+    cropPopover.close();
   }
 
   const insertGapPopover = usePopover();
   const insertGapButtonRef = useRef(null);
 
-  async function insertGap(dur: number) {
+  async function insertGap(dur: number, adjustMediaTracks: boolean) {
     const clock = selectionClockRange?.start;
     assert(clock !== undefined);
-    await postMessage({ type: 'recorder/insertGap', clock, dur });
+    await postMessage({ type: 'recorder/insertGap', clock, dur, adjustMediaTracks });
     insertGapPopover.close();
   }
 
@@ -641,10 +649,11 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       onClick={speedUpPopover.toggle}
     />,
     <Toolbar.Button
+      ref={mergeButtonRef}
       title="Merge"
       icon="fa-solid fa-arrows-up-to-line"
       disabled={session.playing || session.recording || !hasEditorSelection}
-      onClick={merge}
+      onClick={mergePopover.toggle}
     />,
     <Toolbar.Button
       ref={insertGapButtonRef}
@@ -654,10 +663,11 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       onClick={insertGapPopover.toggle}
     />,
     <Toolbar.Button
+      ref={cropButtonRef}
       title="Crop"
       icon="fa-solid fa-crop-simple"
       disabled={session.playing || session.recording || hasEditorSelection || selectionClockRange?.end === undefined}
-      onClick={crop}
+      onClick={cropPopover.toggle}
     />,
     <Toolbar.Separator />,
     <Toolbar.Button
@@ -719,13 +729,36 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
         popover={slowDownPopover}
         onConfirm={slowDown}
         anchor={slowDownButtonRef}
+        pointOnAnchor="bottom-center"
+        pointOnPopover="top-center"
         title="Slow down"
       />
-      <SpeedControlPopover popover={speedUpPopover} onConfirm={speedUp} anchor={speedUpButtonRef} title="Speed up" />
+      <SpeedControlPopover
+        popover={speedUpPopover}
+        onConfirm={speedUp}
+        anchor={speedUpButtonRef}
+        pointOnAnchor="bottom-center"
+        pointOnPopover="top-center"
+        title="Speed up"
+      />
+      <MergePopover
+        popover={mergePopover}
+        onConfirm={merge}
+        anchor={mergeButtonRef}
+        pointOnAnchor="bottom-right"
+        pointOnPopover="top-right"
+      />
       <InsertGapPopover
         popover={insertGapPopover}
         onConfirm={insertGap}
         anchor={insertGapButtonRef}
+        pointOnAnchor="bottom-right"
+        pointOnPopover="top-right"
+      />
+      <CropPopover
+        popover={cropPopover}
+        onConfirm={crop}
+        anchor={cropButtonRef}
         pointOnAnchor="bottom-right"
         pointOnPopover="top-right"
       />
@@ -1695,11 +1728,14 @@ function RangeSelection(props: { timelineDuration: number; range: t.ClockRange }
   return <div className="range-selection" style={style} />;
 }
 
-function SpeedControlPopover(props: PopoverProps & { title: string; onConfirm: (factor: number) => any }) {
+function SpeedControlPopover(
+  props: PopoverProps & { title: string; onConfirm: (factor: number, adjustMediaTracks: boolean) => any },
+) {
   const [factor, setFactor] = useState(2);
+  const [adjustMediaTracks, setAdjustMediaTracks] = useState(true);
   return (
-    <Popover {...props} className="recorder-speed-popover">
-      <form>
+    <Popover {...props}>
+      <form className="recorder-popover-form">
         <label className="label" htmlFor="speed-control-slider">
           {props.title} by {factor}x
         </label>
@@ -1713,7 +1749,14 @@ function SpeedControlPopover(props: PopoverProps & { title: string; onConfirm: (
           onChange={e => setFactor(Number(e.currentTarget!.value))}
           autoFocus
         />
-        <VSCodeButton appearance="primary" onClick={e => props.onConfirm(factor)}>
+        <VSCodeCheckbox
+          checked={adjustMediaTracks}
+          onChange={e => setAdjustMediaTracks((e.currentTarget as HTMLInputElement).checked)}
+          title="If set, media tracks that start *after* this point will be shifted"
+        >
+          Shift subsequent media tracks
+        </VSCodeCheckbox>
+        <VSCodeButton appearance="primary" onClick={e => props.onConfirm(factor, adjustMediaTracks)}>
           OK
         </VSCodeButton>
       </form>
@@ -1721,16 +1764,38 @@ function SpeedControlPopover(props: PopoverProps & { title: string; onConfirm: (
   );
 }
 
-function InsertGapPopover(props: PopoverProps & { onConfirm: (dur: number) => any }) {
+function MergePopover(props: PopoverProps & { onConfirm: (adjustMediaTracks: boolean) => any }) {
+  const [adjustMediaTracks, setAdjustMediaTracks] = useState(true);
+  return (
+    <Popover {...props}>
+      <form className="recorder-popover-form">
+        <label className="label">Merge</label>
+        <VSCodeCheckbox
+          checked={adjustMediaTracks}
+          onChange={e => setAdjustMediaTracks((e.currentTarget as HTMLInputElement).checked)}
+          title="If set, media tracks that start *after* this point will be pulled up"
+        >
+          Shift subsequent media tracks
+        </VSCodeCheckbox>
+        <VSCodeButton appearance="primary" onClick={e => props.onConfirm(adjustMediaTracks)}>
+          OK
+        </VSCodeButton>
+      </form>
+    </Popover>
+  );
+}
+
+function InsertGapPopover(props: PopoverProps & { onConfirm: (dur: number, adjustMediaTracks: boolean) => any }) {
   const [minutes, setMinutes] = useState('');
   const [seconds, setSeconds] = useState('');
+  const [adjustMediaTracks, setAdjustMediaTracks] = useState(true);
   return (
-    <Popover {...props} className="insert-gap-popover">
-      <form>
+    <Popover {...props}>
+      <form className="recorder-popover-form">
         <label className="label" htmlFor="gap-time-minute">
           Insert gap
         </label>
-        <div className="inputs">
+        <div className="row">
           <input
             type="number"
             id="gap-time-minute"
@@ -1752,13 +1817,41 @@ function InsertGapPopover(props: PopoverProps & { onConfirm: (dur: number) => an
             onChange={e => setSeconds(e.currentTarget.value)}
           />
         </div>
+        <VSCodeCheckbox
+          checked={adjustMediaTracks}
+          onChange={e => setAdjustMediaTracks((e.currentTarget as HTMLInputElement).checked)}
+          title="If set, media tracks that start *after* this point will be pushed down"
+        >
+          Shift subsequent media tracks
+        </VSCodeCheckbox>
         <VSCodeButton
           appearance="primary"
           onClick={e => {
             if (/[^0-9]/.test(minutes) || /[^0-9]/.test(seconds)) return;
-            props.onConfirm(Number(minutes || '0') * 60 + Number(seconds || '0'));
+            props.onConfirm(Number(minutes || '0') * 60 + Number(seconds || '0'), adjustMediaTracks);
           }}
         >
+          OK
+        </VSCodeButton>
+      </form>
+    </Popover>
+  );
+}
+
+function CropPopover(props: PopoverProps & { onConfirm: (adjustMediaTracks: boolean) => any }) {
+  const [adjustMediaTracks, setAdjustMediaTracks] = useState(true);
+  return (
+    <Popover {...props}>
+      <form className="recorder-popover-form">
+        <label className="label">Crop</label>
+        <VSCodeCheckbox
+          checked={adjustMediaTracks}
+          onChange={e => setAdjustMediaTracks((e.currentTarget as HTMLInputElement).checked)}
+          title="If set, media tracks that start *after* this point will be deleted"
+        >
+          Delete subsequent media tracks
+        </VSCodeCheckbox>
+        <VSCodeButton appearance="primary" onClick={e => props.onConfirm(adjustMediaTracks)}>
           OK
         </VSCodeButton>
       </form>
@@ -1790,7 +1883,7 @@ function ChapterPopover(
 
   return (
     <Popover {...props} className="chapter-popover">
-      <form>
+      <form className="recorder-popover-form">
         <VSCodeTextArea
           className="title"
           rows={2}

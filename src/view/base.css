@@ -55,8 +55,9 @@ body.vscode-light {
   --marker-chapter-color-active: #b25931;
 
   --popover-border-color: #aaa;
-  --popover-background: #1f1f1f;
-  --popover-foreground: #fff;
+  --popover-box-shadow: 3px 8px 20px 0px #00000042;
+  /* --popover-background: #1f1f1f; */
+  /* --popover-foreground: #fff; */
 
   /* --editor-track-text-change-background: #a1f0dc; */
   /* --editor-track-text-change-background-hover: #78d5be; */
@@ -92,8 +93,9 @@ body.vscode-dark {
   --marker-chapter-color-active: #ffcbb3;
 
   --popover-border-color: #aaa;
-  --popover-background: #1f1f1f;
-  --popover-foreground: #fff;
+  --popover-box-shadow: 3px 8px 20px 0px #ffffff29;
+  /* --popover-background: #1f1f1f; */
+  /* --popover-foreground: #fff; */
 
   /* --editor-track-text-change-background: #063b49; */
   /* --editor-track-text-change-background-hover: #135e71; */

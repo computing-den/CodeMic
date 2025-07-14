@@ -685,21 +685,21 @@ class CodeMic {
       }
       case 'recorder/changeSpeed': {
         assert(this.session?.isLoaded());
-        const change = this.session.editor.changeSpeed(req.range, req.factor);
+        const change = this.session.editor.changeSpeed(req.range, req.factor, req.adjustMediaTracks);
         await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/merge': {
         assert(this.session?.isLoaded());
-        const change = this.session.editor.merge(req.range);
+        const change = this.session.editor.merge(req.range, req.adjustMediaTracks);
         await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
       }
       case 'recorder/insertGap': {
         assert(this.session?.isLoaded());
-        const change = this.session.editor.insertGap(req.clock, req.dur);
+        const change = this.session.editor.insertGap(req.clock, req.dur, req.adjustMediaTracks);
         await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
@@ -727,7 +727,7 @@ class CodeMic {
       }
       case 'recorder/crop': {
         assert(this.session?.isLoaded());
-        const change = this.session.editor.crop(req.clock);
+        const change = this.session.editor.crop(req.clock, req.adjustMediaTracks);
         await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
         return ok;
