@@ -270,6 +270,41 @@ export function getMp3Duration(buffer: Buffer): number {
   return duration;
 }
 
+export function isMp3VBR(buffer: Buffer, maxFramesToCheck = 1000): boolean {
+  const scratch = Buffer.alloc(100);
+  const bytesRead = buffer.copy(scratch, 0, 0, 100);
+  if (bytesRead < 100) return false;
+
+  let offset = skipID3(scratch);
+  const bitRates = new Set<number>();
+
+  let framesChecked = 0;
+
+  while (offset < buffer.length && framesChecked < maxFramesToCheck) {
+    const bytesRead = buffer.copy(scratch, 0, offset, offset + 10);
+    if (bytesRead < 10) break;
+
+    if (scratch[0] === 0xff && (scratch[1] & 0xe0) === 0xe0) {
+      const header = parseFrameHeader(scratch);
+      if (header.frameSize && header.samples && header.bitRate) {
+        bitRates.add(header.bitRate);
+        offset += header.frameSize;
+        framesChecked++;
+
+        if (bitRates.size > 1) return true; // VBR detected
+      } else {
+        offset++;
+      }
+    } else if (scratch[0] === 0x54 && scratch[1] === 0x41 && scratch[2] === 0x47) {
+      offset += 128;
+    } else {
+      offset++;
+    }
+  }
+
+  return false; // no bitrate variation seen
+}
+
 function skipID3(buffer: Buffer): number {
   // http://id3.org/d3v2.3.0
   if (buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33) {

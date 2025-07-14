@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { getMp4MetaData, getMp3Duration } from '../get_media_metadata.js';
+import { getMp4MetaData, getMp3Duration, isMp3VBR } from '../get_media_metadata.js';
 import * as misc from '../misc.js';
 import * as t from '../../lib/types.js';
 import assert from '../../lib/assert.js';
@@ -162,6 +162,12 @@ export default class SessionEditor {
     assert(this.session.isLoaded());
     const fsPath = URI.parse(uri).fsPath;
     const data = await fs.promises.readFile(fsPath);
+    if (isMp3VBR(data)) {
+      throw new Error(
+        `Please encode the audio using a constant bitrate (CBR) instead of variable bitrate (VBR) for more accurate playback. Try: ffmpeg -i input.mp3 -c:a libmp3lame -b:a 192k output.mp3`,
+      );
+    }
+
     const duration = getMp3Duration(data);
     const sha1 = await misc.computeSHA1(data);
     await this.session.core.copyToBlob(fsPath, sha1);
