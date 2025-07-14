@@ -244,3 +244,8 @@ button {
 .with-vscode-button-padding {
   padding: var(--button-icon-padding);
 }
+
+.fas,
+.fa-solid {
+  line-height: 1.2 !important;
+}
