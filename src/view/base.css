@@ -54,7 +54,7 @@ body.vscode-light {
   --marker-chapter-color-hover: #bd6c47;
   --marker-chapter-color-active: #b25931;
 
-  --popover-border-color: #aaa;
+  --popover-border-color: #dedede;
   --popover-box-shadow: 3px 8px 20px 0px #00000042;
   /* --popover-background: #1f1f1f; */
   /* --popover-foreground: #fff; */
@@ -92,8 +92,8 @@ body.vscode-dark {
   --marker-chapter-color-hover: #f8b394;
   --marker-chapter-color-active: #ffcbb3;
 
-  --popover-border-color: #aaa;
-  --popover-box-shadow: 3px 8px 20px 0px #ffffff29;
+  --popover-border-color: #545454;
+  --popover-box-shadow: 3px 8px 20px 0px #000000ad;
   /* --popover-background: #1f1f1f; */
   /* --popover-foreground: #fff; */
 
