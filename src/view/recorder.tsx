@@ -478,7 +478,14 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       onClick: stepForward,
       disabled: session.recording || session.clock === session.head.duration,
     },
-
+    {
+      title: 'Force sync workspace',
+      icon: 'codicon-sync',
+      onClick: () => postMessage({ type: 'recorder/syncWorkspace', clock: selectionClockRange?.start }),
+      // NOTE: Must not programmatically change the workspace during recording
+      //       because the changes will then be picked up by the recorder.
+      disabled: session.recording,
+    },
     {
       title: 'Picture-in-Picture',
       children: <PictureInPicture />,
@@ -486,14 +493,6 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       // NOTE: change of video src does not trigger an update
       //       but it's ok for now, since state/props change during playback.
       disabled: !guideVideoRef.current?.src,
-    },
-    {
-      title: 'Sync workspace',
-      icon: 'codicon-sync',
-      onClick: () => postMessage({ type: 'recorder/syncWorkspace', clock: selectionClockRange?.start }),
-      // NOTE: change of video src does not trigger an update
-      //       but it's ok for now, since state/props change during playback.
-      disabled: session.playing || session.recording,
     },
   ];
 

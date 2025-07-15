@@ -19,7 +19,6 @@ class WorkspacePlayer {
 
   private vscWorkspaceStepper: VscWorkspaceStepper;
   private disposables: vscode.Disposable[] = [];
-  // private updateQueue = lib.taskQueue(this.updateImmediately.bind(this), 1);
 
   constructor(session: LoadedSession, internalWorkspace: InternalWorkspace, vscWorkspace: VscWorkspace) {
     this.session = session;
@@ -59,19 +58,30 @@ class WorkspacePlayer {
   }
 
   async seekWithData(seekData: SeekData, useStepper: boolean) {
+    if (seekData.steps.length === 0) return;
+
     if (useStepper || config.stepOnly) {
-      if (config.logTrackPlayerUpdateStep) {
-        console.log('updateImmediately: applying one at a time', seekData);
-      }
-      // Apply updates one at a time
+      if (config.logTrackPlayerUpdateStep) console.log('player seek: stepping', seekData);
+      // Apply updates one at a time.
+      // If stepper fails for any reason, fall back to sync (unless config.stepOnly is set
+      // which is only for debugging).
+      // Stepper may fail if for example the user messed with the editor during playback.
+      let fallback = false;
+      const uriSet: t.UriSet = new Set();
       for (const step of seekData.steps) {
-        await this.internalWorkspace.applySeekStep(step, seekData.direction);
-        await this.vscWorkspaceStepper.applySeekStep(step, seekData.direction);
+        await this.internalWorkspace.applySeekStep(step, seekData.direction, uriSet);
+        if (!fallback) {
+          const [error] = await lib.tryCatch(this.vscWorkspaceStepper.applySeekStep(step, seekData.direction));
+          if (error && config.stepOnly) throw error;
+          fallback = Boolean(error);
+        }
+      }
+      if (fallback) {
+        if (config.logTrackPlayerUpdateStep) console.log('player seek: falling back to sync');
+        await this.vscWorkspace.sync(Array.from(uriSet));
       }
     } else {
-      if (config.logTrackPlayerUpdateStep) {
-        console.log('updateImmediately: applying wholesale', seekData);
-      }
+      if (config.logTrackPlayerUpdateStep) console.log('player seek: syncing', seekData);
       // Update by seeking the internal this.internalWorkspace first, then syncing the this.internalWorkspace to vscode and fs
       const uriSet: t.UriSet = new Set();
       await this.internalWorkspace.seekWithData(seekData, uriSet);

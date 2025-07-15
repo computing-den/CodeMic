@@ -225,6 +225,12 @@ export default class Player extends React.Component<Props> {
         disabled: !session.loaded || session.clock === session.head.duration,
       },
       {
+        title: 'Force sync workspace',
+        icon: 'codicon-sync',
+        onClick: () => postMessage({ type: 'player/syncWorkspace' }),
+        disabled: !session.loaded,
+      },
+      {
         title: 'Picture-in-Picture',
         children: <PictureInPicture />,
         onClick: this.togglePictureInPicture,
@@ -232,12 +238,7 @@ export default class Player extends React.Component<Props> {
         //       but it's ok for now, since state/props change during playback.
         disabled: !this.getVideoElem()?.src,
       },
-      {
-        title: 'Sync workspace',
-        icon: 'codicon-sync',
-        onClick: () => postMessage({ type: 'player/syncWorkspace' }),
-        disabled: !session.loaded || session.playing,
-      },
+
       {
         title: 'Edit: open this session in the Studio',
         icon: 'codicon-edit',
