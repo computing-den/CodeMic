@@ -14,7 +14,7 @@ import { UpdateLoopAsync } from '../../lib/update_loop_async.js';
 
 enum Status {
   Init,
-  Error,
+  // Error,
   Running,
   Paused,
 }
@@ -25,8 +25,8 @@ type Mode = {
 };
 
 const UPDATE_LOOP_INTERVAL_MS = 100;
-
 const BLANK_VIDEO_ID = '00000000-33fd-4f9d-95dc-37e211464000';
+const SEEK_USING_STEPPER_THRESHOLD_S = 10;
 
 export default class SessionRecordAndReplay {
   session: LoadedSession;
@@ -58,7 +58,12 @@ export default class SessionRecordAndReplay {
     // this.audioTrackPlayers = session.body.audioTracks.map(audioTrack => new AudioTrackPlayer(this.session, audioTrack));
     // this.videoTrackPlayer = new VideoTrackPlayer(this.session);
     this.workspacePlayer = new WorkspacePlayer(this.session, this.internalWorkspace, this.vscWorkspace);
-    this.workspaceRecorder = new WorkspaceRecorder(this.session, this.internalWorkspace, this.vscWorkspace);
+    this.workspaceRecorder = new WorkspaceRecorder(
+      this.session,
+      this.internalWorkspace,
+      this.vscWorkspace,
+      this.workspaceRecorderGotError.bind(this),
+    );
 
     this.updateLoop = new UpdateLoopAsync(this.enqueueUpdate.bind(this), UPDATE_LOOP_INTERVAL_MS);
 
@@ -68,7 +73,6 @@ export default class SessionRecordAndReplay {
     // for (const c of this.audioTrackPlayers) this.initAudioPlayer(c);
     // this.initVideoPlayer();
     // this.workspacePlayer.onError = this.gotError.bind(this);
-    // this.workspaceRecorder.onError = this.gotError.bind(this);
   }
 
   get running(): boolean {
@@ -124,7 +128,7 @@ export default class SessionRecordAndReplay {
   }
 
   /**
-   * This may be called from gotError which may be called from inside a queue
+   * This may be called from error handler which may be called from inside a queue
    * task. So it must not be queued itself.
    */
   async pause(opts?: { withError?: true }) {
@@ -132,7 +136,8 @@ export default class SessionRecordAndReplay {
 
     this.updateLoop.stop();
     this.queue.clear();
-    this.mode.status = opts?.withError ? Status.Error : Status.Paused;
+    // this.mode.status = opts?.withError ? Status.Error : Status.Paused;
+    this.mode.status = Status.Paused;
     if (this.mode.recorder) {
       this.statusBarItem.text = '$(record) Record';
       this.statusBarItem.tooltip = 'CodeMic: click to continue recording';
@@ -187,16 +192,13 @@ export default class SessionRecordAndReplay {
    * useStepper is only useful during testing to test the stepper.
    */
   private async seek(clock: number, useStepper?: boolean) {
+    const origClock = this.clock;
     this.clock = Math.max(0, Math.min(this.session.head.duration, clock));
 
-    if (useStepper) {
-      await this.workspacePlayer.seek(clock, useStepper);
-    } else {
-      const uriSet: t.UriSet = new Set();
-      await this.internalWorkspace.seek(this.clock, uriSet);
-      await this.vscWorkspace.sync(Array.from(uriSet));
-    }
-
+    // Must only use stepper during playback. Otherwise, we don't know if the user has changed
+    // the files and documents while on pause or not.
+    useStepper ??= this.playing && Math.abs(origClock - this.clock) < SEEK_USING_STEPPER_THRESHOLD_S;
+    await this.workspacePlayer.seek(clock, useStepper);
     await this.syncMedia({ hard: true });
     this.updateLoop.resetDiff();
     this.session.onProgress?.();
@@ -349,6 +351,8 @@ export default class SessionRecordAndReplay {
    */
   private async update(diffMs: number) {
     try {
+      assert(diffMs < 10_000, `use seek instead of update for such a large diff (${diffMs / 1000}s)`);
+
       // Wait until all media have loaded enough data to play through.
       const mediaStatuses = await this.getMediaStatuses();
       const isLoading = _.some(mediaStatuses, s => Boolean(s.src) && s.readyState < 4);
@@ -376,7 +380,7 @@ export default class SessionRecordAndReplay {
         // this.internalWorkspace.setEventIndexByClock(this.clock);
       } else {
         this.clock = Math.min(this.session.head.duration, this.clock);
-        await this.workspacePlayer.seek(this.clock);
+        await this.workspacePlayer.seek(this.clock, true);
       }
 
       // Sync media.
@@ -740,12 +744,14 @@ export default class SessionRecordAndReplay {
     try {
       return await promise;
     } catch (error) {
-      this.gotError();
+      this.pause({ withError: true });
       throw error;
     }
   }
 
-  private gotError() {
+  private workspaceRecorderGotError(error: Error) {
+    console.error(error);
+    vscode.window.showErrorMessage(`Error during recording: ${(error as Error)?.message ?? 'Unknown error'}`);
     this.pause({ withError: true });
   }
 

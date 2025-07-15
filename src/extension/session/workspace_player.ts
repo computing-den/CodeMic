@@ -8,8 +8,6 @@ import _ from 'lodash';
 import { LoadedSession } from './session.js';
 import VscWorkspace from './vsc_workspace.js';
 
-const STEP_COUNT_THRESHOLD = 50;
-
 class WorkspacePlayer {
   playing = false;
   // onError?: (error: Error) => any;
@@ -56,20 +54,12 @@ class WorkspacePlayer {
     this.dispose();
   }
 
-  async seek(clock: number, useStepper?: boolean) {
+  async seek(clock: number, useStepper: boolean) {
     await this.seekWithData(this.internalWorkspace.getSeekData(clock), useStepper);
   }
 
-  async seekWithData(seekData: SeekData, useStepper?: boolean) {
-    if (seekData.steps.length > STEP_COUNT_THRESHOLD && useStepper !== true && !config.stepOnly) {
-      if (config.logTrackPlayerUpdateStep) {
-        console.log('updateImmediately: applying wholesale', seekData);
-      }
-      // Update by seeking the internal this.internalWorkspace first, then syncing the this.internalWorkspace to vscode and disk
-      const uriSet: t.UriSet = new Set();
-      await this.internalWorkspace.seekWithData(seekData, uriSet);
-      await this.vscWorkspace.sync(Array.from(uriSet));
-    } else {
+  async seekWithData(seekData: SeekData, useStepper: boolean) {
+    if (useStepper || config.stepOnly) {
       if (config.logTrackPlayerUpdateStep) {
         console.log('updateImmediately: applying one at a time', seekData);
       }
@@ -78,7 +68,14 @@ class WorkspacePlayer {
         await this.internalWorkspace.applySeekStep(step, seekData.direction);
         await this.vscWorkspaceStepper.applySeekStep(step, seekData.direction);
       }
-      // this.internalWorkspace.finalizeSeek(seekData);
+    } else {
+      if (config.logTrackPlayerUpdateStep) {
+        console.log('updateImmediately: applying wholesale', seekData);
+      }
+      // Update by seeking the internal this.internalWorkspace first, then syncing the this.internalWorkspace to vscode and fs
+      const uriSet: t.UriSet = new Set();
+      await this.internalWorkspace.seekWithData(seekData, uriSet);
+      await this.vscWorkspace.sync(Array.from(uriSet));
     }
   }
 
