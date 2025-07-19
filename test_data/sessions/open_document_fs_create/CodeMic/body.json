@@ -1,4 +1,5 @@
 {
+  "formatVersion": 2,
   "full": true,
   "editorEvents": [
     {
@@ -60,6 +61,7 @@
   ],
   "audioTracks": [],
   "videoTracks": [],
+  "imageTracks": [],
   "focusTimeline": [{ "clock": 22.20398835100048, "uri": "workspace:hi.txt", "line": 0, "text": "Hi" }],
   "defaultEol": "\n"
 }

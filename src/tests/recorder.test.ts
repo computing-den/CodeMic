@@ -1,3 +1,4 @@
+import os from 'node:os';
 import vscode, { WorkspaceEdit } from 'vscode';
 import * as assert from 'assert';
 import fs from 'fs';
@@ -16,7 +17,7 @@ import {
   workspacePath,
 } from './test-helpers.js';
 import config from '../extension/config.js';
-import { EditorEvent } from '../lib/types.js';
+import { EditorEvent, EndOfLine } from '../lib/types.js';
 
 // suite('Recorder', () => {
 test('fs changes', recordFsChanges);
@@ -86,7 +87,9 @@ async function recordFsChanges() {
   await codemic.handleMessage({ type: 'recorder/record' });
   await lib.timeout(300);
 
-  const actualFiles = fs.readdirSync(workspacePath, { recursive: true, encoding: 'utf8' });
+  const actualFiles = fs
+    .readdirSync(workspacePath, { recursive: true, encoding: 'utf8' })
+    .map(p => p.replace(/\\/g, '/'));
   const expectedFiles = [
     '.CodeMic',
     'README.txt',
@@ -303,7 +306,7 @@ async function recordOpenTextEditorWithoutDocument() {
       id: 6,
       uri: 'workspace:src/main.c',
       clock: 0.10239563100000032,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -311,7 +314,7 @@ async function recordOpenTextEditorWithoutDocument() {
       id: 7,
       uri: 'workspace:src/inside.txt',
       clock: 1.3122504769999999,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'plaintext',
     },
     {
@@ -436,7 +439,7 @@ async function recordRenameFile() {
       id: 5,
       uri: 'workspace:src/main.c',
       clock: 0.10272586700000011,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -490,7 +493,7 @@ async function recordRenameFile() {
       id: 8,
       uri: 'workspace:src/new.c',
       clock: 0.45762532299999975,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -685,7 +688,7 @@ async function recordRenameFileAndOpenAgainImmediately() {
       id: 3,
       uri: 'workspace:src/main.c',
       clock: 0.10307382400000006,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -739,7 +742,7 @@ async function recordRenameFileAndOpenAgainImmediately() {
       id: 6,
       uri: 'workspace:src/new.c',
       clock: 0.3059229349999996,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -835,7 +838,7 @@ async function recordRenameFileAndOpenAgainImmediately() {
       id: 12,
       uri: 'workspace:src/main.c',
       clock: 1.3696773119999996,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -1014,7 +1017,7 @@ async function recordRenameFileAndOpenAgainWithDelay() {
       id: 3,
       uri: 'workspace:src/main.c',
       clock: 0.10307382400000006,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -1068,7 +1071,7 @@ async function recordRenameFileAndOpenAgainWithDelay() {
       id: 6,
       uri: 'workspace:src/new.c',
       clock: 0.3059229349999996,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -1164,7 +1167,7 @@ async function recordRenameFileAndOpenAgainWithDelay() {
       id: 12,
       uri: 'workspace:src/main.c',
       clock: 1.3696773119999996,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'c',
     },
     // {
@@ -1386,7 +1389,7 @@ async function recordStartWithDirtydocsOpenAndSave() {
       id: 5,
       uri: 'workspace:src/main.c',
       clock: 0,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -1454,7 +1457,7 @@ async function recordStartWithDirtydocsOpenAndSave() {
       id: 8,
       uri: 'workspace:src/inside.txt',
       clock: 1.0136507159999997,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'plaintext',
     },
     {
@@ -1679,7 +1682,7 @@ async function recordSaveJSONWithPrettierJs() {
       id: 5,
       uri: 'workspace:test.json',
       clock: 0.2068292200000001,
-      eol: '\n',
+      eol: os.EOL as EndOfLine,
       languageId: 'json',
     },
     {

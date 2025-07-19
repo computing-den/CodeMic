@@ -1,4 +1,5 @@
 {
+  "formatVersion": 2,
   "full": true,
   "editorEvents": [
     {
@@ -52,6 +53,7 @@
   ],
   "audioTracks": [],
   "videoTracks": [],
+  "imageTracks": [],
   "focusTimeline": [{ "clock": 1.304033872, "uri": "workspace:src/inside.txt", "line": 0, "text": "Inside text" }],
   "defaultEol": "\n"
 }

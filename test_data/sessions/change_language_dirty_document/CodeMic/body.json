@@ -1,4 +1,5 @@
 {
+  "formatVersion": 2,
   "full": true,
   "editorEvents": [
     {
@@ -64,6 +65,7 @@
   ],
   "audioTracks": [],
   "videoTracks": [],
+  "imageTracks": [],
   "focusTimeline": [{ "clock": 0, "uri": "workspace:src/main.c", "line": 3, "text": "    return 99;" }],
   "defaultEol": "\n"
 }

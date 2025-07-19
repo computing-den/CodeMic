@@ -1,4 +1,5 @@
 {
+  "formatVersion": 2,
   "full": true,
   "editorEvents": [
     { "type": "fsCreate", "id": 1, "uri": "workspace:.vscode", "clock": 0, "file": { "type": "dir" } },
@@ -280,6 +281,7 @@
   ],
   "audioTracks": [],
   "videoTracks": [],
+  "imageTracks": [],
   "focusTimeline": [
     {
       "clock": 1.6217903649999934,

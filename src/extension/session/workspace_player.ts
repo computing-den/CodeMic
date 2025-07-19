@@ -61,7 +61,7 @@ class WorkspacePlayer {
     if (seekData.steps.length === 0) return;
 
     if (useStepper || config.stepOnly) {
-      if (config.logTrackPlayerUpdateStep) console.log('player seek: stepping', seekData);
+      if (config.logTrackPlayerUpdateStep) console.log('player seek: stepping');
       // Apply updates one at a time.
       // If stepper fails for any reason, fall back to sync (unless config.stepOnly is set
       // which is only for debugging).
@@ -81,7 +81,7 @@ class WorkspacePlayer {
         await this.vscWorkspace.sync(Array.from(uriSet));
       }
     } else {
-      if (config.logTrackPlayerUpdateStep) console.log('player seek: syncing', seekData);
+      if (config.logTrackPlayerUpdateStep) console.log('player seek: syncing');
       // Update by seeking the internal this.internalWorkspace first, then syncing the this.internalWorkspace to vscode and fs
       const uriSet: t.UriSet = new Set();
       await this.internalWorkspace.seekWithData(seekData, uriSet);
