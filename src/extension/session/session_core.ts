@@ -26,8 +26,6 @@ const WRITE_HISTORY_CLOCK_TIMEOUT_MS = 3_000;
 export default class SessionCore {
   constructor(public session: Session) {}
 
-  static LATEST_FORMAT_VERSION = 2;
-
   static async readLocalHead(workspace: string): Promise<t.SessionHead | undefined> {
     return await storage.readJSONOptional<t.SessionHead>(path.join(SessionCore.getDataPath(workspace), 'head.json'));
   }
@@ -107,7 +105,7 @@ export default class SessionCore {
       duration: 0,
       modificationTimestamp: new Date().toISOString(), // will be overwritten at the end
       toc: [],
-      formatVersion: SessionCore.LATEST_FORMAT_VERSION,
+      formatVersion: lib.LATEST_SESSION_FORMAT_VERSION,
       ignorePatterns: lib.defaultIgnorePatterns,
       hasCover: false,
     };
@@ -344,13 +342,18 @@ export default class SessionCore {
   }): Promise<t.SessionBody> {
     this.assertFormatVersionSupport();
 
-    if (options?.download) {
-      await this.download({ skipIfExists: true, progress: options.progress, abortController: options.abortController });
+    if (options?.download && !(await this.bodyExists())) {
+      await this.download({ progress: options.progress, abortController: options.abortController });
     }
     const compact = await storage.readJSON<any>(path.join(this.dataPath, 'body.json'));
-    const body = deserializeSessionBody(compact, this.session.head.formatVersion);
-    // deserializer converts to the latest format.
-    this.session.head.formatVersion = SessionCore.LATEST_FORMAT_VERSION;
+
+    // deserializer converts the body to the latest format.
+    const body = deserializeSessionBody(compact);
+
+    // Currently, there is no difference between v1 and v2 for the head.
+    // So directly change the formatVersion to the latest.
+    this.session.head.formatVersion = lib.LATEST_SESSION_FORMAT_VERSION;
+
     return body;
   }
 
@@ -361,13 +364,8 @@ export default class SessionCore {
   /**
    * Downloads the session zip from server. Writes the head as well as the session data and updates the cache.
    */
-  async download(options?: { skipIfExists?: boolean; progress?: Progress; abortController?: AbortController }) {
+  async download(options?: { progress?: Progress; abortController?: AbortController }) {
     this.assertFormatVersionSupport();
-
-    if (options?.skipIfExists && (await this.bodyExists())) {
-      options?.progress?.report({ increment: 100 });
-      return;
-    }
 
     options?.progress?.report({ message: 'downloading' });
     const zipFilename = `${this.session.head.handle}_body.zip`;
@@ -605,7 +603,7 @@ export default class SessionCore {
   }
 
   assertFormatVersionSupport() {
-    if (this.session.head.formatVersion > SessionCore.LATEST_FORMAT_VERSION) {
+    if (this.session.head.formatVersion > lib.LATEST_SESSION_FORMAT_VERSION) {
       throw new Error('Please update CodeMic to load this session. It uses features not available in this version.');
     }
   }

@@ -218,10 +218,24 @@ class CodeMic {
     }
   }
 
-  handleUri(uri: vscode.Uri): vscode.ProviderResult<void> {
-    vscode.window.showErrorMessage(
-      `Please update CodeMic to the latest version to enable opening session using an external link`,
-    );
+  async handleUri(uri: vscode.Uri) {
+    try {
+      const match = uri.path.match(/^\/s\/([^\/]+)$/);
+      assert(match, `Unrecognizable URI path: ${uri.path}`);
+      const sessionHandle = match?.[1];
+
+      const { head, publication } = await serverApi.send(
+        { type: 'session/head_and_publication', sessionHandle },
+        this.context.user?.token,
+      );
+      this.publications.set(head.id, publication);
+
+      const session = Session.Core.fromRemote(this.context, head);
+      await session.core.writeHistoryOpenClose();
+      await this.openScreen({ screen: t.Screen.Player, session, load: false });
+    } catch (error) {
+      this.showError(error as Error);
+    }
   }
 
   async handleMessage(req: t.FrontendRequest): Promise<t.BackendResponse> {
@@ -575,6 +589,35 @@ class CodeMic {
         };
         const uris = await vscode.window.showOpenDialog(options);
         return { type: 'uris', uris: uris?.map(x => x.toString()) };
+      }
+      case 'showMessage': {
+        if (req.messageType === 'warning') {
+          await vscode.window.showWarningMessage(req.message);
+        } else if (req.messageType === 'information') {
+          await vscode.window.showInformationMessage(req.message);
+        } else if (req.messageType === 'error') {
+          await vscode.window.showErrorMessage(req.message);
+        }
+
+        return ok;
+      }
+      case 'copySessionLink': {
+        // TODO warn if not published yet
+        if (!req.sessionHandle) {
+          await vscode.window.showErrorMessage('Please enter a valid handle for the session first');
+          return ok;
+        }
+
+        const uri = vscode.Uri.parse(`${vscode.env.uriScheme}://computingden.codemic/s/${req.sessionHandle}`);
+        await vscode.env.clipboard.writeText(uri.toString());
+
+        if (this.publications.get(req.sessionId)) {
+          await vscode.window.showInformationMessage('Copied session link to clipboard');
+        } else {
+          await vscode.window.showInformationMessage('Copied session link to clipboard (session is not published yet)');
+        }
+
+        return ok;
       }
       case 'recorder/undo': {
         assert(this.session?.isLoaded());
@@ -1223,9 +1266,7 @@ class CodeMic {
         coversPath: cache.coversPath,
         version: cache.version,
       },
-      dev: {
-        lastestFormatVersion: SessionCore.LATEST_FORMAT_VERSION,
-      },
+      dev: {},
     };
   }
 }

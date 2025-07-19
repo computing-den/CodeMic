@@ -7,6 +7,8 @@ import { isWindows } from './platform.js';
 
 export const ANONYM_USERNAME = 'anonym'; // NOTE: If you change this, make sure to change it in server too.
 
+export const LATEST_SESSION_FORMAT_VERSION = 2;
+
 // export const COVER_WITH_TO_HEIGHT_RATIO = 16 / 9;
 
 let globalIdCounter = 0;

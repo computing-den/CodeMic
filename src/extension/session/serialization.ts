@@ -1,5 +1,5 @@
 import * as t from '../../lib/types.js';
-import { nextId, getLangaugeIdFromUri } from '../../lib/lib.js';
+import { nextId, getLangaugeIdFromUri, LATEST_SESSION_FORMAT_VERSION } from '../../lib/lib.js';
 import _ from 'lodash';
 import config from '../config.js';
 
@@ -16,6 +16,7 @@ export function serializeSessionBody(body: t.SessionBody): t.SessionBodyExport {
   );
   const uriMap = new Map(uris.map((uri, i) => [uri, i])); // URI to number
   return {
+    formatVersion: LATEST_SESSION_FORMAT_VERSION,
     uris,
     editorEvents: _.map(body.editorEvents, t => serializeEditorEvent(t, uriMap)),
     audioTracks: body.audioTracks,
@@ -197,7 +198,8 @@ export function serializeTestMeta(meta: t.TestMeta): t.TestMetaCompact {
   };
 }
 
-export function deserializeSessionBody(body: any, formatVersion: number): t.SessionBody {
+export function deserializeSessionBody(body: any): t.SessionBody {
+  const formatVersion = body.formatVersion ?? 1;
   switch (formatVersion) {
     case 1:
       return deserializeSessionBodyV1(body as t.BodyFormatV1.SessionBodyCompact);
@@ -272,6 +274,7 @@ export function deserializeSessionBodyV1(body: t.BodyFormatV1.SessionBodyCompact
   }
 
   return {
+    formatVersion: LATEST_SESSION_FORMAT_VERSION,
     editorEvents,
     audioTracks: body.audioTracks.map(deserializeAudioTrackV1),
     videoTracks: body.videoTracks.map(deserializeVideoTrackV1),
@@ -285,6 +288,7 @@ export function deserializeSessionBodyV2(body: t.SessionBodyExport): t.SessionBo
   if (body.full) return _.omit(body, 'full');
 
   return {
+    formatVersion: LATEST_SESSION_FORMAT_VERSION,
     editorEvents: _.map(body.editorEvents, t => deserializeEditorEvent(t, body.uris)),
     audioTracks: body.audioTracks,
     videoTracks: body.videoTracks,

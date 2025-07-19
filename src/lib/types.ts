@@ -73,6 +73,11 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/makeTest' }; response: OKResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
   | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }
+  | {
+      request: { type: 'showMessage'; message: string; messageType: 'warning' | 'information' | 'error' };
+      response: OKResponse;
+    }
+  | { request: { type: 'copySessionLink'; sessionId: string; sessionHandle: string }; response: OKResponse }
   | { request: { type: 'readyToLoadMedia' }; response: OKResponse }
   | { request: { type: 'media/error'; id: string; mediaType: MediaType; error: string }; response: OKResponse };
 
@@ -185,6 +190,14 @@ export type BackendToServerReqRes =
       response: OKResponse;
     }
   | {
+      request: { type: 'session/head_and_publication' } & ({ sessionId: string } | { sessionHandle: string });
+      response: {
+        type: 'sessionHeadAndPublication';
+        head: SessionHead;
+        publication: SessionPublication;
+      };
+    }
+  | {
       request: { type: 'session/like/post'; sessionId: string; value: boolean };
       response: OKResponse;
     };
@@ -248,7 +261,7 @@ export type Store = {
 };
 
 export type DevUIState = {
-  lastestFormatVersion: number;
+  // lastestFormatVersion: number;
 };
 
 export type CacheUIState = {
@@ -419,6 +432,7 @@ export type ClockRange = {
 export type ClockRangeCompact = [number, number];
 
 export type SessionBody = {
+  formatVersion: number;
   editorEvents: EditorEvent[];
   audioTracks: AudioTrack[];
   videoTracks: VideoTrack[];
@@ -430,6 +444,7 @@ export type SessionBody = {
 export type SessionBodyExport = ({ full: true } & SessionBody) | ({ full?: false } & SessionBodyCompact);
 
 export type SessionBodyCompact = {
+  formatVersion?: number;
   uris: string[];
   editorEvents: EditorEventCompact[];
   audioTracks: AudioTrack[];

@@ -453,7 +453,7 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     };
   }
 
-  const mediaToolbarActions = [
+  const mediaToolbarActions = _.compact([
     session.playing
       ? {
           title: 'Pause',
@@ -494,7 +494,13 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       //       but it's ok for now, since state/props change during playback.
       disabled: !guideVideoRef.current?.src,
     },
-  ];
+    {
+      title: 'Share session',
+      icon: 'codicon-link',
+      onClick: () =>
+        postMessage({ type: 'copySessionLink', sessionId: session.head.id, sessionHandle: session.head.handle }),
+    },
+  ]);
 
   const slowDownPopover = usePopover();
   const slowDownButtonRef = useRef(null);

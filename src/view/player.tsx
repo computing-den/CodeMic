@@ -244,6 +244,12 @@ export default class Player extends React.Component<Props> {
         icon: 'codicon-edit',
         onClick: () => postMessage({ type: 'player/openInRecorder' }),
       },
+      {
+        title: 'Share session',
+        icon: 'codicon-link',
+        onClick: () =>
+          postMessage({ type: 'copySessionLink', sessionId: session.head.id, sessionHandle: session.head.handle }),
+      },
     ]);
 
     return (

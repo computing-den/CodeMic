@@ -37,6 +37,7 @@ export type SessionListingProps = {
   onDelete: (id: string) => any;
   onEdit: (id: string) => any;
   onLike: (id: string, value: boolean) => any;
+  onShare: (id: string, handle: string) => any;
 };
 export type Action = { icon: string; title: string; onClick: () => unknown };
 export function SessionListing(props: SessionListingProps) {
@@ -57,6 +58,7 @@ export function SessionListing(props: SessionListingProps) {
       title: 'Delete session and its data',
       onClick: () => props.onDelete(head.id),
     },
+
     // {
     //   icon: 'codicon-repo-forked',
     //   title: 'Fork: create a new session based on this one',
@@ -66,6 +68,11 @@ export function SessionListing(props: SessionListingProps) {
       icon: 'codicon-edit',
       title: 'Edit: open this session in the Studio',
       onClick: () => props.onEdit(head.id),
+    },
+    {
+      icon: 'codicon-link',
+      title: 'Share session',
+      onClick: () => props.onShare(head.id, head.handle),
     },
     publication && {
       icon: liked ? 'codicon-heart-filled' : 'codicon-heart',
@@ -143,6 +150,7 @@ export type SessionListingsProps = {
   onDelete: (id: string) => any;
   onEdit: (id: string) => any;
   onLike: (id: string, value: boolean) => any;
+  onShare: (id: string, handle: string) => any;
 };
 
 export function SessionListings(props: SessionListingsProps) {

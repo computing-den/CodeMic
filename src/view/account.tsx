@@ -7,6 +7,7 @@ import _ from 'lodash';
 import moment from 'moment';
 import { VSCodeButton, VSCodeLink, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 import config from './config.js';
+import { LATEST_SESSION_FORMAT_VERSION } from '../lib/lib.js';
 
 type Props = { user?: t.UserUI; account: t.AccountUIState; earlyAccessEmail?: string; dev: t.DevUIState };
 export default class Account extends React.Component<Props> {
@@ -57,7 +58,7 @@ export default class Account extends React.Component<Props> {
           <Section.Body>
             <div className="heading-subsection subsection">
               <h1>CodeMic</h1>
-              {`format version: ${dev.lastestFormatVersion}`}
+              {`format version: ${LATEST_SESSION_FORMAT_VERSION}`}
             </div>
             {body}
           </Section.Body>

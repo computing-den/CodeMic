@@ -7,6 +7,7 @@ import SessionEditor from './session_editor.js';
 import { scaleProgress } from '../misc.js';
 import _ from 'lodash';
 import os from 'node:os';
+import { LATEST_SESSION_FORMAT_VERSION } from '../../lib/lib.js';
 
 export type LoadedSession = Session & {
   body: t.SessionBody;
@@ -119,6 +120,7 @@ export class Session {
       { title: `Scanning session ${this.head.handle}`, cancellable: false },
       async (progress, abortController) => {
         this.editor.initialize({
+          formatVersion: LATEST_SESSION_FORMAT_VERSION,
           editorEvents: [],
           audioTracks: [],
           videoTracks: [],

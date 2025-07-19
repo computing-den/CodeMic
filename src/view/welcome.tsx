@@ -140,6 +140,8 @@ function SessionsSection(props: SessionsSectionProps) {
   const del = (sessionId: string) => postMessage({ type: 'welcome/deleteSession', sessionId });
   const edit = (sessionId: string) => postMessage({ type: 'welcome/openSessionInRecorder', sessionId });
   const like = (sessionId: string, value: boolean) => postMessage({ type: 'welcome/likeSession', sessionId, value });
+  const share = (sessionId: string, sessionHandle: string) =>
+    postMessage({ type: 'copySessionLink', sessionId, sessionHandle });
   return (
     <Section className="sessions-section" bordered={props.bordered}>
       <Section.Header title={props.title} loading={props.loading} collapsible />
@@ -152,6 +154,7 @@ function SessionsSection(props: SessionsSectionProps) {
             onDelete={del}
             onEdit={edit}
             onLike={like}
+            onShare={share}
           />
         )}
         {props.listings.length === 0 && !props.loading && <Section.Message>Empty</Section.Message>}
