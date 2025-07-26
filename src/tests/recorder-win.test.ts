@@ -54,6 +54,7 @@ async function recordFsChanges() {
 
   log(`=== Opening new session`);
   await codemic.handleMessage({ type: 'welcome/openNewSessionInRecorder' });
+  await lib.timeout(1000);
   await codemic.handleMessage({
     type: 'recorder/updateDetails',
     changes: { title: 'Test Session 1', handle: 'test_session_1' },
@@ -106,13 +107,13 @@ async function recordFsChanges() {
     'images/3.jpg',
     'src/inside.txt',
     'src/main.c',
-    '.CodeMic/blobs/0eb737949842ed40e8ec946ec14055977bb4f265',
-    '.CodeMic/blobs/4af48d75a1b93895baa67568f3b7903e723e23e2',
-    '.CodeMic/blobs/752a116b21f12e8e8826cd7b25bd32ddeee480bf',
-    '.CodeMic/blobs/c2d38c73bb59ed15790b19661bf31a53b5e856b9',
-    '.CodeMic/blobs/c3d880f1ad32e1ff90bb87a79c56efa553c66023',
     '.CodeMic/blobs/d6688b7b322bcc76be5690a58d76b9b9386216dc',
-    '.CodeMic/blobs/f65d313996cb2dcb64c4a28646b89bb7afb2956d',
+    '.CodeMic/blobs/0eb737949842ed40e8ec946ec14055977bb4f265',
+    '.CodeMic/blobs/3fb64b71bb6a82d73aeba41690ac334355b028e2',
+    '.CodeMic/blobs/4af48d75a1b93895baa67568f3b7903e723e23e2',
+    '.CodeMic/blobs/76bc6d612af8cf86f56ba5a429a85426ccf24c3d',
+    '.CodeMic/blobs/752a116b21f12e8e8826cd7b25bd32ddeee480bf',
+    '.CodeMic/blobs/a7092f0367d9377804f782e59f05f58a4f0bca68',
   ];
 
   const extraActualFiles = _.difference(actualFiles, expectedFiles);
@@ -132,59 +133,102 @@ async function recordFsChanges() {
       id: 1,
       uri: 'workspace:README.txt',
       clock: 0,
-      file: { type: 'blob', sha1: 'c2d38c73bb59ed15790b19661bf31a53b5e856b9' },
+      file: {
+        type: 'blob',
+        sha1: '3fb64b71bb6a82d73aeba41690ac334355b028e2',
+      },
     },
-    { type: 'fsCreate', id: 2, uri: 'workspace:images', clock: 0, file: { type: 'dir' } },
+    {
+      type: 'fsCreate',
+      id: 2,
+      uri: 'workspace:images',
+      clock: 0,
+      file: {
+        type: 'dir',
+      },
+    },
     {
       type: 'fsCreate',
       id: 3,
       uri: 'workspace:images/1.jpg',
       clock: 0,
-      file: { type: 'blob', sha1: '0eb737949842ed40e8ec946ec14055977bb4f265' },
+      file: {
+        type: 'blob',
+        sha1: '0eb737949842ed40e8ec946ec14055977bb4f265',
+      },
     },
     {
       type: 'fsCreate',
       id: 4,
       uri: 'workspace:images/2.jpg',
       clock: 0,
-      file: { type: 'blob', sha1: 'd6688b7b322bcc76be5690a58d76b9b9386216dc' },
+      file: {
+        type: 'blob',
+        sha1: 'd6688b7b322bcc76be5690a58d76b9b9386216dc',
+      },
     },
-    { type: 'fsCreate', id: 5, uri: 'workspace:src', clock: 0, file: { type: 'dir' } },
+    {
+      type: 'fsCreate',
+      id: 5,
+      uri: 'workspace:src',
+      clock: 0,
+      file: {
+        type: 'dir',
+      },
+    },
     {
       type: 'fsCreate',
       id: 6,
       uri: 'workspace:src/inside.txt',
       clock: 0,
-      file: { type: 'blob', sha1: 'f65d313996cb2dcb64c4a28646b89bb7afb2956d' },
+      file: {
+        type: 'blob',
+        sha1: '76bc6d612af8cf86f56ba5a429a85426ccf24c3d',
+      },
     },
     {
       type: 'fsCreate',
       id: 7,
       uri: 'workspace:src/main.c',
       clock: 0,
-      file: { type: 'blob', sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023' },
+      file: {
+        type: 'blob',
+        sha1: 'a7092f0367d9377804f782e59f05f58a4f0bca68',
+      },
     },
     {
       type: 'fsCreate',
       id: 8,
       uri: 'workspace:images/3.jpg',
-      clock: 0.10294670399999996,
-      file: { type: 'blob', sha1: '4af48d75a1b93895baa67568f3b7903e723e23e2' },
+      clock: 0.22679179999999996,
+      file: {
+        type: 'blob',
+        sha1: '4af48d75a1b93895baa67568f3b7903e723e23e2',
+      },
     },
     {
       type: 'fsChange',
       id: 9,
       uri: 'workspace:images/1.jpg',
-      clock: 0.3051207520000003,
-      file: { type: 'blob', sha1: '752a116b21f12e8e8826cd7b25bd32ddeee480bf' },
-      revFile: { type: 'blob', sha1: '0eb737949842ed40e8ec946ec14055977bb4f265' },
+      clock: 0.34672829999999977,
+      file: {
+        type: 'blob',
+        sha1: '752a116b21f12e8e8826cd7b25bd32ddeee480bf',
+      },
+      revFile: {
+        type: 'blob',
+        sha1: '0eb737949842ed40e8ec946ec14055977bb4f265',
+      },
     },
     {
       type: 'fsDelete',
       id: 10,
       uri: 'workspace:images/2.jpg',
-      clock: 0.4067855650000001,
-      revFile: { type: 'blob', sha1: 'd6688b7b322bcc76be5690a58d76b9b9386216dc' },
+      clock: 0.5660238,
+      revFile: {
+        type: 'blob',
+        sha1: 'd6688b7b322bcc76be5690a58d76b9b9386216dc',
+      },
     },
   ];
   const actualEvents = JSON.parse(lib.pretty(codemic.session!.body?.editorEvents!));
@@ -198,6 +242,7 @@ async function recordFsChanges() {
 
   assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
 
+  // log('XXX', lib.pretty(codemic.session!.body?.editorEvents));
   // await lib.timeout(1_000_000);
 }
 
@@ -221,7 +266,7 @@ async function recordOpenTextEditorWithoutDocument() {
 
   log(`=== Opening new session`);
   await codemic.handleMessage({ type: 'welcome/openNewSessionInRecorder' });
-  await lib.timeout(200);
+  await lib.timeout(1000);
   await codemic.handleMessage({
     type: 'recorder/updateDetails',
     changes: { title: 'showTextEditor event without openTextDocument', handle: 'show_text_editor_no_document' },
@@ -267,7 +312,7 @@ async function recordOpenTextEditorWithoutDocument() {
       clock: 0,
       file: {
         type: 'blob',
-        sha1: 'c2d38c73bb59ed15790b19661bf31a53b5e856b9',
+        sha1: '3fb64b71bb6a82d73aeba41690ac334355b028e2',
       },
     },
     {
@@ -295,7 +340,7 @@ async function recordOpenTextEditorWithoutDocument() {
       clock: 0,
       file: {
         type: 'blob',
-        sha1: 'f65d313996cb2dcb64c4a28646b89bb7afb2956d',
+        sha1: '76bc6d612af8cf86f56ba5a429a85426ccf24c3d',
       },
     },
     {
@@ -305,7 +350,7 @@ async function recordOpenTextEditorWithoutDocument() {
       clock: 0,
       file: {
         type: 'blob',
-        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+        sha1: 'a7092f0367d9377804f782e59f05f58a4f0bca68',
       },
     },
     {
@@ -391,7 +436,7 @@ async function recordRenameFile() {
 
   log(`=== Opening new session`);
   await codemic.handleMessage({ type: 'welcome/openNewSessionInRecorder' });
-  await lib.timeout(200);
+  await lib.timeout(1000);
   await codemic.handleMessage({
     type: 'recorder/updateDetails',
     changes: { title: 'Rename file', handle: 'rename_file' },
@@ -441,7 +486,7 @@ async function recordRenameFile() {
       clock: 0,
       file: {
         type: 'blob',
-        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+        sha1: 'a7092f0367d9377804f782e59f05f58a4f0bca68',
       },
     },
     {
@@ -581,7 +626,7 @@ async function recordRenameFile() {
       clock: 0.5646270330000002,
       file: {
         type: 'blob',
-        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+        sha1: 'a7092f0367d9377804f782e59f05f58a4f0bca68',
       },
     },
     {
@@ -591,7 +636,7 @@ async function recordRenameFile() {
       clock: 0.5646270330000002,
       revFile: {
         type: 'blob',
-        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+        sha1: 'a7092f0367d9377804f782e59f05f58a4f0bca68',
       },
     },
   ];
@@ -614,9 +659,9 @@ async function recordRenameFile() {
     errors.push(`Actual events: ${lib.pretty(actualEvents)}\nExpected events: ${lib.pretty(expectedEvents)}`);
   }
 
-  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
-
   // log('XXX', lib.pretty(codemic.session!.body?.editorEvents));
+
+  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
 
   // await lib.timeout(1_000_000);
 }
@@ -693,7 +738,7 @@ async function recordRenameFileAndOpenAgainImmediately() {
       clock: 0,
       file: {
         type: 'blob',
-        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+        sha1: 'a7092f0367d9377804f782e59f05f58a4f0bca68',
       },
     },
     {
@@ -833,7 +878,7 @@ async function recordRenameFileAndOpenAgainImmediately() {
       clock: 0.40816207599999965,
       file: {
         type: 'blob',
-        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+        sha1: 'a7092f0367d9377804f782e59f05f58a4f0bca68',
       },
     },
     {
@@ -843,7 +888,7 @@ async function recordRenameFileAndOpenAgainImmediately() {
       clock: 0.40816207599999965,
       revFile: {
         type: 'blob',
-        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+        sha1: 'a7092f0367d9377804f782e59f05f58a4f0bca68',
       },
     },
     {
@@ -945,9 +990,9 @@ async function recordRenameFileAndOpenAgainImmediately() {
     errors.push(`Actual events: ${lib.pretty(actualEvents)}\nExpected events: ${lib.pretty(expectedEvents)}`);
   }
 
-  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
-
   // log('XXX', lib.pretty(codemic.session!.body?.editorEvents));
+
+  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
 
   // await lib.timeout(1_000_000);
 }
@@ -1025,7 +1070,7 @@ async function recordRenameFileAndOpenAgainWithDelay() {
       clock: 0,
       file: {
         type: 'blob',
-        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+        sha1: 'a7092f0367d9377804f782e59f05f58a4f0bca68',
       },
     },
     {
@@ -1165,7 +1210,7 @@ async function recordRenameFileAndOpenAgainWithDelay() {
       clock: 0.40816207599999965,
       file: {
         type: 'blob',
-        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+        sha1: 'a7092f0367d9377804f782e59f05f58a4f0bca68',
       },
     },
     {
@@ -1175,17 +1220,28 @@ async function recordRenameFileAndOpenAgainWithDelay() {
       clock: 0.40816207599999965,
       revFile: {
         type: 'blob',
-        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+        sha1: 'a7092f0367d9377804f782e59f05f58a4f0bca68',
+      },
+    },
+    {
+      type: 'fsCreate',
+      id: 12,
+      uri: 'workspace:src/main.c',
+      clock: 1.4714212319999995,
+      file: {
+        type: 'blob',
+        sha1: 'eab6555aced7835586ca27f868b20246a1460dd4',
       },
     },
     {
       type: 'openTextDocument',
-      id: 12,
+      id: 13,
       uri: 'workspace:src/main.c',
       clock: 1.3696773119999996,
       eol: EOL as EndOfLine,
       languageId: 'c',
     },
+
     // {
     //   type: 'textChange',
     //   id: 13,
@@ -1247,16 +1303,6 @@ async function recordRenameFileAndOpenAgainWithDelay() {
       justOpened: true,
       revUri: 'workspace:src/new.c',
     },
-    {
-      type: 'fsCreate',
-      id: 15,
-      uri: 'workspace:src/main.c',
-      clock: 1.4714212319999995,
-      file: {
-        type: 'blob',
-        sha1: 'eab6555aced7835586ca27f868b20246a1460dd4',
-      },
-    },
   ];
 
   const actualEvents = JSON.parse(lib.pretty(codemic.session!.body?.editorEvents!)) as EditorEvent[];
@@ -1277,9 +1323,9 @@ async function recordRenameFileAndOpenAgainWithDelay() {
     errors.push(`Actual events: ${lib.pretty(actualEvents)}\nExpected events: ${lib.pretty(expectedEvents)}`);
   }
 
-  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
-
   // log('XXX', lib.pretty(codemic.session!.body?.editorEvents));
+
+  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
 
   // await lib.timeout(1_000_000);
 }
@@ -1371,7 +1417,7 @@ async function recordStartWithDirtydocsOpenAndSave() {
       clock: 0,
       file: {
         type: 'blob',
-        sha1: 'c2d38c73bb59ed15790b19661bf31a53b5e856b9',
+        sha1: '3fb64b71bb6a82d73aeba41690ac334355b028e2',
       },
     },
     {
@@ -1390,7 +1436,7 @@ async function recordStartWithDirtydocsOpenAndSave() {
       clock: 0,
       file: {
         type: 'blob',
-        sha1: 'f65d313996cb2dcb64c4a28646b89bb7afb2956d',
+        sha1: '76bc6d612af8cf86f56ba5a429a85426ccf24c3d',
       },
     },
     {
@@ -1400,7 +1446,7 @@ async function recordStartWithDirtydocsOpenAndSave() {
       clock: 0,
       file: {
         type: 'blob',
-        sha1: 'c3d880f1ad32e1ff90bb87a79c56efa553c66023',
+        sha1: 'a7092f0367d9377804f782e59f05f58a4f0bca68',
       },
     },
     {
@@ -1547,11 +1593,11 @@ async function recordStartWithDirtydocsOpenAndSave() {
       clock: 2.12722597,
       file: {
         type: 'blob',
-        sha1: 'be004e9e66d027a2b2a89c091c0f9633c77f2ee0',
+        sha1: 'be0de5a1e5fdfc5a119bf9b300d5513014778ed1',
       },
       revFile: {
         type: 'blob',
-        sha1: 'f65d313996cb2dcb64c4a28646b89bb7afb2956d',
+        sha1: '76bc6d612af8cf86f56ba5a429a85426ccf24c3d',
       },
     },
   ];
@@ -1574,9 +1620,9 @@ async function recordStartWithDirtydocsOpenAndSave() {
     errors.push(`Actual events: ${lib.pretty(actualEvents)}\nExpected events: ${lib.pretty(expectedEvents)}`);
   }
 
-  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
-
   // log('XXX', lib.pretty(codemic.session!.body?.editorEvents));
+
+  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
 
   // await lib.timeout(1_000_000);
 }
@@ -1673,7 +1719,7 @@ async function recordSaveJSONWithPrettierJs() {
       clock: 0,
       file: {
         type: 'blob',
-        sha1: '3f7383a9de50314c9c50b66cd1a1c953ca858dec',
+        sha1: '96345f38ab7b2a2b626d31a6784df0706dcda916',
       },
     },
     {
@@ -1683,7 +1729,7 @@ async function recordSaveJSONWithPrettierJs() {
       clock: 0,
       file: {
         type: 'blob',
-        sha1: 'c2d38c73bb59ed15790b19661bf31a53b5e856b9',
+        sha1: '3fb64b71bb6a82d73aeba41690ac334355b028e2',
       },
     },
     {
@@ -1873,7 +1919,7 @@ async function recordSaveJSONWithPrettierJs() {
       clock: 1.422560993,
       file: {
         type: 'blob',
-        sha1: 'b65b4cc253c24f8f544c786bcb16f19a4aaa943b',
+        sha1: 'b2ea39fd288afd9946dbeed23905769082c85d13',
       },
       revFile: {
         type: 'blob',
@@ -1900,9 +1946,9 @@ async function recordSaveJSONWithPrettierJs() {
     errors.push(`Actual events: ${lib.pretty(actualEvents)}\nExpected events: ${lib.pretty(expectedEvents)}`);
   }
 
-  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
-
   // log('XXX', lib.pretty(codemic.session!.body?.editorEvents));
+
+  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
 
   // await lib.timeout(1_000_000);
 }
