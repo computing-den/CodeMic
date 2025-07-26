@@ -611,9 +611,10 @@ export type UpdateTextDocumentEvent = {
   id: number;
   uri: string;
   clock: number;
-  // eol: EndOfLine;
-  languageId: string;
-  revLanguageId: string;
+  eol?: EndOfLine;
+  revEol?: EndOfLine;
+  languageId?: string;
+  revLanguageId?: string;
 };
 
 export type ShowTextEditorEvent = {
@@ -811,8 +812,10 @@ export type UpdateTextDocumentEventCompact = {
   t: 12;
   u: number;
   c: number;
-  l: string;
-  rl: string;
+  e?: EndOfLine;
+  re?: EndOfLine;
+  l?: string;
+  rl?: string;
 };
 
 export type PositionCompact = [number, number];

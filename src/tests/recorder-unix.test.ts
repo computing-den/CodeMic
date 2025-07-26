@@ -1,4 +1,3 @@
-import os from 'node:os';
 import vscode, { WorkspaceEdit } from 'vscode';
 import * as assert from 'assert';
 import fs from 'fs';
@@ -19,6 +18,8 @@ import {
 import config from '../extension/config.js';
 import { EditorEvent, EndOfLine } from '../lib/types.js';
 
+const EOL = '\n';
+
 // suite('Recorder', () => {
 test('fs changes', recordFsChanges);
 test('showTextEditor event without openTextDocument', recordOpenTextEditorWithoutDocument);
@@ -36,9 +37,12 @@ async function recordFsChanges() {
   fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
   fs.mkdirSync(path.resolve(workspacePath, 'src'), { recursive: true });
   fs.mkdirSync(path.resolve(workspacePath, 'images'), { recursive: true });
-  fs.writeFileSync(path.resolve(workspacePath, 'README.txt'), 'Hello there!\n');
-  fs.writeFileSync(path.resolve(workspacePath, 'src/inside.txt'), 'Inside text\nSecond line\n');
-  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n');
+  fs.writeFileSync(path.resolve(workspacePath, 'README.txt'), `Hello there!${EOL}`);
+  fs.writeFileSync(path.resolve(workspacePath, 'src/inside.txt'), `Inside text${EOL}Second line${EOL}`);
+  fs.writeFileSync(
+    path.resolve(workspacePath, 'src/main.c'),
+    `#include <stdio.h>${EOL}${EOL}int main() {${EOL}    return 0;${EOL}}${EOL}`,
+  );
   fs.cpSync(path.resolve(exampleFilesPath, '1.jpg'), path.resolve(workspacePath, 'images/1.jpg'), { force: true });
   fs.cpSync(path.resolve(exampleFilesPath, '2.jpg'), path.resolve(workspacePath, 'images/2.jpg'), { force: true });
 
@@ -202,9 +206,12 @@ async function recordOpenTextEditorWithoutDocument() {
   fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
   fs.mkdirSync(path.resolve(workspacePath, 'src'), { recursive: true });
   fs.mkdirSync(path.resolve(workspacePath, 'images'), { recursive: true });
-  fs.writeFileSync(path.resolve(workspacePath, 'README.txt'), 'Hello there!\n');
-  fs.writeFileSync(path.resolve(workspacePath, 'src/inside.txt'), 'Inside text\nSecond line\n');
-  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n');
+  fs.writeFileSync(path.resolve(workspacePath, 'README.txt'), `Hello there!${EOL}`);
+  fs.writeFileSync(path.resolve(workspacePath, 'src/inside.txt'), `Inside text${EOL}Second line${EOL}`);
+  fs.writeFileSync(
+    path.resolve(workspacePath, 'src/main.c'),
+    `#include <stdio.h>${EOL}${EOL}int main() {${EOL}    return 0;${EOL}}${EOL}`,
+  );
 
   log(`=== Closing all tabs`);
   await closeAllTabs();
@@ -306,7 +313,7 @@ async function recordOpenTextEditorWithoutDocument() {
       id: 6,
       uri: 'workspace:src/main.c',
       clock: 0.10239563100000032,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -314,7 +321,7 @@ async function recordOpenTextEditorWithoutDocument() {
       id: 7,
       uri: 'workspace:src/inside.txt',
       clock: 1.3122504769999999,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'plaintext',
     },
     {
@@ -357,7 +364,7 @@ async function recordOpenTextEditorWithoutDocument() {
   }
 
   if (missingActualEvents.length || extraActualEvents.length) {
-    errors.push(`Actual events: ${lib.pretty(actualEvents)}\nExpected events: ${lib.pretty(expectedEvents)}`);
+    errors.push(`Actual events: ${lib.pretty(actualEvents)}${EOL}Expected events: ${lib.pretty(expectedEvents)}`);
   }
 
   assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
@@ -371,7 +378,10 @@ async function recordRenameFile() {
   log(`=== Creating files in ${workspacePath}`);
   fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
   fs.mkdirSync(path.resolve(workspacePath, 'src'), { recursive: true });
-  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n');
+  fs.writeFileSync(
+    path.resolve(workspacePath, 'src/main.c'),
+    `#include <stdio.h>${EOL}${EOL}int main() {${EOL}    return 0;${EOL}}${EOL}`,
+  );
 
   log(`=== Closing all tabs`);
   await closeAllTabs();
@@ -439,7 +449,7 @@ async function recordRenameFile() {
       id: 5,
       uri: 'workspace:src/main.c',
       clock: 0.10272586700000011,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -493,7 +503,7 @@ async function recordRenameFile() {
       id: 8,
       uri: 'workspace:src/new.c',
       clock: 0.45762532299999975,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -513,7 +523,7 @@ async function recordRenameFile() {
               character: 0,
             },
           },
-          text: '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n',
+          text: `#include <stdio.h>${EOL}${EOL}int main() {${EOL}    return 0;${EOL}}${EOL}`,
         },
       ],
       revContentChanges: [
@@ -561,7 +571,7 @@ async function recordRenameFile() {
       id: 11,
       uri: 'workspace:src/main.c',
       clock: 0.5646270330000002,
-      revEol: '\n',
+      revEol: EOL as EndOfLine,
       revLanguageId: 'c',
     },
     {
@@ -615,7 +625,10 @@ async function recordRenameFileAndOpenAgainImmediately() {
   log(`=== Creating files in ${workspacePath}`);
   fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
   fs.mkdirSync(path.resolve(workspacePath, 'src'), { recursive: true });
-  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n');
+  fs.writeFileSync(
+    path.resolve(workspacePath, 'src/main.c'),
+    `#include <stdio.h>${EOL}${EOL}int main() {${EOL}    return 0;${EOL}}${EOL}`,
+  );
 
   log(`=== Closing all tabs`);
   await closeAllTabs();
@@ -655,7 +668,7 @@ async function recordRenameFileAndOpenAgainImmediately() {
   await lib.timeout(1000);
 
   log(`=== Recreate and reopen main.c`);
-  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), '// This is a new file');
+  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), `// This is a new file`);
   await vscode.window.showTextDocument(vscode.Uri.file(path.resolve(workspacePath, 'src/main.c')), { preview: false });
   await lib.timeout(1000);
 
@@ -688,7 +701,7 @@ async function recordRenameFileAndOpenAgainImmediately() {
       id: 3,
       uri: 'workspace:src/main.c',
       clock: 0.10307382400000006,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -742,7 +755,7 @@ async function recordRenameFileAndOpenAgainImmediately() {
       id: 6,
       uri: 'workspace:src/new.c',
       clock: 0.3059229349999996,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -762,7 +775,7 @@ async function recordRenameFileAndOpenAgainImmediately() {
               character: 0,
             },
           },
-          text: '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n',
+          text: `#include <stdio.h>${EOL}${EOL}int main() {${EOL}    return 0;${EOL}}${EOL}`,
         },
       ],
       revContentChanges: [
@@ -810,7 +823,7 @@ async function recordRenameFileAndOpenAgainImmediately() {
       id: 9,
       uri: 'workspace:src/main.c',
       clock: 0.3059229349999996,
-      revEol: '\n',
+      revEol: EOL as EndOfLine,
       revLanguageId: 'c',
     },
     {
@@ -838,7 +851,7 @@ async function recordRenameFileAndOpenAgainImmediately() {
       id: 12,
       uri: 'workspace:src/main.c',
       clock: 1.3696773119999996,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -943,7 +956,10 @@ async function recordRenameFileAndOpenAgainWithDelay() {
   log(`=== Creating files in ${workspacePath}`);
   fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
   fs.mkdirSync(path.resolve(workspacePath, 'src'), { recursive: true });
-  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n');
+  fs.writeFileSync(
+    path.resolve(workspacePath, 'src/main.c'),
+    `#include <stdio.h>${EOL}${EOL}int main() {${EOL}    return 0;${EOL}}${EOL}`,
+  );
 
   log(`=== Closing all tabs`);
   await closeAllTabs();
@@ -983,7 +999,7 @@ async function recordRenameFileAndOpenAgainWithDelay() {
   await lib.timeout(1000);
 
   log(`=== Recreate and reopen main.c`);
-  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), '// This is a new file');
+  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), `// This is a new file`);
   await lib.timeout(1000);
   await vscode.window.showTextDocument(vscode.Uri.file(path.resolve(workspacePath, 'src/main.c')), { preview: false });
   await lib.timeout(1000);
@@ -1017,7 +1033,7 @@ async function recordRenameFileAndOpenAgainWithDelay() {
       id: 3,
       uri: 'workspace:src/main.c',
       clock: 0.10307382400000006,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -1071,7 +1087,7 @@ async function recordRenameFileAndOpenAgainWithDelay() {
       id: 6,
       uri: 'workspace:src/new.c',
       clock: 0.3059229349999996,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -1091,7 +1107,7 @@ async function recordRenameFileAndOpenAgainWithDelay() {
               character: 0,
             },
           },
-          text: '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n',
+          text: `#include <stdio.h>${EOL}${EOL}int main() {${EOL}    return 0;${EOL}}${EOL}`,
         },
       ],
       revContentChanges: [
@@ -1139,7 +1155,7 @@ async function recordRenameFileAndOpenAgainWithDelay() {
       id: 9,
       uri: 'workspace:src/main.c',
       clock: 0.3059229349999996,
-      revEol: '\n',
+      revEol: EOL as EndOfLine,
       revLanguageId: 'c',
     },
     {
@@ -1167,7 +1183,7 @@ async function recordRenameFileAndOpenAgainWithDelay() {
       id: 12,
       uri: 'workspace:src/main.c',
       clock: 1.3696773119999996,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'c',
     },
     // {
@@ -1272,9 +1288,12 @@ async function recordStartWithDirtydocsOpenAndSave() {
   log(`=== Creating files in ${workspacePath}`);
   fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
   fs.mkdirSync(path.resolve(workspacePath, 'src'), { recursive: true });
-  fs.writeFileSync(path.resolve(workspacePath, 'README.txt'), 'Hello there!\n');
-  fs.writeFileSync(path.resolve(workspacePath, 'src/inside.txt'), 'Inside text\nSecond line\n');
-  fs.writeFileSync(path.resolve(workspacePath, 'src/main.c'), '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n');
+  fs.writeFileSync(path.resolve(workspacePath, 'README.txt'), `Hello there!${EOL}`);
+  fs.writeFileSync(path.resolve(workspacePath, 'src/inside.txt'), `Inside text${EOL}Second line${EOL}`);
+  fs.writeFileSync(
+    path.resolve(workspacePath, 'src/main.c'),
+    `#include <stdio.h>${EOL}${EOL}int main() {${EOL}    return 0;${EOL}}${EOL}`,
+  );
 
   log(`=== Closing all tabs`);
   await closeAllTabs();
@@ -1321,7 +1340,7 @@ async function recordStartWithDirtydocsOpenAndSave() {
   );
   assert.ok(
     await insideTextEditor.edit(builder => {
-      builder.replace(new vscode.Range(1, 0, 2, 0), 'Third line\n');
+      builder.replace(new vscode.Range(1, 0, 2, 0), `Third line${EOL}`);
     }),
   );
   await lib.timeout(1000);
@@ -1389,7 +1408,7 @@ async function recordStartWithDirtydocsOpenAndSave() {
       id: 5,
       uri: 'workspace:src/main.c',
       clock: 0,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'c',
     },
     {
@@ -1409,7 +1428,7 @@ async function recordStartWithDirtydocsOpenAndSave() {
               character: 0,
             },
           },
-          text: '#include <stdio.h>\n\nint main() {\n    return 99;\n}\n',
+          text: `#include <stdio.h>${EOL}${EOL}int main() {${EOL}    return 99;${EOL}}${EOL}`,
         },
       ],
       revContentChanges: [
@@ -1424,7 +1443,7 @@ async function recordStartWithDirtydocsOpenAndSave() {
               character: 0,
             },
           },
-          text: '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n',
+          text: `#include <stdio.h>${EOL}${EOL}int main() {${EOL}    return 0;${EOL}}${EOL}`,
         },
       ],
       updateSelection: false,
@@ -1457,7 +1476,7 @@ async function recordStartWithDirtydocsOpenAndSave() {
       id: 8,
       uri: 'workspace:src/inside.txt',
       clock: 1.0136507159999997,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'plaintext',
     },
     {
@@ -1491,7 +1510,7 @@ async function recordStartWithDirtydocsOpenAndSave() {
       clock: 1.0136507159999997,
       contentChanges: [
         {
-          text: 'Third line\n',
+          text: `Third line${EOL}`,
           range: {
             start: {
               line: 1,
@@ -1516,7 +1535,7 @@ async function recordStartWithDirtydocsOpenAndSave() {
               character: 0,
             },
           },
-          text: 'Second line\n',
+          text: `Second line${EOL}`,
         },
       ],
       updateSelection: false,
@@ -1566,11 +1585,11 @@ async function recordSaveJSONWithPrettierJs() {
   log(`=== Creating files in ${workspacePath}`);
   fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
   fs.mkdirSync(path.resolve(workspacePath, '.vscode'), { recursive: true });
-  fs.writeFileSync(path.resolve(workspacePath, 'test.json'), '');
-  fs.writeFileSync(path.resolve(workspacePath, 'README.txt'), 'Hello there!\n');
+  fs.writeFileSync(path.resolve(workspacePath, 'test.json'), ``);
+  fs.writeFileSync(path.resolve(workspacePath, 'README.txt'), `Hello there!${EOL}`);
   fs.writeFileSync(
     path.resolve(workspacePath, '.vscode/settings.json'),
-    '{\n  "editor.formatOnSave": true,\n  "[json]": {\n    "editor.defaultFormatter": "esbenp.prettier-vscode"\n  }\n}',
+    `{${EOL}  "editor.formatOnSave": true,${EOL}  "[json]": {${EOL}    "editor.defaultFormatter": "esbenp.prettier-vscode"${EOL}  }${EOL}}`,
   );
 
   log(`=== Closing all tabs`);
@@ -1613,7 +1632,7 @@ async function recordSaveJSONWithPrettierJs() {
     await textEditor.edit(builder => {
       builder.replace(
         vscWorkspace.getVscTextDocumentVscRange(textEditor.document),
-        '{\n"version":\n\n\n"2025-07-01.01"\n}\n',
+        `{${EOL}"version":${EOL}${EOL}${EOL}"2025-07-01.01"${EOL}}${EOL}`,
       );
     }),
   );
@@ -1682,7 +1701,7 @@ async function recordSaveJSONWithPrettierJs() {
       id: 5,
       uri: 'workspace:test.json',
       clock: 0.2068292200000001,
-      eol: os.EOL as EndOfLine,
+      eol: EOL as EndOfLine,
       languageId: 'json',
     },
     {
@@ -1723,7 +1742,7 @@ async function recordSaveJSONWithPrettierJs() {
           character: 0,
         },
       },
-      text: '{\n"version":\n\n\n"2025-07-01.01"\n}\n',
+      text: `{${EOL}"version":${EOL}${EOL}${EOL}"2025-07-01.01"${EOL}}${EOL}`,
       updateSelection: true,
     },
     {
@@ -1798,7 +1817,7 @@ async function recordSaveJSONWithPrettierJs() {
               character: 13,
             },
           },
-          text: '\n\n\n',
+          text: `${EOL}${EOL}${EOL}`,
         },
       ],
       updateSelection: false,

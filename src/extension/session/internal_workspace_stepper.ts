@@ -11,7 +11,10 @@ import { LoadedSession } from './session.js';
 // Not every InternalTextDocument may be attached to a TextEditor. At least not until the
 // TextEditor is opened.
 class InternalWorkspaceStepper implements t.WorkspaceStepper {
-  constructor(private session: LoadedSession, private internalWorkspace: InternalWorkspace) {}
+  constructor(
+    private session: LoadedSession,
+    private internalWorkspace: InternalWorkspace,
+  ) {}
 
   get worktree(): LiveWorktree {
     return this.internalWorkspace.worktree;
@@ -98,9 +101,11 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
     const textDocument = this.worktree.get(e.uri).textDocument;
     assert(textDocument);
     if (direction === t.Direction.Forwards) {
-      textDocument.languageId = e.languageId;
+      if (e.languageId) textDocument.languageId = e.languageId;
+      if (e.eol) textDocument.eol = e.eol;
     } else {
-      textDocument.languageId = e.revLanguageId;
+      if (e.revLanguageId) textDocument.languageId = e.revLanguageId;
+      if (e.revEol) textDocument.eol = e.revEol;
     }
   }
 
@@ -118,9 +123,10 @@ class InternalWorkspaceStepper implements t.WorkspaceStepper {
         if (uriSet) uriSet.add(e.uri);
 
         const item = this.worktree.get(e.uri);
+        // only happens in v1
         if (!item.textDocument) {
           await item.openTextDocument({
-            eol: this.session.body.defaultEol,
+            defaultEol: this.session.body.defaultEol,
             languageId: lib.getLangaugeIdFromUri(e.uri),
           });
         }

@@ -119,7 +119,7 @@ class WorkspaceRecorder {
     // listen for text change events
     {
       const disposable = vscode.workspace.onDidChangeTextDocument(e =>
-        this.catchError(this.queue.enqueue(this.textChange.bind(this), e.document, e.contentChanges)),
+        this.catchError(this.queue.enqueue(this.textDocumentChange.bind(this), e.document, e.contentChanges)),
       );
       this.disposables.push(disposable);
     }
@@ -248,123 +248,138 @@ class WorkspaceRecorder {
     );
   }
 
-  private async textChange(
+  private async textDocumentChange(
     vscTextDocument: vscode.TextDocument,
     vscContentChanges: readonly vscode.TextDocumentContentChangeEvent[],
   ) {
     // See the top of the file for explanation.
 
-    logRawEvent(`event: textChange ${vscTextDocument.uri} ${JSON.stringify(vscContentChanges)}`);
+    logRawEvent(`event: textDocumentChange ${vscTextDocument.uri} ${JSON.stringify(vscContentChanges)}`);
     if (!this.vscWorkspace.shouldRecordVscUri(vscTextDocument.uri)) return;
 
     const uri = this.vscWorkspace.uriFromVsc(vscTextDocument.uri);
-    if (vscContentChanges.length === 0) {
-      if (config.debug) {
-        console.log(`textChange vscContentChanges for ${uri} is empty`);
-      }
-      return;
-    }
-
-    logAcceptedEvent(`accepted textChange for ${uri}`);
 
     // Here, we assume that document must exist internally by the time we get a text change event.
     const irTextDocument = this.worktree.get(uri).textDocument;
     assert(irTextDocument);
 
-    let debugInitIrText: string | undefined;
-    if (config.debug) {
-      debugInitIrText = irTextDocument.getText();
-    }
+    // Check for text change
+    if (vscContentChanges.length > 0) {
+      logAcceptedEvent(`accepted textChange for ${uri}`);
 
-    // Read https://github.com/microsoft/vscode/issues/11487 about contentChanges array.
-    const irContentChanges = vscContentChanges
-      .map(c => ({ text: c.text, range: VscWorkspace.fromVscRange(c.range) }))
-      .sort((a, b) => lib.posCompare(a.range.start, b.range.start));
+      let debugInitIrText: string | undefined;
+      if (config.debug) {
+        debugInitIrText = irTextDocument.getText();
+      }
 
-    // Validate ranges and make sure there are no overlaps.
-    for (const [i, cc] of irContentChanges.entries()) {
-      assert(irTextDocument.isRangeValid(cc.range), 'textChange: invalid range');
-      if (i > 0) {
+      // Read https://github.com/microsoft/vscode/issues/11487 about contentChanges array.
+      const irContentChanges = vscContentChanges
+        .map(c => ({ text: c.text, range: VscWorkspace.fromVscRange(c.range) }))
+        .sort((a, b) => lib.posCompare(a.range.start, b.range.start));
+
+      // Validate ranges and make sure there are no overlaps.
+      for (const [i, cc] of irContentChanges.entries()) {
+        assert(irTextDocument.isRangeValid(cc.range), 'textChange: invalid range');
+        if (i > 0) {
+          assert(
+            lib.posIsAfterOrEqual(cc.range.start, irContentChanges[i - 1].range.end),
+            // ih.isRangeNonOverlapping(irContentChanges[i - 1].range, cc.range),
+            'textChange: got content changes with overlapping ranges',
+          );
+        }
+      }
+
+      // Apply content changes and get the reverse.
+      const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
+
+      let coalescing = false;
+
+      // Try to simplify it to textInsert event when:
+      // - There is only one cursor: only one content change.
+      // - No text is replaced: the range's start and end are the same.
+      let irEvent: t.EditorEvent;
+      if (
+        irContentChanges.length === 1 &&
+        lib.posIsEqual(irContentChanges[0].range.start, irContentChanges[0].range.end)
+      ) {
+        // example:
+        // contentChanges:    [{"text":"a\nb","range":{"start":{"line":0,"character":5},"end":{"line":0,"character":5}}}]
+        // revContentChanges: [{"range":{"start":{"line":0,"character":5},"end":{"line":1,"character":1}},"text":""}]
+        irEvent = {
+          type: 'textInsert',
+          id: lib.nextId(),
+          uri,
+          clock: this.clock,
+          revRange: irRevContentChanges[0].range, // range.start is the position before text insert, while range.end is the position after text insert
+          text: irContentChanges[0].text,
+          updateSelection: false,
+        };
+
+        coalescing = true;
+
+        // console.log('XXX textInsert:', irEvent);
+        // console.log('XXX equivalent textChange:', lib.getTextChangeEventFromTextInsertEvent(irEvent));
+        // console.log('XXX expected textChange:', {
+        //   type: 'textChange',
+        //   clock: this.clock,
+        //   contentChanges: irContentChanges,
+        //   revContentChanges: irRevContentChanges,
+        //   updateSelection: false,
+        // });
+      } else {
+        irEvent = {
+          type: 'textChange',
+          id: lib.nextId(),
+          uri,
+          clock: this.clock,
+          contentChanges: irContentChanges,
+          revContentChanges: irRevContentChanges,
+          updateSelection: false,
+        };
+      }
+
+      this.insertEvent(irEvent, { coalescing });
+      this.setFocus();
+
+      // DEBUG
+      if (config.debug) {
         assert(
-          lib.posIsAfterOrEqual(cc.range.start, irContentChanges[i - 1].range.end),
-          // ih.isRangeNonOverlapping(irContentChanges[i - 1].range, cc.range),
-          'textChange: got content changes with overlapping ranges',
+          irTextDocument.getText() === vscTextDocument.getText(),
+          "textChange: internal text doesn't match vscode text after applying changes",
+        );
+
+        const debugNextIrText = irTextDocument.getText();
+        await this.internalWorkspace.stepper.applyEditorEvent(irEvent, t.Direction.Backwards);
+        const debugReInitIrText = irTextDocument.getText();
+        assert(
+          debugInitIrText === debugReInitIrText,
+          "textChange: text doesn't match what it was after applying changes in reverse",
+        );
+
+        await this.internalWorkspace.stepper.applyEditorEvent(irEvent, t.Direction.Forwards);
+        assert(
+          debugNextIrText === irTextDocument.getText(),
+          "textChange: text doesn't match what it was after applying changes again",
         );
       }
     }
 
-    // Apply content changes and get the reverse.
-    const irRevContentChanges = irTextDocument.applyContentChanges(irContentChanges, true);
-
-    let coalescing = false;
-
-    // Try to simplify it to textInsert event when:
-    // - There is only one cursor: only one content change.
-    // - No text is replaced: the range's start and end are the same.
-    let irEvent: t.EditorEvent;
-    if (
-      irContentChanges.length === 1 &&
-      lib.posIsEqual(irContentChanges[0].range.start, irContentChanges[0].range.end)
-    ) {
-      // example:
-      // contentChanges:    [{"text":"a\nb","range":{"start":{"line":0,"character":5},"end":{"line":0,"character":5}}}]
-      // revContentChanges: [{"range":{"start":{"line":0,"character":5},"end":{"line":1,"character":1}},"text":""}]
-      irEvent = {
-        type: 'textInsert',
+    // Check for EOL change.
+    const eol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
+    if (irTextDocument.eol !== eol) {
+      logAcceptedEvent(`accepted updateTextDocument (EOL) for ${uri}`);
+      const revEol = irTextDocument.eol;
+      irTextDocument.eol = eol;
+      const e: t.UpdateTextDocumentEvent = {
+        type: 'updateTextDocument',
         id: lib.nextId(),
         uri,
         clock: this.clock,
-        revRange: irRevContentChanges[0].range, // range.start is the position before text insert, while range.end is the position after text insert
-        text: irContentChanges[0].text,
-        updateSelection: false,
+        eol,
+        revEol,
       };
-
-      coalescing = true;
-
-      // console.log('XXX textInsert:', irEvent);
-      // console.log('XXX equivalent textChange:', lib.getTextChangeEventFromTextInsertEvent(irEvent));
-      // console.log('XXX expected textChange:', {
-      //   type: 'textChange',
-      //   clock: this.clock,
-      //   contentChanges: irContentChanges,
-      //   revContentChanges: irRevContentChanges,
-      //   updateSelection: false,
-      // });
-    } else {
-      irEvent = {
-        type: 'textChange',
-        id: lib.nextId(),
-        uri,
-        clock: this.clock,
-        contentChanges: irContentChanges,
-        revContentChanges: irRevContentChanges,
-        updateSelection: false,
-      };
-    }
-
-    this.insertEvent(irEvent, { coalescing });
-    this.setFocus();
-
-    // DEBUG
-    if (config.debug) {
-      assert(
-        irTextDocument.getText() === vscTextDocument.getText(),
-        "textChange: internal text doesn't match vscode text after applying changes",
-      );
-
-      const debugNextIrText = irTextDocument.getText();
-      await this.internalWorkspace.stepper.applyEditorEvent(irEvent, t.Direction.Backwards);
-      const debugReInitIrText = irTextDocument.getText();
-      assert(
-        debugInitIrText === debugReInitIrText,
-        "textChange: text doesn't match what it was after applying changes in reverse",
-      );
-
-      await this.internalWorkspace.stepper.applyEditorEvent(irEvent, t.Direction.Forwards);
-      assert(
-        debugNextIrText === irTextDocument.getText(),
-        "textChange: text doesn't match what it was after applying changes again",
-      );
+      // Coalesce to the text change before it.
+      this.insertEvent(e, { coalescing: vscContentChanges.length > 0 });
     }
   }
 
@@ -445,6 +460,7 @@ class WorkspaceRecorder {
     const lastEventIndex = this.session.body.editorEvents.length - 1;
     const lastEvent = this.session.body.editorEvents.at(lastEventIndex);
     if (lastEvent?.uri === uri && lastEvent.type === 'closeTextDocument') {
+      logAcceptedEvent(`accepted updateTextDocument (language ID) for ${uri}`);
       if (irItem.closedDirtyTextDocument) {
         irItem.restoreClosedDirtyDocument();
       } else {

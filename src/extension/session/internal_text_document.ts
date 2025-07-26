@@ -3,21 +3,30 @@ import * as t from '../../lib/types.js';
 import assert from '../../lib/assert.js';
 
 export default class InternalTextDocument implements t.InternalDocument {
-  constructor(public uri: string, public lines: string[], public eol: t.EndOfLine, public languageId: string) {}
+  constructor(
+    public uri: string,
+    public lines: string[],
+    public eol: t.EndOfLine,
+    public languageId: string,
+  ) {}
 
   static fromBuffer(
     uri: string,
     arrayBuffer: Uint8Array,
-    defaultEol: t.EndOfLine,
-    languageId: string,
+    opts: { eol?: t.EndOfLine; defaultEol?: t.EndOfLine; languageId: string },
   ): InternalTextDocument {
-    return InternalTextDocument.fromText(uri, new TextDecoder().decode(arrayBuffer), defaultEol, languageId);
+    return InternalTextDocument.fromText(uri, new TextDecoder().decode(arrayBuffer), opts);
   }
 
-  static fromText(uri: string, text: string, defaultEol: t.EndOfLine, languageId: string): InternalTextDocument {
-    const eol = (text.match(/\r?\n/)?.[0] as t.EndOfLine) || defaultEol;
+  static fromText(
+    uri: string,
+    text: string,
+    opts: { eol?: t.EndOfLine; defaultEol?: t.EndOfLine; languageId: string },
+  ): InternalTextDocument {
+    assert(opts.eol || opts.defaultEol);
+    const eol = opts.eol ?? (text.match(/\r?\n/)?.[0] as t.EndOfLine | undefined) ?? opts.defaultEol!;
     const lines = text.split(/\r?\n/);
-    return new InternalTextDocument(uri, lines, eol, languageId);
+    return new InternalTextDocument(uri, lines, eol, opts.languageId);
   }
 
   get isEmpty(): boolean {

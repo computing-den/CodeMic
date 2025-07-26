@@ -96,14 +96,17 @@ export class LiveWorktreeItem {
     return (this._document = document);
   }
 
-  async openTextDocument(opts: { eol: t.EndOfLine; languageId: string }): Promise<InternalTextDocument> {
+  async openTextDocument(opts: {
+    eol?: t.EndOfLine;
+    defaultEol?: t.EndOfLine;
+    languageId: string;
+  }): Promise<InternalTextDocument> {
     // Shortcut if document already open.
     if (this.textDocument) return this.textDocument;
 
     // Create new text document.
-    const eol = opts?.eol ?? this.worktree.session.body.defaultEol;
     const buffer = await this.getContent();
-    const document = InternalTextDocument.fromBuffer(this.uri, buffer, eol, opts.languageId);
+    const document = InternalTextDocument.fromBuffer(this.uri, buffer, opts);
 
     // Update document and editor.
     this._closedDirtyDocument = undefined;

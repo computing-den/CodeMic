@@ -1,11 +1,13 @@
 import * as assert from 'assert';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import _ from 'lodash';
 import * as vscode from 'vscode';
 import CodeMic from '../extension/codemic.js';
 import config from '../extension/config.js';
 import { EditorEvent } from '../lib/types.js';
+import { timeout } from '../lib/lib.js';
 
 export type SessionTestStep = {
   clock: number;
@@ -84,6 +86,11 @@ export async function openSessionInRecorder(id: string) {
   await getCodeMic().handleMessage({ type: 'welcome/openSessionInRecorder', sessionId: id });
   assert.strictEqual(getCodeMic().session?.head.id, id);
   assert.strictEqual(getCodeMic().recorder?.tabId, 'editor-view');
+
+  // Windows is slow!
+  if (os.platform() === 'win32') {
+    await timeout(2000);
+  }
 }
 
 // function getWorkspacePath(): string {

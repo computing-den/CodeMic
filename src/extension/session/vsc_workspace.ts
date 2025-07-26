@@ -22,7 +22,10 @@ type TabWithInputText = Omit<vscode.Tab, 'input'> & {
 const PROJECT_PATH = path.resolve(__dirname, '..'); // relative to dist
 
 export default class VscWorkspace {
-  constructor(public session: LoadedSession, private internalWorkspace: InternalWorkspace) {}
+  constructor(
+    public session: LoadedSession,
+    private internalWorkspace: InternalWorkspace,
+  ) {}
 
   // static getCoverUri(session: Session): string {
   //   return session.context
@@ -154,6 +157,10 @@ export default class VscWorkspace {
     return eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
   }
 
+  static toVscEol(eol: t.EndOfLine): vscode.EndOfLine {
+    return eol === '\r\n' ? vscode.EndOfLine.CRLF : vscode.EndOfLine.LF;
+  }
+
   private get worktree(): LiveWorktree {
     return this.internalWorkspace.worktree;
   }
@@ -240,7 +247,10 @@ export default class VscWorkspace {
             throw new Error(`uriFromVsc: unknown scheme: ${vscTextDocument.uri}`);
         }
         const eol = VscWorkspace.eolFromVsc(vscTextDocument.eol);
-        const internalTextDocument = InternalTextDocument.fromText(uri, revText, eol, vscTextDocument.languageId);
+        const internalTextDocument = InternalTextDocument.fromText(uri, revText, {
+          eol,
+          languageId: vscTextDocument.languageId,
+        });
         const irContentChanges: t.ContentChange[] = [
           { range: internalTextDocument.getRange(), text: vscTextDocument.getText() },
         ];
@@ -375,7 +385,7 @@ export default class VscWorkspace {
     //         to revert documents before attempting to close anything.
     // If internal document is open:
     //   If there's no vscode document, open it (may be file or untitled).
-    //   If vscode document content is different from internal, edit vscode.
+    //   If vscode document content or EOL is different from internal, edit vscode.
     {
       const edit = new vscode.WorkspaceEdit();
       for (const targetUri of targetUris) {
@@ -390,15 +400,26 @@ export default class VscWorkspace {
           !vscTextDocument.isClosed &&
           (urisChangedOnDisk.has(targetUri) || (!item.textDocument && this.isVscTextDocumentDirty(vscTextDocument)))
         ) {
-          await this.revertVscTextDocument(vscTextDocument);
+          // Revert may change eol and language id. It's ok. We'll set them later.
+          await this.revertVscTextDocument(vscTextDocument, { restoreEol: false, restoreLanguageId: false });
         }
 
         if (item.textDocument) {
           vscTextDocument ??= await this.openTextDocumentByUri(targetUri, { createFileIfNecessary: true });
+          const edits: vscode.TextEdit[] = [];
+          const eol = VscWorkspace.toVscEol(item.textDocument.eol);
           const vscContent = vscTextDocument.getText();
           const internalContent = item.textDocument.getText();
+
+          if (eol !== vscTextDocument.eol) {
+            edits.push(vscode.TextEdit.setEndOfLine(eol));
+          }
           if (vscContent !== internalContent) {
-            edit.replace(vscTextDocument.uri, this.getVscTextDocumentVscRange(vscTextDocument), internalContent);
+            edits.push(vscode.TextEdit.replace(this.getVscTextDocumentVscRange(vscTextDocument), internalContent));
+          }
+
+          if (edits.length > 0) {
+            edit.set(vscTextDocument.uri, edits);
           }
         }
       }
@@ -530,14 +551,16 @@ export default class VscWorkspace {
    *   though we await it. Possible bug report: https://github.com/microsoft/vscode/issues/187396
    */
   async deferRestoreTextEditorByVscUri<T>(cb: () => T, opts?: { exception?: vscode.Uri }): Promise<T> {
-    // Remember the current ative text editor to restore later.
-    const document = vscode.window.activeTextEditor?.document;
+    // Remember the current ative text editor uri to restore later.
+    // NOTE: Don't store the document itself, because the document may change within the
+    // callback if we change the langauge id or something for example.
+    const uri = vscode.window.activeTextEditor?.document.uri;
     let res;
     try {
       res = await cb();
     } finally {
-      if (document && opts?.exception?.toString() !== document.uri.toString()) {
-        await vscode.window.showTextDocument(document);
+      if (uri && opts?.exception?.toString() !== uri.toString()) {
+        await vscode.window.showTextDocument(uri);
       }
     }
     return res;
@@ -547,32 +570,48 @@ export default class VscWorkspace {
     return this.closeVscTextEditorByVscUri(this.uriToVsc(uri), options);
   }
 
-  /**
-   * Use this to save without triggering any onsave events that would cause
-   * the auto formatter to run for example.
-   */
-  async saveVscTextDocument(vscTextDocument: vscode.TextDocument) {
-    await fs.promises.writeFile(vscTextDocument.uri.fsPath, vscTextDocument.getText());
-    await this.revertVscTextDocument(vscTextDocument);
-  }
+  // /**
+  //  * Use this to save without triggering any onsave events that would cause
+  //  * the auto formatter to run for example.
+  //  */
+  // async saveVscTextDocument(vscTextDocument: vscode.TextDocument) {
+  //   await fs.promises.writeFile(vscTextDocument.uri.fsPath, vscTextDocument.getText());
+  //   await this.revertVscTextDocument(vscTextDocument);
+  // }
 
-  async revertVscTextDocument(vscTextDocument: vscode.TextDocument) {
-    await vscode.window.showTextDocument(vscTextDocument, { preview: false, viewColumn: vscode.ViewColumn.One });
-    // await vscode.commands.executeCommand('vscode.open', vscTextDocument.uri);
+  async revertVscTextDocument(
+    vscTextDocument: vscode.TextDocument,
+    opts?: { restoreEol: boolean; restoreLanguageId: boolean },
+  ): Promise<vscode.TextDocument> {
+    const [eol, languageId] = [vscTextDocument.eol, vscTextDocument.languageId];
+    const vscTextEditor = await vscode.window.showTextDocument(vscTextDocument, {
+      preview: false,
+      viewColumn: vscode.ViewColumn.One,
+    });
     await vscode.commands.executeCommand('workbench.action.files.revert');
+
+    if (opts?.restoreEol && eol !== vscTextDocument.eol) {
+      await vscTextEditor.edit(builder => builder.setEndOfLine(eol));
+    }
+
+    if (opts?.restoreLanguageId && languageId !== vscTextDocument.languageId) {
+      vscTextDocument = await vscode.languages.setTextDocumentLanguage(vscTextDocument, languageId);
+    }
+
+    return vscTextDocument;
   }
 
-  async saveAllRelevantVscTabs() {
-    const uris = this.getRelevantTabVscUris();
-    for (const uri of uris) {
-      if (uri.scheme === 'file') {
-        const vscTextDocument = this.findVscTextDocumentByVscUri(uri);
-        if (vscTextDocument) {
-          await this.saveVscTextDocument(vscTextDocument);
-        }
-      }
-    }
-  }
+  // async saveAllRelevantVscTabs() {
+  //   const uris = this.getRelevantTabVscUris();
+  //   for (const uri of uris) {
+  //     if (uri.scheme === 'file') {
+  //       const vscTextDocument = this.findVscTextDocumentByVscUri(uri);
+  //       if (vscTextDocument) {
+  //         await this.saveVscTextDocument(vscTextDocument);
+  //       }
+  //     }
+  //   }
+  // }
 
   /**
    * Will ask for confirmation.
