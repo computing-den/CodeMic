@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 // import FakeMedia from './fake_media.jsx';
 import ProgressBar from './progress_bar.jsx';
 import PathField from './path_field.jsx';
-import MediaToolbar, * as MT from './media_toolbar.jsx';
+import MediaToolbar, { MediaToolbarButton, MediaToolbarMenu, PrimaryAction } from './media_toolbar.jsx';
 import { SessionHead } from './session_head.jsx';
 import SessionDescription from './session_description.jsx';
 import { CommentInput, CommentList } from './comment.jsx';
@@ -13,7 +13,6 @@ import Section from './section.jsx';
 import postMessage from './api.js';
 import { cn } from './misc.js';
 import _ from 'lodash';
-import { AppContext } from './app_context.jsx';
 import { PictureInPicture } from './svgs.jsx';
 import Cover from './cover.jsx';
 import { VSCodeLink } from '@vscode/webview-ui-toolkit/react/index.js';
@@ -140,6 +139,10 @@ export default class Player extends React.Component<Props> {
     await postMessage({ type: 'player/seek', clock: this.props.session.clock + 5 });
   };
 
+  setPlaybackRate = async (rate: number) => {
+    await postMessage({ type: 'player/setPlaybackRate', rate });
+  };
+
   componentDidUpdate(prevProps: Props) {
     this.updateCoverContainerHeight();
 
@@ -174,83 +177,11 @@ export default class Player extends React.Component<Props> {
     // const { cache } = this.context;
     const { session, user } = this.props;
     const { head, publication, local } = session;
-    let clock = session.clock;
+
+    let curOrHistoryClock = session.clock;
     if (!session.loaded && session.history?.lastWatchedClock) {
-      clock = session.history.lastWatchedClock;
+      curOrHistoryClock = session.history.lastWatchedClock;
     }
-
-    let primaryAction: MT.PrimaryAction;
-    if (session.playing) {
-      primaryAction = { type: 'player/pause', title: 'Pause', onClick: this.pause };
-    } else if (session.loaded) {
-      primaryAction = { type: 'player/play', title: 'Play', onClick: this.play };
-    } else if (session.local) {
-      primaryAction = { type: 'player/load', title: `Load session into ${session.workspace}`, onClick: this.load };
-    } else {
-      primaryAction = {
-        type: 'player/download',
-        title: `Download and load session into ${session.workspace}`,
-        onClick: this.load,
-      };
-    }
-
-    const toolbarActions = _.compact([
-      // {
-      //   title: 'Fork: create a new session based on this one',
-      //   icon: 'codicon-repo-forked',
-      //   onClick: this.fork,
-      // },
-      // {
-      //   title: 'Bookmark at this point',
-      //   icon: 'codicon-bookmark',
-      //   onClick: () => {
-      //     console.log('TODO');
-      //   },
-      // },
-      // publication && {
-      //   title: 'Like',
-      //   icon: liked ? 'codicon-heart-filled' : 'codicon-heart',
-      //   onClick: () => postMessage({ type: 'player/likeSession', value: !liked }),
-      // },
-      {
-        title: 'Jump 5s backwards',
-        icon: 'codicon-chevron-left',
-        onClick: this.stepBackward,
-        disabled: !session.loaded || session.clock === 0,
-      },
-      {
-        title: 'Jump 5s forward',
-        icon: 'codicon-chevron-right',
-        onClick: this.stepForward,
-        disabled: !session.loaded || session.clock === session.head.duration,
-      },
-      {
-        title: 'Force sync workspace',
-        icon: 'codicon-sync',
-        onClick: () => postMessage({ type: 'player/syncWorkspace' }),
-        disabled: !session.loaded,
-      },
-      {
-        title: 'Picture-in-Picture',
-        children: <PictureInPicture />,
-        onClick: this.togglePictureInPicture,
-        // NOTE: change of video src does not trigger an update
-        //       but it's ok for now, since state/props change during playback.
-        disabled: !this.getVideoElem()?.src,
-      },
-
-      {
-        title: 'Edit: open this session in the Studio',
-        icon: 'codicon-edit',
-        onClick: () => postMessage({ type: 'player/openInRecorder' }),
-      },
-      {
-        title: 'Share session',
-        icon: 'codicon-link',
-        onClick: () =>
-          postMessage({ type: 'copySessionLink', sessionId: session.head.id, sessionHandle: session.head.handle }),
-      },
-    ]);
 
     return (
       <Screen className="player">
@@ -272,12 +203,17 @@ export default class Player extends React.Component<Props> {
           />
             */}
           <Section.Body>
-            <MediaToolbar
-              className="subsection subsection_spaced"
-              primaryAction={primaryAction}
-              actions={toolbarActions}
-              clock={clock}
-              duration={head.duration}
+            <PlayerMediaToolbar
+              session={session}
+              curOrHistoryClock={curOrHistoryClock}
+              play={this.play}
+              pause={this.pause}
+              load={this.load}
+              stepBackward={this.stepBackward}
+              stepForward={this.stepForward}
+              setPlaybackRate={this.setPlaybackRate}
+              togglePictureInPicture={this.togglePictureInPicture}
+              getVideoElem={this.getVideoElem}
             />
             <div
               id="media-container"
@@ -321,7 +257,12 @@ export default class Player extends React.Component<Props> {
               </div>
               )*/}
             {head.toc.length > 0 && (
-              <TableOfContent head={head} onClick={this.tocItemClicked} clock={clock} loaded={session.loaded} />
+              <TableOfContent
+                head={head}
+                onClick={this.tocItemClicked}
+                clock={curOrHistoryClock}
+                loaded={session.loaded}
+              />
             )}
           </Section.Body>
         </Section>
@@ -358,6 +299,100 @@ export default class Player extends React.Component<Props> {
       </Screen>
     );
   }
+}
+
+type PlayerMediaToolbarProps = {
+  session: t.SessionUIState;
+  curOrHistoryClock: number;
+  play: () => any;
+  pause: () => any;
+  load: () => any;
+  stepBackward: () => any;
+  stepForward: () => any;
+  togglePictureInPicture: () => any;
+  setPlaybackRate: (rate: number) => any;
+  getVideoElem: () => HTMLVideoElement | undefined;
+};
+
+function PlayerMediaToolbar(props: PlayerMediaToolbarProps) {
+  const { session } = props;
+
+  let primaryAction: PrimaryAction;
+  if (session.playing) {
+    primaryAction = { type: 'player/pause', title: 'Pause', onClick: props.pause };
+  } else if (session.loaded) {
+    primaryAction = { type: 'player/play', title: 'Play', onClick: props.play };
+  } else if (session.local) {
+    primaryAction = { type: 'player/load', title: `Load session into ${session.workspace}`, onClick: props.load };
+  } else {
+    primaryAction = {
+      type: 'player/download',
+      title: `Download and load session into ${session.workspace}`,
+      onClick: props.load,
+    };
+  }
+
+  const mediaToolbarActions = _.compact([
+    // {
+    //   title: 'Fork: create a new session based on this one',
+    //   icon: 'codicon-repo-forked',
+    //   onClick: this.fork,
+    // },
+    // {
+    //   title: 'Bookmark at this point',
+    //   icon: 'codicon-bookmark',
+    //   onClick: () => {
+    //     console.log('TODO');
+    //   },
+    // },
+    // publication && {
+    //   title: 'Like',
+    //   icon: liked ? 'codicon-heart-filled' : 'codicon-heart',
+    //   onClick: () => postMessage({ type: 'player/likeSession', value: !liked }),
+    // },
+    <MediaToolbarButton
+      title="Jump 5s backwards"
+      icon="codicon-chevron-left"
+      onClick={props.stepBackward}
+      disabled={!session.loaded || session.clock === 0}
+    />,
+    <MediaToolbarButton
+      title="Jump 5s forward"
+      icon="codicon-chevron-right"
+      onClick={props.stepForward}
+      disabled={!session.loaded || session.clock === session.head.duration}
+    />,
+    <MediaToolbarButton
+      title="Share session"
+      icon="codicon-link"
+      onClick={() =>
+        postMessage({ type: 'copySessionLink', sessionId: session.head.id, sessionHandle: session.head.handle })
+      }
+    />,
+    <MediaToolbarMenu
+      onSync={() => postMessage({ type: 'player/syncWorkspace' })}
+      onEdit={() => postMessage({ type: 'player/openInRecorder' })}
+      onPiP={props.togglePictureInPicture}
+      onPlaybackRate={rate => postMessage({ type: 'player/setPlaybackRate', rate })}
+      canSync={session.loaded}
+      // NOTE: change of video src does not trigger an update
+      //       but it's ok for now, since state/props change during playback.
+      canPiP={Boolean(props.getVideoElem()?.src)}
+      canEdit
+      showEdit
+      playbackRate={session.playbackRate}
+    />,
+  ]);
+
+  return (
+    <MediaToolbar
+      className="subsection subsection_spaced"
+      primaryAction={primaryAction}
+      actions={mediaToolbarActions}
+      clock={props.curOrHistoryClock}
+      duration={session.head.duration}
+    />
+  );
 }
 
 function TableOfContent(props: {

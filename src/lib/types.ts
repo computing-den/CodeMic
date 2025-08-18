@@ -32,6 +32,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'player/comment'; text: string; clock?: number }; response: OKResponse }
   | { request: { type: 'player/likeSession'; value: boolean }; response: OKResponse }
   | { request: { type: 'player/syncWorkspace' }; response: OKResponse }
+  | { request: { type: 'player/setPlaybackRate'; rate: number }; response: OKResponse }
   | { request: { type: 'recorder/openTab'; tabId: RecorderUITabId }; response: OKResponse }
   | { request: { type: 'recorder/load'; skipConfirmation?: boolean }; response: OKResponse }
   | { request: { type: 'recorder/play' }; response: OKResponse }
@@ -39,6 +40,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/pause' }; response: OKResponse }
   | { request: { type: 'recorder/seek'; clock: number; useStepper?: boolean }; response: OKResponse }
   | { request: { type: 'recorder/syncWorkspace'; clock?: number }; response: OKResponse }
+  | { request: { type: 'recorder/setPlaybackRate'; rate: number }; response: OKResponse }
   // | { request: { type: 'recorder/save' }; response: OKResponse }
   | { request: { type: 'recorder/publish' }; response: OKResponse }
   | { request: { type: 'recorder/undo' }; response: OKResponse }
@@ -340,6 +342,7 @@ export type SessionUIState = {
   recording: boolean;
   head: SessionHead;
   clock: number;
+  playbackRate: number;
   workspace: string;
   dataPath: string;
   // coverUri: string;

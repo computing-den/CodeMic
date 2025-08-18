@@ -1,5 +1,5 @@
-import MediaToolbar, * as MT from './media_toolbar.jsx';
-import React, { forwardRef, Ref, RefObject, useEffect, useRef, useState } from 'react';
+import MediaToolbar, { MediaToolbarButton, MediaToolbarMenu, PrimaryAction } from './media_toolbar.jsx';
+import React, { forwardRef, Ref, useEffect, useRef, useState } from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { Vec2, Rect } from '../lib/lib.js';
@@ -435,7 +435,7 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     await postMessage({ type: 'player/seek', clock: session.clock + 5 });
   }
 
-  let primaryAction: MT.PrimaryAction;
+  let primaryAction: PrimaryAction;
   if (session.recording) {
     primaryAction = {
       type: 'recorder/pause',
@@ -454,52 +454,61 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
   }
 
   const mediaToolbarActions = _.compact([
-    session.playing
-      ? {
-          title: 'Pause',
-          icon: 'codicon-debug-pause',
-          onClick: () => postMessage({ type: 'recorder/pause' }),
-        }
-      : {
-          title: 'Play',
-          icon: 'codicon-play',
-          disabled: session.recording,
-          onClick: onPlay,
-        },
-    {
-      title: 'Jump 5s backwards',
-      icon: 'codicon-chevron-left',
-      onClick: stepBackward,
-      disabled: session.recording || session.clock === 0,
-    },
-    {
-      title: 'Jump 5s forward',
-      icon: 'codicon-chevron-right',
-      onClick: stepForward,
-      disabled: session.recording || session.clock === session.head.duration,
-    },
-    {
-      title: 'Force sync workspace',
-      icon: 'codicon-sync',
-      onClick: () => postMessage({ type: 'recorder/syncWorkspace', clock: selectionClockRange?.start }),
-      // NOTE: Must not programmatically change the workspace during recording
-      //       because the changes will then be picked up by the recorder.
-      disabled: session.recording,
-    },
-    {
-      title: 'Picture-in-Picture',
-      children: <PictureInPicture />,
-      onClick: () => togglePictureInPicture(),
+    session.playing ? (
+      <MediaToolbarButton
+        title="Pause"
+        icon="codicon-debug-pause"
+        onClick={() => postMessage({ type: 'recorder/pause' })}
+      />
+    ) : (
+      <MediaToolbarButton title="Play" icon="codicon-play" disabled={session.recording} onClick={onPlay} />
+    ),
+    <MediaToolbarButton
+      title="Jump 5s backwards"
+      icon="codicon-chevron-left"
+      onClick={stepBackward}
+      disabled={session.recording || session.clock === 0}
+    />,
+    <MediaToolbarButton
+      title="Jump 5s forward"
+      icon="codicon-chevron-right"
+      onClick={stepForward}
+      disabled={session.recording || session.clock === session.head.duration}
+    />,
+    // <MediaToolbarButton
+    //   title="Force sync workspace"
+    //   icon="codicon-sync"
+    //   onClick={() => postMessage({ type: 'recorder/syncWorkspace', clock: selectionClockRange?.start })}
+    //   // NOTE: Must not programmatically change the workspace during recording
+    //   //       because the changes will then be picked up by the recorder.
+    //   disabled={session.recording}
+    // />,
+    // <MediaToolbarButton
+    //   title="Picture-in-Picture"
+    //   children={<PictureInPicture />}
+    //   onClick={() => togglePictureInPicture()}
+    //   // NOTE: change of video src does not trigger an update
+    //   //       but it's ok for now, since state/props change during playback.
+    //   disabled={!guideVideoRef.current?.src}
+    // />,
+    <MediaToolbarButton
+      title="Share session"
+      icon="codicon-link"
+      onClick={() =>
+        postMessage({ type: 'copySessionLink', sessionId: session.head.id, sessionHandle: session.head.handle })
+      }
+    />,
+    <MediaToolbarMenu
+      onSync={() => postMessage({ type: 'recorder/syncWorkspace', clock: selectionClockRange?.start })}
+      onPiP={() => togglePictureInPicture()}
+      canSync={session.recording}
       // NOTE: change of video src does not trigger an update
       //       but it's ok for now, since state/props change during playback.
-      disabled: !guideVideoRef.current?.src,
-    },
-    {
-      title: 'Share session',
-      icon: 'codicon-link',
-      onClick: () =>
-        postMessage({ type: 'copySessionLink', sessionId: session.head.id, sessionHandle: session.head.handle }),
-    },
+      canPiP={Boolean(guideVideoRef.current?.src)}
+      canEdit={false}
+      playbackRate={session.playbackRate}
+      onPlaybackRate={rate => postMessage({ type: 'recorder/setPlaybackRate', rate })}
+    />,
   ]);
 
   const slowDownPopover = usePopover();

@@ -13,7 +13,6 @@ import * as paths from '../lib/paths.js';
 import VscWorkspace from './session/vsc_workspace.js';
 import path from 'path';
 import cache from './cache.js';
-import SessionCore from './session/session_core.js';
 import assert from '../lib/assert.js';
 
 type OpenScreenParams =
@@ -502,6 +501,12 @@ class CodeMic {
         await this.updateFrontend();
         return ok;
       }
+      case 'player/setPlaybackRate': {
+        assert(this.session?.isLoaded());
+        this.session.rr.setPlaybackRate(req.rate);
+        await this.updateFrontend();
+        return ok;
+      }
       case 'recorder/openTab': {
         assert(this.session);
         assert(this.recorder);
@@ -547,6 +552,12 @@ class CodeMic {
       case 'recorder/syncWorkspace': {
         assert(this.session?.isLoaded());
         await this.session.rr.enqueueSync(req.clock);
+        await this.updateFrontend();
+        return ok;
+      }
+      case 'recorder/setPlaybackRate': {
+        assert(this.session?.isLoaded());
+        this.session.rr.setPlaybackRate(req.rate);
         await this.updateFrontend();
         return ok;
       }
@@ -1133,7 +1144,7 @@ class CodeMic {
       if (this.welcome) {
         this.welcome.sessions = this.welcome.sessions.filter(s => s.group !== 'remote');
         this.welcome.sessions.push(
-          ...heads.map(head => ({ head, group: 'remote', local: false } satisfies t.SessionListing)),
+          ...heads.map(head => ({ head, group: 'remote', local: false }) satisfies t.SessionListing),
         );
       }
     } catch (error) {
@@ -1216,6 +1227,7 @@ class CodeMic {
         recording: this.session.rr?.recording ?? false,
         head: this.session.head,
         clock: this.session.rr?.clock ?? 0,
+        playbackRate: this.session.rr?.playbackRate ?? 1,
         workspace: this.session.workspace,
         dataPath: this.session.core.dataPath,
         workspaceFocusTimeline: this.session.body?.focusTimeline,

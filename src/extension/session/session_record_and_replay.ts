@@ -31,6 +31,7 @@ const SEEK_USING_STEPPER_THRESHOLD_S = 10;
 export default class SessionRecordAndReplay {
   session: LoadedSession;
   clock = 0;
+  playbackRate = 1;
 
   private internalWorkspace: InternalWorkspace;
   private vscWorkspace: VscWorkspace;
@@ -125,6 +126,10 @@ export default class SessionRecordAndReplay {
 
   async enqueueSync(clock?: number) {
     await this.pauseOnError(this.queue.enqueue(this.sync.bind(this), clock));
+  }
+
+  setPlaybackRate(rate: number) {
+    this.playbackRate = rate;
   }
 
   /**
@@ -364,7 +369,7 @@ export default class SessionRecordAndReplay {
       }
 
       // Update clock.
-      this.clock += diffMs / 1000;
+      this.clock += (this.playbackRate * diffMs) / 1000;
 
       // Update workspace.
       if (this.mode.recorder) {
@@ -506,7 +511,7 @@ export default class SessionRecordAndReplay {
     await Promise.all(
       tracksToSeek.flatMap(t => [
         postMessage({ type: 'media/seek', mediaType: t.type, id: t.id, clock: this.globalClockToTrackLocal(t) }),
-        postMessage({ type: 'media/setPlaybackRate', mediaType: t.type, id: t.id, rate: 1 }),
+        postMessage({ type: 'media/setPlaybackRate', mediaType: t.type, id: t.id, rate: this.playbackRate }),
       ]),
     );
 
@@ -523,7 +528,8 @@ export default class SessionRecordAndReplay {
     await Promise.all(
       tracksToAdjustRate.map(t => {
         const trackGlobalClock = this.trackLocalClockToGlobal(mediaStatuses[t.id].currentTime, t);
-        const rate = lib.adjustTrackPlaybackRate(this.clock, trackGlobalClock);
+        const adjustmentRate = lib.adjustTrackPlaybackRate(this.clock, trackGlobalClock);
+        const rate = adjustmentRate && this.playbackRate * adjustmentRate;
         if (rate !== undefined && Math.abs(mediaStatuses[t.id].playbackRate - rate) > 0.001) {
           return postMessage({ type: 'media/setPlaybackRate', mediaType: t.type, id: t.id, rate });
         }
