@@ -501,7 +501,7 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     <MediaToolbarMenu
       onSync={() => postMessage({ type: 'recorder/syncWorkspace', clock: selectionClockRange?.start })}
       onPiP={() => togglePictureInPicture()}
-      canSync={session.recording}
+      canSync={!session.recording}
       // NOTE: change of video src does not trigger an update
       //       but it's ok for now, since state/props change during playback.
       canPiP={Boolean(guideVideoRef.current?.src)}

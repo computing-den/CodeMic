@@ -79,89 +79,97 @@ class WorkspaceRecorder {
     if (this.recording) return;
 
     this.recording = true;
+    // Ignore user input while waiting for recording to start
+    // We want to make sure the user doesn't change anything until
+    // we're ready to start recording.
+    const ignoreUserInputDisposable = vscode.commands.registerCommand('type', () => {});
 
-    await this.waitForStableFs();
+    try {
+      await this.waitForStableFs();
 
-    // update or create focus
-    await this.queue.enqueue(this.setFocus.bind(this));
+      // update or create focus
+      await this.queue.enqueue(this.setFocus.bind(this));
 
-    // Listen to tabs opening/closing/changing.
-    {
-      const disposable = vscode.window.tabGroups.onDidChangeTabs(tabChangeEvent =>
-        this.catchError(this.queue.enqueue(this.changeTabs.bind(this), tabChangeEvent)),
-      );
-      this.disposables.push(disposable);
+      // Listen to tabs opening/closing/changing.
+      {
+        const disposable = vscode.window.tabGroups.onDidChangeTabs(tabChangeEvent =>
+          this.catchError(this.queue.enqueue(this.changeTabs.bind(this), tabChangeEvent)),
+        );
+        this.disposables.push(disposable);
+      }
+
+      // listen for open document events
+      {
+        const disposable = vscode.workspace.onDidOpenTextDocument(vscTextDocument =>
+          this.catchError(this.queue.enqueue(this.openTextDocument.bind(this), vscTextDocument)),
+        );
+        this.disposables.push(disposable);
+      }
+      // listen for close document events
+      {
+        const disposable = vscode.workspace.onDidCloseTextDocument(vscTextDocument =>
+          this.catchError(this.queue.enqueue(this.closeTextDocument.bind(this), vscTextDocument)),
+        );
+        this.disposables.push(disposable);
+      }
+
+      // listen for show text editor events
+      {
+        const disposable = vscode.window.onDidChangeActiveTextEditor(vscTextEditor =>
+          this.catchError(this.queue.enqueue(this.showTextEditor.bind(this), vscTextEditor)),
+        );
+        this.disposables.push(disposable);
+      }
+
+      // listen for text change events
+      {
+        const disposable = vscode.workspace.onDidChangeTextDocument(e =>
+          this.catchError(this.queue.enqueue(this.textDocumentChange.bind(this), e.document, e.contentChanges)),
+        );
+        this.disposables.push(disposable);
+      }
+
+      // listen for selection change events
+      {
+        const disposable = vscode.window.onDidChangeTextEditorSelection(e =>
+          this.catchError(this.queue.enqueue(this.select.bind(this), e.textEditor, e.selections)),
+        );
+        this.disposables.push(disposable);
+      }
+
+      // NOTE: We now listen to file changes. So no need for listening to save event.
+      // listen for save events
+      // {
+      //   const disposable = vscode.workspace.onDidSaveTextDocument(vscTextDocument =>
+      //     this.catchError(this.saveTextDocument(vscTextDocument))
+      //   );
+      //   this.disposables.push(disposable);
+      // }
+
+      // listen for scroll events
+      {
+        const disposable = vscode.window.onDidChangeTextEditorVisibleRanges(e =>
+          this.catchError(this.queue.enqueue(this.scroll.bind(this), e.textEditor, e.visibleRanges)),
+        );
+        this.disposables.push(disposable);
+      }
+
+      // listen for filesystem events
+      {
+        const watcher = vscode.workspace.createFileSystemWatcher(
+          new vscode.RelativePattern(this.session.workspace, '**/*'),
+        );
+        watcher.onDidCreate(uri => this.catchError(this.queue.enqueue(this.fsCreate.bind(this), uri)));
+        watcher.onDidChange(uri => this.catchError(this.queue.enqueue(this.fsChange.bind(this), uri)));
+        watcher.onDidDelete(uri => this.catchError(this.queue.enqueue(this.fsDelete.bind(this), uri)));
+        this.disposables.push(watcher);
+      }
+    } finally {
+      ignoreUserInputDisposable.dispose();
+
+      // register disposables
+      this.session.context.extension.subscriptions.push(...this.disposables);
     }
-
-    // listen for open document events
-    {
-      const disposable = vscode.workspace.onDidOpenTextDocument(vscTextDocument =>
-        this.catchError(this.queue.enqueue(this.openTextDocument.bind(this), vscTextDocument)),
-      );
-      this.disposables.push(disposable);
-    }
-    // listen for close document events
-    {
-      const disposable = vscode.workspace.onDidCloseTextDocument(vscTextDocument =>
-        this.catchError(this.queue.enqueue(this.closeTextDocument.bind(this), vscTextDocument)),
-      );
-      this.disposables.push(disposable);
-    }
-
-    // listen for show text editor events
-    {
-      const disposable = vscode.window.onDidChangeActiveTextEditor(vscTextEditor =>
-        this.catchError(this.queue.enqueue(this.showTextEditor.bind(this), vscTextEditor)),
-      );
-      this.disposables.push(disposable);
-    }
-
-    // listen for text change events
-    {
-      const disposable = vscode.workspace.onDidChangeTextDocument(e =>
-        this.catchError(this.queue.enqueue(this.textDocumentChange.bind(this), e.document, e.contentChanges)),
-      );
-      this.disposables.push(disposable);
-    }
-
-    // listen for selection change events
-    {
-      const disposable = vscode.window.onDidChangeTextEditorSelection(e =>
-        this.catchError(this.queue.enqueue(this.select.bind(this), e.textEditor, e.selections)),
-      );
-      this.disposables.push(disposable);
-    }
-
-    // NOTE: We now listen to file changes. So no need for listening to save event.
-    // listen for save events
-    // {
-    //   const disposable = vscode.workspace.onDidSaveTextDocument(vscTextDocument =>
-    //     this.catchError(this.saveTextDocument(vscTextDocument))
-    //   );
-    //   this.disposables.push(disposable);
-    // }
-
-    // listen for scroll events
-    {
-      const disposable = vscode.window.onDidChangeTextEditorVisibleRanges(e =>
-        this.catchError(this.queue.enqueue(this.scroll.bind(this), e.textEditor, e.visibleRanges)),
-      );
-      this.disposables.push(disposable);
-    }
-
-    // listen for filesystem events
-    {
-      const watcher = vscode.workspace.createFileSystemWatcher(
-        new vscode.RelativePattern(this.session.workspace, '**/*'),
-      );
-      watcher.onDidCreate(uri => this.catchError(this.queue.enqueue(this.fsCreate.bind(this), uri)));
-      watcher.onDidChange(uri => this.catchError(this.queue.enqueue(this.fsChange.bind(this), uri)));
-      watcher.onDidDelete(uri => this.catchError(this.queue.enqueue(this.fsDelete.bind(this), uri)));
-      this.disposables.push(watcher);
-    }
-
-    // register disposables
-    this.session.context.extension.subscriptions.push(...this.disposables);
   }
 
   pause() {
