@@ -213,7 +213,9 @@ export default class SessionCore {
     return lib.resolveWorkspaceUri(this.session.workspace, uri);
   }
 
-  private getIgnoreInstance = _.memoize(ignorePatterns => ignore().add('.CodeMic').add(ignorePatterns));
+  private getIgnoreInstance = _.memoize(ignorePatterns =>
+    ignore().add('.CodeMic').add('.vscode/settings.json').add('.vscode/settings').add(ignorePatterns),
+  );
 
   shouldRecordAbsPath(abs: string): boolean {
     return this.shouldRecordRelPath(path.relative(this.session.workspace, abs));

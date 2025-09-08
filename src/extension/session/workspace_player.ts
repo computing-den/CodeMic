@@ -32,7 +32,7 @@ class WorkspacePlayer {
 
     this.playing = true;
 
-    // ignore user input
+    // Ignore user input.
     {
       const disposable = vscode.commands.registerCommand('type', (e: { text: string }) => {
         const uri = vscode.window.activeTextEditor?.document.uri;
@@ -42,6 +42,53 @@ class WorkspacePlayer {
         }
       });
       this.disposables.push(disposable);
+    }
+
+    // Prevent auto closing tags and other auto insertions during playback.
+    {
+      const KEYS = [
+        ['editor', 'autoClosingBrackets', 'never'],
+        ['editor', 'autoClosingQuotes', 'never'],
+        ['editor', 'autoSurround', 'never'],
+        ['editor', 'autoClosingOvertype', 'never'],
+        ['editor', 'formatOnType', false],
+        ['editor', 'linkedEditing', false],
+        ['editor', 'renameOnType', false],
+
+        ['html', 'autoClosingTags', false],
+        ['javascript', 'autoClosingTags', false],
+        ['typescript', 'autoClosingTags', false],
+        // ['xml', 'autoClosingTags.enabled', false],
+        // ['php', 'autoClosingTags', false],
+        // ['razor', 'autoClosingTags', false],
+        // ['vue', 'autoClosingTags', false],
+
+        ['javascript.suggest', 'completeFunctionCalls', false],
+        ['typescript.suggest', 'completeFunctionCalls', false],
+        ['python.analysis', 'completeFunctionParens', false],
+        ['C_Cpp', 'autocompleteAddParentheses', false],
+        ['go', 'useCodeSnippetsOnFunctionSuggest', false],
+        ['rust-analyzer.completion', 'callable.snippets', 'none'],
+        ['java.completion', 'guessMethodArguments', false],
+      ] as const;
+
+      for (const [section, key, value] of KEYS) {
+        const cfg = vscode.workspace.getConfiguration(section);
+        if (cfg.has(key)) {
+          await cfg.update(key, value, vscode.ConfigurationTarget.Workspace);
+        }
+      }
+
+      this.disposables.push(
+        new vscode.Disposable(() => {
+          for (const [section, key] of KEYS) {
+            const cfg = vscode.workspace.getConfiguration(section);
+            if (cfg.has(key)) {
+              cfg.update(key, undefined, vscode.ConfigurationTarget.Workspace);
+            }
+          }
+        }),
+      );
     }
 
     // register disposables
