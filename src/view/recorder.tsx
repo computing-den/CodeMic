@@ -922,7 +922,11 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     const clock = this.getClockUnderMouse(e, { emptySpace: true });
     if (clock !== undefined) {
       this.mouseIsDown = true;
-      this.props.setSelection({ type: 'editor', anchor: clock, focus: clock });
+      if (e.shiftKey && this.props.selection?.type === 'editor') {
+        this.props.extendSelection(clock);
+      } else {
+        this.props.setSelection({ type: 'editor', anchor: clock, focus: clock });
+      }
     }
   };
 
@@ -1033,7 +1037,11 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   };
 
   chapterClicked = (e: React.MouseEvent, i: number) => {
-    this.props.setSelection({ type: 'chapter', index: i });
+    if (e.shiftKey && this.props.selection?.type === 'editor') {
+      this.props.extendSelection(this.props.session.head.toc[i].clock);
+    } else {
+      this.props.setSelection({ type: 'chapter', index: i });
+    }
   };
 
   chapterDragStarted = (e: React.DragEvent, i: number) => {
@@ -1067,7 +1075,43 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   };
 
   clockClicked = (e: React.MouseEvent) => {
-    this.props.setSelection({ type: 'editor', anchor: this.props.session.clock, focus: this.props.session.clock });
+    if (e.shiftKey && this.props.selection?.type === 'editor') {
+      this.props.extendSelection(this.props.session.clock);
+    } else {
+      this.props.setSelection({ type: 'editor', anchor: this.props.session.clock, focus: this.props.session.clock });
+    }
+  };
+
+  anchorClicked = (e: React.MouseEvent) => {
+    assert(this.props.selection?.type === 'editor');
+    this.props.setSelection({
+      type: 'editor',
+      anchor: this.props.selection.anchor,
+      focus: this.props.selection.anchor,
+    });
+  };
+
+  focusClicked = (e: React.MouseEvent) => {
+    assert(this.props.selection?.type === 'editor');
+    if (!e.shiftKey) {
+      this.props.setSelection({
+        type: 'editor',
+        anchor: this.props.selection.focus,
+        focus: this.props.selection.focus,
+      });
+    }
+  };
+
+  endClicked = (e: React.MouseEvent) => {
+    if (e.shiftKey && this.props.selection?.type === 'editor') {
+      this.props.extendSelection(this.props.session.head.duration);
+    } else {
+      this.props.setSelection({
+        type: 'editor',
+        anchor: this.props.session.head.duration,
+        focus: this.props.session.head.duration,
+      });
+    }
   };
 
   autoScroll = () => {
@@ -1266,7 +1310,13 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
               )}
               {selection?.type === 'editor' && (
                 <>
-                  <MarkerUI id="anchor" type="anchor" clock={selection.anchor} timelineDuration={timelineDuration} />
+                  <MarkerUI
+                    id="anchor"
+                    type="anchor"
+                    clock={selection.anchor}
+                    timelineDuration={timelineDuration}
+                    onClick={this.anchorClicked}
+                  />
                   <MarkerUI
                     id="focus"
                     type="focus"
@@ -1274,6 +1324,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
                     timelineDuration={timelineDuration}
                     active
                     ref={selectionRef}
+                    onClick={this.focusClicked}
                   />
                 </>
               )}
@@ -1324,7 +1375,13 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
                 />
               )}
               {!session.recording && (
-                <MarkerUI id="end" type="end" clock={session.head.duration} timelineDuration={timelineDuration} />
+                <MarkerUI
+                  id="end"
+                  type="end"
+                  clock={session.head.duration}
+                  timelineDuration={timelineDuration}
+                  onClick={this.endClicked}
+                />
               )}
             </div>
             {editorSelectionRange && (
