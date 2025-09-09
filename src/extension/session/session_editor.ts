@@ -186,7 +186,7 @@ export default class SessionEditor {
     return this.insertApplySessionPatch({
       body: { audioTracks },
       head: { duration: sessionDuration },
-      effects: [{ type: 'setSelection', after: { type: 'track', trackType: 'audio', id } }],
+      effects: [{ type: 'media' }, { type: 'setSelection', after: { type: 'track', trackType: 'audio', id } }],
     });
   }
 
@@ -195,7 +195,7 @@ export default class SessionEditor {
     const audioTracks = this.session.body.audioTracks.filter(t => t.id !== id);
     return this.insertApplySessionPatch({
       body: { audioTracks },
-      effects: [{ type: 'setSelection', before: { type: 'track', trackType: 'audio', id } }],
+      effects: [{ type: 'media' }, { type: 'setSelection', before: { type: 'track', trackType: 'audio', id } }],
     });
   }
 
@@ -207,6 +207,7 @@ export default class SessionEditor {
     return this.insertApplySessionPatch({
       body: { audioTracks },
       effects: [
+        { type: 'media' },
         {
           type: 'setSelection',
           before: { type: 'track', trackType: 'audio', id: update.id },
@@ -255,7 +256,7 @@ export default class SessionEditor {
     return this.insertApplySessionPatch({
       body: { videoTracks },
       head: { duration: sessionDuration },
-      effects: [{ type: 'setSelection', after: { type: 'track', trackType: 'video', id } }],
+      effects: [{ type: 'media' }, { type: 'setSelection', after: { type: 'track', trackType: 'video', id } }],
     });
   }
 
@@ -264,7 +265,7 @@ export default class SessionEditor {
     const videoTracks = this.session.body.videoTracks.filter(t => t.id !== id);
     return this.insertApplySessionPatch({
       body: { videoTracks },
-      effects: [{ type: 'setSelection', before: { type: 'track', trackType: 'video', id } }],
+      effects: [{ type: 'media' }, { type: 'setSelection', before: { type: 'track', trackType: 'video', id } }],
     });
   }
 
@@ -276,6 +277,7 @@ export default class SessionEditor {
     return this.insertApplySessionPatch({
       body: { videoTracks },
       effects: [
+        { type: 'media' },
         {
           type: 'setSelection',
           before: { type: 'track', trackType: 'video', id: update.id },
@@ -324,7 +326,7 @@ export default class SessionEditor {
     return this.insertApplySessionPatch({
       body: { imageTracks },
       head: { duration: sessionDuration },
-      effects: [{ type: 'setSelection', after: { type: 'track', trackType: 'image', id } }],
+      effects: [{ type: 'media' }, { type: 'setSelection', after: { type: 'track', trackType: 'image', id } }],
     });
   }
 
@@ -333,7 +335,7 @@ export default class SessionEditor {
     const imageTracks = this.session.body.imageTracks.filter(t => t.id !== id);
     return this.insertApplySessionPatch({
       body: { imageTracks },
-      effects: [{ type: 'setSelection', before: { type: 'track', trackType: 'image', id } }],
+      effects: [{ type: 'media' }, { type: 'setSelection', before: { type: 'track', trackType: 'image', id } }],
     });
   }
 
@@ -345,6 +347,7 @@ export default class SessionEditor {
     return this.insertApplySessionPatch({
       body: { imageTracks },
       effects: [
+        { type: 'media' },
         {
           type: 'setSelection',
           before: { type: 'track', trackType: 'image', id: update.id },

@@ -24,6 +24,8 @@ type Mode = {
   recorder: boolean;
 };
 
+type ShouldSync = { workspace: boolean; media: boolean };
+
 const UPDATE_LOOP_INTERVAL_MS = 100;
 const BLANK_VIDEO_ID = '00000000-33fd-4f9d-95dc-37e211464000';
 const SEEK_USING_STEPPER_THRESHOLD_S = 10;
@@ -572,17 +574,23 @@ export default class SessionRecordAndReplay {
    */
   private async syncAfterSessionChange(change: t.SessionChange) {
     const uriSet: t.UriSet = new Set();
+    const origClock = this.clock;
+    let shouldSync: ShouldSync = { workspace: false, media: false };
+
+    function mergeShouldSync(a: ShouldSync): ShouldSync {
+      return { workspace: shouldSync.workspace || a.workspace, media: shouldSync.media || a.media };
+    }
 
     // Apply session effects.
     // Makes sure internal workspace stays consistent.
     // May also update this.clock and editor.selection after speed change, merge, etc.
     if (change.direction === t.Direction.Forwards) {
       for (const effect of change.next.effects) {
-        await this.applySessionEffect(change, effect, uriSet);
+        mergeShouldSync(await this.applySessionEffect(change, effect, uriSet));
       }
     } else {
       for (const effect of change.cur.effects.slice().reverse()) {
-        await this.applySessionEffect(change, effect, uriSet);
+        mergeShouldSync(await this.applySessionEffect(change, effect, uriSet));
       }
     }
 
@@ -594,19 +602,30 @@ export default class SessionRecordAndReplay {
     // Duration may have changed. Make sure it's not past the end.
     this.clock = Math.min(this.session.head.duration, this.clock);
 
+    // Should sync everything if clock changed too.
+    if (origClock !== this.clock) shouldSync = { workspace: true, media: true };
+
     // Make sure internal workspace and vsc are in sync at this.clock.
-    await this.internalWorkspace.seek(this.clock, uriSet);
-    await this.vscWorkspace.sync(Array.from(uriSet));
+    if (shouldSync.workspace) {
+      await this.internalWorkspace.seek(this.clock, uriSet);
+      await this.vscWorkspace.sync(Array.from(uriSet));
+    }
 
     // Sync media
-    await this.syncMedia({ hard: true });
+    if (shouldSync.media) {
+      await this.syncMedia({ hard: true });
+    }
   }
 
   /**
    * Maintains this.internalWorkspace based on the effects caused by a change in session head/body.
    * Updates this.clock and editor.selection after speed change, merge, etc.
    */
-  private async applySessionEffect(change: t.SessionChange, effect: t.SessionEffect, uriSet: t.UriSet) {
+  private async applySessionEffect(
+    change: t.SessionChange,
+    effect: t.SessionEffect,
+    uriSet: t.UriSet,
+  ): Promise<ShouldSync> {
     switch (effect.type) {
       case 'insertEditorEvent': {
         if (change.direction === t.Direction.Forwards) {
@@ -620,7 +639,7 @@ export default class SessionRecordAndReplay {
           }
         }
 
-        break;
+        return { workspace: true, media: false };
       }
       case 'updateEditorEvent': {
         // If event clocks are not the same, then we should update this.clock.
@@ -650,7 +669,7 @@ export default class SessionRecordAndReplay {
           }
         }
 
-        break;
+        return { workspace: true, media: false };
       }
       case 'cropEditorEvents': {
         if (change.direction === t.Direction.Forwards) {
@@ -678,7 +697,7 @@ export default class SessionRecordAndReplay {
           }
         }
 
-        break;
+        return { workspace: true, media: true };
       }
       case 'changeSpeed': {
         if (change.direction === t.Direction.Forwards) {
@@ -694,7 +713,7 @@ export default class SessionRecordAndReplay {
           }
         }
 
-        break;
+        return { workspace: true, media: true };
       }
       case 'merge': {
         if (change.direction === t.Direction.Forwards) {
@@ -713,7 +732,7 @@ export default class SessionRecordAndReplay {
           }
         }
 
-        break;
+        return { workspace: true, media: true };
       }
       case 'insertGap': {
         const range = { start: effect.clock, end: effect.clock + effect.duration };
@@ -730,7 +749,7 @@ export default class SessionRecordAndReplay {
           }
         }
 
-        break;
+        return { workspace: true, media: true };
       }
       case 'setSelection': {
         if (change.direction === t.Direction.Forwards) {
@@ -739,7 +758,10 @@ export default class SessionRecordAndReplay {
           this.session.editor.setSelection(effect.before);
         }
 
-        break;
+        return { workspace: false, media: false };
+      }
+      case 'media': {
+        return { workspace: false, media: true };
       }
       default:
         lib.unreachable(effect, 'Unknown effect type');

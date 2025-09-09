@@ -902,6 +902,9 @@ export type SessionEffect =
       rrClock: number;
     }
   | {
+      type: 'media';
+    }
+  | {
       type: 'setSelection';
       before?: RecorderSelection;
       after?: RecorderSelection;
