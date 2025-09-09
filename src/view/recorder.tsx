@@ -922,7 +922,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     const clock = this.getClockUnderMouse(e, { emptySpace: true });
     if (clock !== undefined) {
       this.mouseIsDown = true;
-      if (e.shiftKey && this.props.selection?.type === 'editor') {
+      if (e.shiftKey) {
         this.props.extendSelection(clock);
       } else {
         this.props.setSelection({ type: 'editor', anchor: clock, focus: clock });
@@ -1037,7 +1037,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   };
 
   chapterClicked = (e: React.MouseEvent, i: number) => {
-    if (e.shiftKey && this.props.selection?.type === 'editor') {
+    if (e.shiftKey) {
       this.props.extendSelection(this.props.session.head.toc[i].clock);
     } else {
       this.props.setSelection({ type: 'chapter', index: i });
@@ -1075,7 +1075,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   };
 
   clockClicked = (e: React.MouseEvent) => {
-    if (e.shiftKey && this.props.selection?.type === 'editor') {
+    if (e.shiftKey) {
       this.props.extendSelection(this.props.session.clock);
     } else {
       this.props.setSelection({ type: 'editor', anchor: this.props.session.clock, focus: this.props.session.clock });
@@ -1103,7 +1103,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   };
 
   endClicked = (e: React.MouseEvent) => {
-    if (e.shiftKey && this.props.selection?.type === 'editor') {
+    if (e.shiftKey) {
       this.props.extendSelection(this.props.session.head.duration);
     } else {
       this.props.setSelection({
@@ -1244,7 +1244,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   }
 
   render() {
-    const { cursor, selection, session, setSelection, editChapter, selectionRef } = this.props;
+    const { cursor, selection, session, setSelection, extendSelection, editChapter, selectionRef } = this.props;
     const { pxToSecRatio, trackDrag, trackExtendDrag, markerDrag } = this.state;
     // const clockMarker: Marker | undefined =
     //   session.clock > 0 && session.clock !== session.head.duration && !session.recording
@@ -1289,6 +1289,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
               // timelineHeightPx={timelineHeightPx}
               pxToSecRatio={pxToSecRatio}
               setSelection={setSelection}
+              extendSelection={extendSelection}
             />
             <RangedTracksUI
               timelineDuration={timelineDuration}
@@ -1547,9 +1548,11 @@ type EditorTrackUIProps = {
   pxToSecRatio: number;
   workspaceFocusTimeline?: t.Focus[];
   setSelection: (selection: t.RecorderSelection) => Promise<void>;
+  extendSelection: (clock: number) => Promise<void>;
 };
 function EditorTrackUI(props: EditorTrackUIProps) {
-  const { sessionDuration, timelineDuration, pxToSecRatio, workspaceFocusTimeline, setSelection } = props;
+  const { sessionDuration, timelineDuration, pxToSecRatio, workspaceFocusTimeline, setSelection, extendSelection } =
+    props;
 
   // const lineFocusItems:t.LineFocus [] = [];
   // if (workspaceFocusTimeline) {
@@ -1629,12 +1632,16 @@ function EditorTrackUI(props: EditorTrackUIProps) {
   return (
     <div className="editor-track">
       {documentFocusTimeline.map(documentFocus => {
-        function documentFocusClicked() {
-          setSelection({
-            type: 'editor',
-            anchor: documentFocus.clockRange.start,
-            focus: documentFocus.clockRange.end,
-          });
+        function documentFocusClicked(e: React.MouseEvent) {
+          if (e.shiftKey) {
+            extendSelection(documentFocus.clockRange.start);
+          } else {
+            setSelection({
+              type: 'editor',
+              anchor: documentFocus.clockRange.start,
+              focus: documentFocus.clockRange.end,
+            });
+          }
         }
 
         const style = {
@@ -1650,8 +1657,12 @@ function EditorTrackUI(props: EditorTrackUIProps) {
         );
       })}
       {lineFocusTimeline.map(lineFocus => {
-        function lineFocusClicked() {
-          setSelection({ type: 'editor', anchor: lineFocus.clockRange.start, focus: lineFocus.clockRange.end });
+        function lineFocusClicked(e: React.MouseEvent) {
+          if (e.shiftKey) {
+            extendSelection(lineFocus.clockRange.start);
+          } else {
+            setSelection({ type: 'editor', anchor: lineFocus.clockRange.start, focus: lineFocus.clockRange.end });
+          }
         }
         const style = {
           top: `calc(${(lineFocus.clockRange.start / timelineDuration) * 100}% + ${lineFocus.offsetPx}px)`,

@@ -76,8 +76,26 @@ export default class SessionEditor {
    * focus.
    */
   extendSelection(clock: number) {
-    if (this.selection?.type === 'editor') {
-      this.selection.focus = clock;
+    assert(this.session.isLoaded());
+    switch (this.selection?.type) {
+      case 'editor':
+        this.selection.focus = clock;
+        break;
+      case 'chapter':
+        this.selection = { type: 'editor', anchor: this.session.head.toc[this.selection.index].clock, focus: clock };
+        break;
+      case 'track': {
+        const tracks = _.concat(
+          this.session.body.audioTracks,
+          this.session.body.videoTracks,
+          this.session.body.imageTracks,
+        );
+        const track = _.find(tracks, ['id', this.selection.id])!;
+        this.selection = { type: 'editor', anchor: track.clockRange.start, focus: clock };
+        break;
+      }
+      case undefined:
+        this.selection = { type: 'editor', anchor: 0, focus: clock };
     }
   }
 
