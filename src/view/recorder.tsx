@@ -312,8 +312,12 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
   const selectedChapter = selectedChapterIndex !== undefined ? head.toc[selectedChapterIndex] : undefined;
   const hasEditorSelection = Boolean(getNonEmptyEditorSelection(selection));
 
-  async function setSelection(selection?: t.RecorderSelection) {
+  async function setSelection(selection?: t.RecorderSelection, opts?: { sync?: boolean }) {
     await postMessage({ type: 'recorder/setSelection', selection });
+    if (opts?.sync) {
+      const clock = lib.getRecorderSelectionClockRange(selection, tracks, head.toc)?.start;
+      if (clock) await postMessage({ type: 'recorder/syncWorkspace', clock });
+    }
   }
   async function extendSelection(clock: number) {
     await postMessage({ type: 'recorder/extendSelection', clock });
@@ -797,7 +801,7 @@ type TimelineProps = {
   session: t.SessionUIState;
   cursor?: number;
   selection?: t.RecorderSelection;
-  setSelection: (selection: t.RecorderSelection) => Promise<void>;
+  setSelection: (selection: t.RecorderSelection, opts?: { sync?: boolean }) => Promise<void>;
   extendSelection: (clock: number) => Promise<void>;
   setCursor: (clock?: number) => any;
   editChapter: (index: number) => any;
@@ -925,7 +929,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
       if (e.shiftKey) {
         this.props.extendSelection(clock);
       } else {
-        this.props.setSelection({ type: 'editor', anchor: clock, focus: clock });
+        this.props.setSelection({ type: 'editor', anchor: clock, focus: clock }, { sync: e.ctrlKey || e.metaKey });
       }
     }
   };
@@ -1040,7 +1044,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     if (e.shiftKey) {
       this.props.extendSelection(this.props.session.head.toc[i].clock);
     } else {
-      this.props.setSelection({ type: 'chapter', index: i });
+      this.props.setSelection({ type: 'chapter', index: i }, { sync: e.ctrlKey || e.metaKey });
     }
   };
 
@@ -1078,7 +1082,10 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     if (e.shiftKey) {
       this.props.extendSelection(this.props.session.clock);
     } else {
-      this.props.setSelection({ type: 'editor', anchor: this.props.session.clock, focus: this.props.session.clock });
+      this.props.setSelection(
+        { type: 'editor', anchor: this.props.session.clock, focus: this.props.session.clock },
+        { sync: e.ctrlKey || e.metaKey },
+      );
     }
   };
 
@@ -1093,12 +1100,17 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 
   focusClicked = (e: React.MouseEvent) => {
     assert(this.props.selection?.type === 'editor');
-    if (!e.shiftKey) {
-      this.props.setSelection({
-        type: 'editor',
-        anchor: this.props.selection.focus,
-        focus: this.props.selection.focus,
-      });
+    if (e.shiftKey) {
+      // nothing
+    } else {
+      this.props.setSelection(
+        {
+          type: 'editor',
+          anchor: this.props.selection.focus,
+          focus: this.props.selection.focus,
+        },
+        { sync: e.ctrlKey || e.metaKey },
+      );
     }
   };
 
@@ -1106,11 +1118,14 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     if (e.shiftKey) {
       this.props.extendSelection(this.props.session.head.duration);
     } else {
-      this.props.setSelection({
-        type: 'editor',
-        anchor: this.props.session.head.duration,
-        focus: this.props.session.head.duration,
-      });
+      this.props.setSelection(
+        {
+          type: 'editor',
+          anchor: this.props.session.head.duration,
+          focus: this.props.session.head.duration,
+        },
+        { sync: e.ctrlKey || e.metaKey },
+      );
     }
   };
 
@@ -1547,7 +1562,7 @@ type EditorTrackUIProps = {
   timelineDuration: number;
   pxToSecRatio: number;
   workspaceFocusTimeline?: t.Focus[];
-  setSelection: (selection: t.RecorderSelection) => Promise<void>;
+  setSelection: (selection: t.RecorderSelection, opts?: { sync?: boolean }) => Promise<void>;
   extendSelection: (clock: number) => Promise<void>;
 };
 function EditorTrackUI(props: EditorTrackUIProps) {
@@ -1636,11 +1651,14 @@ function EditorTrackUI(props: EditorTrackUIProps) {
           if (e.shiftKey) {
             extendSelection(documentFocus.clockRange.start);
           } else {
-            setSelection({
-              type: 'editor',
-              anchor: documentFocus.clockRange.start,
-              focus: documentFocus.clockRange.end,
-            });
+            setSelection(
+              {
+                type: 'editor',
+                anchor: documentFocus.clockRange.start,
+                focus: documentFocus.clockRange.end,
+              },
+              { sync: e.ctrlKey || e.metaKey },
+            );
           }
         }
 
@@ -1661,7 +1679,10 @@ function EditorTrackUI(props: EditorTrackUIProps) {
           if (e.shiftKey) {
             extendSelection(lineFocus.clockRange.start);
           } else {
-            setSelection({ type: 'editor', anchor: lineFocus.clockRange.start, focus: lineFocus.clockRange.end });
+            setSelection(
+              { type: 'editor', anchor: lineFocus.clockRange.start, focus: lineFocus.clockRange.end },
+              { sync: e.ctrlKey || e.metaKey },
+            );
           }
         }
         const style = {
