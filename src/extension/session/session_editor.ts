@@ -1,4 +1,6 @@
-import fs from 'fs';
+import fs from 'node:fs';
+import child_process from 'node:child_process';
+import { promisify } from 'node:util';
 import { getMp4MetaData, getMp3Duration, isMp3VBR } from '../get_media_metadata.js';
 import * as misc from '../misc.js';
 import * as t from '../../lib/types.js';
@@ -10,6 +12,10 @@ import * as lib from '../../lib/lib.js';
 import { URI } from 'vscode-uri';
 import * as path from 'path';
 import cache from '../cache.js';
+import config from '../config.js';
+import { Progress } from '../types.js';
+
+const execFile = promisify(child_process.execFile);
 
 const SAVE_TIMEOUT_MS = 5_000;
 
@@ -179,6 +185,7 @@ export default class SessionEditor {
   async insertAudioTrack(uri: string, clock: number): Promise<t.SessionChange> {
     assert(this.session.isLoaded());
     const fsPath = URI.parse(uri).fsPath;
+    // TODO use stream.
     const data = await fs.promises.readFile(fsPath);
     if (isMp3VBR(data)) {
       throw new Error(
@@ -577,6 +584,129 @@ export default class SessionEditor {
           after: { type: 'editor', anchor: clock, focus: clock },
         },
       ],
+    });
+  }
+
+  async mergeVideoTracks(
+    progress: Progress,
+    abortController: AbortController,
+    deleteOld?: boolean,
+  ): Promise<t.SessionChange | undefined> {
+    assert(this.session.isLoaded());
+
+    const individualFilesProgressMultiplier = 0.9;
+
+    let { videoTracks } = this.session.body;
+    if (videoTracks.length === 0) return;
+
+    const tempDir = path.join(this.session.core.dataPath, 'temp');
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+    await fs.promises.mkdir(tempDir, { recursive: true });
+
+    videoTracks = _.orderBy(videoTracks, t => t.clockRange.start);
+    const videoFiles: string[] = [];
+    for (const [i, t] of videoTracks.entries()) {
+      if (abortController.signal.aborted) return;
+
+      progress.report({ message: t.title });
+      assert(t.file.type === 'blob');
+
+      const startOfNext = videoTracks[i + 1]?.clockRange.start ?? t.clockRange.end;
+      const gap = startOfNext - t.clockRange.end;
+
+      const origFilePath = path.join(this.session.core.dataPath, 'blobs', t.file.sha1);
+      const outFilePath = path.join(tempDir, t.file.sha1);
+
+      if (gap > 0) {
+        const vFilter = gap > 0 ? `tpad=stop_mode=clone:stop_duration=${gap}` : 'null';
+        const args = [
+          '-y',
+          '-i',
+          origFilePath,
+          '-filter:v',
+          vFilter,
+          '-map',
+          '0:v',
+          '-an',
+          '-c:v',
+          'libx264',
+          '-preset',
+          'ultrafast',
+          '-movflags',
+          '+faststart',
+          '-f',
+          'mp4',
+          outFilePath,
+        ];
+        if (config.debug) {
+          console.log('ffmpeg ' + args.join(' '));
+        }
+        const { stdout, stderr } = await execFile('ffmpeg', args);
+        if (config.debug && stderr.trim()) console.error(stderr);
+        videoFiles.push(outFilePath);
+      } else if (gap < 0) {
+        throw new Error('Found overlapping videos');
+      } else {
+        videoFiles.push(origFilePath);
+      }
+
+      progress.report({
+        message: t.title,
+        increment: (1 / videoTracks.length) * individualFilesProgressMultiplier * 100,
+      });
+    }
+
+    if (abortController.signal.aborted) return;
+
+    progress.report({ message: 'Final output' });
+
+    const videoFilesStr = videoFiles.map(f => `file ${f}`.replace(/'/g, "'\\''")).join('\n');
+    const videoFilesListPath = path.join(tempDir, 'list');
+    await fs.promises.writeFile(videoFilesListPath, videoFilesStr, 'utf8');
+    const finalOutFilePath = path.join(tempDir, 'final-output.mp4');
+
+    const concatArgs = [
+      '-y',
+      '-f',
+      'concat',
+      '-safe',
+      '0',
+      '-i',
+      videoFilesListPath,
+      '-an', // no audio
+      '-c:v',
+      'libx264', // reencode video with H.264
+      '-movflags',
+      '+faststart',
+      '-f',
+      'mp4', // force MP4 container
+      finalOutFilePath,
+    ];
+    if (config.debug) console.log('ffmpeg ' + concatArgs.join(' '));
+    await execFile('ffmpeg', concatArgs);
+    progress.report({ message: 'Done', increment: (1 - individualFilesProgressMultiplier) * 100 });
+
+    // TODO use stream.
+    const finalData = await fs.promises.readFile(finalOutFilePath);
+    const sha1 = await misc.computeSHA1(finalData);
+    await this.session.core.copyToBlob(finalOutFilePath, sha1);
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+
+    const finalVideoTrack: t.VideoTrack = {
+      id: uuid(),
+      clockRange: { start: videoTracks[0].clockRange.start, end: videoTracks.at(-1)!.clockRange.end },
+      title: 'Merged videos',
+      type: 'video',
+      file: { type: 'blob', sha1 },
+    };
+
+    videoTracks = deleteOld ? [finalVideoTrack] : [...videoTracks, finalVideoTrack];
+
+    if (abortController.signal.aborted) return;
+
+    return this.insertApplySessionPatch({
+      body: { videoTracks },
+      effects: [{ type: 'media' }],
     });
   }
 

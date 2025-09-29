@@ -85,6 +85,21 @@
         justify-content: center;
         height: 400px;
         max-height: 25vh;
+        transition: height 0.1s ease;
+
+        &.hide {
+          height: 22px;
+          video,
+          .empty-content {
+            opacity: 0 !important;
+          }
+          .toggle-button {
+            background: var(--button-icon-background);
+            width: 100%;
+            height: 100%;
+            bottom: 0;
+          }
+        }
 
         /* Show .empty-content if there's no video with src or if the video is blank */
         &:has(video[data-blank]),
@@ -111,8 +126,24 @@
           }
         }
 
+        video {
+          transition: opacity 0.1s ease;
+        }
+
         .empty-content {
           display: none;
+          transition: opacity 0.1s ease;
+        }
+
+        .toggle-button {
+          position: absolute;
+          bottom: 5px;
+          height: 12px;
+          left: 50%;
+          width: 50px;
+          transform: translate(-50%, 0);
+          background: #000000aa;
+          color: #ffffffaa;
         }
       }
 
@@ -274,7 +305,7 @@
                 }
                 &.active {
                   border-color: var(--ranged-track-border-active);
-                  cursor: grab;
+                  cursor: move;
                 }
                 p {
                   position: absolute;
@@ -393,7 +424,7 @@
                 }
 
                 /* &.draggable { */
-                /*   cursor: grab; */
+                /*   cursor: move; */
                 /* } */
 
                 .time {

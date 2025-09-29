@@ -1,10 +1,11 @@
-import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { cn } from './misc.js';
-import React, { ReactNode, RefObject, useEffect, useRef, useState } from 'react';
+import React, { ReactNode, useEffect, useRef, useState } from 'react';
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
-import Popover, { PopoverProps, usePopover } from './popover.jsx';
+import { PopoverProps, usePopover } from './popover.jsx';
 import { PictureInPicture } from './svgs.jsx';
+import PopoverMenu, { PopoverMenuItem } from './popover_menu.jsx';
+import _ from 'lodash';
 
 export type CommonAction = {
   title: string;
@@ -129,19 +130,19 @@ export type MediaToolbarMenuProps = {
 
 export function MediaToolbarMenu(props: MediaToolbarMenuProps) {
   const menuButtonRef = useRef<HTMLElement>(null);
-  const menuPopover = usePopover();
+  const PopoverMenu = usePopover();
 
   return (
     <>
       <MediaToolbarButton
         ref={menuButtonRef}
         title="More actions"
-        onClick={menuPopover.toggle}
+        onClick={PopoverMenu.toggle}
         icon="codicon-kebab-vertical"
       />
-      <MenuPopover
+      <MediaPopoverMenu
         {...props}
-        popover={menuPopover}
+        popover={PopoverMenu}
         // onChange={props.setPlaybackRate}
         anchor={menuButtonRef}
         pointOnAnchor="bottom-right"
@@ -151,93 +152,45 @@ export function MediaToolbarMenu(props: MediaToolbarMenuProps) {
   );
 }
 
-function MenuPopover(props: PopoverProps & MediaToolbarMenuProps) {
+function MediaPopoverMenu(props: PopoverProps & MediaToolbarMenuProps) {
   const [page, setPage] = useState<'root' | 'playbackRate'>('root');
 
   useEffect(() => {
     if (!props.popover.isOpen) setPage('root');
   }, [props.popover.isOpen]);
 
-  const rootPageContent = (
-    <>
-      <MenuItem
-        onClick={() => {
-          // props.onSync();
-          setPage('playbackRate');
-        }}
-        icon="codicon-play-circle"
-        title={`Playback speed (${props.playbackRate === 1 ? 'Normal' : props.playbackRate + 'x'})`}
-      />
-      <MenuItem
-        onClick={() => {
-          props.onSync();
-          props.popover.close();
-        }}
-        icon="codicon-sync"
-        title="Force sync workspace"
-        disabled={!props.canSync}
-      />
-      <MenuItem
-        onClick={() => {
-          props.onPiP();
-          props.popover.close();
-        }}
-        customIcon={<PictureInPicture />}
-        title="Picture-in-Picture"
-        disabled={!props.canPiP}
-      />
-      {props.showEdit && (
-        <MenuItem
-          onClick={() => {
-            props.onEdit?.();
-            props.popover.close();
-          }}
-          icon="codicon-edit"
-          title="Edit session"
-          disabled={!props.canEdit}
-        />
-      )}
-    </>
-  );
+  const rootPageContent: PopoverMenuItem[] = _.compact([
+    {
+      onClick: () => setPage('playbackRate'),
+      icon: 'codicon codicon-play-circle',
+      title: `Playback speed (${props.playbackRate === 1 ? 'Normal' : props.playbackRate + 'x'})`,
+      closeOnClick: false,
+    },
+    {
+      onClick: props.onSync,
+      icon: 'codicon codicon-sync',
+      title: 'Force sync workspace',
+      disabled: !props.canSync,
+    },
+    {
+      onClick: props.onPiP,
+      icon: <PictureInPicture />,
+      title: 'Picture-in-Picture',
+      disabled: !props.canPiP,
+    },
+    props.showEdit && {
+      onClick: props.onEdit,
+      icon: 'codicon codicon-edit',
+      title: 'Edit session',
+      disabled: !props.canEdit,
+    },
+  ]);
 
-  const playbackRateContent = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map(v => (
-    <MenuItem
-      onClick={() => {
-        props.onPlaybackRate(v);
-        props.popover.close();
-      }}
-      title={v === 1 ? 'Normal' : v + 'x'}
-      active={v === props.playbackRate}
-    />
-  ));
+  const playbackRateContent = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map(v => ({
+    onClick: () => props.onPlaybackRate(v),
+    title: v === 1 ? 'Normal' : v + 'x',
+    active: v === props.playbackRate,
+  }));
 
-  return (
-    <Popover {...props} className="media-toolbar-menu">
-      {page === 'root' ? rootPageContent : playbackRateContent}
-    </Popover>
-  );
-}
-
-function MenuItem(props: {
-  onClick: () => void;
-  disabled?: boolean;
-  icon?: string;
-  customIcon?: React.ReactNode;
-  title: string;
-  active?: boolean;
-}) {
-  return (
-    <a
-      href="#"
-      onClick={e => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!props.disabled) props.onClick();
-      }}
-      className={cn('unstyled menu-item', props.disabled && 'disabled', props.active && 'active')}
-    >
-      {(props.icon && <span className={cn('codicon', props.icon)} />) || props.customIcon || <span />}
-      <span className="title">{props.title}</span>
-    </a>
-  );
+  return <PopoverMenu {...props} items={page === 'root' ? rootPageContent : playbackRateContent} />;
 }

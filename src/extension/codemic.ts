@@ -64,7 +64,7 @@ class CodeMic {
           { location: vscode.ProgressLocation.Notification, ...options },
           (progress, cancellationToken) => {
             const controller = new AbortController();
-            cancellationToken.onCancellationRequested(controller.abort);
+            cancellationToken.onCancellationRequested(() => controller.abort());
             return task(progress, controller);
           },
         );
@@ -784,6 +784,19 @@ class CodeMic {
         const change = this.session.editor.crop(req.clock, req.adjustMediaTracks);
         await this.session.rr.enqueueSyncAfterSessionChange(change);
         await this.updateFrontend();
+        return ok;
+      }
+      case 'recorder/mergeVideoTracks': {
+        await this.context.withProgress(
+          { title: `Merging video tracks`, cancellable: true },
+          async (progress, abortController) => {
+            assert(this.session?.isLoaded());
+            const change = await this.session.editor.mergeVideoTracks(progress, abortController, req.deleteOld);
+            if (change) await this.session.rr.enqueueSyncAfterSessionChange(change);
+            await this.updateFrontend();
+          },
+        );
+
         return ok;
       }
       case 'recorder/makeTest': {

@@ -119,6 +119,13 @@ body.vscode-dark {
 html,
 body {
   min-height: 100vh;
+
+  /* Couldn't find a way to make the scrollbar an overlay */
+  /* But I don't want it to take precious space. Also, it */
+  /* interferes with the updateCoverContainerHeight in player.tsx */
+  /* causing an infinite shrink/expand loop as the scrollbar */
+  /* appears and disappears while changing the available width */
+  scrollbar-width: none;
 }
 
 body {

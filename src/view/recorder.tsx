@@ -17,8 +17,8 @@ import { VSCodeButton, VSCodeCheckbox, VSCodeTextArea, VSCodeTextField } from '@
 import Popover, { PopoverProps, usePopover } from './popover.jsx';
 import path from 'path';
 import { URI } from 'vscode-uri';
-import { PictureInPicture } from './svgs.jsx';
 import Cover from './cover.jsx';
+import PopoverMenu, { PopoverMenuItem } from './popover_menu.jsx';
 import config from './config.js';
 
 const TRACK_HEIGHT_PX = 15;
@@ -301,6 +301,7 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
   const { canUndo, canRedo, selection } = recorder;
   const [cursor, setCursor] = useState<number>();
   const guideVideoRef = useRef<HTMLVideoElement>(null);
+  const [showVideo, setShowVideo] = useState(true);
 
   const tracks = _.concat<t.RangedTrack>(
     session.audioTracks ?? [],
@@ -423,8 +424,10 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     try {
       if (document.pictureInPictureElement) {
         await document.exitPictureInPicture();
+        setShowVideo(true);
       } else {
         await guideVideoRef.current!.requestPictureInPicture();
+        setShowVideo(false);
       }
     } catch (error) {
       console.error(error);
@@ -612,6 +615,68 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     await postMessage({ type: 'recorder/makeTest' });
   }
 
+  async function mergeVideoTracks() {
+    await postMessage({ type: 'recorder/mergeVideoTracks' });
+  }
+
+  async function mergeAndReplaceVideoTracks() {
+    await postMessage({ type: 'recorder/mergeVideoTracks', deleteOld: true });
+  }
+
+  const insertPopover = usePopover();
+  const insertButtonRef = useRef(null);
+
+  const insertMenuItems: PopoverMenuItem[] = [
+    {
+      title: 'Insert audio',
+      icon: 'codicon codicon-mic',
+      disabled: session.playing || session.recording,
+      onClick: insertAudio,
+    },
+    {
+      title: 'Insert video',
+      icon: 'codicon codicon-device-camera-video',
+      disabled: session.playing || session.recording,
+      onClick: insertVideo,
+    },
+    {
+      title: 'Insert image',
+      icon: 'codicon codicon-device-camera',
+      disabled: session.playing || session.recording,
+      onClick: insertImage,
+    },
+    {
+      title: 'Insert chapter',
+      icon: 'fa-solid fa-font',
+      disabled: session.playing || session.recording || selectionClockRange === undefined,
+      onClick: chapterPopover.toggle,
+    },
+  ];
+
+  const otherActionsPopover = usePopover();
+  const otherActionsButtonRef = useRef(null);
+
+  const otherActionsItems: PopoverMenuItem[] = _.compact([
+    config.debug && {
+      title: 'Merge video tracks',
+      icon: 'fa-solid fa-link',
+      disabled: session.playing || session.recording,
+      onClick: mergeVideoTracks,
+    },
+    config.debug && {
+      title: 'Merge & replace video tracks',
+      icon: 'fa-solid fa-link',
+      disabled: session.playing || session.recording,
+      onClick: mergeAndReplaceVideoTracks,
+    },
+    config.debug && {
+      title: 'Make test',
+      icon: 'codicon codicon-beaker',
+      disabled: session.playing || session.recording,
+      onClick: makeTest,
+    },
+  ]);
+
   const toolbarActions = _.compact([
     <Toolbar.Button
       title="Undo"
@@ -626,32 +691,7 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       onClick={redo}
     />,
     <Toolbar.Separator />,
-    <Toolbar.Button
-      title="Insert audio"
-      icon="codicon codicon-mic"
-      disabled={session.playing || session.recording}
-      onClick={insertAudio}
-    />,
-    <Toolbar.Button
-      title="Insert video"
-      icon="codicon codicon-device-camera-video"
-      disabled={session.playing || session.recording}
-      onClick={insertVideo}
-    />,
-    <Toolbar.Button
-      title="Insert image"
-      icon="codicon codicon-device-camera"
-      disabled={session.playing || session.recording}
-      onClick={insertImage}
-    />,
-    <Toolbar.Button
-      // ref={insertChapterButtonRef}
-      title="Insert chapter"
-      icon="fa-solid fa-font"
-      disabled={session.playing || session.recording || selectionClockRange === undefined}
-      onClick={chapterPopover.toggle}
-    />,
-    <Toolbar.Separator />,
+    // <Toolbar.Separator />,
     <Toolbar.Button
       ref={slowDownButtonRef}
       title="Slow down"
@@ -689,6 +729,13 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     />,
     <Toolbar.Separator />,
     <Toolbar.Button
+      ref={insertButtonRef}
+      title="Crop"
+      icon="codicon codicon-add"
+      disabled={session.playing || session.recording}
+      onClick={insertPopover.toggle}
+    />,
+    <Toolbar.Button
       title="Delete"
       icon="codicon codicon-trash"
       disabled={
@@ -699,13 +746,13 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       }
       onClick={deleteSelection}
     />,
-    config.debug && <Toolbar.Separator />,
-    config.debug && (
+    otherActionsItems.length > 0 && <Toolbar.Separator />,
+    otherActionsItems.length > 0 && (
       <Toolbar.Button
-        title="Make test"
-        icon="codicon codicon-beaker"
-        disabled={session.playing || session.recording}
-        onClick={makeTest}
+        ref={otherActionsButtonRef}
+        title="More"
+        icon="codicon codicon-kebab-vertical"
+        onClick={otherActionsPopover.toggle}
       />
     ),
   ]);
@@ -719,11 +766,19 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
         clock={session.clock}
         duration={head.duration}
       />
-      <div className="subsection subsection_spaced guide-video-container">
+      <div className={cn('subsection subsection_spaced guide-video-container', !showVideo && 'hide')}>
         <video id="guide-video" ref={guideVideoRef} />
         <div className="empty-content">
           <span className="codicon codicon-device-camera-video" />
         </div>
+        <VSCodeButton
+          className="toggle-button"
+          appearance="icon"
+          title="Hide video"
+          onClick={() => setShowVideo(!showVideo)}
+        >
+          <span className={cn('codicon', showVideo ? 'codicon-chevron-up' : 'codicon-chevron-down')} />
+        </VSCodeButton>
       </div>
       <div className="subsection">
         <Toolbar actions={toolbarActions} />
@@ -780,7 +835,20 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
         pointOnAnchor="bottom-right"
         pointOnPopover="top-right"
       />
-
+      <PopoverMenu
+        popover={insertPopover}
+        anchor={insertButtonRef}
+        pointOnAnchor="bottom-right"
+        pointOnPopover="top-right"
+        items={insertMenuItems}
+      />
+      <PopoverMenu
+        popover={otherActionsPopover}
+        anchor={otherActionsButtonRef}
+        pointOnAnchor="bottom-right"
+        pointOnPopover="top-right"
+        items={otherActionsItems}
+      />
       {selectionClockRange?.start !== undefined && (
         <ChapterPopover
           chapter={selectedChapter}

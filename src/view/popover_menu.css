@@ -1,0 +1,43 @@
+.popover-menu {
+  flex-direction: column;
+  padding: 0 !important;
+
+  .menu-item {
+    padding: var(--spacing-small) var(--spacing-medium);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--spacing-medium);
+    color: var(--foreground);
+
+    &:not(.disabled):hover {
+      background: var(--vscode-list-hoverBackground);
+    }
+
+    &.disabled,
+    &.disabled:hover {
+      color: var(--vscode-disabledForeground);
+
+      svg {
+        fill: var(--vscode-disabledForeground);
+      }
+      /* .codicon, */
+      /* .fa, */
+      /* .title { */
+      /*   fill: var(--vscode-disabledForeground); */
+      /*   color: var(--vscode-disabledForeground); */
+      /* } */
+    }
+
+    &.active {
+      font-weight: bold;
+    }
+
+    svg,
+    .codicon,
+    .fa-solid {
+      width: var(--spacing-large);
+      height: var(--spacing-large);
+      fill: var(--foreground);
+    }
+  }
+}

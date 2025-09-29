@@ -36,7 +36,7 @@ export const pointNameToXY = {
 } as const;
 export const pointNames = Object.keys(pointNameToXY) as PointName[];
 
-type PopoverData = {
+export type PopoverData = {
   id: string;
   // anchor: RefObject<HTMLElement>;
   // ref: RefObject<HTMLElement>
