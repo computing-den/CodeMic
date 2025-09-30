@@ -363,6 +363,8 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       (activeElement.tagName === 'INPUT' ||
         activeElement.tagName === 'TEXTAREA' ||
         activeElement.tagName === 'SELECT' ||
+        activeElement.tagName === 'VSCODE-TEXT-AREA' ||
+        activeElement.tagName === 'VSCODE-TEXT-FIELD' ||
         activeElement.isContentEditable)
     ) {
       return;
