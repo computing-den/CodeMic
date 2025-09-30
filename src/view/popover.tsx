@@ -154,25 +154,17 @@ export default function Popover(props: PopoverProps) {
         const popoverRect = ref.current.getBoundingClientRect();
         const anchorRect = props.anchor.current.getBoundingClientRect();
 
-        const left = anchorRect.left + anchorRect.width * pointOnAnchor.x - popoverRect.width * pointOnPopover.x;
-        const top = anchorRect.top + anchorRect.height * pointOnAnchor.y - popoverRect.height * pointOnPopover.y;
+        let left = anchorRect.left + anchorRect.width * pointOnAnchor.x - popoverRect.width * pointOnPopover.x;
+        let top = anchorRect.top + anchorRect.height * pointOnAnchor.y - popoverRect.height * pointOnPopover.y;
 
         // Clip.
         // There should be a maximum shift beyond which we must not push the popover.
         // Otherwise, while scrolling down for example, a popover can get stuck at
         // the top of the window.
-        if (left + popoverRect.width > document.documentElement.clientWidth) {
-          // TODO Shift to the left
-        }
-        if (left < 0) {
-          // TODO Shift to the right
-        }
-        if (top + popoverRect.height > document.documentElement.clientHeight) {
-          // TODO Shift to the top
-        }
-        if (top < 0) {
-          // TODO Shift to the bottom
-        }
+        left = Math.min(left, document.documentElement.clientWidth - popoverRect.width);
+        left = Math.max(left, 0);
+        top = Math.min(top, document.documentElement.clientHeight - popoverRect.height);
+        top = Math.max(top, 0);
 
         ref.current.style.left = `${left}px`;
         ref.current.style.top = `${top}px`;

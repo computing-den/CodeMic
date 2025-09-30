@@ -818,28 +818,28 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
         popover={mergePopover}
         onConfirm={merge}
         anchor={mergeButtonRef}
-        pointOnAnchor="bottom-right"
-        pointOnPopover="top-right"
+        pointOnAnchor="bottom-left"
+        pointOnPopover="top-left"
       />
       <InsertGapPopover
         popover={insertGapPopover}
         onConfirm={insertGap}
         anchor={insertGapButtonRef}
-        pointOnAnchor="bottom-right"
-        pointOnPopover="top-right"
+        pointOnAnchor="bottom-left"
+        pointOnPopover="top-left"
       />
       <CropPopover
         popover={cropPopover}
         onConfirm={crop}
         anchor={cropButtonRef}
-        pointOnAnchor="bottom-right"
-        pointOnPopover="top-right"
+        pointOnAnchor="bottom-left"
+        pointOnPopover="top-left"
       />
       <PopoverMenu
         popover={insertPopover}
         anchor={insertButtonRef}
-        pointOnAnchor="bottom-right"
-        pointOnPopover="top-right"
+        pointOnAnchor="bottom-left"
+        pointOnPopover="top-left"
         items={insertMenuItems}
       />
       <PopoverMenu
@@ -856,8 +856,8 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
           popover={chapterPopover}
           onConfirm={insertOrUpdateChapter}
           anchor={selectionRef}
-          pointOnAnchor="bottom-center"
-          pointOnPopover="top-center"
+          pointOnAnchor="bottom-left"
+          pointOnPopover="top-left"
           clock={selectionClockRange.start}
         />
       )}
