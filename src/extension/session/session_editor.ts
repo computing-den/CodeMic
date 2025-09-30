@@ -596,26 +596,27 @@ export default class SessionEditor {
 
     const individualFilesProgressMultiplier = 0.9;
 
-    let { videoTracks } = this.session.body;
-    if (videoTracks.length === 0) return;
+    if (this.session.body.videoTracks.length === 0) return;
 
     const tempDir = path.join(this.session.core.dataPath, 'temp');
     await fs.promises.rm(tempDir, { recursive: true, force: true });
     await fs.promises.mkdir(tempDir, { recursive: true });
 
-    videoTracks = _.orderBy(videoTracks, t => t.clockRange.start);
+    const sortedVideoTracks = _.orderBy(this.session.body.videoTracks, t => t.clockRange.start);
     const videoFiles: string[] = [];
-    for (const [i, t] of videoTracks.entries()) {
+    for (const [i, t] of sortedVideoTracks.entries()) {
       if (abortController.signal.aborted) return;
 
       progress.report({ message: t.title });
       assert(t.file.type === 'blob');
 
-      const startOfNext = videoTracks[i + 1]?.clockRange.start ?? t.clockRange.end;
+      const startOfNext = sortedVideoTracks[i + 1]?.clockRange.start ?? this.session.head.duration;
       const gap = startOfNext - t.clockRange.end;
 
       const origFilePath = path.join(this.session.core.dataPath, 'blobs', t.file.sha1);
-      const outFilePath = path.join(tempDir, t.file.sha1);
+      const outFilePath = path.join(tempDir, t.title + '-' + (i + 1));
+
+      console.log('ffmpeg out: ', outFilePath, 'gap: ', gap);
 
       if (gap > 0) {
         const vFilter = gap > 0 ? `tpad=stop_mode=clone:stop_duration=${gap}` : 'null';
@@ -652,7 +653,7 @@ export default class SessionEditor {
 
       progress.report({
         message: t.title,
-        increment: (1 / videoTracks.length) * individualFilesProgressMultiplier * 100,
+        increment: (1 / sortedVideoTracks.length) * individualFilesProgressMultiplier * 100,
       });
     }
 
@@ -694,18 +695,16 @@ export default class SessionEditor {
 
     const finalVideoTrack: t.VideoTrack = {
       id: uuid(),
-      clockRange: { start: videoTracks[0].clockRange.start, end: videoTracks.at(-1)!.clockRange.end },
+      clockRange: { start: sortedVideoTracks[0].clockRange.start, end: this.session.head.duration },
       title: 'Merged videos',
       type: 'video',
       file: { type: 'blob', sha1 },
     };
 
-    videoTracks = deleteOld ? [finalVideoTrack] : [...videoTracks, finalVideoTrack];
-
     if (abortController.signal.aborted) return;
 
     return this.insertApplySessionPatch({
-      body: { videoTracks },
+      body: { videoTracks: deleteOld ? [finalVideoTrack] : [...this.session.body.videoTracks, finalVideoTrack] },
       effects: [{ type: 'media' }],
     });
   }
