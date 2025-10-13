@@ -30,7 +30,7 @@
     bottom: 0;
     width: var(--progress-bar-small-width);
     background: var(--vscode-input-background);
-    transition: all 0.2s ease-in-out;
+    transition: all 0.2s ease;
     cursor: pointer;
 
     .shadow {
@@ -40,7 +40,7 @@
       right: 0;
       background: #cc000030;
       opacity: 0;
-      transition: opacity 0.2s ease-in-out;
+      transition: opacity 0.2s ease;
     }
     .filled {
       position: absolute;
@@ -58,7 +58,15 @@
       right: 0;
       height: 2px;
       background: #181818a1;
-      transition: opacity 0.2s ease-in-out;
+      transition:
+        opacity 0.2s ease,
+        height 0.1s ease,
+        top 0.1s ease;
+      &.active {
+        background: black;
+        height: 4px;
+        top: 2px;
+      }
     }
   }
 }
@@ -72,7 +80,7 @@
   /* box-shadow: 0 0 10px 10px var(--popover-shadow-color); */
   /* opacity: 0; */
   /* visibility: hidden; */
-  /* transition: opacity 0.2s ease-in-out, visibility 0s 0.2s; */
+  /* transition: opacity 0.2s ease, visibility 0s 0.2s; */
   /* padding: var(--spacing-medium); */
   /* border-radius: 5px; */
   /* border: 1px solid var(--popover-border-color); */

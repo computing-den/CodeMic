@@ -7,6 +7,8 @@ import { URI } from 'vscode-uri';
 import path from 'path';
 import _ from 'lodash';
 
+const SNAP_DIFF_NORM = 0.008;
+
 export type Props = {
   className?: string;
   onSeek: (clock: number) => unknown;
@@ -31,8 +33,7 @@ export default function ProgressBar(props: Props) {
   async function clicked(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    const clock = props.duration * getPosNormOfMouse(e.nativeEvent);
-    props.onSeek(clock);
+    props.onSeek(props.duration * getPosNormOfMouse(e.nativeEvent));
   }
 
   useEffect(() => {
@@ -65,7 +66,11 @@ export default function ProgressBar(props: Props) {
 
   function getPosNormOfMouse(e: MouseEvent): number {
     const rect = ref.current!.getBoundingClientRect();
-    return (e.clientY - rect.y) / rect.height;
+    const exactPoint = (e.clientY - rect.y) / rect.height;
+    const snapPoints = [0, ...props.toc.map(item => item.clock / props.duration), 1];
+    const range = [exactPoint - SNAP_DIFF_NORM, exactPoint + SNAP_DIFF_NORM];
+    const closestPoint = snapPoints.find(p => p >= range[0] && p <= range[1]);
+    return closestPoint ?? exactPoint;
   }
 
   function isMouseOnProgressBar(e: MouseEvent): boolean {
@@ -102,9 +107,14 @@ export default function ProgressBar(props: Props) {
       <div className="bar" onClick={clicked}>
         <div className="shadow" style={{ height: `${(underMouse?.yNorm ?? 0) * 100}%` }} />
         <div className="filled" style={filledStyle} />
-        {tocIndicators.map(item => (
-          <div className="toc-item" style={item} />
-        ))}
+        {props.toc.map(item => {
+          const style = { top: `${(item.clock / props.duration) * 100}%` };
+          const active =
+            underMouse?.clock &&
+            underMouse.clock <= item.clock + SNAP_DIFF_NORM &&
+            underMouse.clock >= item.clock - SNAP_DIFF_NORM;
+          return <div className={cn('toc-item', active && 'active')} style={style} />;
+        })}
       </div>
     </div>
   );
