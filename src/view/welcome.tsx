@@ -140,8 +140,8 @@ function SessionsSection(props: SessionsSectionProps) {
   const del = (sessionId: string) => postMessage({ type: 'welcome/deleteSession', sessionId });
   const edit = (sessionId: string) => postMessage({ type: 'welcome/openSessionInRecorder', sessionId });
   const like = (sessionId: string, value: boolean) => postMessage({ type: 'welcome/likeSession', sessionId, value });
-  const share = (sessionId: string, sessionHandle: string) =>
-    postMessage({ type: 'copySessionLink', sessionId, sessionHandle });
+  const share = (sessionId: string, sessionHandle: string, sessionAuthor?: string) =>
+    postMessage({ type: 'copySessionLink', sessionId, sessionHandle, sessionAuthor });
   return (
     <Section className="sessions-section" bordered={props.bordered}>
       <Section.Header title={props.title} loading={props.loading} collapsible />

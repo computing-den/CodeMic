@@ -225,7 +225,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
           placeholder="A-Z a-z 0-9 - _ (e.g. my_project)"
           value={head.handle}
           onInput={this.handleChanged}
-          disabled={!temp}
+          // disabled={!temp}
         >
           Handle
         </VSCodeTextField>
@@ -504,7 +504,12 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       title="Share session"
       icon="codicon-link"
       onClick={() =>
-        postMessage({ type: 'copySessionLink', sessionId: session.head.id, sessionHandle: session.head.handle })
+        postMessage({
+          type: 'copySessionLink',
+          sessionId: session.head.id,
+          sessionHandle: session.head.handle,
+          sessionAuthor: session.head.author,
+        })
       }
     />,
     <MediaToolbarMenu
@@ -732,7 +737,7 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     <Toolbar.Separator />,
     <Toolbar.Button
       ref={insertButtonRef}
-      title="Crop"
+      title="Insert"
       icon="codicon codicon-add"
       disabled={session.playing || session.recording}
       onClick={insertPopover.toggle}

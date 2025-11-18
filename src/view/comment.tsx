@@ -95,8 +95,9 @@ export function CommentList(props: CommentListProps) {
 
 export type CommentInputProps = {
   className?: string;
-  author: string;
+  author?: string;
   onSend: (text: string) => any;
+  disabled?: boolean;
 };
 export function CommentInput(props: CommentInputProps) {
   const [text, setText] = useState('');
@@ -127,7 +128,8 @@ export function CommentInput(props: CommentInputProps) {
         onInput={e => setText((e.target as HTMLInputElement).value)}
         placeholder="Leave a comment"
         onKeyDown={keyDown}
-      ></VSCodeTextArea>
+        disabled={props.disabled}
+      />
       {text.trim() && (
         <div className="buttons">
           <VSCodeButton appearance="secondary" onClick={cancel}>

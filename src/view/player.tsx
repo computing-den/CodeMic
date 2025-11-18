@@ -269,7 +269,7 @@ export default class Player extends React.Component<Props> {
         <Section className="comments-section">
           <Section.Header title="COMMENTS" collapsible />
           <Section.Body>
-            {user && <CommentInput author={user.username} onSend={this.sendComment} />}
+            <CommentInput author={user?.username} onSend={this.sendComment} disabled={!user || !session.publication} />
             {!user && (
               <div>
                 <VSCodeLink href="#" onClick={this.login}>
@@ -366,7 +366,12 @@ function PlayerMediaToolbar(props: PlayerMediaToolbarProps) {
       title="Share session"
       icon="codicon-link"
       onClick={() =>
-        postMessage({ type: 'copySessionLink', sessionId: session.head.id, sessionHandle: session.head.handle })
+        postMessage({
+          type: 'copySessionLink',
+          sessionId: session.head.id,
+          sessionHandle: session.head.handle,
+          sessionAuthor: session.head.author,
+        })
       }
     />,
     <MediaToolbarMenu

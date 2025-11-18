@@ -37,7 +37,7 @@ export type SessionListingProps = {
   onDelete: (id: string) => any;
   onEdit: (id: string) => any;
   onLike: (id: string, value: boolean) => any;
-  onShare: (id: string, handle: string) => any;
+  onShare: (id: string, handle: string, author?: string) => any;
 };
 export type Action = { icon: string; title: string; onClick: () => unknown };
 export function SessionListing(props: SessionListingProps) {
@@ -72,7 +72,7 @@ export function SessionListing(props: SessionListingProps) {
     {
       icon: 'codicon-link',
       title: 'Share session',
-      onClick: () => props.onShare(head.id, head.handle),
+      onClick: () => props.onShare(head.id, head.handle, head.author),
     },
     publication && {
       icon: liked ? 'codicon-heart-filled' : 'codicon-heart',
@@ -150,7 +150,7 @@ export type SessionListingsProps = {
   onDelete: (id: string) => any;
   onEdit: (id: string) => any;
   onLike: (id: string, value: boolean) => any;
-  onShare: (id: string, handle: string) => any;
+  onShare: (id: string, handle: string, author?: string) => any;
 };
 
 export function SessionListings(props: SessionListingsProps) {

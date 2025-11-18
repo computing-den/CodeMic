@@ -219,19 +219,23 @@ class CodeMic {
 
   async handleUri(uri: vscode.Uri) {
     try {
-      const match = uri.path.match(/^\/s\/([^\/]+)$/);
-      assert(match, `Unrecognizable URI path: ${uri.path}`);
-      const sessionHandle = match?.[1];
+      const segments = uri.path.split('/');
+      segments.shift(); // Get rid of empty ''.
+      if (segments[0] === 's' && segments.length === 3) {
+        const [_s, sessionAuthor, sessionHandle] = segments;
 
-      const { head, publication } = await serverApi.send(
-        { type: 'session/head_and_publication', sessionHandle },
-        this.context.user?.token,
-      );
-      this.publications.set(head.id, publication);
+        const { head, publication } = await serverApi.send(
+          { type: 'session/head_and_publication', sessionAuthor, sessionHandle },
+          this.context.user?.token,
+        );
+        this.publications.set(head.id, publication);
 
-      const session = Session.Core.fromRemote(this.context, head);
-      await session.core.writeHistoryOpenClose();
-      await this.openScreen({ screen: t.Screen.Player, session, load: false });
+        const session = Session.Core.fromRemote(this.context, head);
+        await session.core.writeHistoryOpenClose();
+        await this.openScreen({ screen: t.Screen.Player, session, load: false });
+      } else {
+        throw new Error(`Unrecognizable URI path: ${uri.path}`);
+      }
     } catch (error) {
       this.showError(error as Error);
     }
@@ -618,8 +622,13 @@ class CodeMic {
           await vscode.window.showErrorMessage('Please enter a valid handle for the session first');
           return ok;
         }
+        const author = req.sessionAuthor || this.context.user?.username;
+        if (!author) {
+          await vscode.window.showErrorMessage('Please log in first');
+          return ok;
+        }
 
-        const uri = vscode.Uri.parse(`${vscode.env.uriScheme}://computingden.codemic/s/${req.sessionHandle}`);
+        const uri = vscode.Uri.parse(`${vscode.env.uriScheme}://computingden.codemic/s/${author}/${req.sessionHandle}`);
         await vscode.env.clipboard.writeText(uri.toString());
 
         if (this.publications.get(req.sessionId)) {

@@ -1,7 +1,5 @@
 import _ from 'lodash';
 
-export const ANONYM_USERNAME = 'anonym'; // NOTE: If you change this, make sure to change it in server too.
-
 /**
  * Used to limit the number of simultaneous executions of async consumer.
  */

@@ -80,7 +80,10 @@ export type FrontendToBackendReqRes =
       request: { type: 'showMessage'; message: string; messageType: 'warning' | 'information' | 'error' };
       response: OKResponse;
     }
-  | { request: { type: 'copySessionLink'; sessionId: string; sessionHandle: string }; response: OKResponse }
+  | {
+      request: { type: 'copySessionLink'; sessionId: string; sessionHandle: string; sessionAuthor?: string };
+      response: OKResponse;
+    }
   | { request: { type: 'readyToLoadMedia' }; response: OKResponse }
   | { request: { type: 'media/error'; id: string; mediaType: MediaType; error: string }; response: OKResponse };
 
@@ -193,7 +196,10 @@ export type BackendToServerReqRes =
       response: OKResponse;
     }
   | {
-      request: { type: 'session/head_and_publication' } & ({ sessionId: string } | { sessionHandle: string });
+      request: { type: 'session/head_and_publication' } & (
+        | { sessionId: string }
+        | { sessionHandle: string; sessionAuthor: string }
+      );
       response: {
         type: 'sessionHeadAndPublication';
         head: SessionHead;
