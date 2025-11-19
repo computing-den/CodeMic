@@ -5,7 +5,7 @@
     flex: 1;
 
     #details-view {
-      padding: var(--container-padding-ver) var(--container-padding-hor);
+      padding: var(--container-padding-ver) var(--container-padding-hor) 200px;
 
       .cover-container {
         border: var(--cover-container-border);
@@ -60,6 +60,14 @@
       .subsection.buttons {
         display: grid;
         grid-gap: var(--spacing-small);
+
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 1rem;
+        background: var(--vscode-sideBar-background);
+        border-top: 1px solid var(--vscode-sideBar-border);
         /* grid-template-columns: 1fr 1fr; */
 
         /* & vscode-button + vscode-button { */
