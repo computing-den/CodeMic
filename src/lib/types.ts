@@ -375,6 +375,7 @@ export type SessionDetailsUpdate = {
   title?: string;
   handle?: string;
   description?: string;
+  youtubeId?: string;
   ignorePatterns?: string;
 };
 
@@ -385,6 +386,7 @@ export type SessionHead = {
   handle: string;
   title: string;
   description: string;
+  youtubeId?: string;
   author?: string;
   duration: number;
   modificationTimestamp: string;

@@ -70,6 +70,10 @@
     font-size: inherit;
     color: inherit;
   }
+
+  &.error {
+    color: var(--vscode-errorForeground);
+  }
 }
 
 .subsection + .subsection {

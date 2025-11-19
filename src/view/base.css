@@ -233,6 +233,12 @@ vscode-panels {
   }
 }
 
+vscode-text-field[aria-invalid='true'] {
+  &::part(root) {
+    border: 1px solid var(--vscode-inputValidation-errorBorder);
+  }
+}
+
 button {
   min-width: 0;
 }

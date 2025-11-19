@@ -113,7 +113,7 @@ export default class Recorder extends React.Component<RecorderProps> {
 type DetailsViewProps = RecorderProps & TabViewProps & { onLoadRecorder: () => any };
 class DetailsView extends React.Component<DetailsViewProps> {
   state = {
-    // coverKey: 0,
+    youtubeId: this.props.session.head.youtubeId ?? '',
   };
   titleChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
     const changes = { title: (e.target as HTMLInputElement).value };
@@ -133,6 +133,19 @@ class DetailsView extends React.Component<DetailsViewProps> {
   descriptionChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
     const changes = { description: (e.target as HTMLInputElement).value };
     await postMessage({ type: 'recorder/updateDetails', changes });
+  };
+
+  youtubeIdChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
+    let value = (e.target as HTMLInputElement).value;
+
+    const youtubeId = parseYoutubeId(value);
+    if (youtubeId) {
+      await postMessage({ type: 'recorder/updateDetails', changes: { youtubeId } });
+      this.setState({ youtubeId });
+    } else {
+      await postMessage({ type: 'recorder/updateDetails', changes: { youtubeId: '' } });
+      this.setState({ youtubeId: value });
+    }
   };
 
   ignorePatternsChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
@@ -170,8 +183,9 @@ class DetailsView extends React.Component<DetailsViewProps> {
 
   render() {
     const { session, id, className, onLoadRecorder } = this.props;
-    // const { coverKey } = this.state;
+    const { youtubeId } = this.state;
     const { head, workspace, temp, local } = session;
+    const isYoutubeIdValid = Boolean(parseYoutubeId(youtubeId));
 
     return (
       <div id={id} className={className}>
@@ -239,6 +253,20 @@ class DetailsView extends React.Component<DetailsViewProps> {
         >
           Description
         </VSCodeTextArea>
+        <VSCodeTextField
+          className="subsection"
+          placeholder="e.g. https://www.youtube.com/watch?v=Qp2GdLO5eSc"
+          value={youtubeId}
+          onInput={this.youtubeIdChanged}
+          aria-invalid={Boolean(youtubeId && !isYoutubeIdValid)}
+          pattern="[A-Za-z0-9]{5}"
+          // disabled={!temp}
+        >
+          YouTube Video
+        </VSCodeTextField>
+        <p className="subsection help">
+          YouTube video, if available, will be shown on <a href="https://CodeMic.io">CodeMic.io</a>
+        </p>
 
         <VSCodeTextArea
           className="ignore subsection"
@@ -2140,4 +2168,8 @@ function getNonEmptyEditorSelection(selection?: t.RecorderSelection): t.ClockRan
       end: Math.max(selection.focus, selection.anchor),
     };
   }
+}
+
+function parseYoutubeId(value: string) {
+  return value.match(/(^|\/|=)([A-Za-z0-9_-]{11})($|\/|&|\?|#)/)?.[2];
 }
