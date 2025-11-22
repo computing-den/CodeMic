@@ -22,6 +22,7 @@ const EOL = '\n';
 
 // suite('Recorder', () => {
 test('fs changes', recordFsChanges);
+test('recreate file', recordRecreateFile);
 test('showTextEditor event without openTextDocument', recordOpenTextEditorWithoutDocument);
 test('rename file', recordRenameFile);
 test('rename file and open again immediately', recordRenameFileAndOpenAgainImmediately);
@@ -188,6 +189,294 @@ async function recordFsChanges() {
     },
   ];
   const actualEvents = JSON.parse(lib.pretty(codemic.session!.body?.editorEvents!));
+
+  const areEqual = areEventsAlmostEqual(actualEvents, expectedEvents);
+  if (!areEqual) {
+    errors.push(
+      `unexpected editor events.\nActual: ${lib.pretty(actualEvents)}\nExpected: ${lib.pretty(expectedEvents)}`,
+    );
+  }
+
+  assert.ok(errors.length === 0, `found ${errors.length} error(s):\n\n${errors.join('\n\n')}`);
+
+  // await lib.timeout(1_000_000);
+}
+
+async function recordRecreateFile() {
+  // There was a bug where if we had a file, then deleted it, then started the
+  // recorder and recreated the file, we'd get fsCreate, followed by a
+  // textDocumentChange but without any openTextDocument event. That messed
+  // things up because inside the textDocumentChange event handler the document
+  // didn't exist internally. Now, textDocumentChange event handler opens the
+  // document when it doesn't exist.
+
+  // Deleting workspacePath directly will interfere with file system watcher.
+  // fs.rmSync(path.resolve(workspacePath), { recursive: true });
+  log(`=== Creating files in ${workspacePath}`);
+  fs.readdirSync(workspacePath, 'utf8').forEach(p => fs.rmSync(path.resolve(workspacePath, p), { recursive: true }));
+  fs.writeFileSync(path.resolve(workspacePath, 'A.txt'), `First file${EOL}Content here`);
+  fs.writeFileSync(path.resolve(workspacePath, 'B.txt'), `Second file${EOL}Content there`);
+
+  log(`=== Closing all tabs`);
+  await closeAllTabs();
+  log(`=== Opening CodeMic view`);
+  await openCodeMicView();
+  const codemic = getCodeMic();
+
+  log(`=== Opening new session`);
+  await codemic.handleMessage({ type: 'welcome/openNewSessionInRecorder' });
+  await codemic.handleMessage({
+    type: 'recorder/updateDetails',
+    changes: { title: 'Test Session 1', handle: 'test_session_1' },
+  });
+
+  log(`=== Opening A.txt and B.txt`);
+  await vscode.workspace.openTextDocument(vscode.Uri.file(path.resolve(workspacePath, 'A.txt')));
+  await vscode.workspace.openTextDocument(vscode.Uri.file(path.resolve(workspacePath, 'B.txt')));
+
+  log(`=== Closing tabs`);
+  await closeAllTabs();
+
+  log(`=== Deleting A.txt and B.txt`);
+  fs.rmSync(path.resolve(workspacePath, 'A.txt'));
+  fs.rmSync(path.resolve(workspacePath, 'B.txt'));
+
+  log(`=== Scanning new session`);
+  await codemic.handleMessage({ type: 'recorder/load', skipConfirmation: true });
+
+  assert.ok(await pathExists(path.resolve(workspacePath, '.CodeMic', 'head.json')), 'head.json does not exist');
+  assert.ok(await pathExists(path.resolve(workspacePath, '.CodeMic', 'body.json')), 'body.json does not exist');
+
+  log(`=== Start recording`);
+  await codemic.handleMessage({ type: 'recorder/record' });
+  await lib.timeout(100);
+
+  log(`=== Recreate A.txt with the same content`);
+  fs.writeFileSync(path.resolve(workspacePath, 'A.txt'), `First file${EOL}Content here`);
+  await lib.timeout(100);
+
+  log(`=== Recreate B.txt with different content`);
+  fs.writeFileSync(path.resolve(workspacePath, 'B.txt'), `Second file${EOL}But totally differnt`);
+  await lib.timeout(100);
+
+  log(`=== Open A.txt`);
+  const textEditorA = await vscode.window.showTextDocument(vscode.Uri.file(path.resolve(workspacePath, 'A.txt')), {
+    preview: false,
+  });
+  await lib.timeout(100);
+
+  log(`=== Edit A.txt`);
+  assert.ok(
+    await textEditorA.edit(builder => {
+      builder.replace(new vscode.Range(0, 0, 2, 0), `Replaced with${EOL}New stuff`);
+    }),
+  );
+  await lib.timeout(100);
+
+  log(`=== Open B.txt`);
+  const textEditorB = await vscode.window.showTextDocument(vscode.Uri.file(path.resolve(workspacePath, 'B.txt')), {
+    preview: false,
+  });
+  await lib.timeout(100);
+
+  log(`=== Edit B.txt`);
+  assert.ok(
+    await textEditorB.edit(builder => {
+      builder.replace(new vscode.Range(0, 0, 2, 0), `Replaced with${EOL}All kinds of stuff`);
+    }),
+  );
+  await lib.timeout(100);
+
+  log(`=== Pause`);
+  await lib.timeout(200); // Let fs events be processed.
+  await codemic.handleMessage({ type: 'recorder/pause' });
+
+  const actualFiles = fs
+    .readdirSync(workspacePath, { recursive: true, encoding: 'utf8' })
+    .map(p => p.replace(/\\/g, '/'));
+  const expectedFiles = [
+    '.CodeMic',
+    'A.txt',
+    'B.txt',
+    '.CodeMic/blobs',
+    '.CodeMic/body.json',
+    '.CodeMic/head.json',
+    '.CodeMic/blobs/48eff9564358959274b5af8848475962ac439e5f',
+    '.CodeMic/blobs/b1450b97ee8c573f5b93c5084a741d35dcc70930',
+  ];
+
+  const extraActualFiles = _.difference(actualFiles, expectedFiles);
+  const missingActualFiles = _.difference(expectedFiles, actualFiles);
+
+  const errors = [];
+  if (extraActualFiles.length) {
+    errors.push(`extra files found: ${extraActualFiles.join(', ')}`);
+  }
+  if (missingActualFiles.length) {
+    errors.push(`missing files: ${missingActualFiles.join(', ')}`);
+  }
+
+  const expectedEvents: EditorEvent[] = [
+    {
+      type: 'fsCreate',
+      id: 1,
+      uri: 'workspace:A.txt',
+      clock: 0.10274886800000013,
+      file: {
+        type: 'blob',
+        sha1: 'b1450b97ee8c573f5b93c5084a741d35dcc70930',
+      },
+    },
+    {
+      type: 'openTextDocument',
+      id: 2,
+      uri: 'workspace:A.txt',
+      clock: 0.3054968349999999,
+      eol: '\n',
+      languageId: 'plaintext',
+    },
+    {
+      type: 'showTextEditor',
+      id: 3,
+      uri: 'workspace:A.txt',
+      clock: 0.3054968349999999,
+      selections: [
+        {
+          anchor: {
+            line: 0,
+            character: 0,
+          },
+          active: {
+            line: 0,
+            character: 0,
+          },
+        },
+      ],
+      visibleRange: {
+        start: 0,
+        end: 1,
+      },
+      justOpened: true,
+    },
+    {
+      type: 'fsCreate',
+      id: 4,
+      uri: 'workspace:B.txt',
+      clock: 0.3054968349999999,
+      file: {
+        type: 'blob',
+        sha1: '48eff9564358959274b5af8848475962ac439e5f',
+      },
+    },
+    {
+      type: 'openTextDocument',
+      id: 5,
+      uri: 'workspace:B.txt',
+      clock: 0.3054968349999999,
+      eol: '\n',
+      languageId: 'plaintext',
+    },
+    {
+      type: 'textChange',
+      id: 6,
+      uri: 'workspace:A.txt',
+      clock: 0.4072870859999998,
+      contentChanges: [
+        {
+          text: 'Replaced with\nNew stuff',
+          range: {
+            start: {
+              line: 0,
+              character: 0,
+            },
+            end: {
+              line: 1,
+              character: 12,
+            },
+          },
+        },
+      ],
+      revContentChanges: [
+        {
+          range: {
+            start: {
+              line: 0,
+              character: 0,
+            },
+            end: {
+              line: 1,
+              character: 9,
+            },
+          },
+          text: 'First file\nContent here',
+        },
+      ],
+      updateSelection: false,
+    },
+    {
+      type: 'showTextEditor',
+      id: 7,
+      uri: 'workspace:B.txt',
+      clock: 0.508485615,
+      selections: [
+        {
+          anchor: {
+            line: 0,
+            character: 0,
+          },
+          active: {
+            line: 0,
+            character: 0,
+          },
+        },
+      ],
+      visibleRange: {
+        start: 0,
+        end: 1,
+      },
+      justOpened: true,
+      revUri: 'workspace:A.txt',
+    },
+    {
+      type: 'textChange',
+      id: 8,
+      uri: 'workspace:B.txt',
+      clock: 0.6105002600000002,
+      contentChanges: [
+        {
+          text: 'Replaced with\nAll kinds of stuff',
+          range: {
+            start: {
+              line: 0,
+              character: 0,
+            },
+            end: {
+              line: 1,
+              character: 20,
+            },
+          },
+        },
+      ],
+      revContentChanges: [
+        {
+          range: {
+            start: {
+              line: 0,
+              character: 0,
+            },
+            end: {
+              line: 1,
+              character: 18,
+            },
+          },
+          text: 'Second file\nBut totally differnt',
+        },
+      ],
+      updateSelection: false,
+    },
+  ];
+  const actualEvents = JSON.parse(lib.pretty(codemic.session!.body?.editorEvents!));
+  // log('Actual events:', lib.pretty(codemic.session!.body?.editorEvents));
 
   const areEqual = areEventsAlmostEqual(actualEvents, expectedEvents);
   if (!areEqual) {

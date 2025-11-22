@@ -25,6 +25,7 @@
  * Language change (automatic or manual) is modeled as a closeTextDocument
  * followed by an openTextDocument. But, the vscode text document that closes
  * and opens has the same reference identity.
+ *
  */
 
 import * as t from '../../lib/types.js';
@@ -267,9 +268,18 @@ class WorkspaceRecorder {
 
     const uri = this.vscWorkspace.uriFromVsc(vscTextDocument.uri);
 
-    // Here, we assume that document must exist internally by the time we get a text change event.
+    // Here, we assume that the worktree item exists, but the internal document
+    // may not exist yet. This can happen when a document was opened by user,
+    // then file was deleted, then recording started and user recreated the file
+    // with different content and opened it. In this case, we get an fsCreate
+    // followed by a textChange event and no openTextDocument event.
+    // So, here if the document doesn't exist internally, open it. This will
+    // automatically set the content if necessary and we're done.
     const irTextDocument = this.worktree.get(uri).textDocument;
-    assert(irTextDocument);
+    if (!irTextDocument) {
+      await this.openTextDocument(vscTextDocument);
+      return;
+    }
 
     // Check for text change
     if (vscContentChanges.length > 0) {
@@ -608,7 +618,7 @@ class WorkspaceRecorder {
     const justOpened = !item.textEditor;
 
     // If text document has not been opened, open it first and insert 'openTextDocument' event.
-    // This can happen when a document was opened by user while not recorder was on pause and then
+    // This can happen when a document was opened by user while recorder was on pause and then
     // resumed.
     if (!item.textDocument) {
       await this.openTextDocument(vscTextEditor.document);
