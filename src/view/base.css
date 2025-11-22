@@ -37,6 +37,16 @@
   --popover-button-min-width: 60px;
 }
 
+html {
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
 body.vscode-light {
   --ranged-track-border: #007acc;
   --ranged-track-border-hover: #0066ab;

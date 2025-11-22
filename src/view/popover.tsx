@@ -161,10 +161,11 @@ export default function Popover(props: PopoverProps) {
         // There should be a maximum shift beyond which we must not push the popover.
         // Otherwise, while scrolling down for example, a popover can get stuck at
         // the top of the window.
-        left = Math.min(left, document.documentElement.clientWidth - popoverRect.width);
-        left = Math.max(left, 0);
-        top = Math.min(top, document.documentElement.clientHeight - popoverRect.height);
-        top = Math.max(top, 0);
+        const margin = 3;
+        left = Math.min(left, document.documentElement.clientWidth - popoverRect.width - margin);
+        left = Math.max(left, margin);
+        top = Math.min(top, document.documentElement.clientHeight - popoverRect.height - margin);
+        top = Math.max(top, margin);
 
         ref.current.style.left = `${left}px`;
         ref.current.style.top = `${top}px`;

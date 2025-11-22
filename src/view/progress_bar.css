@@ -88,8 +88,7 @@
   /* display: grid; */
   /* grid-gap: var(--spacing-small); */
 
-  width: 250px;
-  max-width: 95vw;
+  width: 250px !important;
   flex-direction: column;
   gap: var(--spacing-small);
 

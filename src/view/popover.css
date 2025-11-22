@@ -9,6 +9,11 @@
   box-shadow: var(--popover-box-shadow);
   display: none;
 
+  /* Without this, we end up in an infinite loop of changing the width while
+  /* trying to maintain a certain position relative to the anchor */
+  width: max-content;
+  max-width: 90vw;
+
   &.open {
     display: flex;
   }
