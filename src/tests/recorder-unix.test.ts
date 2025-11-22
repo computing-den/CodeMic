@@ -1669,16 +1669,6 @@ async function recordSaveJSONWithPrettierJs() {
     {
       type: 'fsCreate',
       id: 2,
-      uri: 'workspace:.vscode/settings.json',
-      clock: 0,
-      file: {
-        type: 'blob',
-        sha1: '3f7383a9de50314c9c50b66cd1a1c953ca858dec',
-      },
-    },
-    {
-      type: 'fsCreate',
-      id: 3,
       uri: 'workspace:README.txt',
       clock: 0,
       file: {
@@ -1688,7 +1678,7 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'fsCreate',
-      id: 4,
+      id: 3,
       uri: 'workspace:test.json',
       clock: 0,
       file: {
@@ -1698,17 +1688,17 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'openTextDocument',
-      id: 5,
+      id: 4,
       uri: 'workspace:test.json',
-      clock: 0.2068292200000001,
-      eol: EOL as EndOfLine,
+      clock: 0.20362086599999973,
+      eol: '\n',
       languageId: 'json',
     },
     {
       type: 'showTextEditor',
-      id: 6,
+      id: 5,
       uri: 'workspace:test.json',
-      clock: 0.2068292200000001,
+      clock: 0.20362086599999973,
       selections: [
         {
           anchor: {
@@ -1729,9 +1719,9 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'textInsert',
-      id: 7,
+      id: 6,
       uri: 'workspace:test.json',
-      clock: 0.2068292200000001,
+      clock: 0.20362086599999973,
       revRange: {
         start: {
           line: 0,
@@ -1742,14 +1732,14 @@ async function recordSaveJSONWithPrettierJs() {
           character: 0,
         },
       },
-      text: `{${EOL}"version":${EOL}${EOL}${EOL}"2025-07-01.01"${EOL}}${EOL}`,
+      text: '{\n"version":\n\n\n"2025-07-01.01"\n}\n',
       updateSelection: true,
     },
     {
       type: 'scroll',
-      id: 8,
+      id: 7,
       uri: 'workspace:test.json',
-      clock: 0.2068292200000001,
+      clock: 0.20362086599999973,
       visibleRange: {
         start: 0,
         end: 6,
@@ -1761,9 +1751,9 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'textChange',
-      id: 9,
+      id: 8,
       uri: 'workspace:test.json',
-      clock: 1.3220568389999998,
+      clock: 0.6245578299999998,
       contentChanges: [
         {
           text: '  ',
@@ -1817,16 +1807,16 @@ async function recordSaveJSONWithPrettierJs() {
               character: 13,
             },
           },
-          text: `${EOL}${EOL}${EOL}`,
+          text: '\n\n\n',
         },
       ],
       updateSelection: false,
     },
     {
       type: 'select',
-      id: 10,
+      id: 9,
       uri: 'workspace:test.json',
-      clock: 1.3220568389999998,
+      clock: 0.6245578299999998,
       selections: [
         {
           anchor: {
@@ -1854,9 +1844,9 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'scroll',
-      id: 11,
+      id: 10,
       uri: 'workspace:test.json',
-      clock: 1.3220568389999998,
+      clock: 0.6245578299999998,
       visibleRange: {
         start: 0,
         end: 3,
@@ -1868,9 +1858,9 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'fsChange',
-      id: 12,
+      id: 11,
       uri: 'workspace:test.json',
-      clock: 1.422560993,
+      clock: 0.7258986279999999,
       file: {
         type: 'blob',
         sha1: 'b65b4cc253c24f8f544c786bcb16f19a4aaa943b',

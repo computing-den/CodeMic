@@ -1715,16 +1715,6 @@ async function recordSaveJSONWithPrettierJs() {
     {
       type: 'fsCreate',
       id: 2,
-      uri: 'workspace:.vscode/settings.json',
-      clock: 0,
-      file: {
-        type: 'blob',
-        sha1: '96345f38ab7b2a2b626d31a6784df0706dcda916',
-      },
-    },
-    {
-      type: 'fsCreate',
-      id: 3,
       uri: 'workspace:README.txt',
       clock: 0,
       file: {
@@ -1734,7 +1724,7 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'fsCreate',
-      id: 4,
+      id: 3,
       uri: 'workspace:test.json',
       clock: 0,
       file: {
@@ -1744,7 +1734,7 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'openTextDocument',
-      id: 5,
+      id: 4,
       uri: 'workspace:test.json',
       clock: 0.2068292200000001,
       eol: EOL as EndOfLine,
@@ -1752,7 +1742,7 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'showTextEditor',
-      id: 6,
+      id: 5,
       uri: 'workspace:test.json',
       clock: 0.2068292200000001,
       selections: [
@@ -1775,7 +1765,7 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'textInsert',
-      id: 7,
+      id: 6,
       uri: 'workspace:test.json',
       clock: 0.2068292200000001,
       revRange: {
@@ -1793,7 +1783,7 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'scroll',
-      id: 8,
+      id: 7,
       uri: 'workspace:test.json',
       clock: 0.2068292200000001,
       visibleRange: {
@@ -1807,7 +1797,7 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'textChange',
-      id: 9,
+      id: 8,
       uri: 'workspace:test.json',
       clock: 1.3220568389999998,
       contentChanges: [
@@ -1870,7 +1860,7 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'select',
-      id: 10,
+      id: 9,
       uri: 'workspace:test.json',
       clock: 1.3220568389999998,
       selections: [
@@ -1900,7 +1890,7 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'scroll',
-      id: 11,
+      id: 10,
       uri: 'workspace:test.json',
       clock: 1.3220568389999998,
       visibleRange: {
@@ -1914,7 +1904,7 @@ async function recordSaveJSONWithPrettierJs() {
     },
     {
       type: 'fsChange',
-      id: 12,
+      id: 11,
       uri: 'workspace:test.json',
       clock: 1.422560993,
       file: {
