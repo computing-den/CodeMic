@@ -33,6 +33,7 @@ class CodeMic {
     loadingFeatured: boolean;
     error?: string;
   };
+  searchQuery = '';
   userMetadata?: t.UserMetadata;
 
   // With the publications in a global map, we don't have to worry about which
@@ -154,13 +155,14 @@ class CodeMic {
       console.log('restoreStateAfterRestart(): ', workspaceChange);
       await VscWorkspace.setWorkspaceChangeGlobalState(this.context);
 
-      let { screen, recorder, workspace, userMetadata } = workspaceChange;
+      let { screen, recorder, workspace, userMetadata, searchQuery } = workspaceChange;
 
       // Make sure vscode has the right workspace folder.
       VscWorkspace.testWorkspace(workspace);
 
-      // Restore user metadata.
+      // Restore user and search.
       this.userMetadata = userMetadata;
+      this.searchQuery = searchQuery;
 
       // Open session.
       const session = await Session.Core.readLocal(this.context, workspace, { mustScan: recorder?.mustScan });
@@ -417,6 +419,13 @@ class CodeMic {
         return ok;
       }
 
+      case 'welcome/search': {
+        this.searchQuery = req.searchQuery;
+
+        await this.updateFrontend();
+        return ok;
+      }
+
       case 'player/openInRecorder': {
         assert(this.session);
         this.session.core.assertFormatVersionSupport();
@@ -459,6 +468,7 @@ class CodeMic {
         await VscWorkspace.setUpWorkspace_MAY_RESTART_VSCODE(this.context, {
           screen: t.Screen.Player,
           workspace: this.session.workspace,
+          searchQuery: this.searchQuery,
           userMetadata: this.userMetadata,
         });
 
@@ -908,6 +918,7 @@ class CodeMic {
     await VscWorkspace.setUpWorkspace_MAY_RESTART_VSCODE(this.context, {
       screen: t.Screen.Recorder,
       workspace: session.workspace,
+      searchQuery: this.searchQuery,
       recorder: { mustScan: session.mustScan, clock: opts?.clock },
       userMetadata: this.userMetadata,
     });
@@ -1006,6 +1017,7 @@ class CodeMic {
         const current = await this.getSessionListingOfDefaultVscWorkspace();
         const recent = await this.getRecentSessionListings(4);
         this.welcome = {
+          searchQuery: this.searchQuery,
           sessions: _.compact([current, ...recent]),
           loadingFeatured: true,
         };
@@ -1266,12 +1278,15 @@ class CodeMic {
     let welcome: t.WelcomeUIState | undefined;
     if (this.screen === t.Screen.Welcome) {
       assert(this.welcome);
+      let sessions: t.SessionUIListing[] = this.welcome.sessions.map(s => ({
+        ...s,
+        history: this.context.settings.history[s.head.id],
+        publication: this.publications.get(s.head.id),
+      }));
+      sessions = lib.searchSessions(sessions, this.searchQuery);
       welcome = {
-        sessions: this.welcome.sessions.map(s => ({
-          ...s,
-          history: this.context.settings.history[s.head.id],
-          publication: this.publications.get(s.head.id),
-        })),
+        searchQuery: this.searchQuery,
+        sessions,
         loadingFeatured: this.welcome.loadingFeatured,
         error: this.welcome.error,
       };

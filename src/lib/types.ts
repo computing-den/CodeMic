@@ -24,6 +24,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'welcome/openNewSessionInRecorder' }; response: OKResponse }
   | { request: { type: 'welcome/deleteSession'; sessionId: string }; response: OKResponse }
   | { request: { type: 'welcome/likeSession'; sessionId: string; value: boolean }; response: OKResponse }
+  | { request: { type: 'welcome/search'; searchQuery: string }; response: OKResponse }
   | { request: { type: 'player/openInRecorder' }; response: OKResponse }
   | { request: { type: 'player/load'; clock?: number }; response: OKResponse }
   | { request: { type: 'player/play' }; response: OKResponse }
@@ -317,6 +318,8 @@ export type AccountUIState = AccountState;
 export type AccountUpdate = Partial<AccountState>;
 
 export type WelcomeUIState = {
+  searchQuery: string;
+  // searchResults: string[]; // session IDs
   sessions: SessionUIListing[];
   loadingFeatured: boolean;
   error?: string;

@@ -33,6 +33,7 @@ export type RecorderRestoreState = {
 export type WorkspaceChangeGlobalState = {
   screen: t.Screen;
   workspace: string;
+  searchQuery: string;
   userMetadata?: t.UserMetadata;
   recorder?: RecorderRestoreState;
 };

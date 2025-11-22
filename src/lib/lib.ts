@@ -214,14 +214,22 @@ export function adjustTrackPlaybackRate(sessionClock: number, trackClock: number
 }
 
 export class Vec2 {
-  constructor(public x: number, public y: number) {}
+  constructor(
+    public x: number,
+    public y: number,
+  ) {}
   sub(p: Vec2): Vec2 {
     return new Vec2(this.x - p.x, this.y - p.y);
   }
 }
 
 export class Rect {
-  constructor(public top: number, public right: number, public bottom: number, public left: number) {}
+  constructor(
+    public top: number,
+    public right: number,
+    public bottom: number,
+    public left: number,
+  ) {}
 
   get height(): number {
     return this.bottom - this.top;
@@ -590,5 +598,26 @@ export function getRecorderSelectionClockRange(
       default:
         unreachable(selection, 'unknown selection');
     }
+  }
+}
+
+export function searchSessions(sessions: t.SessionUIListing[], searchQuery: string): t.SessionUIListing[] {
+  const searchQueryNorm = _.toLower(_.trim(searchQuery || ''));
+  if (!searchQueryNorm) return sessions;
+
+  const tokens = searchQueryNorm.split(/\s+/);
+  return sessions.filter(listing => doFieldsIncludeTokens(getFields(listing.head)));
+
+  function getFields(head: t.SessionHead): string[] {
+    return [head.handle, head.title, head.author ?? '', head.description, ...head.toc.map(item => item.title)].map(
+      str => str?.toLowerCase(),
+    );
+  }
+
+  function doFieldsIncludeTokens(fields: string[]) {
+    return tokens.every(token => doFieldsIncludeToken(fields, token));
+  }
+  function doFieldsIncludeToken(fields: string[], token: string) {
+    return fields.some(field => field.includes(token));
   }
 }

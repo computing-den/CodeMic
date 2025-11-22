@@ -85,6 +85,9 @@ function WelcomeSessions(props: Props) {
     e.preventDefault();
     postMessage({ type: 'account/open', join: true });
   }
+  function search(e: Event | React.FormEvent<HTMLElement>) {
+    postMessage({ type: 'welcome/search', searchQuery: (e.target as HTMLInputElement).value });
+  }
   const current = welcome.sessions.find(s => s.group === 'current');
   const recent = welcome.sessions.filter(s => s.group === 'recent' && s.head.id !== current?.head.id);
   const featured = welcome.sessions.filter(
@@ -98,7 +101,12 @@ function WelcomeSessions(props: Props) {
       <Section className="search-section">
         <Section.Body>
           <div className="search-subsection subsection">
-            <VSCodeTextField placeholder="Search" autofocus></VSCodeTextField>
+            <VSCodeTextField
+              placeholder="Search"
+              autofocus
+              value={welcome.searchQuery}
+              onInput={search}
+            ></VSCodeTextField>
             <VSCodeButton
               onClick={() => postMessage({ type: 'welcome/openNewSessionInRecorder' })}
               title="Record a new session"
