@@ -343,7 +343,7 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
 
   async function setSelection(selection?: t.RecorderSelection, opts?: { sync?: boolean }) {
     await postMessage({ type: 'recorder/setSelection', selection });
-    if (opts?.sync) {
+    if (opts?.sync && !session.recording) {
       const clock = lib.getRecorderSelectionClockRange(selection, tracks, head.toc)?.start;
       if (clock) await postMessage({ type: 'recorder/syncWorkspace', clock });
     }
