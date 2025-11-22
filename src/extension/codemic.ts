@@ -1004,7 +1004,7 @@ class CodeMic {
       }
       case t.Screen.Welcome: {
         const current = await this.getSessionListingOfDefaultVscWorkspace();
-        const recent = await this.getRecentSessionListings();
+        const recent = await this.getRecentSessionListings(4);
         this.welcome = {
           sessions: _.compact([current, ...recent]),
           loadingFeatured: true,
@@ -1135,10 +1135,12 @@ class CodeMic {
     }
   }
 
-  async getRecentSessionListings(): Promise<t.SessionListing[]> {
+  async getRecentSessionListings(limit: number): Promise<t.SessionListing[]> {
     const recent: t.SessionListing[] = [];
     for (const history of Object.values(this.context.settings.history)) {
       try {
+        if (recent.length === limit) break;
+
         const head = await Session.Core.readLocalHead(history.workspace);
         if (head?.id === history.id) {
           recent.push({ head, workspace: history.workspace, group: 'recent', local: true });
