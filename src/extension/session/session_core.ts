@@ -127,32 +127,6 @@ export default class SessionCore {
   //   }
   // }
 
-  // async fork(options?: { author?: t.UserSummary }): Promise<t.SessionHead> {
-  //   await this.download({ skipIfExists: true });
-  //   const forkHead: t.SessionHead = {
-  //     id: uuid(),
-  //     title: `Fork: ${this.session.head.title}`,
-  //     handle: `fork_${this.session.head.handle}`,
-  //     description: this.session.head.description,
-  //     author: options?.author ?? this.session.head.author,
-  //     duration: this.session.head.duration,
-  //     views: 0,
-  //     likes: 0,
-  //     publishTimestamp: undefined,
-  //     modificationTimestamp: this.session.head.modificationTimestamp,
-  //     toc: this.session.head.toc,
-  //     forkedFrom: this.session.head.id,
-  //     hasCover: this.session.head.hasCover,
-  //   };
-
-  //   // Copy the entire session data, then rewrite the head.
-  //   const forkSessionDataPath = path.abs(this.session.context.userDataPath, 'sessions', forkHead.id);
-  //   await fs.promises.cp(this.sessionDataPath, forkSessionDataPath, { recursive: true });
-  //   await storage.writeJSON(path.abs(forkSessionDataPath, 'head.json'), forkHead);
-
-  //   return forkHead;
-  // }
-
   /**
    * Returns a sorted list of all files and directories in workspace. All returned paths are relative to workspace.
    */
@@ -297,6 +271,35 @@ export default class SessionCore {
     await storage.writeJSON(path.join(this.dataPath, 'body.json'), serializeSessionBody(this.session.body));
     this.session.local = true;
     console.log('Wrote session body');
+  }
+
+  async fork(opts: { handle: string; workspace: string; author?: string }): Promise<t.SessionHead> {
+    // TODO download if not exists and show progress
+    assert(await this.bodyExists(), 'Session is not downloaded');
+    assert(this.session.workspace !== opts.workspace, 'Fork must have a different workspace');
+
+    await fs.promises.rm(opts.workspace, { force: true, recursive: true });
+    await fs.promises.cp(this.session.workspace, opts.workspace, { force: true, recursive: true });
+
+    const forkHead: t.SessionHead = {
+      id: uuid(),
+      handle: opts.handle,
+      title: `${this.session.head.title} (fork)`,
+      description: this.session.head.description,
+      author: opts.author ?? this.session.head.author,
+      duration: this.session.head.duration,
+      modificationTimestamp: this.session.head.modificationTimestamp,
+      toc: this.session.head.toc,
+      forkedFrom: this.session.head.id,
+      hasCover: this.session.head.hasCover,
+      ignorePatterns: this.session.head.ignorePatterns,
+      formatVersion: this.session.head.formatVersion,
+    };
+
+    const dataPath = SessionCore.getDataPath(opts.workspace);
+    await storage.writeJSON(path.join(dataPath, 'head.json'), forkHead);
+
+    return forkHead;
   }
 
   async writeHistory(update?: Partial<t.SessionHistory>) {

@@ -818,6 +818,34 @@ class CodeMic {
 
         return ok;
       }
+      case 'recorder/forkSession': {
+        assert(this.session?.isLoaded());
+
+        if (await storage.pathExists(req.workspace)) {
+          const cancel = 'Cancel';
+          const overwrite = 'Overwrite';
+          const answer = await vscode.window.showWarningMessage(
+            `Are you sure you want to overwrite ${req.workspace}?`,
+            { modal: true, detail: 'Existing data will be deleted' },
+            { title: cancel, isCloseAffordance: true },
+            { title: overwrite },
+          );
+
+          if (answer?.title !== overwrite) return ok;
+        }
+
+        await this.stopRecorderWriteAndCleanUp();
+
+        const forkHead = await this.session.core.fork({
+          handle: req.handle,
+          workspace: req.workspace,
+          author: this.context.user?.username,
+        });
+        const session = Session.Core.fromLocal(this.context, forkHead, req.workspace);
+        await this.openScreen({ screen: t.Screen.Recorder, session });
+
+        return ok;
+      }
       case 'recorder/makeTest': {
         assert(this.session?.isLoaded());
         await this.session.rr.makeTest();
@@ -1017,7 +1045,6 @@ class CodeMic {
         const current = await this.getSessionListingOfDefaultVscWorkspace();
         const recent = await this.getRecentSessionListings(4);
         this.welcome = {
-          searchQuery: this.searchQuery,
           sessions: _.compact([current, ...recent]),
           loadingFeatured: true,
         };
@@ -1069,12 +1096,7 @@ class CodeMic {
           if (answer?.title !== exit) return false;
         }
 
-        await this.session.rr?.dispose();
-        this.session.editor.finishEditing();
-        if (!this.session.temp) {
-          await this.session.editor.write({ ifDirty: true });
-          await this.session.core.gcBlobs();
-        }
+        await this.stopRecorderWriteAndCleanUp();
         this.session = undefined;
         this.recorder = undefined;
         break;
@@ -1088,6 +1110,16 @@ class CodeMic {
 
     this.setScreen(t.Screen.Loading);
     return true;
+  }
+
+  async stopRecorderWriteAndCleanUp() {
+    assert(this.session);
+    await this.session.rr?.dispose();
+    this.session.editor.finishEditing();
+    if (!this.session.temp) {
+      await this.session.editor.write({ ifDirty: true });
+      await this.session.core.gcBlobs();
+    }
   }
 
   openView() {
@@ -1148,8 +1180,13 @@ class CodeMic {
   }
 
   async getRecentSessionListings(limit: number): Promise<t.SessionListing[]> {
+    function getTimestamp(history: t.SessionHistory) {
+      return (history && lib.getSessionHistoryItemLastOpenTimestamp(history)) || '';
+    }
+    const orderedHistory = _.orderBy(Object.values(this.context.settings.history), getTimestamp, 'desc');
+
     const recent: t.SessionListing[] = [];
-    for (const history of Object.values(this.context.settings.history)) {
+    for (const history of orderedHistory) {
       try {
         if (recent.length === limit) break;
 
@@ -1162,11 +1199,7 @@ class CodeMic {
       }
     }
 
-    const iteratee = (listing: t.SessionListing) => {
-      const history = this.context.settings.history[listing.head.id];
-      return (history && lib.getSessionHistoryItemLastOpenTimestamp(history)) || '';
-    };
-    return _.orderBy(recent, iteratee, 'desc');
+    return recent;
   }
 
   async updateFeaturedSessionListings() {

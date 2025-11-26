@@ -259,7 +259,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
           value={youtubeId}
           onInput={this.youtubeIdChanged}
           aria-invalid={Boolean(youtubeId && !isYoutubeIdValid)}
-          pattern="[A-Za-z0-9]{5}"
+          // pattern="[A-Za-z0-9]{5}"
           // disabled={!temp}
         >
           YouTube Video
@@ -654,6 +654,12 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     await postMessage({ type: 'recorder/mergeVideoTracks' });
   }
 
+  const forkSessionPopover = usePopover();
+
+  async function forkSession(handle: string, workspace: string) {
+    await postMessage({ type: 'recorder/forkSession', handle, workspace });
+  }
+
   async function mergeAndReplaceVideoTracks() {
     await postMessage({ type: 'recorder/mergeVideoTracks', deleteOld: true });
   }
@@ -697,6 +703,12 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
       icon: 'fa-solid fa-link',
       disabled: session.playing || session.recording,
       onClick: mergeVideoTracks,
+    },
+    config.debug && {
+      title: 'Fork session',
+      icon: 'codicon codicon-repo-forked',
+      disabled: session.playing || session.recording,
+      onClick: forkSessionPopover.toggle,
     },
     config.debug && {
       title: 'Merge & replace video tracks',
@@ -884,6 +896,17 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
         pointOnPopover="top-right"
         items={otherActionsItems}
       />
+      {config.debug && (
+        <ForkSessionPopover
+          popover={forkSessionPopover}
+          anchor={otherActionsButtonRef}
+          pointOnAnchor="bottom-left"
+          pointOnPopover="top-left"
+          handle={head.handle}
+          workspace={session.workspace}
+          onConfirm={forkSession}
+        />
+      )}
       {selectionClockRange?.start !== undefined && (
         <ChapterPopover
           chapter={selectedChapter}
@@ -2058,6 +2081,48 @@ function CropPopover(props: PopoverProps & { onConfirm: (adjustMediaTracks: bool
           Delete subsequent media tracks
         </VSCodeCheckbox>
         <VSCodeButton appearance="primary" onClick={e => props.onConfirm(adjustMediaTracks)}>
+          OK
+        </VSCodeButton>
+      </form>
+    </Popover>
+  );
+}
+
+function ForkSessionPopover(
+  props: PopoverProps & { onConfirm: (handle: string, workspace: string) => any; handle: string; workspace: string },
+) {
+  const [workspace, setWorkspace] = useState(`${props.workspace}_fork`);
+  const [handle, setHandle] = useState(`${props.handle}_fork`);
+  return (
+    <Popover {...props}>
+      <form className="fork-session-popover-form">
+        <label className="label">Fork session</label>
+        <PathField
+          className="subsection"
+          placeholder="Workspace directory"
+          value={workspace}
+          onChange={setWorkspace}
+          pickTitle="New workpace directory"
+        >
+          Workspace
+        </PathField>
+        <VSCodeTextField
+          className="subsection"
+          placeholder="A-Z a-z 0-9 - _ (e.g. my_project)"
+          value={handle}
+          onInput={e => {
+            setHandle((e.target as HTMLInputElement).value.replace(/[^A-Za-z0-9_-]/g, ''));
+          }}
+        >
+          Handle
+        </VSCodeTextField>
+        <VSCodeButton
+          appearance="primary"
+          onClick={e => {
+            if (!handle || !workspace || workspace === '/') return;
+            props.onConfirm(handle, workspace);
+          }}
+        >
           OK
         </VSCodeButton>
       </form>
