@@ -654,6 +654,10 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     await postMessage({ type: 'recorder/mergeVideoTracks' });
   }
 
+  async function makeClip() {
+    await postMessage({ type: 'recorder/makeClip' });
+  }
+
   const forkSessionPopover = usePopover();
 
   async function forkSession(handle: string, workspace: string) {
@@ -699,16 +703,22 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
 
   const otherActionsItems: PopoverMenuItem[] = _.compact([
     config.debug && {
-      title: 'Merge video tracks',
-      icon: 'fa-solid fa-link',
-      disabled: session.playing || session.recording,
-      onClick: mergeVideoTracks,
-    },
-    config.debug && {
       title: 'Fork session',
       icon: 'codicon codicon-repo-forked',
       disabled: session.playing || session.recording,
       onClick: forkSessionPopover.toggle,
+    },
+    config.debug && {
+      title: 'Make clip',
+      icon: 'fa-solid fa-scissors',
+      disabled: session.playing || session.recording,
+      onClick: makeClip,
+    },
+    config.debug && {
+      title: 'Merge video tracks',
+      icon: 'fa-solid fa-link',
+      disabled: session.playing || session.recording,
+      onClick: mergeVideoTracks,
     },
     config.debug && {
       title: 'Merge & replace video tracks',

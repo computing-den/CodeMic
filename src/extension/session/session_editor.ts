@@ -14,6 +14,7 @@ import * as path from 'path';
 import cache from '../cache.js';
 import config from '../config.js';
 import { Progress } from '../types.js';
+import { mergeMediaTracks } from '../media_editor.js';
 
 const execFile = promisify(child_process.execFile);
 
@@ -707,6 +708,57 @@ export default class SessionEditor {
       body: { videoTracks: deleteOld ? [finalVideoTrack] : [...this.session.body.videoTracks, finalVideoTrack] },
       effects: [{ type: 'media' }],
     });
+  }
+
+  async makeClip(progress: Progress, abortController: AbortController): Promise<t.SessionChange[] | undefined> {
+    assert(this.session.isLoaded());
+    assert(this.selection?.type === 'editor', 'Select a range to make a clip');
+
+    const start = Math.min(this.selection.anchor, this.selection.focus);
+    const end = Math.max(this.selection.anchor, this.selection.focus);
+    const limitRange: t.ClockRange = { start, end };
+    const tempDir = path.join(this.session.core.dataPath, 'temp');
+    const blobDir = path.join(this.session.core.dataPath, 'blobs');
+
+    const outputFile = await mergeMediaTracks(
+      this.session.body.audioTracks,
+      this.session.body.videoTracks,
+      this.session.body.imageTracks,
+      limitRange,
+      tempDir,
+      blobDir,
+      progress,
+      abortController,
+    );
+
+    if (!outputFile) return;
+
+    // TODO use stream.
+    const finalData = await fs.promises.readFile(outputFile);
+    const sha1 = await misc.computeSHA1(finalData);
+    await this.session.core.copyToBlob(outputFile, sha1);
+    if (!config.debug) {
+      await fs.promises.rm(tempDir, { recursive: true, force: true });
+    }
+
+    const finalVideoTrack: t.VideoTrack = {
+      id: uuid(),
+      clockRange: { start: limitRange.start, end: limitRange.end },
+      title: 'Merged videos',
+      type: 'video',
+      file: { type: 'blob', sha1 },
+    };
+
+    const change1 = this.insertApplySessionPatch({
+      body: { videoTracks: [finalVideoTrack], audioTracks: [], imageTracks: [] },
+      effects: [{ type: 'media' }],
+    });
+
+    const mergeRange: t.ClockRange = { start: 0, end: limitRange.start };
+    const change2 = this.merge(mergeRange, true);
+    const change3 = this.crop(limitRange.end - limitRange.start, true);
+
+    return [change1, change2, change3];
   }
 
   /**

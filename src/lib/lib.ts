@@ -4,6 +4,7 @@ import assert from './assert.js';
 import { URI } from 'vscode-uri';
 import * as path from 'path';
 import { isWindows } from './platform.js';
+import { produce } from 'immer';
 
 export const ANONYM_USERNAME = 'anonym'; // NOTE: If you change this, make sure to change it in server too.
 
@@ -101,6 +102,20 @@ export function getClockRangeOverlap(a: t.ClockRange, b: t.ClockRange): t.ClockR
   if (end > start) return { start, end };
 }
 
+/**
+ * Get the parts of a that do not overlap with b
+ */
+export function getClockRangeDisjoint(a: t.ClockRange, b: t.ClockRange): t.ClockRange[] {
+  const overlap = getClockRangeOverlap(a, b);
+  if (!overlap) return [a];
+
+  const res: t.ClockRange[] = [];
+  if (overlap.start > a.start) res.push({ start: a.start, end: overlap.start });
+  if (a.end > overlap.end) res.push({ start: overlap.end, end: a.end });
+
+  return res;
+}
+
 export function getClockRangeOverlapDur(a: t.ClockRange, b: t.ClockRange): number {
   const start = Math.max(a.start, b.start);
   const end = Math.min(a.end, b.end);
@@ -109,6 +124,131 @@ export function getClockRangeOverlapDur(a: t.ClockRange, b: t.ClockRange): numbe
 
 export function getClockRangeDur(r: t.ClockRange): number {
   return r.end - r.start;
+}
+
+/**
+ *
+ *  const tracks: t.RangedTrack[] = [
+ *    { id: 'e', type: 'audio', clockRange: { start: 2, end: 5 }, title: 'e' },
+ *    { id: 'd', type: 'audio', clockRange: { start: 0, end: 7 }, title: 'd' },
+ *    { id: 'c', type: 'audio', clockRange: { start: 3, end: 6 }, title: 'c' },
+ *    { id: 'b', type: 'audio', clockRange: { start: 1, end: 2 }, title: 'b' },
+ *    { id: 'a', type: 'audio', clockRange: { start: 4, end: 5 }, title: 'a' },
+ *  ];
+ *
+ *
+ *         d
+ *      b  |
+ *      |  |  e
+ *         |  |
+ *   a  |  |  |
+ *   |  |  |  |
+ *      |  |
+ *      c  |
+ *
+ *
+ * [
+ *   {"track": {"id": "a", ...}, "finalRange": {"start": 4, "end": 5}},
+ *   {"track": {"id": "b", ...}, "finalRange": {"start": 1, "end": 2}},
+ *   {"track": {"id": "c", ...}, "finalRange": {"start": 3, "end": 4}},
+ *   {"track": {"id": "c", ...}, "finalRange": {"start": 5, "end": 6}},
+ *   {"track": {"id": "d", ...}, "finalRange": {"start": 0, "end": 1}},
+ *   {"track": {"id": "d", ...}, "finalRange": {"start": 2, "end": 3}},
+ *   {"track": {"id": "d", ...}, "finalRange": {"start": 6, "end": 7}}
+ * ]
+ *
+ * If tracks are reversed:
+ *
+ * [
+ *   {"track": {"id": "e", ...}, "title": "e"}, "finalRange": {"start": 2, "end": 5}},
+ *   {"track": {"id": "d", ...}, "title": "d"}, "finalRange": {"start": 0, "end": 2}},
+ *   {"track": {"id": "d", ...}, "title": "d"}, "finalRange": {"start": 5, "end": 7}}
+ * ]
+ *
+ */
+export function getDisjointTrackSegments(tracks: t.RangedTrackFile[]): t.TrackSegment[] {
+  const disjointSegments: t.TrackSegment[] = [];
+  _.forEachRight(tracks, track => {
+    let curDisjointRanges: t.ClockRange[] = [track.clockRange];
+
+    // Split each of the curDisjointRanges into segments that do not
+    // overlap with any of the disjointSegments.
+    for (const segment of disjointSegments) {
+      curDisjointRanges = curDisjointRanges.flatMap(range => getClockRangeDisjoint(range, segment.finalRange));
+    }
+
+    for (const range of curDisjointRanges) {
+      disjointSegments.push({ type: 'file', track, originalRange: track.clockRange, finalRange: range });
+    }
+  });
+
+  return disjointSegments;
+}
+
+export function cutTrackSegmentsToRange(segments: t.TrackSegment[], range: t.ClockRange): t.TrackSegment[] {
+  const res: t.TrackSegment[] = [];
+  for (let segment of segments) {
+    const overlap = getClockRangeOverlap(segment.finalRange, range);
+    if (overlap) res.push({ ...segment, finalRange: overlap });
+  }
+  return res;
+}
+
+export function padTrackSegmentsByExtending(segments: t.TrackSegment[], range: t.ClockRange): t.TrackSegment[] {
+  if (segments.length === 0) return [];
+
+  // Order.
+  segments = _.orderBy(segments, p => p.finalRange.start, 'asc');
+
+  return produce(segments, draft => {
+    // Extend start of first segment.
+    draft[0].finalRange.start = range.start;
+
+    // Extend end of last segment.
+    draft[draft.length - 1].finalRange.end = range.end;
+
+    // Stick end of each segment to the next.
+    for (let i = 0; i < draft.length - 1; i++) {
+      draft[i].finalRange.end = draft[i + 1].finalRange.start;
+    }
+  });
+}
+
+export function padTrackSegmentsWithBlanks(segments: t.TrackSegment[], range: t.ClockRange): t.TrackSegment[] {
+  if (segments.length === 0) return [];
+
+  // Order.
+  segments = _.orderBy(segments, p => p.finalRange.start, 'asc');
+
+  const blanks: t.TrackSegment[] = [];
+  // Insert blank at the start.
+  if (segments[0].finalRange.start > range.start) {
+    blanks.push({ type: 'blank', finalRange: { start: range.start, end: segments[0].finalRange.start } });
+  }
+
+  // Insert blank after each segment.
+  for (let i = 0; i < segments.length; i++) {
+    const end = segments[i + 1]?.finalRange?.start ?? range.end;
+    if (segments[i].finalRange.end < end) {
+      blanks.push({ type: 'blank', finalRange: { start: segments[i].finalRange.end, end: end } });
+    }
+  }
+
+  return _.orderBy([...segments, ...blanks], p => p.finalRange.start, 'asc');
+}
+
+export function mergeTracksByExtendingSegments(tracks: t.RangedTrackFile[], range: t.ClockRange): t.TrackSegment[] {
+  let segments = getDisjointTrackSegments(tracks);
+  segments = padTrackSegmentsByExtending(segments, range);
+  segments = cutTrackSegmentsToRange(segments, range);
+  return segments;
+}
+
+export function mergeTracksByInsertingBlanks(tracks: t.RangedTrackFile[], range: t.ClockRange): t.TrackSegment[] {
+  let segments = getDisjointTrackSegments(tracks);
+  segments = padTrackSegmentsWithBlanks(segments, range);
+  segments = cutTrackSegmentsToRange(segments, range);
+  return segments;
 }
 
 export function clockToLocal(clock: number, range: t.ClockRange): number {

@@ -805,13 +805,15 @@ class CodeMic {
         await this.updateFrontend();
         return ok;
       }
-      case 'recorder/mergeVideoTracks': {
+      case 'recorder/makeClip': {
         await this.context.withProgress(
-          { title: `Merging video tracks`, cancellable: true },
+          { title: `Making a clip`, cancellable: true },
           async (progress, abortController) => {
             assert(this.session?.isLoaded());
-            const change = await this.session.editor.mergeVideoTracks(progress, abortController, req.deleteOld);
-            if (change) await this.session.rr.enqueueSyncAfterSessionChange(change);
+            const changes = await this.session.editor.makeClip(progress, abortController);
+            if (changes) {
+              for (const change of changes) await this.session.rr.enqueueSyncAfterSessionChange(change);
+            }
             await this.updateFrontend();
           },
         );
@@ -843,6 +845,20 @@ class CodeMic {
         });
         const session = Session.Core.fromLocal(this.context, forkHead, req.workspace);
         await this.openScreen({ screen: t.Screen.Recorder, session });
+
+        return ok;
+      }
+
+      case 'recorder/mergeVideoTracks': {
+        await this.context.withProgress(
+          { title: `Merging video tracks`, cancellable: true },
+          async (progress, abortController) => {
+            assert(this.session?.isLoaded());
+            const change = await this.session.editor.mergeVideoTracks(progress, abortController, req.deleteOld);
+            if (change) await this.session.rr.enqueueSyncAfterSessionChange(change);
+            await this.updateFrontend();
+          },
+        );
 
         return ok;
       }

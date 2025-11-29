@@ -73,8 +73,9 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/updateChapter'; index: number; update: Partial<TocItem> }; response: OKResponse }
   | { request: { type: 'recorder/deleteChapter'; index: number }; response: OKResponse }
   | { request: { type: 'recorder/crop'; clock: number; adjustMediaTracks: boolean }; response: OKResponse }
-  | { request: { type: 'recorder/mergeVideoTracks'; deleteOld?: boolean }; response: OKResponse }
   | { request: { type: 'recorder/forkSession'; handle: string; workspace: string }; response: OKResponse }
+  | { request: { type: 'recorder/makeClip' }; response: OKResponse }
+  | { request: { type: 'recorder/mergeVideoTracks'; deleteOld?: boolean }; response: OKResponse }
   | { request: { type: 'recorder/makeTest' }; response: OKResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
   | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }
@@ -496,6 +497,27 @@ export type RangedTrackFile = RangedTrack & { file: File };
 export type AudioTrack = RangedTrackFile;
 export type VideoTrack = RangedTrackFile;
 export type ImageTrack = RangedTrackFile;
+
+export type TrackSegment =
+  | {
+      type: 'file';
+      track: RangedTrackFile;
+      originalRange: ClockRange;
+      finalRange: ClockRange;
+    }
+  | {
+      type: 'blank';
+      finalRange: ClockRange;
+    };
+
+// export type RangeTrackSegment = {
+//   track: RangedTrack;
+//   // localStart: number;
+//   // localEnd: number;
+//   // cloneStart: number;
+//   // cloneEnd: number;
+//   // duration: number;
+// }
 
 // export type UriMap = { [key: string]: string };
 
