@@ -134,37 +134,6 @@ export type ExtractResponse<RR extends ReqRes, Req extends { type: string }> = E
   { request: { type: Req['type'] } }
 >['response'];
 
-// export type BackendResponseFor<Req extends FrontendRequest> =
-
-// export type BackendResponseFor<Req extends FrontendRequest> = Extract<
-//   FrontendToBackendReqRes,
-//   { request: { type: Req['type'] } }
-// >['response'];
-
-// export type FrontendResponseFor<Req extends BackendRequest> = Extract<
-//   BackendToFrontendReqRes,
-//   { request: { type: Req['type'] } }
-// >['response'];
-
-// export type PostMessageOptions = {
-//   performDefaultActions: boolean;
-// };
-
-// export type PostMessageToFrontend = <Req extends BackendRequest>(req: Req) => Promise<FrontendResponseFor<Req>>;
-// export type PostMessageToBackend = <Req extends FrontendRequest>(
-//   req: Req,
-//   options?: PostMessageOptions,
-// ) => Promise<BackendResponseFor<Req>>;
-
-// export type B2SReqAccountJoin = { type: 'account/join'; credentials: Credentials };
-// export type B2SResAccountJoin = { type: 'user'; user: User };
-
-// export type B2SReqAccountLogin = { type: 'account/login'; credentials: Credentials };
-// export type B2SResAccountLogin = { type: 'user'; user: User };
-
-// export type B2SReqFeaturedGet = { type: 'featured/get' };
-// export type B2SResFeaturedGet = { type: 'sessionHeads'; sessionHeads: SessionHead[] };
-
 export type BackendToServerReqRes =
   | {
       request: { type: 'earlyAccessEmail'; email: string };

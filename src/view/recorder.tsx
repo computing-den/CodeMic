@@ -1,5 +1,5 @@
 import MediaToolbar, { MediaToolbarButton, MediaToolbarMenu, PrimaryAction } from './media_toolbar.jsx';
-import React, { forwardRef, Ref, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, memo, Ref, useEffect, useRef, useState } from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { Vec2, Rect } from '../lib/lib.js';
@@ -1540,19 +1540,29 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
               <RangeSelection timelineDuration={timelineDuration} range={editorSelectionRange} />
             )}
           </div>
-          <div id="ruler">
-            {_.times(this.getTimelineDuration() / rulerStepDur + 1, i => (
-              <div className="step">
-                <div className="indicator"></div>
-                <div className="time">{lib.formatTimeSeconds(i * rulerStepDur)}</div>
-              </div>
-            ))}
-          </div>
+          <TimelineRuler pxToSecRatio={pxToSecRatio} timelineDuration={timelineDuration} rulerStepDur={rulerStepDur} />
         </div>
       </div>
     );
   }
 }
+
+const TimelineRuler = memo(function TimelineRuler(props: {
+  pxToSecRatio: number;
+  timelineDuration: number;
+  rulerStepDur: number;
+}) {
+  return (
+    <div id="ruler">
+      {_.times(props.timelineDuration / props.rulerStepDur + 1, i => (
+        <div className="step">
+          <div className="indicator"></div>
+          <div className="time">{lib.formatTimeSeconds(i * props.rulerStepDur)}</div>
+        </div>
+      ))}
+    </div>
+  );
+});
 
 type RangedTracksUIProps = {
   timelineDuration: number;
