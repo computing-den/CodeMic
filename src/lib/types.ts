@@ -498,17 +498,10 @@ export type AudioTrack = RangedTrackFile;
 export type VideoTrack = RangedTrackFile;
 export type ImageTrack = RangedTrackFile;
 
-export type TrackSegment =
-  | {
-      type: 'file';
-      track: RangedTrackFile;
-      originalRange: ClockRange;
-      finalRange: ClockRange;
-    }
-  | {
-      type: 'blank';
-      finalRange: ClockRange;
-    };
+export type TrackSegment = {
+  track: RangedTrackFile;
+  finalRange: ClockRange;
+};
 
 // export type RangeTrackSegment = {
 //   track: RangedTrack;

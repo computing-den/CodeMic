@@ -178,7 +178,7 @@ export function getDisjointTrackSegments(tracks: t.RangedTrackFile[]): t.TrackSe
     }
 
     for (const range of curDisjointRanges) {
-      disjointSegments.push({ type: 'file', track, originalRange: track.clockRange, finalRange: range });
+      disjointSegments.push({ track, finalRange: range });
     }
   });
 
@@ -214,39 +214,9 @@ export function padTrackSegmentsByExtending(segments: t.TrackSegment[], range: t
   });
 }
 
-export function padTrackSegmentsWithBlanks(segments: t.TrackSegment[], range: t.ClockRange): t.TrackSegment[] {
-  if (segments.length === 0) return [];
-
-  // Order.
-  segments = _.orderBy(segments, p => p.finalRange.start, 'asc');
-
-  const blanks: t.TrackSegment[] = [];
-  // Insert blank at the start.
-  if (segments[0].finalRange.start > range.start) {
-    blanks.push({ type: 'blank', finalRange: { start: range.start, end: segments[0].finalRange.start } });
-  }
-
-  // Insert blank after each segment.
-  for (let i = 0; i < segments.length; i++) {
-    const end = segments[i + 1]?.finalRange?.start ?? range.end;
-    if (segments[i].finalRange.end < end) {
-      blanks.push({ type: 'blank', finalRange: { start: segments[i].finalRange.end, end: end } });
-    }
-  }
-
-  return _.orderBy([...segments, ...blanks], p => p.finalRange.start, 'asc');
-}
-
 export function mergeTracksByExtendingSegments(tracks: t.RangedTrackFile[], range: t.ClockRange): t.TrackSegment[] {
   let segments = getDisjointTrackSegments(tracks);
   segments = padTrackSegmentsByExtending(segments, range);
-  segments = cutTrackSegmentsToRange(segments, range);
-  return segments;
-}
-
-export function mergeTracksByInsertingBlanks(tracks: t.RangedTrackFile[], range: t.ClockRange): t.TrackSegment[] {
-  let segments = getDisjointTrackSegments(tracks);
-  segments = padTrackSegmentsWithBlanks(segments, range);
   segments = cutTrackSegmentsToRange(segments, range);
   return segments;
 }

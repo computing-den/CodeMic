@@ -730,7 +730,6 @@ export default class SessionEditor {
     const outputFile = await mergeMediaTracks(
       this.session.body.audioTracks,
       this.session.body.videoTracks,
-      this.session.body.imageTracks,
       limitRange,
       tempDir,
       blobDir,
@@ -757,7 +756,7 @@ export default class SessionEditor {
     };
 
     const change1 = this.insertApplySessionPatch({
-      body: { videoTracks: [finalVideoTrack], audioTracks: [], imageTracks: [] },
+      body: { videoTracks: [finalVideoTrack], audioTracks: [] },
       effects: [{ type: 'media' }],
     });
 
