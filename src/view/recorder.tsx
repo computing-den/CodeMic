@@ -1,5 +1,5 @@
 import MediaToolbar, { MediaToolbarButton, MediaToolbarMenu, PrimaryAction } from './media_toolbar.jsx';
-import React, { forwardRef, memo, Ref, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, memo, Ref, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { Vec2, Rect } from '../lib/lib.js';
@@ -20,6 +20,7 @@ import { URI } from 'vscode-uri';
 import Cover from './cover.jsx';
 import PopoverMenu, { PopoverMenuItem } from './popover_menu.jsx';
 import config from './config.js';
+import RecorderMediaToolbar from './recorder_media_toolbar.jsx';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -450,109 +451,6 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     }
   }
 
-  async function togglePictureInPicture() {
-    try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-        setShowVideo(true);
-      } else {
-        await guideVideoRef.current!.requestPictureInPicture();
-        setShowVideo(false);
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  }
-
-  async function stepBackward() {
-    await postMessage({ type: 'player/seek', clock: session.clock - 5 });
-  }
-
-  async function stepForward() {
-    await postMessage({ type: 'player/seek', clock: session.clock + 5 });
-  }
-
-  let primaryAction: PrimaryAction;
-  if (session.recording) {
-    primaryAction = {
-      type: 'recorder/pause',
-      title: 'Record',
-      onClick: async () => {
-        await postMessage({ type: 'recorder/pause' });
-      },
-    };
-  } else {
-    primaryAction = {
-      type: 'recorder/record',
-      title: 'Record',
-      disabled: session.playing,
-      onClick: () => onRecord(),
-    };
-  }
-
-  const mediaToolbarActions = _.compact([
-    session.playing ? (
-      <MediaToolbarButton
-        title="Pause"
-        icon="codicon-debug-pause"
-        onClick={() => postMessage({ type: 'recorder/pause' })}
-      />
-    ) : (
-      <MediaToolbarButton title="Play" icon="codicon-play" disabled={session.recording} onClick={onPlay} />
-    ),
-    <MediaToolbarButton
-      title="Jump 5s backwards"
-      icon="codicon-chevron-left"
-      onClick={stepBackward}
-      disabled={session.recording || session.clock === 0}
-    />,
-    <MediaToolbarButton
-      title="Jump 5s forward"
-      icon="codicon-chevron-right"
-      onClick={stepForward}
-      disabled={session.recording || session.clock === session.head.duration}
-    />,
-    // <MediaToolbarButton
-    //   title="Force sync workspace"
-    //   icon="codicon-sync"
-    //   onClick={() => postMessage({ type: 'recorder/syncWorkspace', clock: selectionClockRange?.start })}
-    //   // NOTE: Must not programmatically change the workspace during recording
-    //   //       because the changes will then be picked up by the recorder.
-    //   disabled={session.recording}
-    // />,
-    // <MediaToolbarButton
-    //   title="Picture-in-Picture"
-    //   children={<PictureInPicture />}
-    //   onClick={() => togglePictureInPicture()}
-    //   // NOTE: change of video src does not trigger an update
-    //   //       but it's ok for now, since state/props change during playback.
-    //   disabled={!guideVideoRef.current?.src}
-    // />,
-    <MediaToolbarButton
-      title="Share session"
-      icon="codicon-link"
-      onClick={() =>
-        postMessage({
-          type: 'copySessionLink',
-          sessionId: session.head.id,
-          sessionHandle: session.head.handle,
-          sessionAuthor: session.head.author,
-        })
-      }
-    />,
-    <MediaToolbarMenu
-      onSync={() => postMessage({ type: 'recorder/syncWorkspace', clock: selectionClockRange?.start })}
-      onPiP={() => togglePictureInPicture()}
-      canSync={!session.recording}
-      // NOTE: change of video src does not trigger an update
-      //       but it's ok for now, since state/props change during playback.
-      canPiP={Boolean(guideVideoRef.current?.src)}
-      canEdit={false}
-      playbackRate={session.playbackRate}
-      onPlaybackRate={rate => postMessage({ type: 'recorder/setPlaybackRate', rate })}
-    />,
-  ]);
-
   const slowDownPopover = usePopover();
   const slowDownButtonRef = useRef(null);
 
@@ -816,12 +714,21 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
 
   return (
     <div id={id} className={className}>
-      <MediaToolbar
+      <RecorderMediaToolbar
         className="subsection subsection_spaced"
-        primaryAction={primaryAction}
-        actions={mediaToolbarActions}
+        playing={session.playing}
+        recording={session.recording}
+        onPlay={onPlay}
+        onRecord={onRecord}
         clock={session.clock}
         duration={head.duration}
+        sessionId={head.id}
+        sessionHandle={head.handle}
+        sessionAuthor={head.author}
+        selectionStart={selectionClockRange?.start}
+        onShowVideoChange={setShowVideo}
+        guideVideoRef={guideVideoRef}
+        playbackRate={session.playbackRate}
       />
       <div className={cn('subsection subsection_spaced guide-video-container', !showVideo && 'hide')}>
         <video id="guide-video" ref={guideVideoRef} />
