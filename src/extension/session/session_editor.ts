@@ -452,10 +452,17 @@ export default class SessionEditor {
       return { ...t, clockRange: { start: newStart, end: t.clockRange.end + diff } };
     }
 
+    function areClocksClose(a: number, b?: number): boolean {
+      return b !== undefined && Math.abs(b - a) < 0.1;
+    }
+
     const editorEvents = this.session.body.editorEvents.map(withUpdatedClock);
-    const focusTimeline = this.session.body.focusTimeline.map(withUpdatedClock);
-    const toc = this.session.head.toc.map(withUpdatedClock);
+    let focusTimeline = this.session.body.focusTimeline.map(withUpdatedClock);
+    let toc = this.session.head.toc.map(withUpdatedClock);
     const duration = lib.calcClockAfterMerge(this.session.head.duration, range);
+
+    focusTimeline = focusTimeline.filter((f, i) => !areClocksClose(f.clock, focusTimeline[i + 1]?.clock));
+    toc = toc.filter((t, i) => !areClocksClose(t.clock, toc[i + 1]?.clock));
 
     let { audioTracks, videoTracks, imageTracks } = this.session.body;
     if (adjustMediaTracks) {
