@@ -22,6 +22,7 @@ export type FrontendToBackendReqRes =
       response: OKResponse;
     }
   | { request: { type: 'welcome/openNewSessionInRecorder' }; response: OKResponse }
+  | { request: { type: 'welcome/openWorkspace' }; response: OKResponse }
   | { request: { type: 'welcome/deleteSession'; sessionId: string }; response: OKResponse }
   | { request: { type: 'welcome/likeSession'; sessionId: string; value: boolean }; response: OKResponse }
   | { request: { type: 'welcome/search'; searchQuery: string }; response: OKResponse }

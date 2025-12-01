@@ -719,9 +719,12 @@ export function searchSessions(sessions: t.SessionUIListing[], searchQuery: stri
   return sessions.filter(listing => doFieldsIncludeTokens(getFields(listing.head)));
 
   function getFields(head: t.SessionHead): string[] {
-    return [head.handle, head.title, head.author ?? '', head.description, ...head.toc.map(item => item.title)].map(
-      str => str?.toLowerCase(),
-    );
+    return [
+      `@${head.author ?? ''}/${head.handle}`,
+      head.title,
+      head.description,
+      ...head.toc.map(item => item.title),
+    ].map(str => str?.toLowerCase());
   }
 
   function doFieldsIncludeTokens(fields: string[]) {

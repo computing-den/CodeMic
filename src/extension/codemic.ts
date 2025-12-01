@@ -173,8 +173,6 @@ class CodeMic {
         await this.openScreen({ screen, session, load: true });
       } else if (screen === t.Screen.Recorder) {
         await this.openScreen({ screen, session, clock: recorder!.clock });
-      } else {
-        throw new Error('Why did vscode restart?');
       }
 
       return true;
@@ -377,6 +375,26 @@ class CodeMic {
         await this.openScreen({ screen: t.Screen.Recorder, session });
 
         // await this.updateFrontend();
+        return ok;
+      }
+      case 'welcome/openWorkspace': {
+        const uris = await vscode.window.showOpenDialog({
+          canSelectFiles: false,
+          canSelectFolders: true,
+          canSelectMany: false,
+          title: 'Open a directory with a .CodeMic session',
+        });
+
+        const workspace = uris?.[0]?.fsPath;
+        if (!workspace) return ok;
+
+        await VscWorkspace.setUpWorkspace_MAY_RESTART_VSCODE(this.context, {
+          screen: t.Screen.Welcome,
+          workspace,
+          searchQuery: this.searchQuery,
+          userMetadata: this.userMetadata,
+        });
+
         return ok;
       }
       case 'welcome/deleteSession': {

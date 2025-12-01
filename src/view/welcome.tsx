@@ -9,6 +9,7 @@ import Section from './section.jsx';
 import postMessage from './api.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeLink, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
+import { Link } from '@vscode/webview-ui-toolkit';
 
 type Props = { user?: t.UserUI; welcome: t.WelcomeUIState; earlyAccessEmail?: string };
 
@@ -107,6 +108,14 @@ function WelcomeSessions(props: Props) {
               value={welcome.searchQuery}
               onInput={search}
             ></VSCodeTextField>
+
+            <VSCodeButton
+              onClick={() => postMessage({ type: 'welcome/openWorkspace' })}
+              title="Open session"
+              appearance="secondary"
+            >
+              <span className="codicon codicon-folder-opened" />
+            </VSCodeButton>
             <VSCodeButton
               onClick={() => postMessage({ type: 'welcome/openNewSessionInRecorder' })}
               title="Record a new session"
@@ -165,7 +174,19 @@ function SessionsSection(props: SessionsSectionProps) {
             onShare={share}
           />
         )}
-        {props.listings.length === 0 && !props.loading && <Section.Message>Empty</Section.Message>}
+        {props.listings.length === 0 && !props.loading && (
+          <div className="empty-listings">
+            <p>No session found in workspace</p>
+            {/*
+            <VSCodeButton
+              appearance="secondary"
+              onClick={() => postMessage({ type: 'welcome/openWorkspace' })}
+              title="Pick a workspace with a session"
+            >
+              Open session
+              </VSCodeButton>*/}
+          </div>
+        )}
       </Section.Body>
     </Section>
   );
