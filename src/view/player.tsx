@@ -224,7 +224,7 @@ export default class Player extends React.Component<Props> {
                 // session.head.hasCover && 'cover',
               )}
             >
-              <Cover local={local} head={head} />
+              <Cover local={local} hasCover={head.hasCover} sessionId={head.id} />
               <video id="guide-video" />
             </div>
             <SessionHead className="subsection subsection_spaced" head={head} withAuthor />

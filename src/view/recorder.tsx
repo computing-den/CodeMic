@@ -1,5 +1,4 @@
-import MediaToolbar, { MediaToolbarButton, MediaToolbarMenu, PrimaryAction } from './media_toolbar.jsx';
-import React, { forwardRef, memo, Ref, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, memo, Ref, RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as t from '../lib/types.js';
 import * as lib from '../lib/lib.js';
 import { Vec2, Rect } from '../lib/lib.js';
@@ -21,6 +20,7 @@ import Cover from './cover.jsx';
 import PopoverMenu, { PopoverMenuItem } from './popover_menu.jsx';
 import config from './config.js';
 import RecorderMediaToolbar from './recorder_media_toolbar.jsx';
+import RecorderToolbar, { RecorderToolbarHandle } from './recorder_toolbar.jsx';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -95,15 +95,26 @@ export default class Recorder extends React.Component<RecorderProps> {
   }
 
   render() {
+    const { recorder, session } = this.props;
     return (
       <Screen className="recorder">
-        <Tabs
-          tabs={this.tabs}
-          activeTabId={this.props.recorder.tabId}
-          onTabChange={this.tabChanged}
-          hideHeader={!this.props.session.loaded}
-        >
-          <DetailsView id="details-view" {...this.props} onLoadRecorder={this.loadRecorder} />
+        <Tabs tabs={this.tabs} activeTabId={recorder.tabId} onTabChange={this.tabChanged} hideHeader={!session.loaded}>
+          <DetailsView
+            id="details-view"
+            youtubeId={session.head.youtubeId}
+            workspace={session.workspace}
+            temp={session.temp}
+            local={session.local}
+            hasCover={session.head.hasCover}
+            sessionId={session.head.id}
+            title={session.head.title}
+            loaded={session.loaded}
+            handle={session.head.handle}
+            description={session.head.description}
+            ignorePatterns={session.head.ignorePatterns}
+            mustScan={session.mustScan}
+            onLoadRecorder={this.loadRecorder}
+          />
           <EditorView id="editor-view" {...this.props} onRecord={this.record} onPlay={this.play} />
         </Tabs>
       </Screen>
@@ -111,10 +122,26 @@ export default class Recorder extends React.Component<RecorderProps> {
   }
 }
 
-type DetailsViewProps = RecorderProps & TabViewProps & { onLoadRecorder: () => any };
-class DetailsView extends React.Component<DetailsViewProps> {
+type DetailsViewProps = {
+  id: string;
+  className?: string;
+  youtubeId?: string;
+  workspace: string;
+  temp: boolean;
+  local: boolean;
+  hasCover: boolean;
+  sessionId: string;
+  title: string;
+  loaded: boolean;
+  handle: string;
+  description: string;
+  ignorePatterns: string;
+  mustScan: boolean;
+  onLoadRecorder: () => any;
+};
+class DetailsView extends React.PureComponent<DetailsViewProps> {
   state = {
-    youtubeId: this.props.session.head.youtubeId ?? '',
+    youtubeId: this.props.youtubeId ?? '',
   };
   titleChanged = async (e: Event | React.FormEvent<HTMLElement>) => {
     const changes = { title: (e.target as HTMLInputElement).value };
@@ -183,17 +210,17 @@ class DetailsView extends React.Component<DetailsViewProps> {
   };
 
   render() {
-    const { session, id, className, onLoadRecorder } = this.props;
+    // console.log('rendering DetailsView');
+    const p = this.props;
     const { youtubeId } = this.state;
-    const { head, workspace, temp, local } = session;
     const isYoutubeIdValid = Boolean(parseYoutubeId(youtubeId));
 
     return (
-      <div id={id} className={className}>
-        <div className={cn('cover-container', head.hasCover && 'has-cover')}>
-          <Cover local={local} head={head} />
+      <div id={p.id} className={p.className}>
+        <div className={cn('cover-container', p.hasCover && 'has-cover')}>
+          <Cover local={p.local} hasCover={p.hasCover} sessionId={p.sessionId} />
           <div className="buttons">
-            {head.hasCover && (
+            {p.hasCover && (
               <VSCodeButton
                 className="delete"
                 appearance="secondary"
@@ -204,7 +231,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
               </VSCodeButton>
             )}
             <VSCodeButton className="pick" onClick={this.pickCover}>
-              {head.hasCover ? 'Change cover' : 'Pick cover'}
+              {p.hasCover ? 'Change cover' : 'Pick cover'}
             </VSCodeButton>
           </div>
         </div>
@@ -215,19 +242,19 @@ class DetailsView extends React.Component<DetailsViewProps> {
           className="title subsection"
           rows={2}
           resize="vertical"
-          value={head.title}
+          value={p.title}
           onInput={this.titleChanged}
           placeholder="The title of this session"
-          autoFocus={!session.loaded}
+          autoFocus={!p.loaded}
         >
           Title
         </VSCodeTextArea>
         <PathField
           className="subsection"
           placeholder="Workspace directory"
-          value={workspace}
+          value={p.workspace}
           onChange={this.workspaceChanged}
-          disabled={!temp}
+          disabled={!p.temp}
           pickTitle="Pick workpace directory"
         >
           Workspace
@@ -238,7 +265,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
         <VSCodeTextField
           className="subsection"
           placeholder="A-Z a-z 0-9 - _ (e.g. my_project)"
-          value={head.handle}
+          value={p.handle}
           onInput={this.handleChanged}
           // disabled={!temp}
         >
@@ -248,7 +275,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
           className="description subsection"
           rows={10}
           resize="vertical"
-          value={head.description}
+          value={p.description}
           onInput={this.descriptionChanged}
           placeholder="What is this session about?"
         >
@@ -273,7 +300,7 @@ class DetailsView extends React.Component<DetailsViewProps> {
           className="ignore subsection"
           rows={10}
           resize="vertical"
-          value={head.ignorePatterns}
+          value={p.ignorePatterns}
           onInput={this.ignorePatternsChanged}
           placeholder={lib.defaultIgnorePatterns}
         >
@@ -303,20 +330,16 @@ class DetailsView extends React.Component<DetailsViewProps> {
           Use <code>.codemicignore</code> to ignore paths.
         </p>*/}
         <div className="subsection buttons">
-          <VSCodeButton
-            onClick={this.publish}
-            disabled={!session.loaded}
-            appearance={session.loaded ? 'primary' : 'secondary'}
-          >
+          <VSCodeButton onClick={this.publish} disabled={!p.loaded} appearance={p.loaded ? 'primary' : 'secondary'}>
             Publish
           </VSCodeButton>
           {/*<VSCodeButton appearance="secondary" onClick={this.save} disabled={session.mustScan}>
             Save
             </VSCodeButton>*/}
         </div>
-        {!session.loaded && (
-          <VSCodeButton className="subsection" onClick={onLoadRecorder} autoFocus>
-            {session.mustScan ? 'Scan workspace to start' : 'Load session into workspace'}
+        {!p.loaded && (
+          <VSCodeButton className="subsection" onClick={p.onLoadRecorder} autoFocus>
+            {p.mustScan ? 'Scan workspace to start' : 'Load session into workspace'}
             <span className="codicon codicon-chevron-right va-top m-left_small" />
           </VSCodeButton>
         )}
@@ -325,64 +348,19 @@ class DetailsView extends React.Component<DetailsViewProps> {
   }
 }
 
-function EditorView({ id, session, className, onRecord, onPlay, recorder }: EditorViewProps) {
-  const { head } = session;
-  const { canUndo, canRedo, selection } = recorder;
-  const [cursor, setCursor] = useState<number>();
-  const guideVideoRef = useRef<HTMLVideoElement>(null);
-  const [showVideo, setShowVideo] = useState(true);
+class EditorView extends React.Component<EditorViewProps> {
+  state = {
+    showVideo: true,
+  };
 
-  const tracks = _.concat<t.RangedTrack>(
-    session.audioTracks ?? [],
-    session.videoTracks ?? [],
-    session.imageTracks ?? [],
-  );
-  const selectionClockRange = lib.getRecorderSelectionClockRange(selection, tracks, head.toc);
-  const selectedChapterIndex = selection?.type === 'chapter' ? selection.index : undefined;
-  const selectedChapter = selectedChapterIndex !== undefined ? head.toc[selectedChapterIndex] : undefined;
-  const hasEditorSelection = Boolean(getNonEmptyEditorSelection(selection));
+  selectionRef = React.createRef<HTMLElement>();
+  guideVideoRef = React.createRef<HTMLVideoElement>();
+  recorderToolbarRef = React.createRef<RecorderToolbarHandle>();
 
-  async function setSelection(selection?: t.RecorderSelection, opts?: { sync?: boolean }) {
-    await postMessage({ type: 'recorder/setSelection', selection });
-    if (opts?.sync && !session.recording) {
-      const clock = lib.getRecorderSelectionClockRange(selection, tracks, head.toc)?.start;
-      if (clock) await postMessage({ type: 'recorder/syncWorkspace', clock });
-    }
-  }
-  async function extendSelection(clock: number) {
-    await postMessage({ type: 'recorder/extendSelection', clock });
-  }
+  setShowVideo = (showVideo: boolean) => this.setState({ showVideo });
+  toggleShowVideo = () => this.setState({ showVideo: !this.state.showVideo });
 
-  async function deleteSelection() {
-    switch (selection?.type) {
-      case 'track':
-        return deleteTrack();
-      case 'chapter':
-        return deleteChapter();
-      default:
-        throw new Error('Cannot delete selection');
-    }
-  }
-
-  async function deleteTrack() {
-    assert(selection?.type === 'track');
-
-    if (selection.trackType === 'audio') {
-      await postMessage({ type: 'recorder/deleteAudio', id: selection.id });
-    } else if (selection.trackType === 'video') {
-      await postMessage({ type: 'recorder/deleteVideo', id: selection.id });
-    } else {
-      await postMessage({ type: 'recorder/deleteImage', id: selection.id });
-    }
-  }
-
-  async function deleteChapter() {
-    assert(selection?.type === 'chapter');
-
-    await postMessage({ type: 'recorder/deleteChapter', index: selection.index });
-  }
-
-  function keyDown(e: KeyboardEvent) {
+  keyDown = (e: KeyboardEvent) => {
     const activeElement = document.activeElement;
 
     // Check for editable or interactive elements.
@@ -400,461 +378,160 @@ function EditorView({ id, session, className, onRecord, onPlay, recorder }: Edit
     }
 
     if (e.key === 'Delete') {
-      deleteSelection();
+      this.deleteSelection();
     }
-  }
+  };
 
-  useEffect(() => {
-    document.addEventListener('keydown', keyDown);
-    return () => document.removeEventListener('keydown', keyDown);
-  }, [keyDown]);
-
-  async function insertAudio() {
-    const { uris } = await postMessage({
-      type: 'showOpenDialog',
-      options: {
-        title: 'Select audio file',
-        filters: { 'MP3 Audio': ['mp3'] },
-      },
-    });
-    if (uris?.length === 1) {
-      const clock = selectionClockRange?.start ?? 0;
-      await postMessage({ type: 'recorder/insertAudio', uri: uris[0], clock });
+  deleteSelection = async () => {
+    const { selection } = this.props.recorder;
+    switch (selection?.type) {
+      case 'track':
+        return this.deleteTrack();
+      case 'chapter':
+        return this.deleteChapter();
+      default:
+        throw new Error('Cannot delete selection');
     }
-  }
+  };
 
-  async function insertVideo() {
-    const { uris } = await postMessage({
-      type: 'showOpenDialog',
-      options: {
-        title: 'Select video file',
-        filters: { 'MP4 Video': ['mp4'] },
-      },
-    });
-    if (uris?.length === 1) {
-      const clock = selectionClockRange?.start ?? 0;
-      await postMessage({ type: 'recorder/insertVideo', uri: uris[0], clock });
-    }
-  }
+  deleteTrack = async () => {
+    const { selection } = this.props.recorder;
+    assert(selection?.type === 'track');
 
-  async function insertImage() {
-    const { uris } = await postMessage({
-      type: 'showOpenDialog',
-      options: {
-        title: 'Select image file',
-        filters: { Image: ['jpg', 'jpeg', 'png', 'svg', 'webp'] },
-      },
-    });
-    if (uris?.length === 1) {
-      const clock = selectionClockRange?.start ?? 0;
-      await postMessage({ type: 'recorder/insertImage', uri: uris[0], clock });
-    }
-  }
-
-  const slowDownPopover = usePopover();
-  const slowDownButtonRef = useRef(null);
-
-  const speedUpPopover = usePopover();
-  const speedUpButtonRef = useRef(null);
-
-  async function changeSpeed(factor: number, adjustMediaTracks: boolean) {
-    assert(selection?.type === 'editor');
-    const range = getNonEmptyEditorSelection(selection);
-    assert(range);
-
-    // TODO disable speed control popover buttons till done.
-    await postMessage({ type: 'recorder/changeSpeed', range, factor, adjustMediaTracks });
-
-    slowDownPopover.close();
-    speedUpPopover.close();
-  }
-
-  function slowDown(factor: number, adjustMediaTracks: boolean) {
-    return changeSpeed(1 / factor, adjustMediaTracks);
-  }
-  function speedUp(factor: number, adjustMediaTracks: boolean) {
-    return changeSpeed(factor, adjustMediaTracks);
-  }
-
-  const mergePopover = usePopover();
-  const mergeButtonRef = useRef(null);
-
-  async function merge(adjustMediaTracks: boolean) {
-    assert(selection?.type === 'editor');
-    const range = getNonEmptyEditorSelection(selection);
-    assert(range);
-
-    await postMessage({ type: 'recorder/merge', range, adjustMediaTracks });
-    mergePopover.close();
-  }
-
-  const cropPopover = usePopover();
-  const cropButtonRef = useRef(null);
-
-  async function crop(adjustMediaTracks: boolean) {
-    // assert(selection?.type === 'editor');
-    const clock = selectionClockRange?.end;
-    assert(clock !== undefined);
-    await postMessage({ type: 'recorder/crop', clock, adjustMediaTracks });
-    cropPopover.close();
-  }
-
-  const insertGapPopover = usePopover();
-  const insertGapButtonRef = useRef(null);
-
-  async function insertGap(dur: number, adjustMediaTracks: boolean) {
-    const clock = selectionClockRange?.start;
-    assert(clock !== undefined);
-    await postMessage({ type: 'recorder/insertGap', clock, dur, adjustMediaTracks });
-    insertGapPopover.close();
-  }
-
-  async function insertOrUpdateChapter(title: string, index?: number) {
-    if (index === undefined) {
-      // insert new.
-      if (title) {
-        const clock = selectionClockRange?.start;
-        assert(clock !== undefined);
-        await postMessage({ type: 'recorder/insertChapter', title, clock });
-      }
+    if (selection.trackType === 'audio') {
+      await postMessage({ type: 'recorder/deleteAudio', id: selection.id });
+    } else if (selection.trackType === 'video') {
+      await postMessage({ type: 'recorder/deleteVideo', id: selection.id });
     } else {
-      // update old
-      if (title) {
-        await postMessage({ type: 'recorder/updateChapter', index, update: { title } });
-      } else {
-        await postMessage({ type: 'recorder/deleteChapter', index });
-      }
+      await postMessage({ type: 'recorder/deleteImage', id: selection.id });
     }
-    chapterPopover.close();
+  };
+
+  deleteChapter = async () => {
+    const { selection } = this.props.recorder;
+    assert(selection?.type === 'chapter');
+    await postMessage({ type: 'recorder/deleteChapter', index: selection.index });
+  };
+
+  editChapter = (index: number) => {
+    this.setSelection({ type: 'chapter', index }).then(this.recorderToolbarRef.current?.toggleChapterPopover);
+  };
+
+  setSelection = async (selection?: t.RecorderSelection, opts?: { sync?: boolean }) => {
+    await postMessage({ type: 'recorder/setSelection', selection });
+    if (opts?.sync && !this.props.session.recording) {
+      const tracks = this.getAllTracks();
+      const clock = lib.getRecorderSelectionClockRange(selection, tracks, this.props.session.head.toc)?.start;
+      if (clock) await postMessage({ type: 'recorder/syncWorkspace', clock });
+    }
+  };
+  extendSelection = async (clock: number) => {
+    await postMessage({ type: 'recorder/extendSelection', clock });
+  };
+
+  getAllTracks = () =>
+    _.concat<t.RangedTrack>(
+      this.props.session.audioTracks ?? [],
+      this.props.session.videoTracks ?? [],
+      this.props.session.imageTracks ?? [],
+    );
+
+  componentDidMount() {
+    document.addEventListener('keydown', this.keyDown);
   }
 
-  function editChapter(index: number) {
-    setSelection({ type: 'chapter', index }).then(() => chapterPopover.toggle());
+  componentWillUnmount() {
+    document.removeEventListener('keydown', this.keyDown);
   }
 
-  const chapterPopover = usePopover();
-  // const insertChapterButtonRef = useRef(null);
-  const selectionRef = useRef(null);
+  render() {
+    // console.log('Rendering EditorView');
+    const { id, session, className, onRecord, onPlay, recorder } = this.props;
+    const { showVideo } = this.state;
+    const { head, workspace } = session;
+    const { selection } = recorder;
 
-  async function undo() {
-    await postMessage({ type: 'recorder/undo' });
-  }
+    const allTracks = this.getAllTracks();
+    const selectionClockRange = lib.getRecorderSelectionClockRange(selection, allTracks, head.toc);
+    const selectedChapterIndex = selection?.type === 'chapter' ? selection.index : undefined;
+    const selectedChapter = selectedChapterIndex !== undefined ? head.toc[selectedChapterIndex] : undefined;
+    const editorSelectionRange = getNonEmptyEditorSelection(selection);
 
-  async function redo() {
-    await postMessage({ type: 'recorder/redo' });
-  }
-
-  async function makeTest() {
-    await postMessage({ type: 'recorder/makeTest' });
-  }
-
-  async function mergeVideoTracks() {
-    await postMessage({ type: 'recorder/mergeVideoTracks' });
-  }
-
-  async function makeClip() {
-    await postMessage({ type: 'recorder/makeClip' });
-  }
-
-  const forkSessionPopover = usePopover();
-
-  async function forkSession(handle: string, workspace: string) {
-    await postMessage({ type: 'recorder/forkSession', handle, workspace });
-  }
-
-  async function mergeAndReplaceVideoTracks() {
-    await postMessage({ type: 'recorder/mergeVideoTracks', deleteOld: true });
-  }
-
-  const insertPopover = usePopover();
-  const insertButtonRef = useRef(null);
-
-  const insertMenuItems: PopoverMenuItem[] = [
-    {
-      title: 'Insert audio',
-      icon: 'codicon codicon-mic',
-      disabled: session.playing || session.recording,
-      onClick: insertAudio,
-    },
-    {
-      title: 'Insert video',
-      icon: 'codicon codicon-device-camera-video',
-      disabled: session.playing || session.recording,
-      onClick: insertVideo,
-    },
-    {
-      title: 'Insert image',
-      icon: 'codicon codicon-device-camera',
-      disabled: session.playing || session.recording,
-      onClick: insertImage,
-    },
-    {
-      title: 'Insert chapter',
-      icon: 'fa-solid fa-font',
-      disabled: session.playing || session.recording || selectionClockRange === undefined,
-      onClick: chapterPopover.toggle,
-    },
-  ];
-
-  const otherActionsPopover = usePopover();
-  const otherActionsButtonRef = useRef(null);
-
-  const otherActionsItems: PopoverMenuItem[] = _.compact([
-    config.debug && {
-      title: 'Fork session',
-      icon: 'codicon codicon-repo-forked',
-      disabled: session.playing || session.recording,
-      onClick: forkSessionPopover.toggle,
-    },
-    config.debug && {
-      title: 'Make clip',
-      icon: 'fa-solid fa-scissors',
-      disabled: session.playing || session.recording,
-      onClick: makeClip,
-    },
-    config.debug && {
-      title: 'Merge video tracks',
-      icon: 'fa-solid fa-link',
-      disabled: session.playing || session.recording,
-      onClick: mergeVideoTracks,
-    },
-    config.debug && {
-      title: 'Merge & replace video tracks',
-      icon: 'fa-solid fa-link',
-      disabled: session.playing || session.recording,
-      onClick: mergeAndReplaceVideoTracks,
-    },
-    config.debug && {
-      title: 'Make test',
-      icon: 'codicon codicon-beaker',
-      disabled: session.playing || session.recording,
-      onClick: makeTest,
-    },
-  ]);
-
-  const toolbarActions = _.compact([
-    <Toolbar.Button
-      title="Undo"
-      icon="fa-solid fa-rotate-left"
-      disabled={!canUndo || session.playing || session.recording}
-      onClick={undo}
-    />,
-    <Toolbar.Button
-      title="Redo"
-      icon="fa-solid fa-rotate-right"
-      disabled={!canRedo || session.playing || session.recording}
-      onClick={redo}
-    />,
-    <Toolbar.Separator />,
-    // <Toolbar.Separator />,
-    <Toolbar.Button
-      ref={slowDownButtonRef}
-      title="Slow down"
-      icon="fa-solid fa-backward"
-      disabled={session.playing || session.recording || !hasEditorSelection}
-      onClick={slowDownPopover.toggle}
-    />,
-    <Toolbar.Button
-      ref={speedUpButtonRef}
-      title="Speed up"
-      icon="fa-solid fa-forward"
-      disabled={session.playing || session.recording || !hasEditorSelection}
-      onClick={speedUpPopover.toggle}
-    />,
-    <Toolbar.Button
-      ref={mergeButtonRef}
-      title="Merge"
-      icon="fa-solid fa-arrows-up-to-line"
-      disabled={session.playing || session.recording || !hasEditorSelection}
-      onClick={mergePopover.toggle}
-    />,
-    <Toolbar.Button
-      ref={insertGapButtonRef}
-      title="Insert gap"
-      icon="fa-solid fa-arrows-left-right-to-line icon-rotate-cw-90"
-      disabled={session.playing || session.recording || hasEditorSelection || selectionClockRange === undefined}
-      onClick={insertGapPopover.toggle}
-    />,
-    <Toolbar.Button
-      ref={cropButtonRef}
-      title="Crop"
-      icon="fa-solid fa-crop-simple"
-      disabled={session.playing || session.recording || hasEditorSelection || selectionClockRange?.end === undefined}
-      onClick={cropPopover.toggle}
-    />,
-    <Toolbar.Separator />,
-    <Toolbar.Button
-      ref={insertButtonRef}
-      title="Insert"
-      icon="codicon codicon-add"
-      disabled={session.playing || session.recording}
-      onClick={insertPopover.toggle}
-    />,
-    <Toolbar.Button
-      title="Delete"
-      icon="codicon codicon-trash"
-      disabled={
-        session.playing ||
-        session.recording ||
-        hasEditorSelection ||
-        (selection?.type !== 'track' && selection?.type !== 'chapter')
-      }
-      onClick={deleteSelection}
-    />,
-    otherActionsItems.length > 0 && <Toolbar.Separator />,
-    otherActionsItems.length > 0 && (
-      <Toolbar.Button
-        ref={otherActionsButtonRef}
-        title="More"
-        icon="codicon codicon-kebab-vertical"
-        onClick={otherActionsPopover.toggle}
-      />
-    ),
-  ]);
-
-  return (
-    <div id={id} className={className}>
-      <RecorderMediaToolbar
-        className="subsection subsection_spaced"
-        playing={session.playing}
-        recording={session.recording}
-        onPlay={onPlay}
-        onRecord={onRecord}
-        clock={session.clock}
-        duration={head.duration}
-        sessionId={head.id}
-        sessionHandle={head.handle}
-        sessionAuthor={head.author}
-        selectionStart={selectionClockRange?.start}
-        onShowVideoChange={setShowVideo}
-        guideVideoRef={guideVideoRef}
-        playbackRate={session.playbackRate}
-      />
-      <div className={cn('subsection subsection_spaced guide-video-container', !showVideo && 'hide')}>
-        <video id="guide-video" ref={guideVideoRef} />
-        <div className="empty-content">
-          <span className="codicon codicon-device-camera-video" />
+    return (
+      <div id={id} className={className}>
+        <RecorderMediaToolbar
+          className="subsection subsection_spaced"
+          playing={session.playing}
+          recording={session.recording}
+          onPlay={onPlay}
+          onRecord={onRecord}
+          clock={session.clock}
+          duration={head.duration}
+          sessionId={head.id}
+          sessionHandle={head.handle}
+          sessionAuthor={head.author}
+          selectionStart={selectionClockRange?.start}
+          onShowVideoChange={this.setShowVideo}
+          guideVideoRef={this.guideVideoRef}
+          playbackRate={session.playbackRate}
+        />
+        <div className={cn('subsection subsection_spaced guide-video-container', !showVideo && 'hide')}>
+          <video id="guide-video" ref={this.guideVideoRef} />
+          <div className="empty-content">
+            <span className="codicon codicon-device-camera-video" />
+          </div>
+          <VSCodeButton className="toggle-button" appearance="icon" title="Hide video" onClick={this.toggleShowVideo}>
+            <span className={cn('codicon', showVideo ? 'codicon-chevron-up' : 'codicon-chevron-down')} />
+          </VSCodeButton>
         </div>
-        <VSCodeButton
-          className="toggle-button"
-          appearance="icon"
-          title="Hide video"
-          onClick={() => setShowVideo(!showVideo)}
-        >
-          <span className={cn('codicon', showVideo ? 'codicon-chevron-up' : 'codicon-chevron-down')} />
-        </VSCodeButton>
-      </div>
-      <div className="subsection">
-        <Toolbar actions={toolbarActions} />
-      </div>
-      <Timeline
-        session={session}
-        // markers={state.markers}
-        cursor={cursor}
-        // anchor={state.anchor}
-        // focus={state.focus}
-        // trackSelection={state.trackSelection}
-        setSelection={setSelection}
-        extendSelection={extendSelection}
-        setCursor={setCursor}
-        selection={selection}
-        // onChange={updateState}
-        editChapter={editChapter}
-        selectionRef={selectionRef}
-      />
-      <SpeedControlPopover
-        popover={slowDownPopover}
-        onConfirm={slowDown}
-        anchor={slowDownButtonRef}
-        pointOnAnchor="bottom-center"
-        pointOnPopover="top-center"
-        title="Slow down"
-      />
-      <SpeedControlPopover
-        popover={speedUpPopover}
-        onConfirm={speedUp}
-        anchor={speedUpButtonRef}
-        pointOnAnchor="bottom-center"
-        pointOnPopover="top-center"
-        title="Speed up"
-      />
-      <MergePopover
-        popover={mergePopover}
-        onConfirm={merge}
-        anchor={mergeButtonRef}
-        pointOnAnchor="bottom-left"
-        pointOnPopover="top-left"
-      />
-      <InsertGapPopover
-        popover={insertGapPopover}
-        onConfirm={insertGap}
-        anchor={insertGapButtonRef}
-        pointOnAnchor="bottom-left"
-        pointOnPopover="top-left"
-      />
-      <CropPopover
-        popover={cropPopover}
-        onConfirm={crop}
-        anchor={cropButtonRef}
-        pointOnAnchor="bottom-left"
-        pointOnPopover="top-left"
-      />
-      <PopoverMenu
-        popover={insertPopover}
-        anchor={insertButtonRef}
-        pointOnAnchor="bottom-left"
-        pointOnPopover="top-left"
-        items={insertMenuItems}
-      />
-      <PopoverMenu
-        popover={otherActionsPopover}
-        anchor={otherActionsButtonRef}
-        pointOnAnchor="bottom-right"
-        pointOnPopover="top-right"
-        items={otherActionsItems}
-      />
-      {config.debug && (
-        <ForkSessionPopover
-          popover={forkSessionPopover}
-          anchor={otherActionsButtonRef}
-          pointOnAnchor="bottom-left"
-          pointOnPopover="top-left"
-          handle={head.handle}
-          workspace={session.workspace}
-          onConfirm={forkSession}
+        <div className="subsection">
+          <RecorderToolbar
+            playing={session.playing}
+            recording={session.recording}
+            canUndo={recorder.canUndo}
+            canRedo={recorder.canRedo}
+            hasEditorSelection={Boolean(editorSelectionRange)}
+            selectionStart={selectionClockRange?.start}
+            selectionEnd={selectionClockRange?.end}
+            editorSelectionStart={editorSelectionRange?.start}
+            editorSelectionEnd={editorSelectionRange?.end}
+            selectionType={selection?.type}
+            selectedChapterTitle={selectedChapter?.title}
+            selectedChapterIndex={selectedChapterIndex}
+            onDeleteSelection={this.deleteSelection}
+            selectionRef={this.selectionRef}
+            sessionHandle={head.handle}
+            sessionWorkspace={workspace}
+            ref={this.recorderToolbarRef}
+          />
+        </div>
+        <Timeline
+          session={session}
+          setSelection={this.setSelection}
+          extendSelection={this.extendSelection}
+          selection={selection}
+          editChapter={this.editChapter}
+          selectionRef={this.selectionRef}
         />
-      )}
-      {selectionClockRange?.start !== undefined && (
-        <ChapterPopover
-          chapter={selectedChapter}
-          index={selectedChapterIndex}
-          popover={chapterPopover}
-          onConfirm={insertOrUpdateChapter}
-          anchor={selectionRef}
-          pointOnAnchor="bottom-left"
-          pointOnPopover="top-left"
-          clock={selectionClockRange.start}
-        />
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
 }
 
 type TimelineProps = {
   session: t.SessionUIState;
-  cursor?: number;
   selection?: t.RecorderSelection;
   setSelection: (selection: t.RecorderSelection, opts?: { sync?: boolean }) => Promise<void>;
   extendSelection: (clock: number) => Promise<void>;
-  setCursor: (clock?: number) => any;
   editChapter: (index: number) => any;
-  selectionRef: Ref<any>;
+  selectionRef: RefObject<any>;
 };
 type TimelineState = {
   pxToSecRatio: number;
   trackDrag?: TimelineDrag<t.RangedTrack>;
   trackExtendDrag?: TimelineDrag<t.RangedTrack>;
   markerDrag?: TimelineDrag<MarkerDragLoad>;
+  cursor: number | undefined;
 };
 class Timeline extends React.Component<TimelineProps, TimelineState> {
   state = {
@@ -948,19 +625,19 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     const clock = this.getClockUnderMouse(e);
 
     if (this.mouseIsDown && clock !== undefined) {
-      this.props.setCursor();
+      this.setState({ cursor: undefined });
       this.props.extendSelection(clock);
     } else {
       if (clock === undefined || !this.isMouseOverEmptySpaceInTimeline(e)) {
-        this.props.setCursor();
+        this.setState({ cursor: undefined });
       } else {
-        this.props.setCursor(clock);
+        this.setState({ cursor: clock });
       }
     }
   };
 
   mouseLeft = (e: MouseEvent) => {
-    this.props.setCursor();
+    this.setState({ cursor: undefined });
   };
 
   mouseOut = (e: MouseEvent) => {};
@@ -1302,28 +979,11 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   }
 
   render() {
-    const { cursor, selection, session, setSelection, extendSelection, editChapter, selectionRef } = this.props;
-    const { pxToSecRatio, trackDrag, trackExtendDrag, markerDrag } = this.state;
-    // const clockMarker: Marker | undefined =
-    //   session.clock > 0 && session.clock !== session.head.duration && !session.recording
-    //     ? { id: 'clock', clock: session.clock, type: 'clock' }
-    //     : undefined;
-    // const endOrRecordingMarker: Marker = session.recording
-    //   ? { id: 'recording', clock: session.head.duration, type: 'recording' }
-    //   : { id: 'end', clock: session.head.duration, type: 'end' };
-
+    const { selection, session, setSelection, extendSelection, selectionRef } = this.props;
+    const { pxToSecRatio, trackDrag, trackExtendDrag, markerDrag, cursor } = this.state;
     const editorSelectionRange = getNonEmptyEditorSelection(selection);
-
-    // const allMarkers = _.compact([
-    //   cursor,
-    //   hasEditorSelection && anchor,
-    //   focus,
-    //   clockMarker,
-    //   endOrRecordingMarker,
-    // ]);
     const timelineDuration = this.getTimelineDuration();
 
-    // const groupedEditorTracks = groupEditorEvents(recorder.editorTrack!.events, timelineDuration, timelineHeightPx);
     const tracks = _.orderBy(
       _.concat<t.RangedTrack>(session.audioTracks ?? [], session.videoTracks ?? [], session.imageTracks ?? []),
       track => track.clockRange.start,
@@ -1388,32 +1048,21 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
                 </>
               )}
               {session.head.toc?.map((entry, i) => (
-                <MarkerUI
+                <ChapterMarkerUI
                   id={`chapter-${i}`}
                   type="chapter"
                   clock={entry.clock}
                   timelineDuration={timelineDuration}
                   active={selection?.type === 'chapter' && selection.index === i}
                   label={entry.title}
-                  buttons={[
-                    <VSCodeButton
-                      appearance="icon"
-                      title="Edit"
-                      onClick={e => {
-                        this.editChapter(e, i);
-                      }}
-                    >
-                      <span className="codicon codicon-edit" />
-                    </VSCodeButton>,
-                  ]}
-                  hideTime
                   markerDrag={markerDrag}
-                  draggable
-                  onClick={e => this.chapterClicked(e, i)}
-                  onDragStart={e => this.chapterDragStarted(e, i)}
-                  onDragEnd={e => this.chapterDragEnded(e, i)}
-                  onDrag={e => this.chapterDragged(e, i)}
-                  ref={selection?.type === 'chapter' && selection.index === i ? selectionRef : null}
+                  index={i}
+                  onClick={this.chapterClicked}
+                  onEdit={this.editChapter}
+                  onDragStart={this.chapterDragStarted}
+                  onDragEnd={this.chapterDragEnded}
+                  onDrag={this.chapterDragged}
+                  selectionRef={selection?.type === 'chapter' && selection.index === i ? selectionRef : undefined}
                 />
               ))}
               {session.clock > 0 && session.clock !== session.head.duration && !session.recording && (
@@ -1650,6 +1299,7 @@ function EditorTrackUI(props: EditorTrackUIProps) {
   const lineFocusTimeline: { text: string; clockRange: t.ClockRange; offsetPx: number }[] = [];
   // const heightOf1Sec = timelineHeightPx / timelineDuration;
   // const heightOf1Sec = TIMELINE_STEP_HEIGHT / stepDuration;
+  const startTime = performance.now();
   for (const [i, focus] of (workspaceFocusTimeline ?? []).entries()) {
     let offsetPx = 0;
     const lastLineFocus = lineFocusTimeline.at(-1);
@@ -1696,6 +1346,10 @@ function EditorTrackUI(props: EditorTrackUIProps) {
       documentFocusTimeline.push({ uri: focus.uri, clockRange: { start: focus.clock, end: nextFocusClock } });
     }
   }
+
+  const endTime = performance.now();
+
+  // console.log('Rendering EditorTrackUI, calculations took', endTime - startTime + 'ms');
 
   return (
     <div className="editor-track">
@@ -1819,6 +1473,59 @@ function EditorTrackUI(props: EditorTrackUIProps) {
 //   }
 // }
 
+type ChapterMarkerProps = {
+  id: string;
+  type: MarkerType;
+  clock: number;
+  timelineDuration: number;
+  label?: React.ReactNode;
+  active?: boolean;
+  onEdit?: (e: React.MouseEvent, i: number) => any;
+  onClick?: (e: React.MouseEvent, i: number) => any;
+  onDragStart?: (e: React.DragEvent, i: number) => any;
+  onDragEnd?: (e: React.DragEvent, i: number) => any;
+  onDrag?: (e: React.DragEvent, i: number) => any;
+  markerDrag?: TimelineDrag<MarkerDragLoad>;
+  index: number;
+  selectionRef?: RefObject<HTMLElement>;
+};
+
+class ChapterMarkerUI extends React.Component<ChapterMarkerProps> {
+  chapterClicked = (e: React.MouseEvent) => this.props.onClick?.(e, this.props.index);
+  chapterDragStarted = (e: React.DragEvent) => this.props.onDragStart?.(e, this.props.index);
+  chapterDragEnded = (e: React.DragEvent) => this.props.onDragEnd?.(e, this.props.index);
+  chapterDragged = (e: React.DragEvent) => this.props.onDrag?.(e, this.props.index);
+  edit = (e: React.MouseEvent) => this.props.onEdit?.(e, this.props.index);
+
+  buttons = [
+    <VSCodeButton appearance="icon" title="Edit" onClick={this.edit}>
+      <span className="codicon codicon-edit" />
+    </VSCodeButton>,
+  ];
+  render() {
+    const p = this.props;
+    return (
+      <MarkerUI
+        id={`chapter-${p.index}`}
+        type="chapter"
+        clock={p.clock}
+        timelineDuration={p.timelineDuration}
+        active={p.active}
+        label={p.label}
+        buttons={this.buttons}
+        hideTime
+        markerDrag={p.markerDrag}
+        draggable
+        onClick={this.chapterClicked}
+        onDragStart={this.chapterDragStarted}
+        onDragEnd={this.chapterDragEnded}
+        onDrag={this.chapterDragged}
+        ref={p.selectionRef}
+      />
+    );
+  }
+}
+
 type MarkerProps = {
   id: string;
   type: MarkerType;
@@ -1836,45 +1543,52 @@ type MarkerProps = {
   markerDrag?: TimelineDrag<MarkerDragLoad>;
   // ref: RefObject<HTMLElement>;
 };
-const MarkerUI = forwardRef(function MarkerUI(props: MarkerProps, ref: React.Ref<any>) {
-  let clock = props.clock;
+const MarkerUI = memo(
+  forwardRef(function MarkerUI(props: MarkerProps, ref: React.Ref<any>) {
+    let clock = props.clock;
 
-  // If marker changes in the backend, there might be a flash of old marker.
-  // So we make sure that the marker is exactly the same before applying the markerDrag offset.
-  if (props.id === props.markerDrag?.load.id && props.clock === props.markerDrag.load.initClock) {
-    clock = getClockOfTimelineDrag(props.clock, props.markerDrag);
-  }
+    // If marker changes in the backend, there might be a flash of old marker.
+    // So we make sure that the marker is exactly the same before applying the markerDrag offset.
+    if (props.id === props.markerDrag?.load.id && props.clock === props.markerDrag.load.initClock) {
+      clock = getClockOfTimelineDrag(props.clock, props.markerDrag);
+    }
 
-  const style = {
-    top: `${(clock / props.timelineDuration) * 100}%`,
-  };
-  return (
-    <div
-      ref={ref}
-      id={`marker_${props.id}`}
-      className={cn('marker', `marker_${props.type}`, props.active && 'marker_active', props.draggable && 'draggable')}
-      style={style}
-      onClick={props.onClick}
-      onDragStart={props.onDragStart}
-      onDragEnd={props.onDragEnd}
-      onDrag={props.onDrag}
-      draggable={props.draggable}
-    >
-      {!props.hideTime && (
-        <div className="time">
-          {lib.formatTimeSeconds(clock)}
-          {/*marker.label ? ' ' + marker.label : ''*/}
-        </div>
-      )}
-      {(props.label || props.buttons) && (
-        <div className="content">
-          {props.label && <div className="label">{props.label}</div>}
-          {!_.isEmpty(props.buttons) && <div className="buttons">{props.buttons}</div>}
-        </div>
-      )}
-    </div>
-  );
-});
+    const style = {
+      top: `${(clock / props.timelineDuration) * 100}%`,
+    };
+    return (
+      <div
+        ref={ref}
+        id={`marker_${props.id}`}
+        className={cn(
+          'marker',
+          `marker_${props.type}`,
+          props.active && 'marker_active',
+          props.draggable && 'draggable',
+        )}
+        style={style}
+        onClick={props.onClick}
+        onDragStart={props.onDragStart}
+        onDragEnd={props.onDragEnd}
+        onDrag={props.onDrag}
+        draggable={props.draggable}
+      >
+        {!props.hideTime && (
+          <div className="time">
+            {lib.formatTimeSeconds(clock)}
+            {/*marker.label ? ' ' + marker.label : ''*/}
+          </div>
+        )}
+        {(props.label || props.buttons) && (
+          <div className="content">
+            {props.label && <div className="label">{props.label}</div>}
+            {!_.isEmpty(props.buttons) && <div className="buttons">{props.buttons}</div>}
+          </div>
+        )}
+      </div>
+    );
+  }),
+);
 
 function RangeSelection(props: { timelineDuration: number; range: t.ClockRange }) {
   const style = {
@@ -1882,224 +1596,6 @@ function RangeSelection(props: { timelineDuration: number; range: t.ClockRange }
     height: `${((props.range.end - props.range.start) / props.timelineDuration) * 100}%`,
   };
   return <div className="range-selection" style={style} />;
-}
-
-function SpeedControlPopover(
-  props: PopoverProps & { title: string; onConfirm: (factor: number, adjustMediaTracks: boolean) => any },
-) {
-  const [factor, setFactor] = useState(2);
-  const [adjustMediaTracks, setAdjustMediaTracks] = useState(true);
-  return (
-    <Popover {...props}>
-      <form className="recorder-popover-form">
-        <label className="label" htmlFor="speed-control-slider">
-          {props.title} by {factor}x
-        </label>
-        <input
-          type="range"
-          id="speed-control-slider"
-          min={1}
-          max={10}
-          step={0.1}
-          value={factor}
-          onChange={e => setFactor(Number(e.currentTarget!.value))}
-          autoFocus
-        />
-        <VSCodeCheckbox
-          checked={adjustMediaTracks}
-          onChange={e => setAdjustMediaTracks((e.currentTarget as HTMLInputElement).checked)}
-          title="If set, media tracks that start *after* this point will be shifted"
-        >
-          Shift subsequent media tracks
-        </VSCodeCheckbox>
-        <VSCodeButton appearance="primary" onClick={e => props.onConfirm(factor, adjustMediaTracks)}>
-          OK
-        </VSCodeButton>
-      </form>
-    </Popover>
-  );
-}
-
-function MergePopover(props: PopoverProps & { onConfirm: (adjustMediaTracks: boolean) => any }) {
-  const [adjustMediaTracks, setAdjustMediaTracks] = useState(true);
-  return (
-    <Popover {...props}>
-      <form className="recorder-popover-form">
-        <label className="label">Merge</label>
-        <VSCodeCheckbox
-          checked={adjustMediaTracks}
-          onChange={e => setAdjustMediaTracks((e.currentTarget as HTMLInputElement).checked)}
-          title="If set, media tracks that start *after* this point will be pulled up"
-        >
-          Shift subsequent media tracks
-        </VSCodeCheckbox>
-        <VSCodeButton appearance="primary" onClick={e => props.onConfirm(adjustMediaTracks)}>
-          OK
-        </VSCodeButton>
-      </form>
-    </Popover>
-  );
-}
-
-function InsertGapPopover(props: PopoverProps & { onConfirm: (dur: number, adjustMediaTracks: boolean) => any }) {
-  const [minutes, setMinutes] = useState('');
-  const [seconds, setSeconds] = useState('');
-  const [adjustMediaTracks, setAdjustMediaTracks] = useState(true);
-  return (
-    <Popover {...props}>
-      <form className="recorder-popover-form">
-        <label className="label" htmlFor="gap-time-minute">
-          Insert gap
-        </label>
-        <div className="row">
-          <input
-            type="number"
-            id="gap-time-minute"
-            min={0}
-            max={60}
-            step={1}
-            value={minutes}
-            placeholder="minutes"
-            onChange={e => setMinutes(e.currentTarget.value)}
-          />
-          <input
-            type="number"
-            id="gap-time-seconds"
-            min={0}
-            max={59}
-            step={1}
-            value={seconds}
-            placeholder="seconds"
-            onChange={e => setSeconds(e.currentTarget.value)}
-          />
-        </div>
-        <VSCodeCheckbox
-          checked={adjustMediaTracks}
-          onChange={e => setAdjustMediaTracks((e.currentTarget as HTMLInputElement).checked)}
-          title="If set, media tracks that start *after* this point will be pushed down"
-        >
-          Shift subsequent media tracks
-        </VSCodeCheckbox>
-        <VSCodeButton
-          appearance="primary"
-          onClick={e => {
-            if (/[^0-9]/.test(minutes) || /[^0-9]/.test(seconds)) return;
-            props.onConfirm(Number(minutes || '0') * 60 + Number(seconds || '0'), adjustMediaTracks);
-          }}
-        >
-          OK
-        </VSCodeButton>
-      </form>
-    </Popover>
-  );
-}
-
-function CropPopover(props: PopoverProps & { onConfirm: (adjustMediaTracks: boolean) => any }) {
-  const [adjustMediaTracks, setAdjustMediaTracks] = useState(true);
-  return (
-    <Popover {...props}>
-      <form className="recorder-popover-form">
-        <label className="label">Crop</label>
-        <VSCodeCheckbox
-          checked={adjustMediaTracks}
-          onChange={e => setAdjustMediaTracks((e.currentTarget as HTMLInputElement).checked)}
-          title="If set, media tracks that start *after* this point will be deleted"
-        >
-          Delete subsequent media tracks
-        </VSCodeCheckbox>
-        <VSCodeButton appearance="primary" onClick={e => props.onConfirm(adjustMediaTracks)}>
-          OK
-        </VSCodeButton>
-      </form>
-    </Popover>
-  );
-}
-
-function ForkSessionPopover(
-  props: PopoverProps & { onConfirm: (handle: string, workspace: string) => any; handle: string; workspace: string },
-) {
-  const [workspace, setWorkspace] = useState(`${props.workspace}_fork`);
-  const [handle, setHandle] = useState(`${props.handle}_fork`);
-  return (
-    <Popover {...props}>
-      <form className="fork-session-popover-form">
-        <label className="label">Fork session</label>
-        <PathField
-          className="subsection"
-          placeholder="Workspace directory"
-          value={workspace}
-          onChange={setWorkspace}
-          pickTitle="New workpace directory"
-        >
-          Workspace
-        </PathField>
-        <VSCodeTextField
-          className="subsection"
-          placeholder="A-Z a-z 0-9 - _ (e.g. my_project)"
-          value={handle}
-          onInput={e => {
-            setHandle((e.target as HTMLInputElement).value.replace(/[^A-Za-z0-9_-]/g, ''));
-          }}
-        >
-          Handle
-        </VSCodeTextField>
-        <VSCodeButton
-          appearance="primary"
-          onClick={e => {
-            if (!handle || !workspace || workspace === '/') return;
-            props.onConfirm(handle, workspace);
-          }}
-        >
-          OK
-        </VSCodeButton>
-      </form>
-    </Popover>
-  );
-}
-
-function ChapterPopover(
-  props: PopoverProps & {
-    clock?: number;
-    chapter?: t.TocItem;
-    index?: number;
-    onConfirm: (title: string, index?: number) => any;
-  },
-) {
-  const [title, setTitle] = useState(props.chapter?.title ?? '');
-
-  function keyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) confirm();
-  }
-
-  function confirm() {
-    props.onConfirm(title.trim(), props.index);
-  }
-
-  useEffect(() => {
-    setTitle(props.chapter?.title ?? '');
-  }, [props.popover.isOpen, props.chapter?.title]);
-
-  return (
-    <Popover {...props} className="chapter-popover">
-      <form className="recorder-popover-form">
-        <VSCodeTextArea
-          className="title"
-          rows={2}
-          resize="vertical"
-          value={title}
-          onInput={e => setTitle((e.currentTarget as HTMLTextAreaElement).value)}
-          placeholder="Enter chapter title"
-          onKeyDown={keyDown}
-          autoFocus
-        >
-          Chapter at {props.clock ? lib.formatTimeSeconds(props.clock) : ''}
-        </VSCodeTextArea>
-        <VSCodeButton appearance="primary" onClick={confirm}>
-          OK
-        </VSCodeButton>
-      </form>
-    </Popover>
-  );
 }
 
 function roundTo(value: number, to: number) {

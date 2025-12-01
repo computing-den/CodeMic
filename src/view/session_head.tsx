@@ -84,7 +84,7 @@ export function SessionListing(props: SessionListingProps) {
   return (
     <div className={cn('session-listing', props.className)} onClick={() => props.onClick(head.id)} tabIndex={0}>
       <div className="cover-container">
-        <Cover local={local} head={head} />
+        <Cover local={local} hasCover={head.hasCover} sessionId={head.id} />
         <div className="duration">{lib.formatTimeSeconds(head.duration)}</div>
         {history?.lastWatchedClock ? (
           <div className="progress">

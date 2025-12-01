@@ -21,6 +21,8 @@ export type Props = {
 };
 
 const RecorderMediaToolbar = memo(function RecorderMediaToolbar(props: Props) {
+  // console.log('Rendering RecorderMediaToolbar');
+
   let primaryAction: PrimaryAction;
   if (props.recording) {
     primaryAction = {

@@ -552,7 +552,7 @@
   }
 }
 
-.chapter-popover {
+.popover.chapter-popover {
   width: calc(100vw - 2 * var(--container-padding-hor));
   max-width: 300px;
 
