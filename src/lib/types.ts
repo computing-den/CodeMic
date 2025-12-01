@@ -366,6 +366,7 @@ export type SessionHead = {
   modificationTimestamp: string;
   toc: TocItem[];
   forkedFrom?: string;
+  isClip?: boolean;
   hasCover: boolean;
   ignorePatterns: string;
   formatVersion: number;
@@ -860,6 +861,7 @@ export type EditableSessionHead = {
   duration: number;
   modificationTimestamp: string;
   toc: TocItem[];
+  isClip?: boolean;
 };
 
 export type SessionEffect =

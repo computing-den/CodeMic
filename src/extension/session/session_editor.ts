@@ -756,6 +756,7 @@ export default class SessionEditor {
     };
 
     const change1 = this.insertApplySessionPatch({
+      head: { isClip: true },
       body: { videoTracks: [finalVideoTrack], audioTracks: [] },
       effects: [{ type: 'media' }],
     });
@@ -848,6 +849,7 @@ export default class SessionEditor {
       duration: patch.head?.duration ?? this.session.head.duration,
       modificationTimestamp: patch.head?.modificationTimestamp ?? this.session.head.modificationTimestamp,
       toc: patch.head?.toc ?? this.session.head.toc,
+      isClip: patch.head?.isClip ?? this.session.head.isClip,
     };
 
     const effects = patch.effects ?? [];

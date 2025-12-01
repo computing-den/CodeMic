@@ -844,6 +844,7 @@ class CodeMic {
           author: this.context.user?.username,
         });
         const session = Session.Core.fromLocal(this.context, forkHead, req.workspace);
+        await cache.copyCover(Session.Core.getDataPath(req.workspace), session.head.id);
         await this.openScreen({ screen: t.Screen.Recorder, session });
 
         return ok;

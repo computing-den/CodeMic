@@ -9,6 +9,7 @@ import React from 'react';
 import _ from 'lodash';
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 import Cover from './cover.jsx';
+import ClipBanner from './clip_banner.jsx';
 
 export type SessionHeadProps = {
   className?: string;
@@ -85,6 +86,7 @@ export function SessionListing(props: SessionListingProps) {
     <div className={cn('session-listing', props.className)} onClick={() => props.onClick(head.id)} tabIndex={0}>
       <div className="cover-container">
         <Cover local={local} hasCover={head.hasCover} sessionId={head.id} />
+        {head.isClip && <ClipBanner />}
         <div className="duration">{lib.formatTimeSeconds(head.duration)}</div>
         {history?.lastWatchedClock ? (
           <div className="progress">

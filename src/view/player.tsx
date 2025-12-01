@@ -17,6 +17,7 @@ import { PictureInPicture } from './svgs.jsx';
 import Cover from './cover.jsx';
 import { VSCodeLink } from '@vscode/webview-ui-toolkit/react/index.js';
 import { mediaManager } from './media_manager.js';
+import ClipBanner from './clip_banner.jsx';
 
 type Props = { user?: t.UserUI; player: t.PlayerUIState; session: t.SessionUIState };
 export default class Player extends React.Component<Props> {
@@ -176,9 +177,9 @@ export default class Player extends React.Component<Props> {
   render() {
     // const { cache } = this.context;
     const { session, user } = this.props;
-    const { head, publication, local } = session;
+    const { head, publication, local, clock } = session;
 
-    let curOrHistoryClock = session.clock;
+    let curOrHistoryClock = clock;
     if (!session.loaded && session.history?.lastWatchedClock) {
       curOrHistoryClock = session.history.lastWatchedClock;
     }
@@ -189,7 +190,7 @@ export default class Player extends React.Component<Props> {
           <ProgressBar
             duration={head.duration}
             onSeek={this.seek}
-            clock={session.clock}
+            clock={clock}
             workspaceFocusTimeline={session.workspaceFocusTimeline}
             toc={head.toc}
           />
@@ -225,6 +226,7 @@ export default class Player extends React.Component<Props> {
               )}
             >
               <Cover local={local} hasCover={head.hasCover} sessionId={head.id} />
+              {head.isClip && clock === 0 && <ClipBanner />}
               <video id="guide-video" />
             </div>
             <SessionHead className="subsection subsection_spaced" head={head} withAuthor />

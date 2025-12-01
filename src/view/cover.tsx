@@ -19,5 +19,5 @@ export default memo(function Cover(props: Props) {
 
   const fallback = Utils.joinPath(URI.parse(config.extensionWebviewUri), 'resources', 'default-cover.png').toString();
 
-  return <ImgWithFallback className={props.className} src={src} fallback={fallback} />;
+  return <ImgWithFallback className={cn('session-cover', props.className)} src={src} fallback={fallback} />;
 });

@@ -105,6 +105,7 @@ export default class SessionCore {
       duration: 0,
       modificationTimestamp: new Date().toISOString(), // will be overwritten at the end
       toc: [],
+      isClip: false,
       formatVersion: lib.LATEST_SESSION_FORMAT_VERSION,
       ignorePatterns: lib.defaultIgnorePatterns,
       hasCover: false,
@@ -291,6 +292,7 @@ export default class SessionCore {
       modificationTimestamp: this.session.head.modificationTimestamp,
       toc: this.session.head.toc,
       forkedFrom: this.session.head.id,
+      isClip: this.session.head.isClip,
       hasCover: this.session.head.hasCover,
       ignorePatterns: this.session.head.ignorePatterns,
       formatVersion: this.session.head.formatVersion,

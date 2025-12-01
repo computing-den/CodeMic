@@ -1,0 +1,15 @@
+.clip-banner {
+  position: absolute;
+  right: -24px;
+  top: 8px;
+  transform-origin: center;
+  transform: rotate(35deg);
+  background: #dd0000;
+  color: white;
+  font-size: 0.8rem;
+  padding: 2px 30px;
+  font-weight: bold;
+  box-shadow: 0 3px 10px 3px #00000054;
+  z-index: 1;
+  letter-spacing: 1px;
+}

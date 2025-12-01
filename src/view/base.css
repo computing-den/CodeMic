@@ -136,6 +136,10 @@ body {
   /* causing an infinite shrink/expand loop as the scrollbar */
   /* appears and disappears while changing the available width */
   scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 body {

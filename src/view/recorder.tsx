@@ -21,6 +21,7 @@ import PopoverMenu, { PopoverMenuItem } from './popover_menu.jsx';
 import config from './config.js';
 import RecorderMediaToolbar from './recorder_media_toolbar.jsx';
 import RecorderToolbar, { RecorderToolbarHandle } from './recorder_toolbar.jsx';
+import ClipBanner from './clip_banner.jsx';
 
 const TRACK_HEIGHT_PX = 15;
 const TRACK_MIN_GAP_PX = 1;
@@ -106,6 +107,7 @@ export default class Recorder extends React.Component<RecorderProps> {
             temp={session.temp}
             local={session.local}
             hasCover={session.head.hasCover}
+            isClip={session.head.isClip}
             sessionId={session.head.id}
             title={session.head.title}
             loaded={session.loaded}
@@ -130,6 +132,7 @@ type DetailsViewProps = {
   temp: boolean;
   local: boolean;
   hasCover: boolean;
+  isClip?: boolean;
   sessionId: string;
   title: string;
   loaded: boolean;
@@ -219,6 +222,7 @@ class DetailsView extends React.PureComponent<DetailsViewProps> {
       <div id={p.id} className={p.className}>
         <div className={cn('cover-container', p.hasCover && 'has-cover')}>
           <Cover local={p.local} hasCover={p.hasCover} sessionId={p.sessionId} />
+          {p.isClip && <ClipBanner />}
           <div className="buttons">
             {p.hasCover && (
               <VSCodeButton
