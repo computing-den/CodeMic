@@ -311,7 +311,10 @@ export default class SessionRecordAndReplay {
       if (selectionClockRange) {
         seekTo = selectionClockRange.start;
       }
-    } else if (this.isAlmostAtTheEnd()) {
+    }
+
+    // Almost at the end?
+    if ((seekTo ?? this.clock) > this.session.head.duration - 1) {
       seekTo = 0;
     }
 
@@ -781,10 +784,6 @@ export default class SessionRecordAndReplay {
     console.error(error);
     vscode.window.showErrorMessage(`Error during recording: ${(error as Error)?.message ?? 'Unknown error'}`);
     this.pause({ withError: true });
-  }
-
-  private isAlmostAtTheEnd() {
-    return this.clock > this.session.head.duration - 1;
   }
 
   private isTrackInRange(t: t.RangedTrack): boolean {
