@@ -127,7 +127,7 @@ async function mergeAudioTracks(
 
     let trimStart = overlap.start - track.clockRange.start;
     let trimEnd = overlap.end - track.clockRange.start;
-    let delay = overlap.start;
+    let delay = overlap.start - limitRange.start;
     let pad = i === audioTracks.length - 1 ? limitRange.end - overlap.end : 0;
     const filterParts = _.compact([
       `atrim=start=${trimStart}:end=${trimEnd}`,
