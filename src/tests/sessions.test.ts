@@ -84,7 +84,7 @@ async function testSessionSteps(sessionHandle: string, steps: SessionTestStep[])
     console.log(`===== Steps: ${label}`);
 
     // Seek if necessary.
-    await getCodeMic().handleMessage({ type: 'recorder/seek', clock: step.clock, useStepper: step.useStepper });
+    await getCodeMic().handleMessage({ type: 'recorder/seek', clock: step.clock, preferStepper: step.preferStepper });
 
     const testClockPath = path.resolve(sessionTestDataPath, `clock_${step.clockStr}`);
     const meta = deserializeTestMeta(JSON.parse(fs.readFileSync(path.resolve(testClockPath, 'meta.json'), 'utf8')));

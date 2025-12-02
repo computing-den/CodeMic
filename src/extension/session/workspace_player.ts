@@ -8,6 +8,8 @@ import _ from 'lodash';
 import { LoadedSession } from './session.js';
 import VscWorkspace from './vsc_workspace.js';
 
+const STEPPER_HARD_THRESHOLD = 100;
+
 class WorkspacePlayer {
   playing = false;
   // onError?: (error: Error) => any;
@@ -100,14 +102,15 @@ class WorkspacePlayer {
     this.dispose();
   }
 
-  async seek(clock: number, useStepper: boolean) {
-    await this.seekWithData(this.internalWorkspace.getSeekData(clock), useStepper);
+  async seek(clock: number, preferStepper: boolean) {
+    await this.seekWithData(this.internalWorkspace.getSeekData(clock), preferStepper);
   }
 
-  async seekWithData(seekData: SeekData, useStepper: boolean) {
+  async seekWithData(seekData: SeekData, preferStepper: boolean) {
     if (seekData.steps.length === 0) return;
+    const forceSync = seekData.steps.length > STEPPER_HARD_THRESHOLD;
 
-    if (useStepper || config.stepOnly) {
+    if ((!forceSync && preferStepper) || config.stepOnly) {
       if (config.logTrackPlayerUpdateStep) console.log('player seek: stepping');
       // Apply updates one at a time.
       // If stepper fails for any reason, fall back to sync (unless config.stepOnly is set

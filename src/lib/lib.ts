@@ -711,23 +711,33 @@ export function getRecorderSelectionClockRange(
   }
 }
 
-export function searchSessions(sessions: t.SessionUIListing[], searchQuery: string): t.SessionUIListing[] {
+export function searchSessions(
+  sessions: t.SessionUIListing[],
+  searchQuery: string,
+  recentLimit: number,
+): t.SessionUIListing[] {
   const searchQueryNorm = _.toLower(_.trim(searchQuery || ''));
-  if (!searchQueryNorm) return sessions;
-
   const tokens = searchQueryNorm.split(/\s+/);
 
-  let pairs = sessions.map(listing => ({
-    listing,
-    score:
-      ((getTokensMatchScore(getFields(listing.head)) *
-        (listing.publication ? listing.publication.likes * 20 + listing.publication.views : 1)) /
-        10) *
-      (listing.head.isClip ? 1 : 2),
-  }));
-  pairs = _.filter(pairs, 'score');
-  pairs = _.orderBy(pairs, 'score', 'desc');
-  return _.map(pairs, 'listing');
+  let pairs = sessions.map(listing => {
+    const matchScore = searchQueryNorm ? getTokensMatchScore(getFields(listing.head)) : 1;
+    const statsScore = (listing.publication ? listing.publication.likes * 20 + listing.publication.views : 1) / 10;
+    const clipScore = listing.head.isClip ? 1 : 2;
+    const score = matchScore * statsScore * clipScore;
+    return { listing, score };
+  });
+
+  let groupedPairs = _.groupBy(pairs, p => p.listing.group);
+  let recentPairs = groupedPairs.recent ?? [];
+  let currentPairs = groupedPairs.current ?? [];
+  let remotePairs = groupedPairs.remote ?? [];
+
+  remotePairs = _.filter(remotePairs, 'score');
+  remotePairs = _.reject(remotePairs, p => recentPairs.some(recent => recent.listing.head.id === p.listing.head.id));
+  remotePairs = _.orderBy(remotePairs, 'score', 'desc');
+  recentPairs = _.take(_.filter(recentPairs, 'score'), recentLimit);
+
+  return _.map([...recentPairs, ...currentPairs, ...remotePairs], 'listing');
 
   function getFields(head: t.SessionHead): string[] {
     return [
@@ -759,15 +769,15 @@ export function searchSessions(sessions: t.SessionUIListing[], searchQuery: stri
   }
 }
 
-export function limitRecentSessions(sessions: t.SessionUIListing[], limit: number): t.SessionUIListing[] {
-  let res = [];
-  let count = 0;
-  for (const listing of sessions) {
-    if (listing.group === 'recent') {
-      if (count >= limit) continue;
-      count++;
-    }
-    res.push(listing);
-  }
-  return res;
-}
+// export function limitRecentSessions(sessions: t.SessionUIListing[], limit: number): t.SessionUIListing[] {
+//   let res = [];
+//   let count = 0;
+//   for (const listing of sessions) {
+//     if (listing.group === 'recent') {
+//       if (count >= limit) continue;
+//       count++;
+//     }
+//     res.push(listing);
+//   }
+//   return res;
+// }

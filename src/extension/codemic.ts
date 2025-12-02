@@ -1,4 +1,4 @@
-import './config.js'; // Init config
+import config from './config.js'; // Init config
 import WebviewProvider from './webview_provider.js';
 import Session from './session/session.js';
 import * as storage from './storage.js';
@@ -577,7 +577,7 @@ class CodeMic {
       }
       case 'recorder/seek': {
         assert(this.session?.isLoaded());
-        await this.session.rr.enqueueSeek(req.clock, req.useStepper);
+        await this.session.rr.enqueueSeek(req.clock, req.preferStepper);
         await this.updateFrontend();
         return ok;
       }
@@ -1351,8 +1351,7 @@ class CodeMic {
         history: this.context.settings.history[s.head.id],
         publication: this.publications.get(s.head.id),
       }));
-      sessions = lib.searchSessions(sessions, this.searchQuery);
-      sessions = lib.limitRecentSessions(sessions, 4);
+      sessions = lib.searchSessions(sessions, this.searchQuery, config.debug ? 100 : 4);
 
       welcome = {
         searchQuery: this.searchQuery,

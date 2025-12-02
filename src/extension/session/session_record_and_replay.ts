@@ -122,8 +122,8 @@ export default class SessionRecordAndReplay {
     await this.pauseOnError(this.queue.enqueue(this.record.bind(this)));
   }
 
-  async enqueueSeek(clock: number, useStepper?: boolean) {
-    await this.pauseOnError(this.queue.enqueue(this.seek.bind(this), clock, useStepper));
+  async enqueueSeek(clock: number, preferStepper?: boolean) {
+    await this.pauseOnError(this.queue.enqueue(this.seek.bind(this), clock, preferStepper));
   }
 
   async enqueueSync(clock?: number) {
@@ -196,16 +196,16 @@ export default class SessionRecordAndReplay {
   }
 
   /**
-   * useStepper is only useful during testing to test the stepper.
+   * preferStepper is only useful during testing to test the stepper.
    */
-  private async seek(clock: number, useStepper?: boolean) {
+  private async seek(clock: number, preferStepper?: boolean) {
     const origClock = this.clock;
     this.clock = Math.max(0, Math.min(this.session.head.duration, clock));
 
     // Must only use stepper during playback. Otherwise, we don't know if the user has changed
     // the files and documents while on pause or not.
-    useStepper ??= this.playing && Math.abs(origClock - this.clock) < SEEK_USING_STEPPER_THRESHOLD_S;
-    await this.workspacePlayer.seek(clock, useStepper);
+    preferStepper ??= this.playing && Math.abs(origClock - this.clock) < SEEK_USING_STEPPER_THRESHOLD_S;
+    await this.workspacePlayer.seek(clock, preferStepper);
     await this.syncMedia({ hard: true });
     this.updateLoop.resetDiff();
     this.session.onProgress?.();

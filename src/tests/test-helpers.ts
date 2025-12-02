@@ -12,7 +12,7 @@ import { timeout } from '../lib/lib.js';
 export type SessionTestStep = {
   clock: number;
   clockStr: string;
-  useStepper: boolean;
+  preferStepper: boolean;
 };
 
 export const projectPath = path.resolve(__dirname, '..'); // relative to dist
@@ -116,11 +116,11 @@ export function createRandomSessionTestSteps(clockStrs: string[]): SessionTestSt
     if (candidate && candidate !== resClockStrs.at(-1)) resClockStrs.push(candidate);
   }
 
-  return resClockStrs.map(clockStr => ({ clockStr, clock: Number(clockStr), useStepper: _.sample([true, false]) }));
+  return resClockStrs.map(clockStr => ({ clockStr, clock: Number(clockStr), preferStepper: _.sample([true, false]) }));
 }
 
 export function sessionTestStepToString(step: SessionTestStep): string {
-  return (step.useStepper ? 'step:' : 'sync:') + step.clockStr;
+  return (step.preferStepper ? 'step:' : 'sync:') + step.clockStr;
 }
 
 export async function closeAllTabs() {
