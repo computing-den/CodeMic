@@ -16,6 +16,7 @@ export type Props = {
   clock: number;
   workspaceFocusTimeline?: t.Focus[];
   toc: t.TocItem[];
+  sessionTitle: string;
 };
 
 type UnderMouse = {
@@ -98,7 +99,9 @@ export default function ProgressBar(props: Props) {
         showOnAnchorHover
       >
         <div className="with-clock">
-          <div className="truncate">{underMouse?.tocItem?.title || 'Unknown section'}</div>
+          <div className="truncate">
+            {underMouse?.tocItem?.title || props.toc.length === 0 ? props.sessionTitle : 'Unknown section'}
+          </div>
           <div>{lib.formatTimeSeconds(underMouse?.clock ?? 0)}</div>
         </div>
         <div className="truncate">{focusUri || 'Unknown file'}</div>

@@ -76,7 +76,7 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/crop'; clock: number; adjustMediaTracks: boolean }; response: OKResponse }
   | { request: { type: 'recorder/forkSession'; handle: string; workspace: string }; response: OKResponse }
   | { request: { type: 'recorder/makeClip' }; response: OKResponse }
-  | { request: { type: 'recorder/mergeVideoTracks'; deleteOld?: boolean }; response: OKResponse }
+  | { request: { type: 'recorder/mergeVideoAudioTracks'; deleteOld?: boolean }; response: OKResponse }
   | { request: { type: 'recorder/makeTest' }; response: OKResponse }
   | { request: { type: 'getStore' }; response: StoreResponse }
   | { request: { type: 'showOpenDialog'; options: OpenDialogOptions }; response: UrisResponse }

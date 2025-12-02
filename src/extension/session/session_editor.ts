@@ -595,124 +595,34 @@ export default class SessionEditor {
     });
   }
 
-  async mergeVideoTracks(
+  async mergeVideoAudioTracks(
     progress: Progress,
     abortController: AbortController,
     deleteOld?: boolean,
   ): Promise<t.SessionChange | undefined> {
     assert(this.session.isLoaded());
 
-    const individualFilesProgressMultiplier = 0.9;
-
-    if (this.session.body.videoTracks.length === 0) return;
-
-    const tempDir = path.join(this.session.core.dataPath, 'temp');
-    await fs.promises.rm(tempDir, { recursive: true, force: true });
-    await fs.promises.mkdir(tempDir, { recursive: true });
-
-    const sortedVideoTracks = _.orderBy(this.session.body.videoTracks, t => t.clockRange.start);
-    const videoFiles: string[] = [];
-    for (const [i, t] of sortedVideoTracks.entries()) {
-      if (abortController.signal.aborted) return;
-
-      progress.report({ message: t.title });
-      assert(t.file.type === 'blob');
-
-      const startOfNext = sortedVideoTracks[i + 1]?.clockRange.start ?? this.session.head.duration;
-      const gap = startOfNext - t.clockRange.end;
-
-      const origFilePath = path.join(this.session.core.dataPath, 'blobs', t.file.sha1);
-      const outFilePath = path.join(tempDir, t.title + '-' + (i + 1));
-
-      console.log('ffmpeg out: ', outFilePath, 'gap: ', gap);
-
-      if (gap > 0) {
-        const vFilter = gap > 0 ? `tpad=stop_mode=clone:stop_duration=${gap}` : 'null';
-        const args = [
-          '-y',
-          '-i',
-          origFilePath,
-          '-filter:v',
-          vFilter,
-          '-map',
-          '0:v',
-          '-an',
-          '-c:v',
-          'libx264',
-          '-preset',
-          'ultrafast',
-          '-movflags',
-          '+faststart',
-          '-f',
-          'mp4',
-          outFilePath,
-        ];
-        if (config.debug) {
-          console.log('ffmpeg ' + args.join(' '));
-        }
-        const { stdout, stderr } = await execFile('ffmpeg', args);
-        if (config.debug && stderr.trim()) console.error(stderr);
-        videoFiles.push(outFilePath);
-      } else if (gap < 0) {
-        throw new Error('Found overlapping videos');
-      } else {
-        videoFiles.push(origFilePath);
-      }
-
-      progress.report({
-        message: t.title,
-        increment: (1 / sortedVideoTracks.length) * individualFilesProgressMultiplier * 100,
-      });
-    }
-
-    if (abortController.signal.aborted) return;
-
-    progress.report({ message: 'Final output' });
-
-    const videoFilesStr = videoFiles.map(f => `file ${f}`.replace(/'/g, "'\\''")).join('\n');
-    const videoFilesListPath = path.join(tempDir, 'list');
-    await fs.promises.writeFile(videoFilesListPath, videoFilesStr, 'utf8');
-    const finalOutFilePath = path.join(tempDir, 'final-output.mp4');
-
-    const concatArgs = [
-      '-y',
-      '-f',
-      'concat',
-      '-safe',
-      '0',
-      '-i',
-      videoFilesListPath,
-      '-an', // no audio
-      '-c:v',
-      'libx264', // reencode video with H.264
-      '-movflags',
-      '+faststart',
-      '-f',
-      'mp4', // force MP4 container
-      finalOutFilePath,
-    ];
-    if (config.debug) console.log('ffmpeg ' + concatArgs.join(' '));
-    await execFile('ffmpeg', concatArgs);
-    progress.report({ message: 'Done', increment: (1 - individualFilesProgressMultiplier) * 100 });
-
-    // TODO use stream.
-    const finalData = await fs.promises.readFile(finalOutFilePath);
-    const sha1 = await misc.computeSHA1(finalData);
-    await this.session.core.copyToBlob(finalOutFilePath, sha1);
-    await fs.promises.rm(tempDir, { recursive: true, force: true });
-
-    const finalVideoTrack: t.VideoTrack = {
-      id: uuid(),
-      clockRange: { start: sortedVideoTracks[0].clockRange.start, end: this.session.head.duration },
-      title: 'Merged videos',
-      type: 'video',
-      file: { type: 'blob', sha1 },
+    let limitRange: t.ClockRange;
+    const editorSelection = this.selection?.type === 'editor' && {
+      start: Math.min(this.selection.focus, this.selection.anchor),
+      end: Math.max(this.selection.focus, this.selection.anchor),
     };
 
-    if (abortController.signal.aborted) return;
+    if (editorSelection && editorSelection.end > editorSelection.start) {
+      limitRange = editorSelection;
+    } else {
+      limitRange = { start: 0, end: this.session.head.duration };
+    }
+
+    const finalVideoTrack = await this.mergeAudioAndVideoTracksHelper(progress, abortController, limitRange);
+
+    if (!finalVideoTrack) return;
 
     return this.insertApplySessionPatch({
-      body: { videoTracks: deleteOld ? [finalVideoTrack] : [...this.session.body.videoTracks, finalVideoTrack] },
+      body: {
+        videoTracks: deleteOld ? [finalVideoTrack] : [...this.session.body.videoTracks, finalVideoTrack],
+        audioTracks: deleteOld ? [] : this.session.body.audioTracks,
+      },
       effects: [{ type: 'media' }],
     });
   }
@@ -724,6 +634,31 @@ export default class SessionEditor {
     const start = Math.min(this.selection.anchor, this.selection.focus);
     const end = Math.max(this.selection.anchor, this.selection.focus);
     const limitRange: t.ClockRange = { start, end };
+
+    const finalVideoTrack = await this.mergeAudioAndVideoTracksHelper(progress, abortController, limitRange);
+
+    if (!finalVideoTrack) return;
+
+    const change1 = this.insertApplySessionPatch({
+      head: { isClip: true },
+      body: { videoTracks: [finalVideoTrack], audioTracks: [] },
+      effects: [{ type: 'media' }],
+    });
+
+    const mergeRange: t.ClockRange = { start: 0, end: limitRange.start };
+    const change2 = this.merge(mergeRange, true);
+    const change3 = this.crop(limitRange.end - limitRange.start, true);
+
+    return [change1, change2, change3];
+  }
+
+  async mergeAudioAndVideoTracksHelper(
+    progress: Progress,
+    abortController: AbortController,
+    limitRange: t.ClockRange,
+  ): Promise<t.RangedTrackFile | undefined> {
+    assert(this.session.isLoaded());
+
     const tempDir = path.join(this.session.core.dataPath, 'temp');
     const blobDir = path.join(this.session.core.dataPath, 'blobs');
 
@@ -750,22 +685,12 @@ export default class SessionEditor {
     const finalVideoTrack: t.VideoTrack = {
       id: uuid(),
       clockRange: { start: limitRange.start, end: limitRange.end },
-      title: 'Merged videos',
+      title: 'Merged',
       type: 'video',
       file: { type: 'blob', sha1 },
     };
 
-    const change1 = this.insertApplySessionPatch({
-      head: { isClip: true },
-      body: { videoTracks: [finalVideoTrack], audioTracks: [] },
-      effects: [{ type: 'media' }],
-    });
-
-    const mergeRange: t.ClockRange = { start: 0, end: limitRange.start };
-    const change2 = this.merge(mergeRange, true);
-    const change3 = this.crop(limitRange.end - limitRange.start, true);
-
-    return [change1, change2, change3];
+    return finalVideoTrack;
   }
 
   /**

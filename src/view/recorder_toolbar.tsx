@@ -107,16 +107,16 @@ const RecorderToolbar = memo(
       await postMessage({ type: 'recorder/makeTest' });
     }
 
-    async function mergeVideoTracks() {
-      await postMessage({ type: 'recorder/mergeVideoTracks' });
+    async function mergeVideoAudioTracks() {
+      await postMessage({ type: 'recorder/mergeVideoAudioTracks' });
     }
 
     async function makeClip() {
       await postMessage({ type: 'recorder/makeClip' });
     }
 
-    async function mergeAndReplaceVideoTracks() {
-      await postMessage({ type: 'recorder/mergeVideoTracks', deleteOld: true });
+    async function mergeAndReplaceVideoAudioTracks() {
+      await postMessage({ type: 'recorder/mergeVideoAudioTracks', deleteOld: true });
     }
 
     async function changeSpeed(factor: number, adjustMediaTracks: boolean) {
@@ -232,16 +232,16 @@ const RecorderToolbar = memo(
         onClick: makeClip,
       },
       config.debug && {
-        title: 'Merge video tracks',
+        title: 'Merge video/audio tracks',
         icon: 'fa-solid fa-link',
         disabled: props.playing || props.recording,
-        onClick: mergeVideoTracks,
+        onClick: mergeVideoAudioTracks,
       },
       config.debug && {
-        title: 'Merge & replace video tracks',
+        title: 'Merge & replace video/audio tracks',
         icon: 'fa-solid fa-link',
         disabled: props.playing || props.recording,
-        onClick: mergeAndReplaceVideoTracks,
+        onClick: mergeAndReplaceVideoAudioTracks,
       },
       config.debug && {
         title: 'Make test',

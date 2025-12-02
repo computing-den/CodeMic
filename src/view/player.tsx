@@ -193,6 +193,7 @@ export default class Player extends React.Component<Props> {
             clock={clock}
             workspaceFocusTimeline={session.workspaceFocusTimeline}
             toc={head.toc}
+            sessionTitle={head.title}
           />
         )}
         <Section className="main-section">

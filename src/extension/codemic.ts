@@ -868,12 +868,12 @@ class CodeMic {
         return ok;
       }
 
-      case 'recorder/mergeVideoTracks': {
+      case 'recorder/mergeVideoAudioTracks': {
         await this.context.withProgress(
-          { title: `Merging video tracks`, cancellable: true },
+          { title: `Merging video/audio tracks`, cancellable: true },
           async (progress, abortController) => {
             assert(this.session?.isLoaded());
-            const change = await this.session.editor.mergeVideoTracks(progress, abortController, req.deleteOld);
+            const change = await this.session.editor.mergeVideoAudioTracks(progress, abortController, req.deleteOld);
             if (change) await this.session.rr.enqueueSyncAfterSessionChange(change);
             await this.updateFrontend();
           },

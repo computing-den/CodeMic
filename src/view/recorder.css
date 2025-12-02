@@ -546,7 +546,7 @@
     gap: var(--spacing-small);
   }
 
-  & vscode-button {
+  & > vscode-button {
     margin: 0 0 0 auto;
     min-width: var(--popover-button-min-width);
   }
