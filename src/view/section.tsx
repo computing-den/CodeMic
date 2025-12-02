@@ -72,14 +72,14 @@ export class Body extends React.Component<BodyProps> {
   }
 }
 
-export function Message(props: { children: React.ReactNode }) {
-  return <div className="message">{props.children}</div>;
+export function Messages(props: { children: React.ReactNode }) {
+  return <div className="messages">{props.children}</div>;
 }
 
 export default class Section extends React.Component<SectionProps> {
   static Header = Header;
   static Body = Body;
-  static Message = Message;
+  static Messages = Messages;
   render() {
     return (
       <div className={`section ${this.props.bordered ? 'bordered' : ''} ${this.props.className || ''}`}>

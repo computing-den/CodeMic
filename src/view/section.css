@@ -51,12 +51,19 @@
     display: flex;
     flex-direction: column;
 
-    .message {
-      font-size: 1.5rem;
-      color: var(--text-weak);
-      margin: 2rem 1rem 2rem;
-      text-align: center;
-      letter-spacing: 2px;
+    .messages {
+      display: grid;
+      justify-items: center;
+      align-items: center;
+      margin: 2rem 2rem;
+      gap: 0.5rem;
+
+      & p {
+        font-size: 0.9rem;
+        color: var(--text-weak);
+        text-align: center;
+        letter-spacing: 2px;
+      }
     }
   }
 }

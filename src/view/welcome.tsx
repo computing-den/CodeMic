@@ -10,6 +10,7 @@ import postMessage from './api.js';
 import _ from 'lodash';
 import { VSCodeButton, VSCodeLink, VSCodeTextField } from '@vscode/webview-ui-toolkit/react';
 import { Link } from '@vscode/webview-ui-toolkit';
+import { cn } from './misc.js';
 
 type Props = { user?: t.UserUI; welcome: t.WelcomeUIState; earlyAccessEmail?: string };
 
@@ -75,6 +76,7 @@ export default function Welcome(props: Props) {
 
 function WelcomeSessions(props: Props) {
   const { welcome } = props;
+  const [atTop, setAtTop] = useState(true);
 
   function login(e: React.MouseEvent) {
     e.stopPropagation();
@@ -94,52 +96,62 @@ function WelcomeSessions(props: Props) {
   const featured = welcome.sessions.filter(
     s => s.group === 'remote' && s.head.id !== current?.head.id && !recent.some(r => r.head.id === s.head.id),
   );
-  const empty = !current && recent.length === 0 && featured.length === 0;
+
+  useEffect(() => {
+    function scrolled() {
+      setAtTop(!document.scrollingElement?.scrollTop);
+    }
+
+    scrolled();
+    window.addEventListener('scroll', scrolled);
+    return () => window.removeEventListener('scroll', scrolled);
+  }, []);
 
   return (
     <Screen className="welcome-sessions">
       {/*<LatencyTest store={this.props.store} />*/}
-      <Section className="search-section">
-        <Section.Body>
-          <div className="search-subsection subsection">
-            <VSCodeTextField
-              placeholder="Search"
-              autofocus
-              value={welcome.searchQuery}
-              onInput={search}
-            ></VSCodeTextField>
-
-            <VSCodeButton
-              onClick={() => postMessage({ type: 'welcome/openWorkspace' })}
-              title="Open session"
-              appearance="secondary"
-            >
-              <span className="codicon codicon-folder-opened" />
-            </VSCodeButton>
-            <VSCodeButton
-              onClick={() => postMessage({ type: 'welcome/openNewSessionInRecorder' })}
-              title="Record a new session"
-            >
-              <span className="codicon codicon-device-camera-video" />
-            </VSCodeButton>
-          </div>
-          {!props.user && (
-            <div className="signin-subsection subsection">
-              <VSCodeLink href="#" onClick={login}>
-                Log in
-              </VSCodeLink>{' '}
-              or{' '}
-              <VSCodeLink href="#" onClick={join}>
-                join
-              </VSCodeLink>{' '}
-              to publish your own sessions.
-            </div>
-          )}
-        </Section.Body>
-      </Section>
-      <SessionsSection user={props.user} title="WORKSPACE" listings={_.compact([current])} />
+      <div className={cn('search-header', atTop && 'at-top')}>
+        <VSCodeTextField placeholder="Search" autofocus value={welcome.searchQuery} onInput={search}></VSCodeTextField>
+        <VSCodeButton
+          onClick={() => postMessage({ type: 'welcome/openWorkspace' })}
+          title="Open session"
+          appearance="secondary"
+        >
+          <span className="codicon codicon-folder-opened" />
+        </VSCodeButton>
+        <VSCodeButton
+          onClick={() => postMessage({ type: 'welcome/openNewSessionInRecorder' })}
+          title="Record a new session"
+        >
+          <span className="codicon codicon-device-camera-video" />
+        </VSCodeButton>
+      </div>
+      {!props.user && (
+        <div className="signin">
+          <VSCodeLink href="#" onClick={login}>
+            Log in
+          </VSCodeLink>{' '}
+          or{' '}
+          <VSCodeLink href="#" onClick={join}>
+            join
+          </VSCodeLink>{' '}
+          to publish your own sessions.
+        </div>
+      )}
+      <SessionsSection
+        user={props.user}
+        title="WORKSPACE"
+        listings={_.compact([current])}
+        emptyMessage="No session found in workspace"
+      />
       {recent.length > 0 && <SessionsSection user={props.user} title="RECENT" listings={recent} />}
-      <SessionsSection user={props.user} title="FEATURED" listings={featured} loading={welcome.loadingFeatured} />
+      <SessionsSection
+        user={props.user}
+        title="FEATURED"
+        listings={featured}
+        loading={welcome.loadingFeatured}
+        emptyMessage="Could not fetch featured sessions"
+      />
     </Screen>
   );
 }
@@ -147,6 +159,7 @@ function WelcomeSessions(props: Props) {
 type SessionsSectionProps = {
   user?: t.UserUI;
   title: string;
+  emptyMessage?: string;
   listings: t.SessionUIListing[];
   bordered?: boolean;
   loading?: boolean;
@@ -174,9 +187,9 @@ function SessionsSection(props: SessionsSectionProps) {
             onShare={share}
           />
         )}
-        {props.listings.length === 0 && !props.loading && (
-          <div className="empty-listings">
-            <p>No session found in workspace</p>
+        {props.listings.length === 0 && !props.loading && props.emptyMessage && (
+          <Section.Messages>
+            <p>{props.emptyMessage}</p>
             {/*
             <VSCodeButton
               appearance="secondary"
@@ -185,7 +198,7 @@ function SessionsSection(props: SessionsSectionProps) {
             >
               Open session
               </VSCodeButton>*/}
-          </div>
+          </Section.Messages>
         )}
       </Section.Body>
     </Section>

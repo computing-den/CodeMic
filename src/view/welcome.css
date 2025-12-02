@@ -49,62 +49,73 @@
 }
 
 .welcome-sessions {
-  .search-section .section-body {
+  .search-header {
+    display: flex;
+    align-items: center;
+
+    position: sticky;
+    top: 0;
+    background: var(--vscode-sideBar-background);
+    padding-bottom: 0.5rem;
+    z-index: 2;
     /* Set 1px top padding so that the focus outline of the search input doesn't overflow. */
-    padding: 1px var(--container-padding-hor) 0 var(--container-padding-hor);
+    padding: 1px var(--container-padding-hor) 0.5rem var(--container-padding-hor);
+    transition: 0.2s box-shadow ease;
 
-    .search-subsection {
-      display: flex;
-      align-items: center;
-
-      & vscode-text-field {
-        flex: 1;
-      }
-
-      & vscode-button {
-        margin-left: var(--spacing-x-small);
-      }
+    &:not(.at-top) {
+      box-shadow: 0 1px 10px 1px #0000002e;
     }
 
-    .signin-subsection {
-      p {
-        margin: 0;
-      }
-      /* display: flex; */
-      /* flex-direction: column; */
+    & vscode-text-field {
+      flex: 1;
+    }
 
-      /* > * + * { */
-      /*   margin-left: 0.25rem; */
-      /* } */
-
-      /* & vscode-button::part(content) { */
-      /*   white-space: nowrap; */
-      /* } */
-
-      /* .fields { */
-      /*   display: flex; */
-      /*   margin: 0 -0.25rem; */
-
-      /*   & > * { */
-      /*     flex: 1 0 0; */
-      /*     margin: 0 0.25rem; */
-      /*   } */
-      /* } */
-      /* .buttons { */
-      /*   display: flex; */
-      /*   flex-direction: column; */
-      /*   /\* margin: 0 -0.25rem; *\/ */
-
-      /*   & > * { */
-      /*     flex: 1 0 0; */
-      /*     margin-top: 0.25rem; */
-      /*     /\* margin: 0 0.25rem; *\/ */
-      /*   } */
-      /* } */
+    & vscode-button {
+      margin-left: var(--spacing-x-small);
     }
   }
 
+  .signin {
+    margin-top: 0;
+    padding: 0 var(--container-padding-hor);
+
+    p {
+      margin: 0;
+    }
+    /* display: flex; */
+    /* flex-direction: column; */
+
+    /* > * + * { */
+    /*   margin-left: 0.25rem; */
+    /* } */
+
+    /* & vscode-button::part(content) { */
+    /*   white-space: nowrap; */
+    /* } */
+
+    /* .fields { */
+    /*   display: flex; */
+    /*   margin: 0 -0.25rem; */
+
+    /*   & > * { */
+    /*     flex: 1 0 0; */
+    /*     margin: 0 0.25rem; */
+    /*   } */
+    /* } */
+    /* .buttons { */
+    /*   display: flex; */
+    /*   flex-direction: column; */
+    /*   /\* margin: 0 -0.25rem; *\/ */
+
+    /*   & > * { */
+    /*     flex: 1 0 0; */
+    /*     margin-top: 0.25rem; */
+    /*     /\* margin: 0 0.25rem; *\/ */
+    /*   } */
+    /* } */
+  }
   .sessions-section {
+    margin-top: var(--spacing-medium);
     /* .session-item { */
     /*   flex-direction: row; */
     /*   .card-content { */
@@ -112,20 +123,5 @@
     /*     flex-direction: column; */
     /*   } */
     /* } */
-
-    .empty-listings {
-      display: grid;
-      justify-items: center;
-      align-items: center;
-      margin: 2rem 1rem 2rem;
-      gap: 0.5rem;
-
-      & p {
-        font-size: 0.9rem;
-        color: var(--text-weak);
-        text-align: center;
-        letter-spacing: 2px;
-      }
-    }
   }
 }
