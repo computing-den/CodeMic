@@ -1078,7 +1078,7 @@ class CodeMic {
       }
       case t.Screen.Welcome: {
         const current = await this.getSessionListingOfDefaultVscWorkspace();
-        const recent = await this.getRecentSessionListings(4);
+        const recent = await this.getRecentSessionListings();
         this.welcome = {
           sessions: _.compact([current, ...recent]),
           loadingFeatured: true,
@@ -1214,7 +1214,7 @@ class CodeMic {
     }
   }
 
-  async getRecentSessionListings(limit: number): Promise<t.SessionListing[]> {
+  async getRecentSessionListings(limit?: number): Promise<t.SessionListing[]> {
     function getTimestamp(history: t.SessionHistory) {
       return (history && lib.getSessionHistoryItemLastOpenTimestamp(history)) || '';
     }
@@ -1223,7 +1223,7 @@ class CodeMic {
     const recent: t.SessionListing[] = [];
     for (const history of orderedHistory) {
       try {
-        if (recent.length === limit) break;
+        if (limit !== undefined && recent.length === limit) break;
 
         const head = await Session.Core.readLocalHead(history.workspace);
         if (head?.id === history.id) {
@@ -1352,6 +1352,8 @@ class CodeMic {
         publication: this.publications.get(s.head.id),
       }));
       sessions = lib.searchSessions(sessions, this.searchQuery);
+      sessions = lib.limitRecentSessions(sessions, 4);
+
       welcome = {
         searchQuery: this.searchQuery,
         sessions,

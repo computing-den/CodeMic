@@ -716,21 +716,58 @@ export function searchSessions(sessions: t.SessionUIListing[], searchQuery: stri
   if (!searchQueryNorm) return sessions;
 
   const tokens = searchQueryNorm.split(/\s+/);
-  return sessions.filter(listing => doFieldsIncludeTokens(getFields(listing.head)));
+
+  let pairs = sessions.map(listing => ({
+    listing,
+    score:
+      ((getTokensMatchScore(getFields(listing.head)) *
+        (listing.publication ? listing.publication.likes * 20 + listing.publication.views : 1)) /
+        10) *
+      (listing.head.isClip ? 1 : 2),
+  }));
+  pairs = _.filter(pairs, 'score');
+  pairs = _.orderBy(pairs, 'score', 'desc');
+  return _.map(pairs, 'listing');
 
   function getFields(head: t.SessionHead): string[] {
     return [
       `@${head.author ?? ''}/${head.handle}`,
       head.title,
+      head.toc.map(item => item.title).join(' '),
       head.description,
-      ...head.toc.map(item => item.title),
     ].map(str => str?.toLowerCase());
   }
 
-  function doFieldsIncludeTokens(fields: string[]) {
-    return tokens.every(token => doFieldsIncludeToken(fields, token));
+  function getTokensMatchScore(fields: string[]): number {
+    let score = 0;
+    for (const token of tokens) {
+      let tokenMatchScore = getTokenMatchScore(fields, token);
+      if (!tokenMatchScore) return 0; // all tokens must match
+      score += tokenMatchScore;
+    }
+    return score;
   }
-  function doFieldsIncludeToken(fields: string[], token: string) {
-    return fields.some(field => field.includes(token));
+  function getTokenMatchScore(fields: string[], token: string): number {
+    let score = 0;
+    for (let i = 0; i < fields.length; i++) {
+      if (fields[i].includes(token)) {
+        score += (fields.length - i) ** 2 * (token.length / fields[i].length);
+      }
+    }
+
+    return score;
   }
+}
+
+export function limitRecentSessions(sessions: t.SessionUIListing[], limit: number): t.SessionUIListing[] {
+  let res = [];
+  let count = 0;
+  for (const listing of sessions) {
+    if (listing.group === 'recent') {
+      if (count >= limit) continue;
+      count++;
+    }
+    res.push(listing);
+  }
+  return res;
 }
