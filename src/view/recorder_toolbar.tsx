@@ -219,7 +219,7 @@ const RecorderToolbar = memo(
     }
 
     const otherActionsItems: PopoverMenuItem[] = _.compact([
-      config.debug && {
+      {
         title: 'Fork session',
         icon: 'codicon codicon-repo-forked',
         disabled: props.playing || props.recording,
@@ -412,17 +412,15 @@ const RecorderToolbar = memo(
           pointOnPopover="top-right"
           items={otherActionsItems}
         />
-        {config.debug && (
-          <ForkSessionPopover
-            popover={forkSessionPopover}
-            anchor={otherActionsButtonRef}
-            pointOnAnchor="bottom-left"
-            pointOnPopover="top-left"
-            handle={props.sessionHandle}
-            workspace={props.sessionWorkspace}
-            onConfirm={forkSession}
-          />
-        )}
+        <ForkSessionPopover
+          popover={forkSessionPopover}
+          anchor={otherActionsButtonRef}
+          pointOnAnchor="bottom-left"
+          pointOnPopover="top-left"
+          handle={props.sessionHandle}
+          workspace={props.sessionWorkspace}
+          onConfirm={forkSession}
+        />
         {props.selectionStart !== undefined && (
           <ChapterPopover
             chapterTitle={props.selectedChapterTitle}
