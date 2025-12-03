@@ -777,6 +777,13 @@ export function searchSessions(
   }
 }
 
+export function getHashTags(head: t.SessionHead): string[] {
+  const regexp = /(?:^|\s)(#[a-zA-Z0-9_-]+)(?=$|[^a-zA-Z0-9_-])/g;
+  const titleTagsIt = head.title.matchAll(regexp);
+  const descTagsIt = head.description.matchAll(regexp);
+  return [...titleTagsIt, ...descTagsIt].map(m => m[1]);
+}
+
 // export function limitRecentSessions(sessions: t.SessionUIListing[], limit: number): t.SessionUIListing[] {
 //   let res = [];
 //   let count = 0;

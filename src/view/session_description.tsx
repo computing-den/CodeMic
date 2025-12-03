@@ -5,6 +5,7 @@ import { cn } from './misc.js';
 import TextToParagraphs from './text_to_paragraphs.jsx';
 import React, { useState } from 'react';
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react/index.js';
+import _ from 'lodash';
 
 const EXPAND_THRESHOLD = 300;
 
@@ -23,6 +24,9 @@ export default function SessionDescription(props: Props) {
   const expandable = head.description.length > EXPAND_THRESHOLD;
   const description =
     expandable && !expanded ? head.description.substring(0, EXPAND_THRESHOLD) + '...' : head.description;
+
+  const tags = lib.getHashTags(head);
+  const tagsStr = _.truncate(_.take(tags, 6).join(' '), { length: 60 });
 
   function toggleExpansion(e: React.MouseEvent) {
     e.preventDefault();
@@ -58,6 +62,7 @@ export default function SessionDescription(props: Props) {
         </>
       </div>
       <div className="body">
+        <p className="tags">{tagsStr}</p>
         <TextToParagraphs text={description} />
         {expandable && (
           <a className="expand" href="#" onClick={toggleExpansion}>

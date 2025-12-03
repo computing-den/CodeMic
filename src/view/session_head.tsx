@@ -14,18 +14,27 @@ import ClipBanner from './clip_banner.jsx';
 export type SessionHeadProps = {
   className?: string;
   head: t.SessionHead;
-  withAuthor?: boolean;
 };
 
-export function SessionHead({ className, withAuthor, head }: SessionHeadProps) {
+export function SessionHead({ className, head }: SessionHeadProps) {
+  // const tags = lib.getHashTags(head);
+  // const tagsStr = _.truncate(_.take(tags, 6).join(' '), { length: 60 });
+
   return (
     <WithAvatar className={cn('session-head', className)} username={head.author}>
-      <div className="title">{head.title || 'Untitled'}</div>
-      {withAuthor && (
-        <div className="footer">
-          <span className="footer-item author">{head.author || 'anonymous'}</span>
-        </div>
-      )}
+      <div className="title">
+        {head.title || 'Untitled'}
+        {/* <span className="tags">{tagsStr}</span>*/}
+      </div>
+      <div className="footer">
+        <span className="footer-item author" title={`@${head.author || 'anonymous'}/${head.handle}`}>
+          {head.author || 'anonymous'}
+          <span className="handle">
+            <span className="no-select"> </span>/<span className="no-select"> </span>
+            {head.handle}
+          </span>
+        </span>
+      </div>
     </WithAvatar>
   );
 }
@@ -82,6 +91,9 @@ export function SessionListing(props: SessionListingProps) {
     },
   ]);
 
+  const tags = lib.getHashTags(head);
+  const tagsStr = _.truncate(_.take(tags, 3).join(' '), { length: 30 });
+
   return (
     <div className={cn('session-listing', props.className)} onClick={() => props.onClick(head.id)} tabIndex={0}>
       <div className="cover-container">
@@ -95,7 +107,9 @@ export function SessionListing(props: SessionListingProps) {
         ) : null}
       </div>
       <WithAvatar username={head.author} className="caption" small>
-        <div className="title">{head.title || 'Untitled'}</div>
+        <div className="title">
+          {head.title || 'Untitled'} <span className="tags">{tagsStr}</span>
+        </div>
         {/*head.description && (
             <div className="description">
               <TextToParagraphs text={head.description} />

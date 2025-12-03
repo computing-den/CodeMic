@@ -28,6 +28,11 @@
   > .body {
     margin-top: var(--spacing-small);
 
+    & p.tags {
+      font-size: 0.8em;
+      color: var(--text-weak);
+    }
+
     & a.expand {
     }
   }

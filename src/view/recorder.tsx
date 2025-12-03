@@ -281,7 +281,8 @@ class DetailsView extends React.PureComponent<DetailsViewProps> {
           resize="vertical"
           value={p.description}
           onInput={this.descriptionChanged}
-          placeholder="What is this session about?"
+          // Don't change the placeholder={'...'} to placeholder="" or the new line character won't be interpreted
+          placeholder={'What is this session about?\n\n#C #JavaScript #OpenGL'}
         >
           Description
         </VSCodeTextArea>

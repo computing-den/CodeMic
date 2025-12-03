@@ -230,7 +230,7 @@ export default class Player extends React.Component<Props> {
               {head.isClip && clock === 0 && <ClipBanner />}
               <video id="guide-video" />
             </div>
-            <SessionHead className="subsection subsection_spaced" head={head} withAuthor />
+            <SessionHead className="subsection subsection_spaced" head={head} />
             <SessionDescription
               className="subsection"
               head={head}

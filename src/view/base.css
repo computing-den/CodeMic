@@ -55,6 +55,7 @@ body.vscode-light {
   /* --ranged-track-border-active: #007acc; */
 
   --text-weak: #666;
+  --text-weak-2: #8f8f8f;
   --background-secondary: #e7e7e7;
 
   --editor-track-color: #666;
@@ -93,6 +94,7 @@ body.vscode-dark {
   /* --ranged-track-border-active: #007acc; */
 
   --text-weak: #aaa;
+  --text-weak-2: #939393;
   --background-secondary: #181818;
 
   --editor-track-color: #aaa;
@@ -277,4 +279,8 @@ button {
 .fas,
 .fa-solid {
   line-height: 1.2 !important;
+}
+
+.no-select {
+  user-select: none;
 }
