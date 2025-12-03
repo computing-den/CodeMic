@@ -166,13 +166,15 @@ class CodeMic {
 
       // Open session.
       const session = await Session.Core.readLocal(this.context, workspace, { mustScan: recorder?.mustScan });
-      assert(session, 'Failed to read sesion after setting workspace folder');
+      assert(session, 'Failed to read session after setting workspace folder');
 
       // Open screen. This will also load the session.
       if (screen === t.Screen.Player) {
         await this.openScreen({ screen, session, load: true });
       } else if (screen === t.Screen.Recorder) {
         await this.openScreen({ screen, session, clock: recorder!.clock });
+      } else if (screen === t.Screen.Welcome) {
+        await this.openScreen({ screen });
       }
 
       return true;
@@ -387,6 +389,8 @@ class CodeMic {
 
         const workspace = uris?.[0]?.fsPath;
         if (!workspace) return ok;
+
+        // if (Session.Core.sessionExists(workspace))
 
         await VscWorkspace.setUpWorkspace_MAY_RESTART_VSCODE(this.context, {
           screen: t.Screen.Welcome,
@@ -1032,6 +1036,8 @@ class CodeMic {
 
     if (!(await this.closeCurrentScreen())) return;
 
+    this.setScreen(t.Screen.Loading);
+
     switch (params.screen) {
       case t.Screen.Loading: {
         this.setScreen(t.Screen.Loading);
@@ -1143,7 +1149,7 @@ class CodeMic {
         lib.unreachable(this.screen);
     }
 
-    this.setScreen(t.Screen.Loading);
+    // this.setScreen(t.Screen.Loading);
     return true;
   }
 

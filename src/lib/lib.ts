@@ -721,9 +721,11 @@ export function searchSessions(
 
   let pairs = sessions.map(listing => {
     const matchScore = searchQueryNorm ? getTokensMatchScore(getFields(listing.head)) : 1;
-    const statsScore = (listing.publication ? listing.publication.likes * 20 + listing.publication.views : 1) / 10;
-    const clipScore = listing.head.isClip ? 1 : 2;
-    const score = matchScore * statsScore * clipScore;
+    const likes = listing.publication?.likes ?? 0;
+    const views = listing.publication?.views ?? 0;
+    const statsScore = Math.sqrt(likes * 20 + views + 1) / 10;
+    const clipMult = listing.head.isClip ? 1 : 2;
+    const score = matchScore * statsScore * clipMult;
     return { listing, score };
   });
 
@@ -735,7 +737,13 @@ export function searchSessions(
   remotePairs = _.filter(remotePairs, 'score');
   remotePairs = _.reject(remotePairs, p => recentPairs.some(recent => recent.listing.head.id === p.listing.head.id));
   remotePairs = _.orderBy(remotePairs, 'score', 'desc');
-  recentPairs = _.take(_.filter(recentPairs, 'score'), recentLimit);
+  recentPairs = _.filter(recentPairs, 'score');
+  recentPairs = _.orderBy(
+    recentPairs,
+    p => p.listing.history && getSessionHistoryItemLastOpenTimestamp(p.listing.history),
+    'desc',
+  );
+  recentPairs = _.take(recentPairs, recentLimit);
 
   return _.map([...recentPairs, ...currentPairs, ...remotePairs], 'listing');
 

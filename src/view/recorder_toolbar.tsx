@@ -574,12 +574,29 @@ function CropPopover(props: PopoverProps & { onConfirm: (adjustMediaTracks: bool
 function ForkSessionPopover(
   props: PopoverProps & { onConfirm: (handle: string, workspace: string) => any; handle: string; workspace: string },
 ) {
+  const [handle, setHandle_] = useState(`${props.handle}_fork`);
   const [workspace, setWorkspace] = useState(`${props.workspace}_fork`);
-  const [handle, setHandle] = useState(`${props.handle}_fork`);
+
+  function handleChanged(e: any) {
+    const value = (e.target as HTMLInputElement).value.replace(/[^A-Za-z0-9_-]/g, '');
+    setHandle_(value);
+    if (workspace) {
+      setWorkspace(path.join(path.dirname(workspace), value));
+    }
+  }
+
   return (
     <Popover {...props}>
       <form className="recorder-popover-form">
         <label className="label">Fork session</label>
+        <VSCodeTextField
+          className="subsection"
+          placeholder="A-Z a-z 0-9 - _ (e.g. my_project)"
+          value={handle}
+          onInput={handleChanged}
+        >
+          Handle
+        </VSCodeTextField>
         <PathField
           className="subsection"
           placeholder="Workspace directory"
@@ -589,16 +606,6 @@ function ForkSessionPopover(
         >
           Workspace
         </PathField>
-        <VSCodeTextField
-          className="subsection"
-          placeholder="A-Z a-z 0-9 - _ (e.g. my_project)"
-          value={handle}
-          onInput={e => {
-            setHandle((e.target as HTMLInputElement).value.replace(/[^A-Za-z0-9_-]/g, ''));
-          }}
-        >
-          Handle
-        </VSCodeTextField>
         <VSCodeButton
           appearance="primary"
           onClick={e => {
