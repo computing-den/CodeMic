@@ -343,6 +343,7 @@ class CodeMic {
         const listing = this.welcome?.sessions.find(s => s.head.id === req.sessionId);
         assert(listing);
         const session = Session.Core.fromListing(this.context, listing);
+        await session.core.writeHistoryOpenClose();
         await this.openScreen({ screen: t.Screen.Player, session, load: false });
 
         // await this.updateFrontend();
@@ -353,6 +354,7 @@ class CodeMic {
         assert(listing);
         const session = Session.Core.fromListing(this.context, listing);
         if (!listing.local) await session.download({ skipIfExists: true });
+        await session.core.writeHistoryOpenClose();
         await this.openScreen({ screen: t.Screen.Recorder, session });
 
         // await this.updateFrontend();
@@ -391,6 +393,15 @@ class CodeMic {
         if (!workspace) return ok;
 
         // if (Session.Core.sessionExists(workspace))
+        try {
+          const head = await Session.Core.readLocalHead(workspace);
+          if (head) {
+            const session = Session.Core.fromLocal(this.context, head, workspace);
+            await session.core.writeHistoryOpenClose();
+          }
+        } catch (error) {
+          console.error(error);
+        }
 
         await VscWorkspace.setUpWorkspace_MAY_RESTART_VSCODE(this.context, {
           screen: t.Screen.Welcome,

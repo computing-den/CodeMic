@@ -59,7 +59,7 @@ export function SessionListing(props: SessionListingProps) {
     a.onClick?.();
   };
 
-  const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
+  // const lastOpenedTimestamp = history && lib.getSessionHistoryItemLastOpenTimestamp(history);
   const liked = props.user?.metadata?.likes.includes(head.id);
 
   const actions = _.compact<Action>([
@@ -115,13 +115,13 @@ export function SessionListing(props: SessionListingProps) {
               <TextToParagraphs text={head.description} />
             </div>
             )*/}
-        {lastOpenedTimestamp && (
+        {/*lastOpenedTimestamp && (
           <div className="footer">
             <span className="footer-item timestamp">
               Last opened <TimeFromNow timestamp={lastOpenedTimestamp} />
             </span>
           </div>
-        )}
+          )*/}
         {publication?.publishTimestamp && (
           <div className="footer">
             <span className="footer-item timestamp">
