@@ -15,6 +15,34 @@ CodeMic is a Visual Studio Code extension that enables developers to create inte
 
 Install from [Visual Studio Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ComputingDen.codemic).
 
+## Development
+
+Create config.json in the root directory like this:
+
+```json
+{
+  "server": "https://codemic.io",
+  "logWebviewVideoEvents": false,
+  "logBackendVideoEvents": false,
+  "logWebviewAudioEvents": false,
+  "logBackendAudioEvents": false,
+  "logRecorderAcceptedVscEvents": false,
+  "logRecorderRawVscEvents": false,
+  "logSessionRRUpdateStep": false,
+  "logTrackPlayerUpdateStep": false,
+  "logMasterAndTracksTimeUpdates": false,
+  "logVscWorkspaceStepper": false,
+  "exportFullBody": false,
+  "testWithLastParams": false,
+  "testRepeatCount": 2,
+  "testComplexityMultiplier": 10,
+  "stepOnly": false,
+  "debug": true
+}
+```
+
+After doing `npm install`, you should be able to run the extension for development directly from VSCode.
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details. 
