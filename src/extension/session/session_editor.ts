@@ -15,6 +15,8 @@ import cache from '../cache.js';
 import config from '../config.js';
 import { Progress } from '../types.js';
 import { mergeMediaTracks } from '../media_editor.js';
+import osPaths from '../os_paths.js';
+import { ensureContainingDir } from '../storage.js';
 
 const execFile = promisify(child_process.execFile);
 
@@ -381,6 +383,33 @@ export default class SessionEditor {
         },
       ],
     });
+  }
+
+  async insertFiles(filesBase64: { name: string; base64: string }[], clock: number): Promise<t.SessionChange[]> {
+    assert(this.session.isLoaded());
+    const files = filesBase64.map(file => ({ name: file.name, data: Buffer.from(file.base64, 'base64') }));
+    const changes: t.SessionChange[] = [];
+    for (const file of files) {
+      const filepath = path.join(osPaths.temp, file.name);
+      const uri = URI.file(filepath).toString();
+      await ensureContainingDir(filepath);
+      await fs.promises.writeFile(filepath, file.data); // TODO this write can be avoided, we're gonna copy the file to blobs.
+      const name = file.name.toLowerCase();
+      if (name.endsWith('.mp4')) {
+        changes.push(await this.insertVideoTrack(uri, clock));
+      } else if (name.endsWith('.mp3')) {
+        changes.push(await this.insertAudioTrack(uri, clock));
+      } else if (
+        name.endsWith('.jpg') ||
+        name.endsWith('.jpeg') ||
+        name.endsWith('.png') ||
+        name.endsWith('.svg') ||
+        name.endsWith('.webp')
+      ) {
+        changes.push(await this.insertImageTrack(uri, clock));
+      }
+    }
+    return changes;
   }
 
   updateDuration(duration: number, opts?: { coalescing?: boolean }) {

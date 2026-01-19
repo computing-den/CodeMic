@@ -54,6 +54,10 @@ export type FrontendToBackendReqRes =
   | { request: { type: 'recorder/deleteAudio'; id: string }; response: OKResponse }
   | { request: { type: 'recorder/updateAudio'; update: Partial<AudioTrack> }; response: OKResponse }
   | { request: { type: 'recorder/insertVideo'; uri: string; clock: number }; response: OKResponse }
+  | {
+      request: { type: 'recorder/insertFiles'; files: { name: string; base64: string }[]; clock: number };
+      response: OKResponse;
+    }
   | { request: { type: 'recorder/deleteVideo'; id: string }; response: OKResponse }
   | { request: { type: 'recorder/updateVideo'; update: Partial<VideoTrack> }; response: OKResponse }
   | { request: { type: 'recorder/insertImage'; uri: string; clock: number }; response: OKResponse }

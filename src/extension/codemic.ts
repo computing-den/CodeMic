@@ -742,6 +742,13 @@ class CodeMic {
         await this.updateFrontend();
         return ok;
       }
+      case 'recorder/insertFiles': {
+        assert(this.session?.isLoaded());
+        const changes = await this.session.editor.insertFiles(req.files, req.clock);
+        for (const change of changes) await this.session.rr.enqueueSyncAfterSessionChange(change);
+        await this.updateFrontend();
+        return ok;
+      }
       case 'recorder/deleteVideo': {
         assert(this.session?.isLoaded());
         const change = this.session.editor.deleteVideoTrack(req.id);

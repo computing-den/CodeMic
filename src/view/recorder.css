@@ -564,3 +564,7 @@
     /* } */
   }
 }
+
+.popover.insert-popover-menu {
+  width: 200px;
+}

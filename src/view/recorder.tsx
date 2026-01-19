@@ -515,6 +515,8 @@ class EditorView extends React.Component<EditorViewProps> {
           setSelection={this.setSelection}
           extendSelection={this.extendSelection}
           selection={selection}
+          selectionStart={selectionClockRange?.start}
+          selectionEnd={selectionClockRange?.end}
           editChapter={this.editChapter}
           selectionRef={this.selectionRef}
         />
@@ -528,6 +530,8 @@ type TimelineProps = {
   selection?: t.RecorderSelection;
   setSelection: (selection: t.RecorderSelection, opts?: { sync?: boolean }) => Promise<void>;
   extendSelection: (clock: number) => Promise<void>;
+  selectionStart?: number;
+  selectionEnd?: number;
   editChapter: (index: number) => any;
   selectionRef: RefObject<any>;
 };
@@ -594,7 +598,7 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 
       // if (!this.zoomState || this.zoomState.timestampMs < Date.now() - 300) {
       this.zoomState = { timestampMs: Date.now(), clock, clientY: e.clientY };
-      console.log('setting zoomState: ', JSON.stringify(this.zoomState));
+      // console.log('setting zoomState: ', JSON.stringify(this.zoomState));
       // }
 
       // 120  => px2sec = px2sec * 1.1
@@ -678,6 +682,44 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   //   return { id: track.id, trackType: track.type };
   // };
 
+  handleDragIn = (e: DragEvent) => {
+    if (e.dataTransfer?.items?.length) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
+  handleDragOver = (e: DragEvent) => {
+    if (e.dataTransfer?.items?.length) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
+  handleDrop = async (e: DragEvent) => {
+    if (e.dataTransfer?.items?.length) {
+      const clock = this.props.selectionStart ?? this.props.session.clock;
+      const files = await Promise.all(
+        Array.from(e.dataTransfer.files, f => {
+          return new Promise<{ name: string; base64: string }>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(f);
+            reader.onload = () =>
+              resolve({
+                name: f.name,
+                base64: (reader.result as string).slice((reader.result as string).indexOf(',') + 1),
+              });
+            reader.onerror = reject;
+          });
+        }),
+      );
+      await postMessage({ type: 'recorder/insertFiles', files, clock });
+
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
   trackClicked = (e: React.MouseEvent, track: t.RangedTrack) => {
     e.stopPropagation();
     this.props.setSelection({ type: 'track', trackType: track.type, id: track.id });
@@ -693,7 +735,6 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 
     const startClockUnderMouse = this.getClockUnderMouse(e.nativeEvent);
     if (startClockUnderMouse !== undefined) {
-      console.log('trackDragStarted', track, startClockUnderMouse);
       this.setState({ trackDrag: { load: track, startClockUnderMouse, curClockUnderMouse: startClockUnderMouse } });
     }
   };
@@ -731,7 +772,6 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 
     const startClockUnderMouse = this.getClockUnderMouse(e.nativeEvent);
     if (startClockUnderMouse !== undefined) {
-      console.log('trackExtendDragStarted', track, startClockUnderMouse);
       this.setState({
         trackExtendDrag: { load: track, startClockUnderMouse, curClockUnderMouse: startClockUnderMouse },
       });
@@ -897,11 +937,11 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
     const dur = this.getTimelineDuration();
     const timelineTopPadding = parseFloat(window.getComputedStyle(timeline).paddingTop) || 0;
 
-    console.log(
-      `scroll: ${timeline.scrollTop} = T.top ${timelineRect.top} - TB.top ${
-        timelineBodyRect.top
-      } + TP ${timelineTopPadding} = ${timelineRect.top - timelineBodyRect.top + timelineTopPadding}`,
-    );
+    // console.log(
+    //   `scroll: ${timeline.scrollTop} = T.top ${timelineRect.top} - TB.top ${
+    //     timelineBodyRect.top
+    //   } + TP ${timelineTopPadding} = ${timelineRect.top - timelineBodyRect.top + timelineTopPadding}`,
+    // );
 
     const top =
       timelineRect.top +
@@ -946,9 +986,13 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
   componentDidMount() {
     // window.addEventListener('resize', this.resized);
     // this.updateTimelineHeightPx();
+    // document.addEventListener('dragover', e => console.log('doc dragover', e.target), true);
 
     const timeline = document.getElementById('timeline')!;
     timeline.addEventListener('wheel', this.wheelMoved);
+    timeline.addEventListener('dragenter', this.handleDragIn, true);
+    timeline.addEventListener('dragover', this.handleDragOver, true);
+    timeline.addEventListener('drop', this.handleDrop, true);
 
     document.addEventListener('mousemove', this.mouseMoved);
     document.addEventListener('mousedown', this.mouseDown);
@@ -964,6 +1008,10 @@ class Timeline extends React.Component<TimelineProps, TimelineState> {
 
     const timeline = document.getElementById('timeline')!;
     timeline.removeEventListener('wheel', this.wheelMoved);
+    timeline.removeEventListener('dragenter', this.handleDragIn, true);
+    timeline.removeEventListener('dragover', this.handleDragOver, true);
+    timeline.removeEventListener('drop', this.handleDrop, true);
+
     document.removeEventListener('mousemove', this.mouseMoved);
     document.removeEventListener('mousedown', this.mouseDown);
     document.removeEventListener('mouseup', this.mouseUp);
@@ -1304,7 +1352,7 @@ function EditorTrackUI(props: EditorTrackUIProps) {
   const lineFocusTimeline: { text: string; clockRange: t.ClockRange; offsetPx: number }[] = [];
   // const heightOf1Sec = timelineHeightPx / timelineDuration;
   // const heightOf1Sec = TIMELINE_STEP_HEIGHT / stepDuration;
-  const startTime = performance.now();
+  // const startTime = performance.now();
   for (const [i, focus] of (workspaceFocusTimeline ?? []).entries()) {
     let offsetPx = 0;
     const lastLineFocus = lineFocusTimeline.at(-1);
@@ -1352,8 +1400,7 @@ function EditorTrackUI(props: EditorTrackUIProps) {
     }
   }
 
-  const endTime = performance.now();
-
+  // const endTime = performance.now();
   // console.log('Rendering EditorTrackUI, calculations took', endTime - startTime + 'ms');
 
   return (

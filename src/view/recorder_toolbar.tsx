@@ -399,11 +399,13 @@ const RecorderToolbar = memo(
           pointOnPopover="top-left"
         />
         <PopoverMenu
+          className="insert-popover-menu"
           popover={insertPopover}
           anchor={insertButtonRef}
           pointOnAnchor="bottom-left"
           pointOnPopover="top-left"
           items={insertMenuItems}
+          hints={['or drop files onto the timeline while holding Shift.']}
         />
         <PopoverMenu
           popover={otherActionsPopover}

@@ -1,17 +1,14 @@
 .popover-menu {
   flex-direction: column;
   padding: 0 !important;
+  overflow: hidden;
 
-  .menu-item {
+  .item {
     padding: var(--spacing-small) var(--spacing-medium);
     display: grid;
     grid-template-columns: auto 1fr;
     gap: var(--spacing-medium);
     color: var(--foreground);
-
-    &:not(.disabled):hover {
-      background: var(--vscode-list-hoverBackground);
-    }
 
     &.disabled,
     &.disabled:hover {
@@ -38,6 +35,22 @@
       width: var(--spacing-large);
       height: var(--spacing-large);
       fill: var(--foreground);
+    }
+
+    &.action {
+      &:not(.disabled):hover {
+        background: var(--vscode-list-hoverBackground);
+      }
+    }
+
+    &.hint {
+      opacity: 0.8;
+      font-size: 0.8em;
+      color: var(--vscode-list-warningForeground);
+      /* background: var(--vscode-list-inactiveSelectionBackground); */
+      svg {
+        fill: var(--vscode-list-warningForeground);
+      }
     }
   }
 }
