@@ -558,7 +558,11 @@ class WorkspaceRecorder {
     logAcceptedEvent(`accepted closeTextDocument for ${uri}`);
 
     const item = this.worktree.getOpt(uri);
-    assert(item?.textDocument, `got closeTextDocument for ${uri} but it doesn't exist internally. Ignored.`);
+    if (!item?.textDocument) {
+      console.log(`got closeTextDocument for ${uri} but it doesn't exist internally. Ignored.`);
+      return;
+    }
+    // assert(item?.textDocument, `got closeTextDocument for ${uri} but it doesn't exist internally. Ignored.`);
 
     const isDirty = await item.isDirty();
     const revText = isDirty ? item.textDocument.getText() : undefined;
