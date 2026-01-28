@@ -57,43 +57,54 @@
 
     .toc {
       border: calc(var(--border-width) * 1px) solid var(--vscode-input-border, var(--popover-border));
-      padding: calc(var(--spacing-medium) - var(--spacing-small)) var(--spacing-medium);
+      padding: var(--spacing-medium);
+      padding-bottom: var(--spacing-small);
       background: var(--input-background);
       border-radius: calc(var(--corner-radius) * 1px);
 
-      > .item {
-        display: flex;
-        align-items: center;
+      > .header {
+        display: grid;
+        font-weight: bold;
+        margin-bottom: var(--spacing-medium);
+      }
 
-        margin-left: calc(var(--spacing-small) * -1);
-        margin-right: calc(var(--spacing-small) * -1);
-        padding: var(--spacing-small);
+      > .items {
+        cursor: pointer;
 
-        &.active {
+        > .item {
+          display: flex;
+          align-items: center;
+
+          margin-left: calc(var(--spacing-small) * -1);
+          margin-right: calc(var(--spacing-small) * -1);
+          padding: var(--spacing-small);
+
+          &.active {
+            > .title {
+              font-weight: bold;
+            }
+            > .clock {
+              opacity: 1;
+            }
+          }
+
+          &.selectable:hover {
+            cursor: pointer;
+            background: var(--vscode-list-hoverBackground);
+          }
+
+          & + .item {
+            /* margin-top: var(--spacing-small); */
+          }
+
           > .title {
-            font-weight: bold;
+            flex: 1;
+            padding-right: var(--spacing-medium);
           }
           > .clock {
-            opacity: 1;
+            font-weight: bold;
+            opacity: 0.7;
           }
-        }
-
-        &.selectable:hover {
-          cursor: pointer;
-          background: var(--vscode-list-hoverBackground);
-        }
-
-        & + .item {
-          /* margin-top: var(--spacing-small); */
-        }
-
-        > .title {
-          flex: 1;
-          padding-right: var(--spacing-medium);
-        }
-        > .clock {
-          font-weight: bold;
-          opacity: 0.7;
         }
       }
     }

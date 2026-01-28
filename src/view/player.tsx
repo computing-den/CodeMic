@@ -434,28 +434,33 @@ function TableOfContent(props: {
 
   return (
     <div className="subsection toc">
+      <div className="header">Chapters</div>
       {startIndex > 0 && (
         <a className="expand unstyled" href="#" onClick={toggleExpansion}>
           ...
         </a>
       )}
-      {toc.map((item, i) => (
-        <div
-          tabIndex={0}
-          className={cn(
-            'item',
-            props.loaded && 'selectable',
-            i + startIndex === tocIndex && (props.loaded || tocIndex > 0) && 'active',
-          )}
-          onClick={e => clicked(e, item)}
-        >
-          <div className="title">{item.title}</div>
-          <div className="clock">{lib.formatTimeSeconds(item.clock)}</div>
-        </div>
-      ))}
-      <a className="expand" href="#" onClick={toggleExpansion}>
-        {expanded ? 'less' : 'more'}
-      </a>
+      <div className="items">
+        {toc.map((item, i) => (
+          <div
+            tabIndex={0}
+            className={cn(
+              'item',
+              props.loaded && 'selectable',
+              i + startIndex === tocIndex && (props.loaded || tocIndex > 0) && 'active',
+            )}
+            onClick={e => clicked(e, item)}
+          >
+            <div className="title">{item.title}</div>
+            <div className="clock">{lib.formatTimeSeconds(item.clock)}</div>
+          </div>
+        ))}
+      </div>
+      {expandable && (
+        <a className="expand" href="#" onClick={toggleExpansion}>
+          {expanded ? 'less' : 'more'}
+        </a>
+      )}
     </div>
   );
 }

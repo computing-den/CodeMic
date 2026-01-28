@@ -100,7 +100,7 @@ export default function ProgressBar(props: Props) {
       >
         <div className="with-clock">
           <div className="truncate">
-            {underMouse?.tocItem?.title || props.toc.length === 0 ? props.sessionTitle : 'Unknown section'}
+            {underMouse?.tocItem?.title || (props.toc.length === 0 ? props.sessionTitle : 'Unknown section')}
           </div>
           <div>{lib.formatTimeSeconds(underMouse?.clock ?? 0)}</div>
         </div>
