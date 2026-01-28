@@ -335,19 +335,18 @@ class DetailsView extends React.PureComponent<DetailsViewProps> {
           Use <code>.codemicignore</code> to ignore paths.
         </p>*/}
         <div className="subsection buttons">
-          <VSCodeButton onClick={this.publish} disabled={!p.loaded} appearance={p.loaded ? 'primary' : 'secondary'}>
-            Publish
-          </VSCodeButton>
-          {/*<VSCodeButton appearance="secondary" onClick={this.save} disabled={session.mustScan}>
-            Save
-            </VSCodeButton>*/}
+          {!p.loaded && (
+            <VSCodeButton className="subsection" onClick={p.onLoadRecorder} autoFocus>
+              {p.mustScan ? 'Scan workspace to start' : 'Load session into workspace'}
+              <span className="codicon codicon-chevron-right va-top m-left_small" />
+            </VSCodeButton>
+          )}
+          {p.loaded && (
+            <VSCodeButton onClick={this.publish} disabled={!p.loaded} appearance={p.loaded ? 'primary' : 'secondary'}>
+              Publish
+            </VSCodeButton>
+          )}
         </div>
-        {!p.loaded && (
-          <VSCodeButton className="subsection" onClick={p.onLoadRecorder} autoFocus>
-            {p.mustScan ? 'Scan workspace to start' : 'Load session into workspace'}
-            <span className="codicon codicon-chevron-right va-top m-left_small" />
-          </VSCodeButton>
-        )}
       </div>
     );
   }

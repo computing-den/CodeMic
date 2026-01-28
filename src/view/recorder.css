@@ -60,6 +60,7 @@
       .subsection.buttons {
         display: grid;
         grid-gap: var(--spacing-small);
+        box-shadow: 0 5px 7px 7px #00000036;
 
         position: fixed;
         bottom: 0;
